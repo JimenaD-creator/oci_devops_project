@@ -260,7 +260,7 @@ function App() {
 
   const [user, setUser] = useState({
     name: "Jimena Diaz",
-    role: "Algo que no puedo decir"
+    role: "Project manager"
   });
 
   useEffect(() => {
