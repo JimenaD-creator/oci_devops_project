@@ -4,7 +4,7 @@ import { logout } from '../utils/auth';
 import API_LIST from '../services/API';
 import SprintsPage from '../pages/SprintsPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
-import Analytics from '../pages/Analytics';
+import Analytics from '../pages/KPIAnalytics';
 
 import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { text: 'Sprints',       icon: <AssignmentIcon />,  id: 'sprints' },
   { text: 'Tasks',        icon: <TaskAltIcon />,     id: 'tasks' },
   { text: 'Team',        icon: <GroupsIcon />,      id: 'team' },
-  { text: 'Analytics',     icon: <AnalyticsIcon />,   id: 'analytics' },
+  { text: 'KPI Analytics',     icon: <AnalyticsIcon />,   id: 'analytics' },
   { text: 'AI Insights',   icon: <AutoAwesomeIcon />, id: 'ai'},
   { text: 'Configuration', icon: <SettingsIcon />,    id: 'config' },
 ];

@@ -1,8 +1,8 @@
 import React from "react";
 import { Calendar, Target } from "lucide-react";
-import AnalyticsInsights from "../components/analytics/AnalyticsInsights";
 import KPIComparisonCards from "../components/analytics/KPIComparisonCards";
 import IndividualTable from "../components/analytics/IndividualTable";
+import DeveloperTable from "../components/analytics/DeveloperTable";
 
 export default function Analytics() {
   return (
@@ -146,7 +146,7 @@ export default function Analytics() {
           {/* Header */}
           <div className="header-flex">
             <div>
-              <h1 className="header-title">Productivity Analytics</h1>
+              <h1 className="header-title">KPI Analytics</h1>
               <p className="header-subtitle">
                 <Calendar size={14} />
                 Enero – Abril 2024 · Tracking 20% Improvement Goal
@@ -197,9 +197,8 @@ export default function Analytics() {
           </div>
 
           <KPIComparisonCards/>
-
+          <DeveloperTable/>
           <IndividualTable />
-          <AnalyticsInsights />
         </div>
       </div>
     </>
