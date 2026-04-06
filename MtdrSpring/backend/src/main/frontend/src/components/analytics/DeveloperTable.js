@@ -107,17 +107,25 @@ export default function DeveloperTable(){
           }
 
           .search-wrapper { position: relative; }
-          .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6F6F6F; }
-          
-          .search-input {
-            padding: 6px 12px 6px 32px;
+          .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6F6F6F;
+            pointer-events: none;
+          }
+
+          .search-wrapper input.search-input[type="text"] {
+            box-sizing: border-box;
+            padding: 6px 12px 6px 36px;
             font-size: 12px;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
             width: 176px;
             outline: none;
           }
-          .search-input:focus { border-color: #C74634; }
+          .search-wrapper input.search-input[type="text"]:focus { border-color: #C74634; }
 
           .export-btn {
             display: flex;
