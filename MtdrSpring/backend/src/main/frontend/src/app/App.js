@@ -4,6 +4,7 @@ import { logout } from '../utils/auth';
 import API_LIST from '../services/API';
 import SprintsPage from '../pages/SprintsPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
+import AnalyticsInsights from '../pages/Analytics';
 
 import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
@@ -194,7 +195,8 @@ function App() {
             toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem} />
         )}
         {activePage === 'sprints' && <SprintsPage />}
-        {!['dashboard', 'sprints'].includes(activePage) && (
+        {activePage === 'analytics' && <AnalyticsInsights />}
+        {!['dashboard', 'sprints', 'analytics'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#CCC', mb: 1 }}>

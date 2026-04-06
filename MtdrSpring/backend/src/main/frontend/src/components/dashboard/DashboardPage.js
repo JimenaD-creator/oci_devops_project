@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box, Grid, Card, CardContent, Chip, Typography,
   LinearProgress, Table, TableBody, TableCell, TableContainer, TableRow,
   Paper, CircularProgress, IconButton, Button, Badge,
+  FormControl, InputLabel, Select, MenuItem, TextField,
 } from '@mui/material';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -15,10 +16,33 @@ import SummaryCards from './SummaryCards';
 import KPICards from './KPICards';
 
 export default function DashboardPage({ items, isLoading, isInserting, toggleDone, deleteItem, addItem }) {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [developerFilter, setDeveloperFilter] = useState('all');
+  const [sprintFilter, setSprintFilter] = useState('all');
+  const [dueBefore, setDueBefore] = useState('');
+
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      if (statusFilter === 'pending' && item.done) return false;
+      if (statusFilter === 'completed' && !item.done) return false;
+      if (developerFilter !== 'all' && item.developer !== developerFilter) return false;
+      if (sprintFilter !== 'all' && item.sprint !== sprintFilter) return false;
+      if (dueBefore && item.dueDate) {
+        const d = String(item.dueDate).slice(0, 10);
+        if (d > dueBefore) return false;
+      }
+      return true;
+    });
+  }, [items, statusFilter, developerFilter, sprintFilter, dueBefore]);
+
+  const pendingItems = filteredItems.filter(i => !i.done);
+  const completedItems = filteredItems.filter(i => i.done);
+
   const total = items.length;
-  const doneCount = items.filter(i => i.done).length;
-  const pendingCount = items.filter(i => !i.done).length;
-  const progress = total > 0 ? Math.round((doneCount / total) * 100) : 78;
+  const doneAllCount = items.filter(i => i.done).length;
+  const pendingCount = pendingItems.length;
+  const doneCount = completedItems.length;
+  const progress = total > 0 ? Math.round((doneAllCount / total) * 100) : 78;
 
   return (
     <Box sx={{ maxWidth: 1200, width: '100%' }}>
@@ -81,7 +105,7 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
               '& .MuiLinearProgress-bar': { bgcolor: '#E53935', borderRadius: 5 } }} />
         </CardContent>
       </Card>
-      <SummaryCards completedTasksCount={doneCount} />
+      <SummaryCards completedTasksCount={doneAllCount} />
       <KPICards />
 
       <Paper sx={{ p: 3, borderRadius: 3, mb: 3, border: '1px solid #EFEFEF', boxShadow: 'none' }}>
@@ -89,6 +113,60 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
         <NewItem addItem={addItem} isInserting={isInserting} />
       </Paper>
 
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, alignItems: 'center' }}>
+        <FormControl sx={{ minWidth: 140 }} size="small">
+          <InputLabel id="status-filter-label">Status</InputLabel>
+          <Select
+            labelId="status-filter-label"
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            label="Status"
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="pending">Pending</MenuItem>
+            <MenuItem value="completed">Completed</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl sx={{ minWidth: 160 }} size="small">
+          <InputLabel id="developer-filter-label">Developer</InputLabel>
+          <Select
+            labelId="developer-filter-label"
+            id="developer-filter"
+            value={developerFilter}
+            onChange={(e) => setDeveloperFilter(e.target.value)}
+            label="Developer"
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="developer1">Developer 1</MenuItem>
+            <MenuItem value="developer2">Developer 2</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl sx={{ minWidth: 140 }} size="small">
+          <InputLabel id="sprint-filter-label">Sprint</InputLabel>
+          <Select
+            labelId="sprint-filter-label"
+            id="sprint-filter"
+            value={sprintFilter}
+            onChange={(e) => setSprintFilter(e.target.value)}
+            label="Sprint"
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="sprint1">Sprint 1</MenuItem>
+            <MenuItem value="sprint2">Sprint 2</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          size="small"
+          type="date"
+          label="Due before"
+          value={dueBefore}
+          onChange={(e) => setDueBefore(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 160 }}
+        />
+      </Box>
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress color="error" /></Box>
       ) : (
@@ -103,7 +181,7 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
             <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none' }}>
               <Table>
                 <TableBody>
-                  {items.filter(i => !i.done).map((item) => (
+                  {pendingItems.map((item) => (
                     <TableRow key={item.id} hover sx={{ '&:last-child td': { border: 0 } }}>
                       <TableCell sx={{ py: 2, fontWeight: 500, fontSize: '0.9rem' }}>{item.description}</TableCell>
                       <TableCell align="right">
@@ -115,7 +193,7 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
                       </TableCell>
                     </TableRow>
                   ))}
-                  {items.filter(i => !i.done).length === 0 && (
+                  {pendingItems.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={2} sx={{ textAlign: 'center', py: 4, color: '#BBB' }}>
                         No hay tareas pendientes
@@ -137,7 +215,7 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
             <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none', bgcolor: '#FAFAFA' }}>
               <Table>
                 <TableBody>
-                  {items.filter(i => i.done).map((item) => (
+                  {completedItems.map((item) => (
                     <TableRow key={item.id} sx={{ '&:last-child td': { border: 0 } }}>
                       <TableCell sx={{ color: '#AAA', textDecoration: 'line-through', fontSize: '0.9rem' }}>
                         {item.description}
@@ -152,7 +230,7 @@ export default function DashboardPage({ items, isLoading, isInserting, toggleDon
                       </TableCell>
                     </TableRow>
                   ))}
-                  {items.filter(i => i.done).length === 0 && (
+                  {completedItems.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={2} sx={{ textAlign: 'center', py: 4, color: '#BBB' }}>
                         Aún no hay tareas completadas
