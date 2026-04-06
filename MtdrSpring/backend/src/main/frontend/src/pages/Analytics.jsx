@@ -1,6 +1,6 @@
 import React from "react";
 import { Calendar, Target } from "lucide-react";
-import AnalyticsInsights from "../components/analytics/analyticsInsights";
+import AnalyticsInsights from "../components/analytics/AnalyticsInsights";
 import KPIComparisonCards from "../components/analytics/KPIComparisonCards";
 import IndividualTable from "../components/analytics/IndividualTable";
 

@@ -4,7 +4,7 @@ import { logout } from '../utils/auth';
 import API_LIST from '../services/API';
 import SprintsPage from '../pages/SprintsPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
-import AnalyticsInsights from '../pages/Analytics';
+import Analytics from '../pages/Analytics';
 
 import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
@@ -195,7 +195,7 @@ function App() {
             toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem} />
         )}
         {activePage === 'sprints' && <SprintsPage />}
-        {activePage === 'analytics' && <AnalyticsInsights />}
+        {activePage === 'analytics' && <Analytics />}
         {!['dashboard', 'sprints', 'analytics'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Box sx={{ textAlign: 'center' }}>
