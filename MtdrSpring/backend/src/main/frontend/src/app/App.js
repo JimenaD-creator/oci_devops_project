@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import API_LIST from '../services/API';
 import SprintsPage from '../pages/SprintsPage';
+import TasksPage from '../pages/TasksPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
 import Analytics from '../pages/KPIAnalytics';
-
 import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
   Typography, Chip, Avatar, IconButton, Menu, MenuItem
@@ -66,12 +66,34 @@ function App() {
   }, []);
 
   const toggleDone = (e, id, desc, done) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     fetch(`${API_LIST}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: desc, done })
-    }).then(() => setItems(items.map(x => x.id === id ? { ...x, done } : x)));
+    }).then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((updated) => {
+        setItems((prev) =>
+          prev.map((x) => {
+            if (String(x.id) !== String(id)) return x;
+            return {
+              ...x,
+              description: updated.description,
+              done: updated.done,
+              completedAt: updated.completedAt ?? updated.completed_at ?? (done ? new Date().toISOString() : null),
+            };
+          })
+        );
+      })
+      .catch(() => {
+        setItems((prev) =>
+          prev.map((x) =>
+            String(x.id) === String(id)
+              ? { ...x, done, completedAt: done ? new Date().toISOString() : null }
+              : x
+          )
+        );
+      });
   };
 
   const deleteItem = (id) => {
@@ -191,12 +213,27 @@ function App() {
         }}
       >
         {activePage === 'dashboard' && (
-          <DashboardPage items={items} isLoading={isLoading} isInserting={isInserting}
-            toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem} />
+          <DashboardPage
+            items={items}
+            isLoading={isLoading}
+            toggleDone={toggleDone}
+            deleteItem={deleteItem}
+            onNavigateToTasks={() => setActivePage('tasks')}
+          />
+        )}
+        {activePage === 'tasks' && (
+          <TasksPage
+            items={items}
+            isLoading={isLoading}
+            isInserting={isInserting}
+            toggleDone={toggleDone}
+            deleteItem={deleteItem}
+            addItem={addItem}
+          />
         )}
         {activePage === 'sprints' && <SprintsPage />}
         {activePage === 'analytics' && <Analytics />}
-        {!['dashboard', 'sprints', 'analytics'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#CCC', mb: 1 }}>

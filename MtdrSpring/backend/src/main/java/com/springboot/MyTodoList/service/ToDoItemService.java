@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +59,12 @@ public class ToDoItemService {
             toDoItem.setID(id);
             toDoItem.setCreation_ts(td.getCreation_ts());
             toDoItem.setDescription(td.getDescription());
+            boolean wasDone = toDoItem.isDone();
+            if (td.isDone() && !wasDone) {
+                toDoItem.setCompletedAt(OffsetDateTime.now());
+            } else if (!td.isDone()) {
+                toDoItem.setCompletedAt(null);
+            }
             toDoItem.setDone(td.isDone());
             return toDoItemRepository.save(toDoItem);
         }else{

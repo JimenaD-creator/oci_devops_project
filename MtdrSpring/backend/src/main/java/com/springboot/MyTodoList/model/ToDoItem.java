@@ -20,6 +20,9 @@ public class ToDoItem {
     OffsetDateTime creation_ts;
     @Column(name = "done")
     boolean done;
+    /** Set when the task is marked done; cleared when undone. */
+    @Column(name = "COMPLETED_AT")
+    OffsetDateTime completedAt;
     public ToDoItem(){
 
     }
@@ -62,6 +65,14 @@ public class ToDoItem {
         this.done = done;
     }
 
+    public OffsetDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(OffsetDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+
     @Override
     public String toString() {
         return "ToDoItem{" +
@@ -69,6 +80,7 @@ public class ToDoItem {
                 ", description='" + description + '\'' +
                 ", creation_ts=" + creation_ts +
                 ", done=" + done +
+                ", completedAt=" + completedAt +
                 '}';
     }
 }
