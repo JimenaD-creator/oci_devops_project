@@ -23,6 +23,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int ID;
 
+    @Column(name = "NAME")
+    private String name;
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     @Column(name = "PHONENUMBER")
     String phonenumber;
 

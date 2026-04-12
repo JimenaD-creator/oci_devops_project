@@ -1,20 +1,24 @@
-/*
-## MyToDoReact (Springboot) version 1.0.
-##
-## Copyright (c) 2022 Oracle, Inc.
-## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
-*/
-/*
- * The swagger definition of the APIs can be found here:
- * https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/oracleonpremjava/b/todolist/o/swagger_APIs_definition.json
- *
- * You can view it in swagger-ui by going to the following petstore swagger ui page and
- * pasting the URL above that points to the definitions of the APIs that are used in this app:
- * https://petstore.swagger.io/
- * @author  jean.de.lavarene@oracle.com
- */
-// Copy from the endpoint from the API Gateway Deployment
-// Example: const API_LIST = 'https://di2eyonlz5s7kmuektcddaw5zq.apigateway.<region>.oci.customer-oci.com/todolist';
-// const API_LIST = 'https://di2eyonlz5s7kmuektcddaw5zq.apigateway.eu-frankfurt-1.oci.customer-oci.com/todolist';
-const API_LIST = '/todolist';
-export default API_LIST;
+const BASE_URL = 'http://localhost:8080';
+
+export const TODOITEM_API = `${BASE_URL}/api/todolist`;
+
+export const taskAPI = {
+  getAll: () => fetch(`${BASE_URL}/api/tasks`).then(r => r.ok ? r.json() : Promise.reject()),
+  create: (data) => fetch(`${BASE_URL}/api/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => r.ok ? r.json() : Promise.reject()),
+  update: (id, data) => fetch(`${BASE_URL}/api/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => r.ok ? r.json() : Promise.reject()),
+  delete: (id) => fetch(`${BASE_URL}/api/tasks/${id}`, { method: 'DELETE' }),
+};
+
+export const sprintAPI = {
+  getAll: () => fetch(`${BASE_URL}/api/sprints`).then(r => r.ok ? r.json() : Promise.reject()),
+};
+
+export default TODOITEM_API;
