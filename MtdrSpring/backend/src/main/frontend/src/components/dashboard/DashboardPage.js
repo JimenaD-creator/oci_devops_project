@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography,
+  Box, Card, CardContent, Typography,
   LinearProgress, Paper, IconButton, Button, Badge,
   FormGroup, FormControlLabel, Stack, Checkbox, CircularProgress,
 } from '@mui/material';
@@ -49,6 +49,23 @@ export default function DashboardPage() {
   const compareMode = selectedSprints.length > 1;
   const primarySprint = selectedSprints[0];
 
+  const projectName = useMemo(() => {
+    const name = allSprints.find((s) => s.assignedProject?.name)?.assignedProject?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+    return 'Project';
+  }, [allSprints]);
+
+  const sprintDateLabel = useMemo(() => {
+    if (!primarySprint) return '';
+    if (compareMode) {
+      return selectedSprints
+        .map((s) => (s.dateRangeEn || s.dateRange || '').trim())
+        .filter(Boolean)
+        .join(' · ');
+    }
+    return primarySprint.dateRangeEn || primarySprint.dateRange || '';
+  }, [primarySprint, compareMode, selectedSprints]);
+
   // Conteo de desarrolladores únicos basados en la relación USERS/USER_TASK
   const teamDeveloperCount = useMemo(
     () => new Set(selectedSprints.flatMap((s) => (s.developers || []).map((d) => d.name))).size,
@@ -61,8 +78,10 @@ export default function DashboardPage() {
       const avg = selectedSprints.reduce((a, s) => a + (s.kpis?.completionRate || 0), 0) / selectedSprints.length;
       return Math.round(avg);
     }
-    if (!primarySprint.totalTasks) return 0;
-    return Math.round((primarySprint.totalCompleted / primarySprint.totalTasks) * 100);
+    const total = primarySprint.taskStatusTotal ?? 0;
+    if (!total) return 0;
+    const done = primarySprint.taskStatusDistribution?.find((d) => d.key === 'DONE')?.count ?? 0;
+    return Math.round((done / total) * 100);
   }, [primarySprint, compareMode, selectedSprints]);
 
   const toggleSprint = (id, checked) => {
@@ -82,17 +101,32 @@ export default function DashboardPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%', mx: 'auto', p: 2 }}>
+    <Box sx={{ maxWidth: 1200, width: '100%', mx: 'auto', pt: 0, px: 2, pb: 2 }}>
       {/* Header del Dashboard */}
-      <Paper elevation={0} sx={{ p: 2.5, mb: 2, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A' }}>
-              Productivity Analytics
+      <Paper elevation={0} sx={{ p: 2, mb: 1.5, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box sx={{ pr: 1, minWidth: 0 }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 800,
+                color: '#1A1A1A',
+                lineHeight: 1.2,
+                fontSize: { xs: '1.65rem', sm: '2rem', md: '2.25rem' },
+              }}
+            >
+              Dashboard – {projectName}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#666', fontWeight: 500 }}>
-              {compareMode ? 'Multi-Sprint Comparison' : `${primarySprint?.name} Overview`}
-            </Typography>
+            {sprintDateLabel ? (
+              <Typography variant="body2" sx={{ color: '#666', fontWeight: 600, mt: 0.75 }}>
+                {compareMode ? 'Sprint dates: ' : 'Sprint Date: '}
+                {sprintDateLabel}
+              </Typography>
+            ) : (
+              <Typography variant="body2" sx={{ color: '#666', fontWeight: 500, mt: 0.5 }}>
+                {compareMode ? 'Multi-sprint comparison' : `${primarySprint?.name ?? 'Sprint'} overview`}
+              </Typography>
+            )}
           </Box>
           <Stack direction="row" spacing={1}>
             <Button startIcon={<RefreshIcon />} variant="outlined" onClick={handleRefresh} size="small" sx={{ borderRadius: 2, color: '#555' }}>
@@ -103,32 +137,46 @@ export default function DashboardPage() {
         </Box>
       </Paper>
 
-      {/* Selector de Sprints */}
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Sprints en Base de Datos:</Typography>
-        <FormGroup row>
-          {allSprints.map((sp) => (
-            <FormControlLabel
-              key={sp.id}
-              control={<Checkbox size="small" checked={selectedSprintIds.includes(sp.id)} onChange={(e) => toggleSprint(sp.id, e.target.checked)} sx={{ '&.Mui-checked': { color: ORACLE_RED } }} />}
-              label={<Typography variant="body2" sx={{ fontWeight: 600 }}>{sp.name}</Typography>}
-            />
-          ))}
+        <Typography variant="body2" sx={{ color: '#555', fontWeight: 600, mb: 1.25 }}>
+          Select one or more sprints to view or compare metrics.
+        </Typography>
+        <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap' }}>
+          {allSprints.map((sp) => {
+            const sprintColor = sp.accentColor ?? '#607D8B';
+            return (
+              <FormControlLabel
+                key={sp.id}
+                control={(
+                  <Checkbox
+                    size="small"
+                    checked={selectedSprintIds.includes(sp.id)}
+                    onChange={(e) => toggleSprint(sp.id, e.target.checked)}
+                    sx={{ '&.Mui-checked': { color: sprintColor } }}
+                  />
+                )}
+                label={(
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: sprintColor,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{sp.name}</Typography>
+                  </Box>
+                )}
+              />
+            );
+          })}
         </FormGroup>
       </Paper>
 
-      {/* Tarjetas de Resumen */}
-      {!compareMode ? (
-        <SummaryCards 
-          completedTasksCount={primarySprint?.totalCompleted ?? 0}
-          totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
-          pendingTasksCount={Math.max(0, (primarySprint?.totalTasks || 0) - (primarySprint?.totalCompleted || 0))}
-        />
-      ) : (
-        <SprintComparisonCharts selectedSprints={selectedSprints} />
-      )}
-
-      {/* Barra de Progreso General */}
+      {/* Completion rate*/}
       <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -146,8 +194,19 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Tarjetas de resumen + gráfico de estados */}
+      {!compareMode ? (
+        <SummaryCards
+          totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
+          taskStatusDistribution={primarySprint?.taskStatusDistribution ?? []}
+          taskStatusTotal={primarySprint?.taskStatusTotal ?? 0}
+        />
+      ) : (
+        <SprintComparisonCharts selectedSprints={selectedSprints} />
+      )}
+
       {/* Gráficas de Carga de Trabajo (Basadas en USERS_TASK) */}
-      <DeveloperWorkloadCharts selectedSprints={selectedSprints} />
+      <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
 
       {/* Tabla de Productividad (Breakdown) */}
       <Box sx={{ mt: 3 }}>

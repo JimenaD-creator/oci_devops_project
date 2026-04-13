@@ -15,13 +15,20 @@ import { avgHoursPerTask } from './dashboardSprintData';
 
 const CHART_H = 220;
 
+/** Stacked segment for tasks still open — distinct from sprint accent colors (completed). */
+const PENDING_TASKS_COLOR = '#FB8C00';
+
+const AXIS_TICK = { fontSize: 14, fill: '#1565C0' };
+const AXIS_LINE = { stroke: '#64B5F6' };
+const GRID_STROKE = '#E1BEE7';
+
 const tooltipPaper = {
   borderRadius: 8,
-  border: '1px solid #EEE',
-  fontSize: 12,
-  padding: '8px 10px',
+  border: '1px solid #90CAF9',
+  fontSize: 14,
+  padding: '10px 12px',
   background: '#fff',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  boxShadow: '0 2px 10px rgba(21,101,192,0.15)',
 };
 
 function HoursWithPendingTooltip({ active, payload }) {
@@ -31,13 +38,13 @@ function HoursWithPendingTooltip({ active, payload }) {
   const pending = row.pending ?? 0;
   return (
     <Box sx={tooltipPaper}>
-      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1A1A1A', display: 'block' }}>
+      <Typography sx={{ fontWeight: 700, color: '#1565C0', display: 'block', fontSize: '0.95rem' }}>
         {row.name}
       </Typography>
-      <Typography variant="caption" sx={{ color: '#555', display: 'block', mt: 0.5 }}>
+      <Typography sx={{ color: '#0277BD', display: 'block', mt: 0.5, fontSize: '0.9rem', fontWeight: 600 }}>
         {hours} h logged
       </Typography>
-      <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 0.25 }}>
+      <Typography sx={{ color: '#E65100', display: 'block', mt: 0.35, fontSize: '0.85rem', fontWeight: 600 }}>
         {pending} task{pending === 1 ? '' : 's'} still open
       </Typography>
     </Box>
@@ -51,13 +58,13 @@ function AvgWithPendingTooltip({ active, payload }) {
   const pending = row.pending ?? 0;
   return (
     <Box sx={tooltipPaper}>
-      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1A1A1A', display: 'block' }}>
+      <Typography sx={{ fontWeight: 700, color: '#1565C0', display: 'block', fontSize: '0.95rem' }}>
         {row.name}
       </Typography>
-      <Typography variant="caption" sx={{ color: '#555', display: 'block', mt: 0.5 }}>
+      <Typography sx={{ color: '#2E7D32', display: 'block', mt: 0.5, fontSize: '0.9rem', fontWeight: 600 }}>
         {avg} hrs/task (on completed work)
       </Typography>
-      <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 0.25 }}>
+      <Typography sx={{ color: '#E65100', display: 'block', mt: 0.35, fontSize: '0.85rem', fontWeight: 600 }}>
         {pending} task{pending === 1 ? '' : 's'} still open in sprint
       </Typography>
     </Box>
@@ -76,31 +83,31 @@ function SprintCompareBarBlock({
 }) {
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1A1A1A', mb: 0.25 }}>
+      <Typography sx={{ fontWeight: 800, color: '#1A1A1A', mb: 0.35, fontSize: '1.02rem' }}>
         {title}
       </Typography>
       {subtitle ? (
-        <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 1 }}>
+        <Typography sx={{ color: '#666', display: 'block', mb: 1, fontSize: '0.92rem', fontWeight: 500 }}>
           {subtitle}
         </Typography>
       ) : null}
       <ResponsiveContainer width="100%" height={CHART_H}>
         <BarChart data={data} margin={{ top: 6, right: 8, left: -8, bottom: 4 }} barCategoryGap="18%">
-          <CartesianGrid strokeDasharray="3 3" stroke="#EEE" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis
             dataKey="shortLabel"
-            tick={{ fontSize: 11 }}
-            axisLine={{ stroke: '#E0E0E0' }}
+            tick={AXIS_TICK}
+            axisLine={AXIS_LINE}
             interval={0}
           />
-          <YAxis tick={{ fontSize: 11 }} axisLine={false} width={40} />
+          <YAxis tick={AXIS_TICK} axisLine={false} width={44} />
           {hoursTooltipPending ? (
             <Tooltip content={<HoursWithPendingTooltip />} />
           ) : avgTooltipPending ? (
             <Tooltip content={<AvgWithPendingTooltip />} />
           ) : (
             <Tooltip
-              contentStyle={{ borderRadius: 8, border: '1px solid #EEE', fontSize: 12 }}
+              contentStyle={{ borderRadius: 8, border: '1px solid #90CAF9', fontSize: 14, padding: '10px 12px' }}
               formatter={(v, name) => {
                 if (stackedPending && (name === 'completed' || name === 'Completed')) {
                   return [`${v} done`, 'Completed'];
@@ -120,7 +127,14 @@ function SprintCompareBarBlock({
                   <Cell key={`${row.shortLabel}-c`} fill={row.accentColor} />
                 ))}
               </Bar>
-              <Bar dataKey="pending" name="pending" stackId="tasks" fill="#BDBDBD" radius={[4, 4, 0, 0]} maxBarSize={48} />
+              <Bar
+                dataKey="pending"
+                name="pending"
+                stackId="tasks"
+                fill={PENDING_TASKS_COLOR}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
             </>
           ) : (
             <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={48}>
@@ -183,13 +197,13 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
             justifyContent: 'center',
           }}
         >
-          <CompareArrowsIcon sx={{ color: '#C74634', fontSize: 22 }} />
+          <CompareArrowsIcon sx={{ color: '#C74634', fontSize: 26 }} />
         </Box>
         <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
+          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.12rem' }}>
             Sprint comparison
           </Typography>
-          <Typography variant="caption" sx={{ color: '#888', display: 'block', maxWidth: 720 }}>
+          <Typography sx={{ color: '#666', display: 'block', maxWidth: 720, fontSize: '0.95rem', mt: 0.35, fontWeight: 500 }}>
             Stacked tasks show completed vs pending; hours include pending count in the tooltip.
           </Typography>
         </Box>
@@ -205,7 +219,7 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
       >
         <SprintCompareBarBlock
           title="Tasks: completed vs pending"
-          subtitle="Stacked: done (color) + still open (gray)"
+          subtitle="Stacked: completed (sprint color) + pending (amber)"
           data={data}
           dataKey="completed"
           valueFormatter={(v) => `${v} tasks`}
@@ -213,7 +227,7 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
         />
         <SprintCompareBarBlock
           title="Hours worked"
-          subtitle="Total hours logged per sprint (tooltip shows open tasks)"
+          subtitle="Total hours worked per sprint"
           data={data}
           dataKey="hours"
           valueFormatter={(v) => `${v} h`}
@@ -221,7 +235,7 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
         />
         <SprintCompareBarBlock
           title="Average hours / task"
-          subtitle="Total hours ÷ completed tasks (tooltip shows open tasks)"
+          subtitle="Total hours / completed tasks"
           data={data}
           dataKey="avgPerTask"
           valueFormatter={(v) => `${v} hrs/task`}

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Clock, TrendingUp, CheckCircle2, ListTodo } from 'lucide-react';
+import { Box } from '@mui/material';
+import { Clock, ClipboardList } from 'lucide-react';
 import { motion } from 'framer-motion';
+import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 
 const ORACLE_RED = '#C74634';
 
@@ -15,54 +17,43 @@ const cardBase = {
 
 /**
  * KPI cards when exactly one sprint is selected (dashboard).
+ * Left: tasks + hours stacked vertically and stretched to match chart height.
+ * Right: task status bar chart.
  */
 export default function SummaryCards({
-  completedTasksCount = 0,
   totalHoursDisplay = '0',
-  pendingTasksCount = 0,
+  taskStatusDistribution = [],
+  taskStatusTotal = 0,
 }) {
   const cards = [
     {
-      icon: CheckCircle2,
-      title: 'Total Completed Tasks',
-      value: String(completedTasksCount),
-      subtitle: 'tasks done this sprint',
-      trend: '+8% vs last sprint',
+      icon: ClipboardList,
+      title: 'Total tasks',
+      value: String(taskStatusTotal),
+      subtitle: 'all tasks assigned to this sprint',
     },
     {
       icon: Clock,
       title: 'Total Hours Worked',
       value: totalHoursDisplay,
       subtitle: 'hours logged this sprint',
-      trend: '+12% vs last sprint',
-    },
-    {
-      icon: ListTodo,
-      title: 'Pending Tasks',
-      value: String(pendingTasksCount),
-      subtitle: 'still open this sprint',
-      trend: pendingTasksCount > 0 ? 'In backlog' : 'Sprint clear',
-      trendVariant: pendingTasksCount > 0 ? 'positive' : 'neutral',
     },
   ];
 
   const styles = {
-    grid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-      gap: '1rem',
-      marginBottom: '1.5rem',
-    },
     card: {
       ...cardBase,
       borderTop: `3px solid ${ORACLE_RED}`,
       display: 'flex',
       alignItems: 'center',
       gap: '1.25rem',
+      flex: 1,
+      minHeight: 0,
+      width: '100%',
     },
     iconWrapper: {
-      width: '3.5rem',
-      height: '3.5rem',
+      width: '4rem',
+      height: '4rem',
       borderRadius: '1rem',
       backgroundColor: 'rgba(199,70,52,0.1)',
       display: 'flex',
@@ -71,65 +62,62 @@ export default function SummaryCards({
       flexShrink: 0,
     },
     content: { flex: 1, minWidth: 0 },
-    label: { fontSize: '0.75rem', fontWeight: 600, color: '#6F6F6F', marginBottom: '0.25rem' },
-    value: { fontSize: '2.25rem', fontWeight: 700, color: '#2E2E2E', lineHeight: 1, marginBottom: '0.25rem' },
-    subtitle: { fontSize: '0.75rem', color: '#6F6F6F' },
-    trend: {
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.25rem',
-      padding: '0.375rem 0.625rem',
-      backgroundColor: '#F0FDF4',
-      border: '1px solid #DCFCE7',
-      borderRadius: '0.5rem',
-    },
-    trendNeutral: {
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.25rem',
-      padding: '0.375rem 0.625rem',
-      backgroundColor: '#F5F5F5',
-      border: '1px solid #EEEEEE',
-      borderRadius: '0.5rem',
-    },
-    trendText: { fontSize: '0.75rem', fontWeight: 700, color: '#16A34A' },
-    trendTextNeutral: { fontSize: '0.75rem', fontWeight: 700, color: '#616161' },
+    label: { fontSize: '0.95rem', fontWeight: 700, color: '#555', marginBottom: '0.35rem' },
+    value: { fontSize: '2.85rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.05, marginBottom: '0.35rem' },
+    subtitle: { fontSize: '0.9rem', color: '#616161', fontWeight: 500 },
   };
 
   return (
-    <div style={styles.grid}>
-      {cards.map((card, i) => (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
+        gap: 2,
+        alignItems: 'stretch',
+        mb: 3,
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          minHeight: 0,
+          height: { md: '100%' },
+        }}
+      >
+        {cards.map((card, i) => (
+          <motion.div
+            key={card.title}
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1, duration: 0.4 }}
+            style={{ flex: 1, display: 'flex', minHeight: 0 }}
+          >
+            <div style={styles.card}>
+              <div style={styles.iconWrapper}>
+                <card.icon style={{ width: '2rem', height: '2rem', color: ORACLE_RED }} />
+              </div>
+              <div style={styles.content}>
+                <p style={styles.label}>{card.title}</p>
+                <p style={styles.value}>{card.value}</p>
+                <p style={styles.subtitle}>{card.subtitle}</p>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </Box>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
         <motion.div
-          key={card.title}
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1, duration: 0.4 }}
-          style={styles.card}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
         >
-          <div style={styles.iconWrapper}>
-            <card.icon style={{ width: '1.75rem', height: '1.75rem', color: ORACLE_RED }} />
-          </div>
-          <div style={styles.content}>
-            <p style={styles.label}>{card.title}</p>
-            <p style={styles.value}>{card.value}</p>
-            <p style={styles.subtitle}>{card.subtitle}</p>
-          </div>
-          <div style={card.trendVariant === 'neutral' ? styles.trendNeutral : styles.trend}>
-            <TrendingUp
-              style={{
-                width: '0.875rem',
-                height: '0.875rem',
-                color: card.trendVariant === 'neutral' ? '#757575' : '#16A34A',
-              }}
-            />
-            <span style={card.trendVariant === 'neutral' ? styles.trendTextNeutral : styles.trendText}>
-              {card.trend}
-            </span>
-          </div>
+          <TaskStatusDistributionChart distribution={taskStatusDistribution} total={taskStatusTotal} />
         </motion.div>
-      ))}
-    </div>
+      </Box>
+    </Box>
   );
 }

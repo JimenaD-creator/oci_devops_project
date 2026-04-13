@@ -54,7 +54,7 @@ export default function Login() {
   async function completeLogin() {
     setFormError('');
     if (!email.trim() || !password) {
-      setFormError('Por favor ingresa tus credenciales.');
+      setFormError('Please enter your email, phone, or username and password.');
       return;
     }
     
@@ -63,12 +63,22 @@ export default function Login() {
       const response = await fetch(`${API_BASE}/users`);
       if (!response.ok) throw new Error('Error en el servidor');
       const users = await response.json();
-      
-      const match = users.find(u => 
-        (u.email === email.trim() || String(u.phoneNumber) === email.trim()) && 
-        u.userPassword === password
-      );
-
+      const idRaw = String(email).trim();
+      const idLower = idRaw.toLowerCase();
+      const idDigits = idRaw.replace(/\D/g, '');
+      const match = users.find((u) => {
+        const pass = u.userPassword != null ? String(u.userPassword) : '';
+        if (pass !== password) return false;
+        const phoneDigits =
+          u.phoneNumber != null ? String(u.phoneNumber).replace(/\D/g, '') : '';
+        const phoneOk = idDigits.length > 0 && phoneDigits === idDigits;
+        const nameOk =
+          u.name != null && String(u.name).trim().toLowerCase() === idLower;
+        const emailOk =
+          u.email != null &&
+          String(u.email).trim().toLowerCase() === idLower;
+        return phoneOk || nameOk || emailOk;
+      });
       if (match) {
         const userRole = (match.type || 'DEVELOPER').toUpperCase();
 
@@ -130,14 +140,14 @@ export default function Login() {
 
         <form className="login-form" onSubmit={handleSignIn} noValidate>
           <div className="login-field-group">
-            <label className="login-label" htmlFor="login-email">Email o Usuario</label>
+            <label className="login-label" htmlFor="login-email">Email, phone, or username</label>
             <div className={focusedField === 'email' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
               <span className="login-input-icon"><MailIcon /></span>
               <input
                 id="login-email"
                 type="text"
                 className="login-input"
-                placeholder="Ingresa tu correo o teléfono"
+                placeholder="Email, phone, or username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={() => setFocusedField('email')}
