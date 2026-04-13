@@ -5,8 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-
-
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.CorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -15,14 +17,30 @@ public class WebSecurityConfiguration {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll() // Permitir todo sin autenticación
+                // Permitimos el acceso a usuarios, tareas y sprints
+                .requestMatchers("/api/users", "/api/tasks", "/api/sprints").permitAll() 
+                .anyRequest().permitAll()
             )
-            .csrf(csrf -> csrf.disable()) // Desactivar CSRF si no usas formularios
-            .httpBasic(httpBasic -> httpBasic.disable()) // Desactivar autenticación básica
-            .formLogin(formLogin -> formLogin.disable()); // Desactivar login por formulario
-
+            .httpBasic(h -> h.disable())
+            .formLogin(f -> f.disable());
+            
         return http.build();
     }
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Permitimos que el puerto 3000 de React hable con el 8080 de Spring
+        config.setAllowedOriginPatterns(Arrays.asList("*")); 
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 }

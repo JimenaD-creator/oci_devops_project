@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
-import API_LIST from '../services/API';
+import API_LIST, { taskAPI } from '../services/API';
 import SprintsPage from '../pages/SprintsPage';
 import TasksPage from '../pages/TasksPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
@@ -10,7 +10,6 @@ import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
   Typography, Chip, Avatar, IconButton, Menu, MenuItem
 } from '@mui/material';
-
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -25,23 +24,16 @@ const DRAWER_WIDTH = 240;
 const NAV_ITEMS = [
   { text: 'Dashboard',     icon: <DashboardIcon />,   id: 'dashboard' },
   { text: 'Sprints',       icon: <AssignmentIcon />,  id: 'sprints' },
-  { text: 'Tasks',        icon: <TaskAltIcon />,     id: 'tasks' },
-  { text: 'Team',        icon: <GroupsIcon />,      id: 'team' },
-  { text: 'KPI Analytics',     icon: <AnalyticsIcon />,   id: 'analytics' },
-  { text: 'AI Insights',   icon: <AutoAwesomeIcon />, id: 'ai'},
+  { text: 'Tasks',         icon: <TaskAltIcon />,     id: 'tasks' },
+  { text: 'Team',          icon: <GroupsIcon />,      id: 'team' },
+  { text: 'KPI Analytics', icon: <AnalyticsIcon />,   id: 'analytics' },
+  { text: 'AI Insights',   icon: <AutoAwesomeIcon />, id: 'ai' },
   { text: 'Configuration', icon: <SettingsIcon />,    id: 'config' },
 ];
 
 const getInitials = (name) => {
-  if (!name) return "";
-  const parts = name.split(" ");
-  let initials = "";
-  for (let i = 0; i < Math.min(parts.length, 2); i++) {
-    if (parts[i].length > 0) {
-      initials += parts[i][0].toUpperCase();
-    }
-  }
-  return initials;
+  if (!name) return '';
+  return name.split(' ').slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('');
 };
 
 function App() {
@@ -51,69 +43,38 @@ function App() {
   const [isLoading, setLoading] = useState(false);
   const [isInserting, setInserting] = useState(false);
   const [items, setItems] = useState([]);
-
-  const [user, setUser] = useState({
-    name: "Jimena Diaz",
-    role: "Project Manager"
-  });
+  const [user] = useState({ name: 'Jimena Diaz', role: 'Project Manager' });
 
   useEffect(() => {
     setLoading(true);
-    fetch(API_LIST)
-      .then(res => res.ok ? res.json() : Promise.reject('Error'))
-      .then(data => { setItems(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    taskAPI.getAll()
+      .then(data => setItems(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const toggleDone = (e, id, desc, done) => {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    fetch(`${API_LIST}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: desc, done })
-    }).then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((updated) => {
-        setItems((prev) =>
-          prev.map((x) => {
-            if (String(x.id) !== String(id)) return x;
-            return {
-              ...x,
-              description: updated.description,
-              done: updated.done,
-              completedAt: updated.completedAt ?? updated.completed_at ?? (done ? new Date().toISOString() : null),
-            };
-          })
-        );
-      })
-      .catch(() => {
-        setItems((prev) =>
-          prev.map((x) =>
-            String(x.id) === String(id)
-              ? { ...x, done, completedAt: done ? new Date().toISOString() : null }
-              : x
-          )
-        );
-      });
+  const addItem = (taskData) => {
+    setInserting(true);
+    taskAPI.create(taskData)
+      .then(created => setItems(prev => [created, ...prev]))
+      .catch(() => {})
+      .finally(() => setInserting(false));
+  };
+
+  const toggleDone = (e, id) => {
+    if (e?.preventDefault) e.preventDefault();
+    const item = items.find(i => String(i.id) === String(id));
+    if (!item) return;
+    const updated = { ...item, status: item.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED' };
+    taskAPI.update(id, updated)
+      .then(res => setItems(prev => prev.map(i => String(i.id) === String(id) ? res : i)))
+      .catch(() => {});
   };
 
   const deleteItem = (id) => {
-    fetch(`${API_LIST}/${id}`, { method: 'DELETE' })
-      .then(() => setItems(items.filter(i => i.id !== id)));
-  };
-
-  const addItem = (text) => {
-    setInserting(true);
-    fetch(API_LIST, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: text }),
-    }).then(res => {
-      if (res.ok) {
-        const id = res.headers.get('location');
-        setItems([{ id, description: text, done: false, createdAt: new Date() }, ...items]);
-        setInserting(false);
-      }
-    });
+    taskAPI.delete(id)
+      .then(() => setItems(prev => prev.filter(i => String(i.id) !== String(id))))
+      .catch(() => {});
   };
 
   const handleLogout = () => {
@@ -133,10 +94,7 @@ function App() {
         },
       }}>
         <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #2A2A2A' }}>
-          <Box sx={{
-            width: 36, height: 36, bgcolor: '#E53935', borderRadius: 1.5,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
+          <Box sx={{ width: 36, height: 36, bgcolor: '#E53935', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography sx={{ color: 'white', fontWeight: 900, fontSize: '0.65rem', letterSpacing: 1 }}>ORA</Typography>
           </Box>
           <Box>
@@ -147,22 +105,17 @@ function App() {
 
         <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }}>
           {NAV_ITEMS.map((item) => (
-            <ListItem button key={item.id} onClick={() => setActivePage(item.id)}
-              sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
-                backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
-                '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
-                transition: 'background-color 0.15s ease',
-              }}>
+            <ListItem button key={item.id} onClick={() => setActivePage(item.id)} sx={{
+              borderRadius: '8px', mb: 0.5, py: 1.1,
+              backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
+              '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
+              transition: 'background-color 0.15s ease',
+            }}>
               <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
                 {item.icon}
               </ListItemIcon>
               <ListItemText primary={item.text}
                 primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }} />
-              {item.badge && (
-                <Chip label={item.badge} size="small"
-                  sx={{ bgcolor: '#E53935', color: 'white', fontWeight: 700, fontSize: '0.6rem', height: 18 }} />
-              )}
             </ListItem>
           ))}
         </List>
@@ -176,60 +129,28 @@ function App() {
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
               <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{user.role}</Typography>
             </Box>
-            <IconButton
-              size="small"
-              sx={{ color: '#666' }}
-              onClick={(e) => setMenuAnchor(e.currentTarget)}
-              aria-label="Menú de cuenta"
-            >
+            <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
               <MoreVertIcon fontSize="small" />
             </IconButton>
-            <Menu
-              anchorEl={menuAnchor}
-              open={Boolean(menuAnchor)}
-              onClose={() => setMenuAnchor(null)}
+            <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}
               anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
+              transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
               <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
             </Menu>
           </Box>
         </Box>
       </Drawer>
 
-      <Box
-        component="main"
-        sx={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: `${DRAWER_WIDTH}px`,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          p: 4,
-          boxSizing: 'border-box',
-          backgroundColor: '#F7F8FA',
-        }}
-      >
+      <Box component="main" sx={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        p: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
+      }}>
         {activePage === 'dashboard' && (
-          <DashboardPage
-            items={items}
-            isLoading={isLoading}
-            toggleDone={toggleDone}
-            deleteItem={deleteItem}
-            onNavigateToTasks={() => setActivePage('tasks')}
-          />
+          <DashboardPage items={items} isLoading={isLoading} toggleDone={toggleDone} deleteItem={deleteItem} onNavigateToTasks={() => setActivePage('tasks')} />
         )}
         {activePage === 'tasks' && (
-          <TasksPage
-            items={items}
-            isLoading={isLoading}
-            isInserting={isInserting}
-            toggleDone={toggleDone}
-            deleteItem={deleteItem}
-            addItem={addItem}
-          />
+          <TasksPage items={items} isLoading={isLoading} isInserting={isInserting} toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem} />
         )}
         {activePage === 'sprints' && <SprintsPage />}
         {activePage === 'analytics' && <Analytics />}
