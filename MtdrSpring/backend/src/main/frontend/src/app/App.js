@@ -6,30 +6,23 @@ import SprintsPage from '../pages/SprintsPage';
 import TasksPage from '../pages/TasksPage';
 import DashboardPage from '../components/dashboard/DashboardPage';
 import Analytics from '../pages/KPIAnalytics';
+import ProjectSelector from '../pages/ProjectSelector';
+
 import {
   Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
-  Typography, Chip, Avatar, IconButton, Menu, MenuItem
+  Typography, Avatar, IconButton, Menu, MenuItem
 } from '@mui/material';
+
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import GroupsIcon from '@mui/icons-material/Groups';
-import SettingsIcon from '@mui/icons-material/Settings';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 const DRAWER_WIDTH = 240;
-
-const NAV_ITEMS = [
-  { text: 'Dashboard',     icon: <DashboardIcon />,   id: 'dashboard' },
-  { text: 'Sprints',       icon: <AssignmentIcon />,  id: 'sprints' },
-  { text: 'Tasks',         icon: <TaskAltIcon />,     id: 'tasks' },
-  { text: 'Team',          icon: <GroupsIcon />,      id: 'team' },
-  { text: 'KPI Analytics', icon: <AnalyticsIcon />,   id: 'analytics' },
-  { text: 'AI Insights',   icon: <AutoAwesomeIcon />, id: 'ai' },
-  { text: 'Configuration', icon: <SettingsIcon />,    id: 'config' },
-];
 
 const getInitials = (name) => {
   if (!name) return '';
@@ -43,15 +36,58 @@ function App() {
   const [isLoading, setLoading] = useState(false);
   const [isInserting, setInserting] = useState(false);
   const [items, setItems] = useState([]);
-  const [user] = useState({ name: 'Jimena Diaz', role: 'Project Manager' });
+  const [projectSelected, setProjectSelected] = useState(!!localStorage.getItem('selectedProjectId'));
+
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      return { 
+        ...parsed, 
+        role: (parsed.role || parsed.type || 'DEVELOPER').toUpperCase() 
+      };
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
-    setLoading(true);
-    taskAPI.getAll()
-      .then(data => setItems(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    if (user && user.role === 'DEVELOPER') {
+      logout();
+      localStorage.clear();
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (user && user.role !== 'DEVELOPER') {
+      setLoading(true);
+      taskAPI.getAll()
+        .then(data => setItems(data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  if (!user || user.role === 'DEVELOPER') return null;
+
+  const NAV_ITEMS = [
+    { text: 'Dashboard', icon: <DashboardIcon />, id: 'dashboard', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'Sprints', icon: <AssignmentIcon />, id: 'sprints', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'Tasks', icon: <TaskAltIcon />, id: 'tasks', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'KPI Analytics', icon: <AnalyticsIcon />, id: 'analytics', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'AI Insights', icon: <AutoAwesomeIcon />, id: 'ai', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'Cambiar Proyecto', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
+  ].filter(item => item.roles.includes(user.role));
+
+  const handleLogout = () => {
+    logout();
+    localStorage.removeItem('selectedProjectId');
+    localStorage.removeItem('selectedProjectName');
+    setMenuAnchor(null);
+    navigate('/login', { replace: true });
+  };
 
   const addItem = (taskData) => {
     setInserting(true);
@@ -77,14 +113,12 @@ function App() {
       .catch(() => {});
   };
 
-  const handleLogout = () => {
-    logout();
-    setMenuAnchor(null);
-    navigate('/login', { replace: true });
-  };
+  if (user.role === 'ADMIN' && !projectSelected) {
+    return <ProjectSelector onSelect={() => setProjectSelected(true)} />;
+  }
 
   return (
-    <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#F7F8FA', overflowX: 'hidden' }}>
+    <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#F7F8FA' }}>
       <Drawer variant="permanent" sx={{
         width: DRAWER_WIDTH, flexShrink: 0,
         '& .MuiDrawer-paper': {
@@ -99,18 +133,27 @@ function App() {
           </Box>
           <Box>
             <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>Oracle Software</Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>Manager Tool</Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role} Panel</Typography>
           </Box>
         </Box>
 
         <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }}>
           {NAV_ITEMS.map((item) => (
-            <ListItem button key={item.id} onClick={() => setActivePage(item.id)} sx={{
-              borderRadius: '8px', mb: 0.5, py: 1.1,
-              backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
-              '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
-              transition: 'background-color 0.15s ease',
-            }}>
+            <ListItem button key={item.id} 
+              onClick={() => {
+                if (item.id === 'selector') {
+                  localStorage.removeItem('selectedProjectId');
+                  setProjectSelected(false);
+                } else {
+                  setActivePage(item.id);
+                }
+              }} 
+              sx={{
+                borderRadius: '8px', mb: 0.5, py: 1.1,
+                backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
+                '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
+                transition: 'background-color 0.15s ease',
+              }}>
               <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
                 {item.icon}
               </ListItemIcon>
@@ -126,7 +169,7 @@ function App() {
               {getInitials(user.name)}
             </Avatar>
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', noWrap: true }}>{user.name}</Typography>
               <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{user.role}</Typography>
             </Box>
             <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
@@ -143,8 +186,7 @@ function App() {
 
       <Box component="main" sx={{
         position: 'fixed', top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
-        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        p: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
+        overflowY: 'auto', p: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
       }}>
         {activePage === 'dashboard' && (
           <DashboardPage items={items} isLoading={isLoading} toggleDone={toggleDone} deleteItem={deleteItem} onNavigateToTasks={() => setActivePage('tasks')} />
@@ -154,14 +196,10 @@ function App() {
         )}
         {activePage === 'sprints' && <SprintsPage />}
         {activePage === 'analytics' && <Analytics />}
+        
         {!['dashboard', 'sprints', 'analytics', 'tasks'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#CCC', mb: 1 }}>
-                {NAV_ITEMS.find(n => n.id === activePage)?.text}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#BBB' }}>Esta sección está en desarrollo</Typography>
-            </Box>
+            <Typography variant="h6" color="textSecondary">Sección en desarrollo</Typography>
           </Box>
         )}
       </Box>
