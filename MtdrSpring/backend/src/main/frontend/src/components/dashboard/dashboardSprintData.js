@@ -1,7 +1,32 @@
-export const SPRINT_CHART_COLORS = ['#C74634', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA'];
+/** Distinct chart colors; assignment is by sprint rank (sorted id), not raw id % length, to avoid collisions (e.g. ids 1, 6, 11). */
+export const SPRINT_CHART_COLORS = [
+  '#C74634',
+  '#1E88E5',
+  '#43A047',
+  '#FB8C00',
+  '#8E24AA',
+  '#00897B',
+  '#5E35B1',
+  '#C62828',
+  '#0277BD',
+  '#2E7D32',
+  '#F57C00',
+  '#6D4C41',
+];
 
-export function accentForSprintId(id) {
-  return SPRINT_CHART_COLORS[Number(id) % SPRINT_CHART_COLORS.length];
+/**
+ * Mutates each sprint: accentColor from palette by order among all sprints (sorted by id).
+ */
+export function assignSprintAccentColors(sprints) {
+  if (!Array.isArray(sprints) || sprints.length === 0) return sprints;
+  const byIdAsc = [...sprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const rank = new Map(byIdAsc.map((s, i) => [s.id, i]));
+  const n = SPRINT_CHART_COLORS.length;
+  sprints.forEach((s) => {
+    const i = rank.has(s.id) ? rank.get(s.id) : 0;
+    s.accentColor = SPRINT_CHART_COLORS[i % n];
+  });
+  return sprints;
 }
 
 function inferStatus(apiSprint) {
@@ -28,12 +53,59 @@ function initialsFromName(name) {
   return (name || '').slice(0, 2).toUpperCase();
 }
 
+/** Dashboard chart buckets: To Do, In Progress, In Review, Done (TASK.STATUS). */
+export function bucketTaskStatus(raw) {
+  const s = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (s === 'DONE' || s === 'COMPLETED') return 'DONE';
+  if (s === 'IN_REVIEW' || s === 'REVIEW') return 'IN_REVIEW';
+  if (s === 'IN_PROGRESS') return 'IN_PROGRESS';
+  if (s === 'PENDING' || s === 'TODO' || s === 'TO_DO' || s === '') return 'TODO';
+  return 'TODO';
+}
+
+const TASK_STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+
+const STATUS_DIST_META = {
+  TODO: { name: 'To Do', color: '#FB8C00' },
+  IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
+  IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
+  DONE: { name: 'Done', color: '#43A047' },
+};
+
+export function taskSprintId(task) {
+  if (task == null) return null;
+  const as = task.assignedSprint;
+  if (as != null && typeof as === 'object' && as.id != null) return Number(as.id);
+  if (typeof as === 'number' || (typeof as === 'string' && as !== '')) {
+    const n = Number(as);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (task.assignedSprintId != null) return Number(task.assignedSprintId);
+  if (task.sprintId != null) return Number(task.sprintId);
+  return null;
+}
+
+function sprintTaskStatusRows(counts) {
+  const rows = TASK_STATUS_ORDER.map((key) => ({
+    key,
+    name: STATUS_DIST_META[key].name,
+    count: counts[key] ?? 0,
+    color: STATUS_DIST_META[key].color,
+  }));
+  const taskStatusTotal = TASK_STATUS_ORDER.reduce((a, k) => a + (counts[k] ?? 0), 0);
+  return { taskStatusDistribution: rows, taskStatusTotal };
+}
+
 function mapApiSprint(apiSprint) {
   const id = apiSprint.id;
   return {
     id,
+    assignedProject: apiSprint.assignedProject ?? null,
     shortLabel: `Sprint ${id}`,
-    accentColor: accentForSprintId(id),
+    accentColor: SPRINT_CHART_COLORS[0],
     name: `Sprint ${id}`,
     dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'es'),
     dateRangeEn: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
@@ -41,6 +113,8 @@ function mapApiSprint(apiSprint) {
     totalTasks: 0,
     totalCompleted: 0,
     totalHours: 0,
+    taskStatusDistribution: [],
+    taskStatusTotal: 0,
     kpis: {
       completionRate:    Math.round((apiSprint.completionRate    ?? 0) * 100),
       onTimeDelivery:    Math.round((apiSprint.onTimeDelivery    ?? 0) * 100),
@@ -55,18 +129,26 @@ function mapApiSprint(apiSprint) {
 function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   const sprintMap = {};
   sprints.forEach((sp) => {
-    sprintMap[sp.id] = { ...sp, _devMap: {} };
+    const id = Number(sp.id);
+    sprintMap[id] = {
+      ...sp,
+      id,
+      _devMap: {},
+      _statusCounts: { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 },
+    };
   });
 
   const taskSprintMap = {};
-  tasks.forEach((task) => {
-    if (task.assignedSprint?.id) {
-      taskSprintMap[task.id] = {
-        sprintId: task.assignedSprint.id,
-        status: task.status,
-        assignedHours: task.assignedHours ?? 0,
-      };
-    }
+  (tasks || []).forEach((task) => {
+    const sid = taskSprintId(task);
+    if (sid == null || !Number.isFinite(sid) || !sprintMap[sid]) return;
+    taskSprintMap[task.id] = {
+      sprintId: sid,
+      status: task.status,
+      assignedHours: task.assignedHours ?? 0,
+    };
+    const b = bucketTaskStatus(task.status);
+    sprintMap[sid]._statusCounts[b] += 1;
   });
 
   userTasks.forEach((ut) => {
@@ -102,11 +184,14 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   });
 
   return sprints.map((sp) => {
-    const { _devMap, ...rest } = sprintMap[sp.id];
+    const id = Number(sp.id);
+    const entry = sprintMap[id];
+    const { _devMap, _statusCounts, ...rest } = entry;
     const devs = Object.values(_devMap);
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
     devs.forEach((d) => { d.workload = Math.round((d.hours / maxHours) * 100); });
-    return { ...rest, developers: devs };
+    const statusPart = sprintTaskStatusRows(_statusCounts);
+    return { ...rest, developers: devs, ...statusPart };
   });
 }
 
@@ -125,7 +210,9 @@ export async function fetchDashboardSprints() {
     const apiUserTasks = await userTasksRes.json();
 
     const mapped = apiSprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
-    return enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
+    const enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
+    assignSprintAccentColors(enriched);
+    return enriched;
   } catch (error) {
     console.error("Fallo al cargar datos del Dashboard:", error);
     return [];
