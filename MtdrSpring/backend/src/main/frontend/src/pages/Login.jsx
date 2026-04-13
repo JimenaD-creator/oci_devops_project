@@ -54,25 +54,60 @@ export default function Login() {
   async function completeLogin() {
     setFormError('');
     if (!email.trim() || !password) {
-      setFormError('Please enter your email or username and password.');
+      setFormError('Por favor ingresa tus credenciales.');
       return;
     }
+    
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/users`);
-      if (!response.ok) throw new Error('Backend error');
+      if (!response.ok) throw new Error('Error en el servidor');
       const users = await response.json();
-      const match = users.find(
-        u => String(u.phoneNumber) === String(email).trim() && u.userPassword === password
+      
+      const match = users.find(u => 
+        (u.email === email.trim() || String(u.phoneNumber) === email.trim()) && 
+        u.userPassword === password
       );
+
       if (match) {
+        const userRole = (match.type || 'DEVELOPER').toUpperCase();
+
+        if (userRole === 'DEVELOPER') {
+          setFormError('Acceso denegado: Los desarrolladores no tienen permisos para acceder a esta plataforma.');
+          setIsLoading(false);
+          return; 
+        }
+
         setSessionAuthenticated();
-        navigate('/', { replace: true });
+        
+        const userData = { 
+          id: match.id,
+          name: match.name, 
+          role: userRole 
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+
+        if (userData.role === 'ADMIN') {
+          navigate('/project-selector');
+        } else if (userData.role === 'MANAGER') {
+          try {
+            const projRes = await fetch(`${API_BASE}/api/projects/manager/${match.id}`);
+            if (projRes.ok) {
+              const project = await projRes.json();
+              localStorage.setItem('selectedProjectId', project.id);
+              localStorage.setItem('selectedProjectName', project.name);
+            }
+          } catch (e) { 
+            console.error("No se pudo pre-cargar el proyecto del Manager"); 
+          }
+          navigate('/'); // Va al dashboard
+        }
       } else {
-        setFormError('Invalid credentials. Please try again.');
+        setFormError('Credenciales inválidas. Intenta de nuevo.');
       }
     } catch (err) {
-      setFormError('Could not connect to server. Try again.');
+      setFormError('No se pudo conectar con el servidor.');
     } finally {
       setIsLoading(false);
     }
@@ -90,19 +125,19 @@ export default function Login() {
           <h1 className="login-brand">ORACLE</h1>
           <div className="login-brand-bar" />
           <h2 className="login-title">Software Manager Tool</h2>
-          <p className="login-subtitle">Sign in to access your team dashboard</p>
+          <p className="login-subtitle">Inicia sesión para acceder al panel</p>
         </div>
 
         <form className="login-form" onSubmit={handleSignIn} noValidate>
           <div className="login-field-group">
-            <label className="login-label" htmlFor="login-email">Email or Username</label>
+            <label className="login-label" htmlFor="login-email">Email o Usuario</label>
             <div className={focusedField === 'email' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
               <span className="login-input-icon"><MailIcon /></span>
               <input
                 id="login-email"
                 type="text"
                 className="login-input"
-                placeholder="Enter your email or username"
+                placeholder="Ingresa tu correo o teléfono"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={() => setFocusedField('email')}
@@ -112,14 +147,14 @@ export default function Login() {
           </div>
 
           <div className="login-field-group">
-            <label className="login-label" htmlFor="login-password">Password</label>
+            <label className="login-label" htmlFor="login-password">Contraseña</label>
             <div className={focusedField === 'password' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
               <span className="login-input-icon"><LockIcon /></span>
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 className="login-input"
-                placeholder="Enter your password"
+                placeholder="Ingresa tu contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setFocusedField('password')}
@@ -142,11 +177,24 @@ export default function Login() {
               <span className="login-checkbox-custom">
                 {rememberMe && <span className="login-check-mark">✓</span>}
               </span>
-              <span className="login-remember-text">Remember me</span>
+              <span className="login-remember-text">Recordarme</span>
             </label>
           </div>
 
-          {formError && <p className="login-form-error" role="alert">{formError}</p>}
+          {formError && (
+            <div style={{ 
+              backgroundColor: '#ffebee', 
+              color: '#c62828', 
+              padding: '10px', 
+              borderRadius: '4px', 
+              fontSize: '0.85rem',
+              marginBottom: '15px',
+              border: '1px solid #ffcdd2',
+              textAlign: 'center'
+            }}>
+              {formError}
+            </div>
+          )}
 
           <button type="submit" className="login-signin-btn" disabled={isLoading}>
             {isLoading ? (
@@ -155,12 +203,12 @@ export default function Login() {
                 <span className="login-dot login-dot--delay-1" />
                 <span className="login-dot login-dot--delay-2" />
               </span>
-            ) : 'Sign In'}
+            ) : 'Iniciar Sesión'}
           </button>
 
           <div className="login-forgot-wrap">
             <a href="#forgot" className="login-forgot-link" onClick={(e) => e.preventDefault()}>
-              Forgot password?
+              ¿Olvidaste tu contraseña?
             </a>
           </div>
 
@@ -170,19 +218,12 @@ export default function Login() {
 
           <button type="button" className="login-sso-btn" onClick={completeLogin}>
             <ShieldIcon />
-            <span>Secure login with Oracle SSO</span>
+            <span>Acceso Seguro con Oracle SSO</span>
           </button>
         </form>
 
         <div className="login-footer">
-          <p className="login-footer-text">© 2026 Oracle Corporation. All rights reserved.</p>
-          <div className="login-footer-links">
-            <a href="#privacy" className="login-footer-link" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
-            <span className="login-footer-sep">·</span>
-            <a href="#terms" className="login-footer-link" onClick={(e) => e.preventDefault()}>Terms of Use</a>
-            <span className="login-footer-sep">·</span>
-            <a href="#help" className="login-footer-link" onClick={(e) => e.preventDefault()}>Help</a>
-          </div>
+          <p className="login-footer-text">© 2026 Oracle Corporation. Todos los derechos reservados.</p>
         </div>
       </div>
     </div>
