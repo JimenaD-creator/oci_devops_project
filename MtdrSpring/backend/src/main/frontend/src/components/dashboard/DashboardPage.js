@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Box, Card, CardContent, Typography,
-  LinearProgress, Paper, IconButton, Badge,
+  Box, Typography,
+  LinearProgress, Paper, Card, CardContent, IconButton, Badge,
   FormGroup, FormControlLabel, Checkbox, CircularProgress,
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -31,18 +31,30 @@ export default function DashboardPage() {
         setAllSprints(sprints);
         if (sprints.length > 0 && selectedSprintIds.length === 0) {
           const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
-          setSelectedSprintIds([active.id]);
+          setSelectedSprintIds([Number(active.id)]);
         }
       })
       .finally(() => setSprintsLoading(false));
   };
 
-  const selectedSprints = useMemo(
-    () => allSprints
-      .filter((s) => selectedSprintIds.includes(s.id))
-      .sort((a, b) => selectedSprintIds.indexOf(a.id) - selectedSprintIds.indexOf(b.id)),
-    [selectedSprintIds, allSprints]
-  );
+  /**
+   * One sprint per id, numeric id match (API may return number or string).
+   * Dedupes so compare mode only when the user truly selected multiple distinct sprints.
+   */
+  const selectedSprints = useMemo(() => {
+    const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
+    const orderedUnique = [...new Set(selectedSprintIds.map((id) => Number(id)))].filter((id) =>
+      Number.isFinite(id)
+    );
+    return orderedUnique
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const ia = selectedSprintIds.findIndex((x) => Number(x) === Number(a.id));
+        const ib = selectedSprintIds.findIndex((x) => Number(x) === Number(b.id));
+        return ia - ib;
+      });
+  }, [selectedSprintIds, allSprints]);
 
   const compareMode = selectedSprints.length > 1;
   const primarySprint = selectedSprints[0];
@@ -69,23 +81,21 @@ export default function DashboardPage() {
     [selectedSprints]
   );
 
+  /** Always from API `Sprint.completionRate` (mapped to `kpis.completionRate`, 0–100). */
   const heroProgress = useMemo(() => {
-    if (!primarySprint) return 0;
-    if (compareMode) {
-      const avg = selectedSprints.reduce((a, s) => a + (s.kpis?.completionRate || 0), 0) / selectedSprints.length;
-      return Math.round(avg);
-    }
-    const total = primarySprint.taskStatusTotal ?? 0;
-    if (!total) return 0;
-    const done = primarySprint.taskStatusDistribution?.find((d) => d.key === 'DONE')?.count ?? 0;
-    return Math.round((done / total) * 100);
-  }, [primarySprint, compareMode, selectedSprints]);
+    if (!selectedSprints.length) return 0;
+    const sum = selectedSprints.reduce((a, s) => a + (s.kpis?.completionRate ?? 0), 0);
+    return Math.round(sum / selectedSprints.length);
+  }, [selectedSprints]);
 
   const toggleSprint = (id, checked) => {
+    const nid = Number(id);
     setSelectedSprintIds((prev) => {
-      if (checked) return [...new Set([...prev, id])];
-      if (prev.length <= 1) return prev;
-      return prev.filter((x) => x !== id);
+      const nums = prev.map(Number);
+      if (checked) return [...new Set([...nums, nid])];
+      const unique = [...new Set(nums)];
+      if (unique.length <= 1) return prev;
+      return [...new Set(nums.filter((x) => x !== nid))];
     });
   };
 
@@ -109,9 +119,26 @@ export default function DashboardPage() {
         boxSizing: 'border-box',
       }}
     >
-      <Paper elevation={0} sx={{ p: 2, mb: 1.5, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box sx={{ pr: 1, minWidth: 0 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          mb: 1.5,
+          borderRadius: 3,
+          border: '1px solid #ECECEC',
+          bgcolor: '#FFFFFF',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 2,
+            mb: 1.5,
+          }}
+        >
+          <Box sx={{ pr: 1, minWidth: 0, flex: 1 }}>
             <Typography
               variant="h3"
               sx={{
@@ -134,7 +161,7 @@ export default function DashboardPage() {
               </Typography>
             )}
           </Box>
-          <IconButton sx={{ bgcolor: '#F5F5F5' }}>
+          <IconButton sx={{ bgcolor: '#F5F5F5', flexShrink: 0 }} aria-label="Notifications">
             <Badge badgeContent={1} color="error">
               <NotificationsIcon />
             </Badge>
@@ -144,7 +171,7 @@ export default function DashboardPage() {
 
       <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 2.5 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {compareMode ? 'Multi-sprint comparison' : (primarySprint?.name || 'Project Progress')}
             </Typography>
@@ -160,7 +187,12 @@ export default function DashboardPage() {
           <LinearProgress
             variant="determinate"
             value={heroProgress}
-            sx={{ height: 10, borderRadius: 5, bgcolor: '#F0F0F0', '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED } }}
+            sx={{
+              height: 10,
+              borderRadius: 5,
+              bgcolor: '#F0F0F0',
+              '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED },
+            }}
           />
         </CardContent>
       </Card>
@@ -178,7 +210,7 @@ export default function DashboardPage() {
                 control={(
                   <Checkbox
                     size="small"
-                    checked={selectedSprintIds.includes(sp.id)}
+                    checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
                     onChange={(e) => toggleSprint(sp.id, e.target.checked)}
                     sx={{ '&.Mui-checked': { color: sprintColor } }}
                   />
