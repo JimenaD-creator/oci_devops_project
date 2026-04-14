@@ -14,6 +14,7 @@ const STATUS_OPTIONS = [
   { value: 'TODO',        label: 'To Do' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'IN_REVIEW',   label: 'In Review' },
+  { value: 'PENDING',     label: 'Pending' },
   { value: 'DONE',        label: 'Done' },
 ];
 
@@ -24,6 +25,41 @@ const STATUS_PILL_STYLE = {
   'DONE':        { bg: '#E8F5E9',  color: '#2E7D32' },
   'PENDING':     { bg: '#FFF3E0',  color: '#E65100' },
 };
+
+const CLASSIFICATION_PILL_STYLE = {
+  FEATURE: { bg: '#E8F5E9', color: '#2E7D32', label: 'Feature' },
+  BUG: { bg: '#FFEBEE', color: '#C62828', label: 'Bug' },
+  TASK: { bg: '#E3F2FD', color: '#1565C0', label: 'Task' },
+  USER_STORY: { bg: '#F3E5F5', color: '#7B1FA2', label: 'User Story' },
+};
+
+const PRIORITY_PILL_STYLE = {
+  LOW: { bg: '#ECEFF1', color: '#546E7A', label: 'Low' },
+  MEDIUM: { bg: '#FFF8E1', color: '#F57F17', label: 'Medium' },
+  HIGH: { bg: '#FFF3E0', color: '#EF6C00', label: 'High' },
+  CRITICAL: { bg: '#FFEBEE', color: '#C62828', label: 'Critical' },
+};
+
+function normalizeClassification(value) {
+  if (!value) return 'TASK';
+  const normalized = String(value).trim().toUpperCase().replace(/\s+/g, '_');
+  if (normalized === 'ATASK') return 'TASK';
+  if (CLASSIFICATION_PILL_STYLE[normalized]) return normalized;
+  return 'TASK';
+}
+
+function normalizePriority(value) {
+  if (!value) return 'MEDIUM';
+  const normalized = String(value).trim().toUpperCase();
+  if (PRIORITY_PILL_STYLE[normalized]) return normalized;
+  return 'MEDIUM';
+}
+
+function priorityRank(value) {
+  const key = normalizePriority(value);
+  const rankMap = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+  return rankMap[key] ?? 0;
+}
 
 function initialsFromLabel(label) {
   if (!label || label === 'Unassigned') return '?';
@@ -49,6 +85,10 @@ function TaskCard({ item, isDone, onStatusChange }) {
   const rawStatus = item.rawStatus || (isDone ? 'DONE' : 'TODO');
   const pillStyle = STATUS_PILL_STYLE[rawStatus] || STATUS_PILL_STYLE['TODO'];
   const pillLabel = STATUS_OPTIONS.find(s => s.value === rawStatus)?.label || rawStatus;
+  const classificationKey = normalizeClassification(item.classification || item._raw?.classification);
+  const classificationStyle = CLASSIFICATION_PILL_STYLE[classificationKey];
+  const priorityKey = normalizePriority(item.priority || item._raw?.priority);
+  const priorityStyle = PRIORITY_PILL_STYLE[priorityKey];
 
   const handleChipClick = (e) => {
     e.stopPropagation();
@@ -62,7 +102,7 @@ function TaskCard({ item, isDone, onStatusChange }) {
 
   return (
     <div
-      className={`kanban-task-card${isDone ? ' kanban-task-card--done' : ''}`}
+      className={`kanban-task-card kanban-task-card--p-${priorityKey.toLowerCase()}${isDone ? ' kanban-task-card--done' : ''}`}
       onClick={(e) => setAnchorEl(e.currentTarget)}
       style={{ cursor: 'pointer' }}
     >
@@ -72,12 +112,27 @@ function TaskCard({ item, isDone, onStatusChange }) {
           className="kanban-task-status-pill"
           style={{ background: pillStyle.bg, color: pillStyle.color, cursor: 'pointer' }}
           onClick={handleChipClick}
-          title="Click para cambiar status"
+          title="Click to change status"
         >
           {pillLabel} ▾
         </span>
       </div>
       <p className="kanban-task-title">{item.description || '(No description)'}</p>
+      {item.details ? <p className="kanban-task-subtitle">{item.details}</p> : null}
+      <div className="kanban-task-classification-row">
+        <span
+          className="kanban-task-classification-pill"
+          style={{ background: classificationStyle.bg, color: classificationStyle.color }}
+        >
+          {classificationStyle.label}
+        </span>
+        <span
+          className="kanban-task-priority-pill"
+          style={{ background: priorityStyle.bg, color: priorityStyle.color }}
+        >
+          {priorityStyle.label}
+        </span>
+      </div>
       <div className="kanban-task-footer">
         <div className="kanban-task-meta">
           <div className="kanban-task-hours">
@@ -119,6 +174,9 @@ export default function KanbanBoard({ items = [], onStatusChange }) {
     items.forEach((item) => {
       const b = bucketForItem(item);
       buckets[b].push(item);
+    });
+    Object.values(buckets).forEach((tasks) => {
+      tasks.sort((a, b) => priorityRank(b.priority || b._raw?.priority) - priorityRank(a.priority || a._raw?.priority));
     });
     return COLUMN_DEFS.map((col) => ({ ...col, tasks: buckets[col.id] }));
   }, [items]);

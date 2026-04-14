@@ -5,14 +5,15 @@ import { ListTodo } from 'lucide-react';
 
 const ORACLE_RED = '#C74634';
 
-const CHART_HEIGHT = 300;
+const CHART_HEIGHT = 200;
+const PIE_OUTER_RADIUS = 78;
 
 const cardBase = {
   backgroundColor: 'white',
-  borderRadius: '12px',
+  borderRadius: '10px',
   border: '1px solid #EFEFEF',
   boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-  padding: '1.25rem 1.35rem',
+  padding: '0.75rem 0.95rem',
   overflow: 'hidden',
 };
 
@@ -78,7 +79,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         fill={c}
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        fontSize={14}
+        fontSize={12}
         fontWeight={800}
       >
         {value}
@@ -93,15 +94,18 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         borderTop: `3px solid ${ORACLE_RED}`,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: CHART_HEIGHT + 140,
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
         <div
           style={{
-            width: '3.5rem',
-            height: '3.5rem',
-            borderRadius: '1rem',
+            width: '2.5rem',
+            height: '2.5rem',
+            borderRadius: '0.65rem',
             backgroundColor: 'rgba(199,70,52,0.1)',
             display: 'flex',
             alignItems: 'center',
@@ -109,13 +113,13 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
             flexShrink: 0,
           }}
         >
-          <ListTodo style={{ width: '1.85rem', height: '1.85rem', color: ORACLE_RED }} />
+          <ListTodo style={{ width: '1.35rem', height: '1.35rem', color: ORACLE_RED }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '1.15rem', lineHeight: 1.25 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.95rem', lineHeight: 1.25 }}>
             Tasks by status
           </Typography>
-          <Typography sx={{ fontSize: '0.95rem', color: '#1565C0', mt: 0.25, fontWeight: 600 }}>
+          <Typography sx={{ fontSize: '0.72rem', color: '#1565C0', mt: 0.15, fontWeight: 600, lineHeight: 1.3 }}>
             To Do · In Progress · In Review · Done
           </Typography>
         </div>
@@ -139,7 +143,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
                 cx="50%"
                 cy="50%"
                 innerRadius={0}
-                outerRadius={118}
+                outerRadius={PIE_OUTER_RADIUS}
                 paddingAngle={2}
                 labelLine={false}
                 label={renderSliceLabel}
@@ -154,7 +158,8 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         ) : (
           <Box
             sx={{
-              height: '100%',
+              height: CHART_HEIGHT,
+              minHeight: 120,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -163,7 +168,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
               bgcolor: '#F3E5F5',
             }}
           >
-            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '1rem' }}>
+            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.85rem' }}>
               No tasks in this sprint
             </Typography>
           </Box>
@@ -174,10 +179,14 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         <Box
           sx={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.6rem 1.25rem',
+            flexWrap: 'nowrap',
+            gap: '0.35rem 0.75rem',
             justifyContent: 'center',
-            mt: 1.5,
+            alignItems: 'center',
+            mt: 1,
+            overflowX: 'auto',
+            flexShrink: 0,
+            width: '100%',
           }}
         >
           {distribution.map((d) => (
@@ -185,7 +194,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
               key={d.key}
               component="span"
               sx={{
-                fontSize: '0.9rem',
+                fontSize: '0.75rem',
                 color: d.color,
                 display: 'inline-flex',
                 alignItems: 'center',

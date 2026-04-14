@@ -61,14 +61,14 @@ export default function Login() {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/users`);
-      if (!response.ok) throw new Error('Error en el servidor');
+      if (!response.ok) throw new Error('Server error');
       const users = await response.json();
       const idRaw = String(email).trim();
       const idLower = idRaw.toLowerCase();
       const idDigits = idRaw.replace(/\D/g, '');
       const match = users.find((u) => {
-        const pass = u.userPassword != null ? String(u.userPassword) : '';
-        if (pass !== password) return false;
+        const pass = u.userPassword != null ? String(u.userPassword).trim() : '';
+        if (pass !== String(password).trim()) return false;
         const phoneDigits =
           u.phoneNumber != null ? String(u.phoneNumber).replace(/\D/g, '') : '';
         const phoneOk = idDigits.length > 0 && phoneDigits === idDigits;
@@ -83,7 +83,7 @@ export default function Login() {
         const userRole = (match.type || 'DEVELOPER').toUpperCase();
 
         if (userRole === 'DEVELOPER') {
-          setFormError('Acceso denegado: Los desarrolladores no tienen permisos para acceder a esta plataforma.');
+          setFormError('Access denied: developers do not have permission to access this application.');
           setIsLoading(false);
           return; 
         }
@@ -109,15 +109,15 @@ export default function Login() {
               localStorage.setItem('selectedProjectName', project.name);
             }
           } catch (e) { 
-            console.error("No se pudo pre-cargar el proyecto del Manager"); 
+            console.error('Could not pre-load the manager project'); 
           }
-          navigate('/'); // Va al dashboard
+          navigate('/'); // Go to dashboard
         }
       } else {
-        setFormError('Credenciales inválidas. Intenta de nuevo.');
+        setFormError('Invalid credentials. Please try again.');
       }
     } catch (err) {
-      setFormError('No se pudo conectar con el servidor.');
+      setFormError('Could not connect to the server.');
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +135,7 @@ export default function Login() {
           <h1 className="login-brand">ORACLE</h1>
           <div className="login-brand-bar" />
           <h2 className="login-title">Software Manager Tool</h2>
-          <p className="login-subtitle">Inicia sesión para acceder al panel</p>
+          <p className="login-subtitle">Sign in to access the dashboard</p>
         </div>
 
         <form className="login-form" onSubmit={handleSignIn} noValidate>
@@ -157,14 +157,14 @@ export default function Login() {
           </div>
 
           <div className="login-field-group">
-            <label className="login-label" htmlFor="login-password">Contraseña</label>
+            <label className="login-label" htmlFor="login-password">Password</label>
             <div className={focusedField === 'password' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
               <span className="login-input-icon"><LockIcon /></span>
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 className="login-input"
-                placeholder="Ingresa tu contraseña"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setFocusedField('password')}
@@ -187,7 +187,7 @@ export default function Login() {
               <span className="login-checkbox-custom">
                 {rememberMe && <span className="login-check-mark">✓</span>}
               </span>
-              <span className="login-remember-text">Recordarme</span>
+              <span className="login-remember-text">Remember me</span>
             </label>
           </div>
 
@@ -213,12 +213,12 @@ export default function Login() {
                 <span className="login-dot login-dot--delay-1" />
                 <span className="login-dot login-dot--delay-2" />
               </span>
-            ) : 'Iniciar Sesión'}
+            ) : 'Sign in'}
           </button>
 
           <div className="login-forgot-wrap">
             <a href="#forgot" className="login-forgot-link" onClick={(e) => e.preventDefault()}>
-              ¿Olvidaste tu contraseña?
+              Forgot your password?
             </a>
           </div>
 
@@ -228,12 +228,12 @@ export default function Login() {
 
           <button type="button" className="login-sso-btn" onClick={completeLogin}>
             <ShieldIcon />
-            <span>Acceso Seguro con Oracle SSO</span>
+            <span>Secure sign-in with Oracle SSO</span>
           </button>
         </form>
 
         <div className="login-footer">
-          <p className="login-footer-text">© 2026 Oracle Corporation. Todos los derechos reservados.</p>
+          <p className="login-footer-text">© 2026 Oracle Corporation. All rights reserved.</p>
         </div>
       </div>
     </div>

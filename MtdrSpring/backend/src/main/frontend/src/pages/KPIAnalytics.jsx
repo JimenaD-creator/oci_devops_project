@@ -111,7 +111,7 @@ export default function KPIAnalytics() {
               }}
             >
               <Calendar size={14} aria-hidden />
-              Enero – Abril 2024 · Tracking 20% Improvement Goal
+              January – April 2024 · Tracking 20% improvement goal
             </Typography>
           </Box>
           <Box
@@ -128,7 +128,7 @@ export default function KPIAnalytics() {
           >
             <Target size={16} color="#C74634" aria-hidden />
             <Typography sx={{ fontWeight: 700, fontSize: "0.875rem", color: "#C74634" }}>
-              Meta: +20% Productivity
+              Goal: +20% productivity
             </Typography>
           </Box>
         </Box>
@@ -140,7 +140,7 @@ export default function KPIAnalytics() {
                 Overall Productivity Improvement
               </h2>
               <p style={{ fontSize: "14px", color: "#6F6F6F", margin: 0 }}>
-                Meta: +20% · Proyectado alcanzarse en:{" "}
+                Goal: +20% · Projected to reach by:{" "}
                 <span style={{ fontWeight: "600", color: "#2E2E2E" }}>Sprint 15</span>
               </p>
             </div>
@@ -153,10 +153,10 @@ export default function KPIAnalytics() {
           <div style={{ marginTop: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "500", color: "#6F6F6F" }}>
-                Progreso hacia meta del +20%
+                Progress toward +20% goal
               </span>
               <span style={{ fontSize: "12px", fontWeight: "bold", color: "#C74634" }}>
-                85% completado
+                85% complete
               </span>
             </div>
             <div className="progress-track">
@@ -165,7 +165,7 @@ export default function KPIAnalytics() {
             <div className="progress-labels">
               <span>Baseline (Sprint 1)</span>
               <span style={{ fontWeight: "600", color: "#C74634" }}>Actual: +17%</span>
-              <span>Meta: +20%</span>
+              <span>Goal: +20%</span>
             </div>
           </div>
         </div>

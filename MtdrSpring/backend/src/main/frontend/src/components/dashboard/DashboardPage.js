@@ -1,10 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box, Card, CardContent, Typography,
-  LinearProgress, Paper, IconButton, Button, Badge,
-  FormGroup, FormControlLabel, Stack, Checkbox, CircularProgress,
+  LinearProgress, Paper, IconButton, Badge,
+  FormGroup, FormControlLabel, Checkbox, CircularProgress,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
 import SummaryCards from './SummaryCards';
@@ -12,6 +11,7 @@ import SprintComparisonCharts from './SprintComparisonCharts';
 import DeveloperWorkloadCharts from '../analytics/DeveloperWorkloadCharts';
 import DeveloperTable from '../analytics/DeveloperTable';
 import { fetchDashboardSprints } from './dashboardSprintData';
+import { DASHBOARD_CONTENT_MAX_WIDTH } from './dashboardConstants';
 
 const ORACLE_RED = '#C74634';
 
@@ -20,7 +20,6 @@ export default function DashboardPage() {
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
 
-  // Carga inicial de datos desde el Backend (vía dashboardSprintData)
   useEffect(() => {
     handleRefresh();
   }, []);
@@ -31,7 +30,6 @@ export default function DashboardPage() {
       .then((sprints) => {
         setAllSprints(sprints);
         if (sprints.length > 0 && selectedSprintIds.length === 0) {
-          // Seleccionar por defecto el último sprint activo
           const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
           setSelectedSprintIds([active.id]);
         }
@@ -66,7 +64,6 @@ export default function DashboardPage() {
     return primarySprint.dateRangeEn || primarySprint.dateRange || '';
   }, [primarySprint, compareMode, selectedSprints]);
 
-  // Conteo de desarrolladores únicos basados en la relación USERS/USER_TASK
   const teamDeveloperCount = useMemo(
     () => new Set(selectedSprints.flatMap((s) => (s.developers || []).map((d) => d.name))).size,
     [selectedSprints]
@@ -87,7 +84,7 @@ export default function DashboardPage() {
   const toggleSprint = (id, checked) => {
     setSelectedSprintIds((prev) => {
       if (checked) return [...new Set([...prev, id])];
-      if (prev.length <= 1) return prev; // Mantener al menos uno seleccionado
+      if (prev.length <= 1) return prev;
       return prev.filter((x) => x !== id);
     });
   };
@@ -101,8 +98,17 @@ export default function DashboardPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%', mx: 'auto', pt: 0, px: 2, pb: 2 }}>
-      {/* Header del Dashboard */}
+    <Box
+      sx={{
+        maxWidth: DASHBOARD_CONTENT_MAX_WIDTH,
+        width: '100%',
+        mx: 'auto',
+        pt: 0,
+        px: 2,
+        pb: 2,
+        boxSizing: 'border-box',
+      }}
+    >
       <Paper elevation={0} sx={{ p: 2, mb: 1.5, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ pr: 1, minWidth: 0 }}>
@@ -128,20 +134,42 @@ export default function DashboardPage() {
               </Typography>
             )}
           </Box>
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<RefreshIcon />} variant="outlined" onClick={handleRefresh} size="small" sx={{ borderRadius: 2, color: '#555' }}>
-              Sync Data
-            </Button>
-            <IconButton sx={{ bgcolor: '#F5F5F5' }}><Badge badgeContent={1} color="error"><NotificationsIcon /></Badge></IconButton>
-          </Stack>
+          <IconButton sx={{ bgcolor: '#F5F5F5' }}>
+            <Badge badgeContent={1} color="error">
+              <NotificationsIcon />
+            </Badge>
+          </IconButton>
         </Box>
       </Paper>
+
+      <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 2.5 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {compareMode ? 'Multi-sprint comparison' : (primarySprint?.name || 'Project Progress')}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{teamDeveloperCount} devs</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Completion Rate</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: ORACLE_RED }}>{heroProgress}%</Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={heroProgress}
+            sx={{ height: 10, borderRadius: 5, bgcolor: '#F0F0F0', '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED } }}
+          />
+        </CardContent>
+      </Card>
 
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
         <Typography variant="body2" sx={{ color: '#555', fontWeight: 600, mb: 1.25 }}>
           Select one or more sprints to view or compare metrics.
         </Typography>
-        <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap' }}>
+        <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
           {allSprints.map((sp) => {
             const sprintColor = sp.accentColor ?? '#607D8B';
             return (
@@ -176,41 +204,24 @@ export default function DashboardPage() {
         </FormGroup>
       </Paper>
 
-      {/* Completion rate*/}
-      <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{primarySprint?.name || 'Project Progress'}</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{teamDeveloperCount} devs</Typography>
-            </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+        {!compareMode ? (
+          <SummaryCards
+            totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
+            taskStatusDistribution={primarySprint?.taskStatusDistribution ?? []}
+            taskStatusTotal={primarySprint?.taskStatusTotal ?? 0}
+          />
+        ) : (
+          <Box sx={{ mb: 3 }}>
+            <SprintComparisonCharts selectedSprints={selectedSprints} />
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Completion Rate</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 800, color: ORACLE_RED }}>{heroProgress}%</Typography>
-          </Box>
-          <LinearProgress variant="determinate" value={heroProgress} sx={{ height: 10, borderRadius: 5, bgcolor: '#F0F0F0', '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED } }} />
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Tarjetas de resumen + gráfico de estados */}
-      {!compareMode ? (
-        <SummaryCards
-          totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
-          taskStatusDistribution={primarySprint?.taskStatusDistribution ?? []}
-          taskStatusTotal={primarySprint?.taskStatusTotal ?? 0}
-        />
-      ) : (
-        <SprintComparisonCharts selectedSprints={selectedSprints} />
-      )}
+        <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
 
-      {/* Gráficas de Carga de Trabajo (Basadas en USERS_TASK) */}
-      <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
-
-      {/* Tabla de Productividad (Breakdown) */}
-      <Box sx={{ mt: 3 }}>
-        <DeveloperTable selectedSprints={selectedSprints} compareMode={compareMode} />
+        <Box sx={{ mt: 3 }}>
+          <DeveloperTable selectedSprints={selectedSprints} compareMode={compareMode} />
+        </Box>
       </Box>
     </Box>
   );

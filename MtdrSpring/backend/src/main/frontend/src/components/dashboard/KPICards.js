@@ -173,7 +173,7 @@ export default function KPICards({ compareMode, selectedSprints = [] }) {
           ) : (
             <>
               <p style={styles.valueSingle}>{kpi.displayValue}</p>
-              <p style={styles.subtitle}>vs sprint anterior</p>
+              <p style={styles.subtitle}>vs previous sprint</p>
             </>
           )}
         </motion.div>

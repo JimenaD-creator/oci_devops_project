@@ -13,14 +13,12 @@ import {
 } from 'recharts';
 import { avgHoursPerTask } from './dashboardSprintData';
 
-const CHART_H = 220;
+const CHART_H = 228;
 
-/** Stacked segment for tasks still open — distinct from sprint accent colors (completed). */
-const PENDING_TASKS_COLOR = '#FB8C00';
-
-const AXIS_TICK = { fontSize: 14, fill: '#1565C0' };
-const AXIS_LINE = { stroke: '#64B5F6' };
+const Y_AXIS_TICK = { fontSize: 12, fill: '#1A1A1A', fontWeight: 500 };
+const X_AXIS_LINE = { stroke: '#BDBDBD' };
 const GRID_STROKE = '#E1BEE7';
+const FALLBACK_SPRINT_COLOR = '#424242';
 
 const tooltipPaper = {
   borderRadius: 8,
@@ -31,42 +29,33 @@ const tooltipPaper = {
   boxShadow: '0 2px 10px rgba(21,101,192,0.15)',
 };
 
-function HoursWithPendingTooltip({ active, payload }) {
+function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
-  const hours = row.hours;
+  const sprintColor = row.accentColor ?? FALLBACK_SPRINT_COLOR;
+  const rawValue = payload[0]?.value;
+  const formattedValue = valueFormatter ? valueFormatter(rawValue) : rawValue;
   const pending = row.pending ?? 0;
-  return (
-    <Box sx={tooltipPaper}>
-      <Typography sx={{ fontWeight: 700, color: '#1565C0', display: 'block', fontSize: '0.95rem' }}>
-        {row.name}
-      </Typography>
-      <Typography sx={{ color: '#0277BD', display: 'block', mt: 0.5, fontSize: '0.9rem', fontWeight: 600 }}>
-        {hours} h logged
-      </Typography>
-      <Typography sx={{ color: '#E65100', display: 'block', mt: 0.35, fontSize: '0.85rem', fontWeight: 600 }}>
-        {pending} task{pending === 1 ? '' : 's'} still open
-      </Typography>
-    </Box>
-  );
-}
+  const metricLabel =
+    metric === 'completed'
+      ? 'Completed'
+      : metric === 'hours'
+        ? 'Hours worked'
+        : 'Average';
 
-function AvgWithPendingTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
-  const avg = row.avgPerTask;
-  const pending = row.pending ?? 0;
   return (
-    <Box sx={tooltipPaper}>
-      <Typography sx={{ fontWeight: 700, color: '#1565C0', display: 'block', fontSize: '0.95rem' }}>
+    <Box sx={{ ...tooltipPaper, border: `1px solid ${sprintColor}66` }}>
+      <Typography sx={{ fontWeight: 700, color: sprintColor, display: 'block', fontSize: '0.95rem' }}>
         {row.name}
       </Typography>
-      <Typography sx={{ color: '#2E7D32', display: 'block', mt: 0.5, fontSize: '0.9rem', fontWeight: 600 }}>
-        {avg} hrs/task (on completed work)
+      <Typography sx={{ color: sprintColor, display: 'block', mt: 0.5, fontSize: '0.9rem', fontWeight: 700 }}>
+        {metricLabel}: {formattedValue}
       </Typography>
-      <Typography sx={{ color: '#E65100', display: 'block', mt: 0.35, fontSize: '0.85rem', fontWeight: 600 }}>
-        {pending} task{pending === 1 ? '' : 's'} still open in sprint
-      </Typography>
+      {(metric === 'hours' || metric === 'avgPerTask') ? (
+        <Typography sx={{ color: sprintColor, display: 'block', mt: 0.35, fontSize: '0.84rem', fontWeight: 600, opacity: 0.85 }}>
+          Open tasks: {pending}
+        </Typography>
+      ) : null}
     </Box>
   );
 }
@@ -77,10 +66,28 @@ function SprintCompareBarBlock({
   data,
   dataKey,
   valueFormatter,
-  stackedPending,
-  hoursTooltipPending,
-  avgTooltipPending,
 }) {
+  const renderSprintXTick = (props) => {
+    const { x, y, payload } = props;
+    const row = data.find((d) => d.shortLabel === payload.value);
+    const fill = row?.accentColor ?? FALLBACK_SPRINT_COLOR;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          transform="rotate(-38)"
+          textAnchor="end"
+          fill={fill}
+          fontSize={11}
+          fontWeight={600}
+          dy={8}
+          dx={-2}
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <Typography sx={{ fontWeight: 800, color: '#1A1A1A', mb: 0.35, fontSize: '1.02rem' }}>
@@ -92,57 +99,23 @@ function SprintCompareBarBlock({
         </Typography>
       ) : null}
       <ResponsiveContainer width="100%" height={CHART_H}>
-        <BarChart data={data} margin={{ top: 6, right: 8, left: -8, bottom: 4 }} barCategoryGap="18%">
+        <BarChart data={data} margin={{ top: 8, right: 10, left: 4, bottom: 42 }} barCategoryGap="24%">
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis
             dataKey="shortLabel"
-            tick={AXIS_TICK}
-            axisLine={AXIS_LINE}
+            tick={renderSprintXTick}
+            axisLine={X_AXIS_LINE}
+            tickLine={{ stroke: '#BDBDBD' }}
             interval={0}
+            height={48}
           />
-          <YAxis tick={AXIS_TICK} axisLine={false} width={44} />
-          {hoursTooltipPending ? (
-            <Tooltip content={<HoursWithPendingTooltip />} />
-          ) : avgTooltipPending ? (
-            <Tooltip content={<AvgWithPendingTooltip />} />
-          ) : (
-            <Tooltip
-              contentStyle={{ borderRadius: 8, border: '1px solid #90CAF9', fontSize: 14, padding: '10px 12px' }}
-              formatter={(v, name) => {
-                if (stackedPending && (name === 'completed' || name === 'Completed')) {
-                  return [`${v} done`, 'Completed'];
-                }
-                if (stackedPending && (name === 'pending' || name === 'Pending')) {
-                  return [`${v} open`, 'Pending'];
-                }
-                return [valueFormatter ? valueFormatter(v) : v, ''];
-              }}
-              labelFormatter={(_, payload) => payload?.[0]?.payload?.name ?? ''}
-            />
-          )}
-          {stackedPending ? (
-            <>
-              <Bar dataKey="completed" name="completed" stackId="tasks" radius={[0, 0, 0, 0]} maxBarSize={48}>
-                {data.map((row) => (
-                  <Cell key={`${row.shortLabel}-c`} fill={row.accentColor} />
-                ))}
-              </Bar>
-              <Bar
-                dataKey="pending"
-                name="pending"
-                stackId="tasks"
-                fill={PENDING_TASKS_COLOR}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={48}
-              />
-            </>
-          ) : (
-            <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={48}>
-              {data.map((row) => (
-                <Cell key={row.shortLabel} fill={row.accentColor} />
-              ))}
-            </Bar>
-          )}
+          <YAxis tick={Y_AXIS_TICK} axisLine={false} width={48} />
+          <Tooltip content={<SprintMetricTooltip metric={dataKey} valueFormatter={valueFormatter} />} />
+          <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={44}>
+            {data.map((row) => (
+              <Cell key={row.shortLabel} fill={row.accentColor} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </Box>
@@ -183,6 +156,9 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
         borderRadius: 3,
         border: '1px solid #EFEFEF',
         boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -203,8 +179,8 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
           <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.12rem' }}>
             Sprint comparison
           </Typography>
-          <Typography sx={{ color: '#666', display: 'block', maxWidth: 720, fontSize: '0.95rem', mt: 0.35, fontWeight: 500 }}>
-            Stacked tasks show completed vs pending; hours include pending count in the tooltip.
+          <Typography sx={{ color: '#666', display: 'block', fontSize: '0.95rem', mt: 0.35, fontWeight: 500 }}>
+            Completed tasks per sprint, hours worked and average hours per task
           </Typography>
         </Box>
       </Box>
@@ -212,18 +188,17 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-          gap: { xs: 2.5, md: 2 },
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 2,
           alignItems: 'stretch',
         }}
       >
         <SprintCompareBarBlock
-          title="Tasks: completed vs pending"
-          subtitle="Stacked: completed (sprint color) + pending (amber)"
+          title="Completed tasks per sprint"
+          subtitle="Total tasks marked done"
           data={data}
           dataKey="completed"
           valueFormatter={(v) => `${v} tasks`}
-          stackedPending
         />
         <SprintCompareBarBlock
           title="Hours worked"
@@ -231,7 +206,6 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
           data={data}
           dataKey="hours"
           valueFormatter={(v) => `${v} h`}
-          hoursTooltipPending
         />
         <SprintCompareBarBlock
           title="Average hours / task"
@@ -239,7 +213,6 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
           data={data}
           dataKey="avgPerTask"
           valueFormatter={(v) => `${v} hrs/task`}
-          avgTooltipPending
         />
       </Box>
     </Paper>

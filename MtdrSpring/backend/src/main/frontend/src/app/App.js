@@ -78,7 +78,7 @@ function App() {
     { text: 'Tasks', icon: <TaskAltIcon />, id: 'tasks', roles: ['ADMIN', 'MANAGER'] },
     { text: 'KPI Analytics', icon: <AnalyticsIcon />, id: 'analytics', roles: ['ADMIN', 'MANAGER'] },
     { text: 'AI Insights', icon: <AutoAwesomeIcon />, id: 'ai', roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Cambiar Proyecto', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
+    { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter(item => item.roles.includes(user.role));
 
   const handleLogout = () => {
@@ -178,7 +178,7 @@ function App() {
             <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}
               anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
               transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-              <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
+              <MenuItem onClick={handleLogout}>Sign out</MenuItem>
             </Menu>
           </Box>
         </Box>
@@ -186,6 +186,8 @@ function App() {
 
       <Box component="main" sx={{
         position: 'fixed', top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        pt: 2, px: 4, pb: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
         overflowY: 'auto', p: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
       }}>
         {activePage === 'dashboard' && (
@@ -199,7 +201,7 @@ function App() {
         
         {!['dashboard', 'sprints', 'analytics', 'tasks'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-            <Typography variant="h6" color="textSecondary">Sección en desarrollo</Typography>
+            <Typography variant="h6" color="textSecondary">Section under development</Typography>
           </Box>
         )}
       </Box>

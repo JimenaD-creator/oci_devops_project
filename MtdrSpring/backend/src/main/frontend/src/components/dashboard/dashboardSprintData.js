@@ -107,7 +107,7 @@ function mapApiSprint(apiSprint) {
     shortLabel: `Sprint ${id}`,
     accentColor: SPRINT_CHART_COLORS[0],
     name: `Sprint ${id}`,
-    dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'es'),
+    dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     dateRangeEn: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     status: inferStatus(apiSprint),
     totalTasks: 0,
@@ -203,7 +203,7 @@ export async function fetchDashboardSprints() {
       fetch('http://127.0.0.1:8080/api/user-tasks'),
     ]);
 
-    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Error en la carga');
+    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Failed to load data');
 
     const apiSprints   = await sprintsRes.json();
     const apiTasks     = await tasksRes.json();
@@ -214,7 +214,7 @@ export async function fetchDashboardSprints() {
     assignSprintAccentColors(enriched);
     return enriched;
   } catch (error) {
-    console.error("Fallo al cargar datos del Dashboard:", error);
+    console.error('Dashboard data load failed:', error);
     return [];
   }
 }

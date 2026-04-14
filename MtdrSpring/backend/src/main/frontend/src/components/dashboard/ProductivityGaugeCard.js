@@ -98,25 +98,25 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
       </Box>
 
       <Typography variant="body2" sx={{ color: '#888', mt: 1 }}>
-        Meta: {meta}%
+        Goal: {meta}%
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
         {above ? (
           <>
             <CheckCircleOutlineIcon sx={{ color: '#2E7D32', fontSize: 20 }} />
             <Typography variant="body2" sx={{ color: '#2E7D32', fontWeight: 600 }}>
-              Por encima de la meta
+              Above goal
             </Typography>
           </>
         ) : (
           <Typography variant="body2" sx={{ color: '#C74634', fontWeight: 600 }}>
-            Por debajo de la meta
+            Below goal
           </Typography>
         )}
       </Box>
       {compareMode && selectedSprints.length > 1 && (
         <Typography variant="caption" sx={{ color: '#AAA', mt: 1, textAlign: 'center' }}>
-          Promedio de los sprints seleccionados
+          Average of selected sprints
         </Typography>
       )}
     </Paper>

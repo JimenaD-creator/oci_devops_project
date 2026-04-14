@@ -3,9 +3,9 @@ import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-re
 
 const initialData = [
   { name: 'Carlos Ruiz', initials: 'CR', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
-  { name: 'María García', initials: 'MG', assigned: 10, completed: 8, hours: 45.0, onTime: 85, participation: 90, workload: 100 },
-  { name: 'Juan Pérez', initials: 'JP', assigned: 6, completed: 5, hours: 20.0, onTime: 60, participation: 80, workload: 60 },
-  { name: 'Laura Sánchez', initials: 'LS', assigned: 7, completed: 6, hours: 31.0, onTime: 75, participation: 95, workload: 70 },
+  { name: 'Maria Garcia', initials: 'MG', assigned: 10, completed: 8, hours: 45.0, onTime: 85, participation: 90, workload: 100 },
+  { name: 'Juan Perez', initials: 'JP', assigned: 6, completed: 5, hours: 20.0, onTime: 60, participation: 80, workload: 60 },
+  { name: 'Laura Sanchez', initials: 'LS', assigned: 7, completed: 6, hours: 31.0, onTime: 75, participation: 95, workload: 70 },
 ];
 
 const rate = (completed, assigned) => Math.round((completed / assigned) * 100);

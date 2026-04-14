@@ -120,6 +120,15 @@
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+.kanban-task-card--p-critical {
+  border-left: 4px solid #C62828;
+  background: linear-gradient(90deg, rgba(255, 235, 238, 0.75) 0%, #FFFFFF 18%);
+}
+
+.kanban-task-card--p-high {
+  border-left: 4px solid #EF6C00;
+}
+
 .kanban-task-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
@@ -156,13 +165,46 @@
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.35;
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.35rem;
   color: #2e2e2e;
 }
 
 .kanban-task-card--done .kanban-task-title {
   color: #6f6f6f;
   text-decoration: line-through;
+}
+
+.kanban-task-subtitle {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  margin: 0 0 0.7rem;
+  color: #6f6f6f;
+}
+
+.kanban-task-classification-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+.kanban-task-classification-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 7px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.kanban-task-priority-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 7px;
+  border-radius: 9999px;
+  text-transform: uppercase;
 }
 
 .kanban-task-footer {

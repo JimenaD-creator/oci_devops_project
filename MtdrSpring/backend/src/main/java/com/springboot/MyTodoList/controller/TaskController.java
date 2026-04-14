@@ -55,7 +55,10 @@ public class TaskController {
             Task existingTask = task.get();
             existingTask.setAssignedSprint(taskDetails.getAssignedSprint());
             existingTask.setClassification(taskDetails.getClassification());
+            existingTask.setTitle(taskDetails.getTitle());
+            existingTask.setDescription(taskDetails.getDescription());
             existingTask.setStatus(taskDetails.getStatus());
+            existingTask.setPriority(taskDetails.getPriority());
             existingTask.setAssignedHours(taskDetails.getAssignedHours());
             existingTask.setStartDate(taskDetails.getStartDate());
             existingTask.setDueDate(taskDetails.getDueDate());

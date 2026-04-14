@@ -18,7 +18,7 @@ const ProjectSelector = ({ onSelect }) => {
           setProjects(data);
         }
       } catch (err) {
-        console.error("Error cargando proyectos:", err);
+        console.error('Error loading projects:', err);
       } finally {
         setLoading(false);
       }
@@ -43,7 +43,7 @@ const ProjectSelector = ({ onSelect }) => {
     }}>
       <Container maxWidth="md">
         <Box sx={{ mb: 6, textAlign: 'center' }}>
-          {/* El logo lo dejamos en negro/rojo para que resalte en el blanco */}
+          {/* Logo in black/red for contrast on white */}
           <Typography sx={{ 
             fontSize: '2.5rem', 
             fontWeight: 900, 
@@ -61,10 +61,10 @@ const ProjectSelector = ({ onSelect }) => {
             marginBottom: '20px' 
           }} />
           <Typography variant="h5" sx={{ fontWeight: 600, color: '#111', mb: 1 }}>
-            Selección de Proyecto
+            Project selection
           </Typography>
           <Typography sx={{ color: '#666' }}>
-            Elige un entorno para gestionar tus tareas y sprints
+            Choose an environment to manage your tasks and sprints
           </Typography>
         </Box>
 
@@ -125,7 +125,7 @@ const ProjectSelector = ({ onSelect }) => {
               '&:hover': { color: '#E53935', bgcolor: 'transparent' } 
             }}
           >
-            Cerrar sesión y salir
+            Sign out and exit
           </Button>
         </Box>
       </Container>

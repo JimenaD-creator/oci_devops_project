@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Button,
-  LinearProgress, Avatar, AvatarGroup, IconButton, Divider, Paper,
+  LinearProgress, IconButton, Divider, Paper,
   CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, Select, FormControl, InputLabel
+  TextField, Stack,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -16,9 +18,9 @@ const ORACLE_RED = '#E53935';
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 const STATUS_CONFIG = {
-  active:    { label: 'En Curso',   color: '#E8F5E9', textColor: '#2E7D32' },
-  completed: { label: 'Completado', color: '#EEF2FF', textColor: '#3730A3' },
-  planned:   { label: 'Planeado',   color: '#FFF8E1', textColor: '#F57F17' },
+  active:    { label: 'Active',    color: '#E8F5E9', textColor: '#2E7D32' },
+  completed: { label: 'Completed', color: '#EEF2FF', textColor: '#3730A3' },
+  planned:   { label: 'Planned',   color: '#FFF8E1', textColor: '#F57F17' },
 };
 
 const AVATAR_COLORS = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA'];
@@ -34,7 +36,7 @@ function inferStatus(sprint) {
 
 function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function getInitials(name) {
@@ -64,7 +66,7 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
     }}>
       <CardContent sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-          <Box>
+          <Box sx={{ minWidth: 0, pr: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>Sprint {sprint.id}</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
               <CalendarTodayIcon sx={{ fontSize: 12, color: '#AAA' }} />
@@ -72,6 +74,22 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
                 {formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}
               </Typography>
             </Box>
+            {sprint.goal ? (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#777',
+                  mt: 0.75,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: 1.35,
+                }}
+              >
+                {sprint.goal}
+              </Typography>
+            ) : null}
           </Box>
           <Chip label={statusCfg.label} size="small"
             sx={{ bgcolor: statusCfg.color, color: statusCfg.textColor, fontWeight: 700, fontSize: '0.7rem' }} />
@@ -80,7 +98,7 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
         {status !== 'planned' && (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>Progreso</Typography>
+              <Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>Progress</Typography>
               <Typography variant="caption" sx={{ fontWeight: 800, color: progress === 100 ? '#2E7D32' : ORACLE_RED }}>
                 {progress}%
               </Typography>
@@ -104,7 +122,7 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
             </Box>
           </Box>
           <Typography variant="caption" sx={{ color: '#AAA', fontWeight: 600 }}>
-            {total} tareas · {Math.round((sprint.completionRate ?? 0) * 100)}% KPI
+            {total} tasks · {Math.round((sprint.completionRate ?? 0) * 100)}% KPI
           </Typography>
         </Box>
       </CardContent>
@@ -129,30 +147,53 @@ function SprintDetail({ sprint, tasks, onTaskStatusChange }) {
   };
 
   const statusLabel = {
-    'DONE':        { label: 'Listo',       bg: '#F0FFF4', color: '#2E7D32' },
-    'IN_PROGRESS': { label: 'En progreso', bg: '#E3F2FD', color: '#1565C0' },
-    'PENDING':     { label: 'Pendiente',   bg: '#FFF1F0', color: '#C62828' },
-    'TODO':        { label: 'Por hacer',   bg: '#F5F5F5', color: '#757575' },
+    'DONE':        { label: 'Done',        bg: '#F0FFF4', color: '#2E7D32' },
+    'IN_PROGRESS': { label: 'In progress', bg: '#E3F2FD', color: '#1565C0' },
+    'PENDING':     { label: 'Pending',     bg: '#FFF1F0', color: '#C62828' },
+    'TODO':        { label: 'To do',       bg: '#F5F5F5', color: '#757575' },
   };
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>Sprint {sprint.id} — Detalle</Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800 }}>Sprint {sprint.id} — Detail</Typography>
           <Typography variant="body2" sx={{ color: '#999', mt: 0.5 }}>
             {formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}
           </Typography>
         </Box>
       </Box>
 
+      {sprint.goal ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 3,
+            borderRadius: 2,
+            border: '1px solid #ECECEC',
+            bgcolor: '#FAFAFA',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <FlagOutlinedIcon sx={{ fontSize: 18, color: ORACLE_RED }} />
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#757575', letterSpacing: 0.4 }}>
+              Sprint goal
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#333', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+            {sprint.goal}
+          </Typography>
+        </Paper>
+      ) : null}
+
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {[
-          { label: 'Total',       value: total,      color: '#555' },
-          { label: 'Completadas', value: done,        color: '#2E7D32' },
-          { label: 'En progreso', value: inProgress,  color: '#1565C0' },
-          { label: 'Pendientes',  value: pending,     color: '#C62828' },
-          { label: 'Completado',  value: `${progress}%`, color: ORACLE_RED },
+          { label: 'Total',       value: total,       color: '#555' },
+          { label: 'Completed',   value: done,        color: '#2E7D32' },
+          { label: 'In progress', value: inProgress,  color: '#1565C0' },
+          { label: 'Pending',     value: pending,     color: '#C62828' },
+          { label: 'Completion',  value: `${progress}%`, color: ORACLE_RED },
         ].map((s) => (
           <Grid item xs key={s.label}>
             <Paper sx={{ p: 2, borderRadius: 2, border: '1px solid #EFEFEF', boxShadow: 'none', textAlign: 'center' }}>
@@ -165,7 +206,7 @@ function SprintDetail({ sprint, tasks, onTaskStatusChange }) {
 
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>Progreso del sprint</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>Sprint progress</Typography>
           <Typography variant="body2" sx={{ fontWeight: 800, color: ORACLE_RED }}>{progress}%</Typography>
         </Box>
         <LinearProgress variant="determinate" value={progress} sx={{
@@ -173,15 +214,15 @@ function SprintDetail({ sprint, tasks, onTaskStatusChange }) {
           '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED, borderRadius: 5 }
         }} />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-          <Typography variant="caption" sx={{ color: '#AAA' }}>Inicio: {formatDate(sprint.startDate)}</Typography>
-          <Typography variant="caption" sx={{ color: '#AAA' }}>Fin: {formatDate(sprint.dueDate)}</Typography>
+          <Typography variant="caption" sx={{ color: '#AAA' }}>Start: {formatDate(sprint.startDate)}</Typography>
+          <Typography variant="caption" sx={{ color: '#AAA' }}>End: {formatDate(sprint.dueDate)}</Typography>
         </Box>
       </Box>
 
       <Paper sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none', overflow: 'hidden' }}>
         {sprintTasks.length === 0 ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ color: '#CCC' }}>No hay tareas en este sprint</Typography>
+            <Typography variant="body2" sx={{ color: '#CCC' }}>No tasks in this sprint</Typography>
           </Box>
         ) : sprintTasks.map((task, i) => (
           <Box key={task.id}>
@@ -218,12 +259,34 @@ function SprintDetail({ sprint, tasks, onTaskStatusChange }) {
 function NewSprintDialog({ open, onClose, onCreated, projectId }) {
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [goal, setGoal] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setStartDate('');
+    setDueDate('');
+    setGoal('');
+  }, [open]);
+
+  const resetForm = () => {
+    setStartDate('');
+    setDueDate('');
+    setGoal('');
+  };
+
+  const handleClose = () => {
+    if (!saving) {
+      resetForm();
+      onClose();
+    }
+  };
 
   const handleSave = async () => {
     if (!startDate || !dueDate) return;
     setSaving(true);
     try {
+      const goalTrim = goal.trim();
       const res = await fetch(`${API_BASE}/api/sprints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -235,46 +298,160 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           onTimeDelivery: 0,
           teamParticipation: 0,
           workloadBalance: 0,
+          goal: goalTrim || null,
         }),
       });
       if (res.ok) {
         const created = await res.json();
         onCreated(created);
-        onClose();
-        setStartDate('');
-        setDueDate('');
+        handleClose();
       }
     } finally {
       setSaving(false);
     }
   };
 
+  const canSave = Boolean(startDate && dueDate);
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 800 }}>Nuevo Sprint</DialogTitle>
-      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-        <TextField
-          label="Fecha de inicio"
-          type="date"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          fullWidth
-        />
-        <TextField
-          label="Fecha de fin"
-          type="date"
-          value={dueDate}
-          onChange={e => setDueDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          fullWidth
-        />
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      scroll="body"
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          borderRadius: 3,
+          border: '1px solid #E5E5E5',
+          boxShadow: '0 18px 48px rgba(0,0,0,0.12)',
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <DialogTitle sx={{ p: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+            borderBottom: '1px solid #F0F0F0',
+            bgcolor: '#FAFAFA',
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: 'rgba(229,57,53,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <AddIcon sx={{ color: ORACLE_RED, fontSize: 26 }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1A1A1A', lineHeight: 1.25 }}>
+                New sprint
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            aria-label="Close"
+            onClick={handleClose}
+            disabled={saving}
+            size="small"
+            sx={{ color: '#9E9E9E', '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' } }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ px: 2.5, pt: 2, pb: 1 }}>
+        <Typography variant="body2" sx={{ color: '#616161', fontWeight: 500, lineHeight: 1.5, mb: 2 }}>
+          Pick start and end dates, then add an optional sprint goal if you want one.
+        </Typography>
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Start date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <TextField
+              label="End date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+          </Stack>
+          <TextField
+            label="Sprint goal (optional)"
+            placeholder="What should this sprint achieve?"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            fullWidth
+            multiline
+            minRows={4}
+            inputProps={{ maxLength: 2000 }}
+            helperText={`${goal.length} / 2000 characters`}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, alignItems: 'flex-start' } }}
+          />
+        </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} sx={{ color: '#888', textTransform: 'none' }}>Cancelar</Button>
-        <Button onClick={handleSave} disabled={saving || !startDate || !dueDate} variant="contained"
-          sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#C62828' } }}>
-          {saving ? 'Guardando...' : 'Crear Sprint'}
+
+      <DialogActions
+        sx={{
+          px: 2.5,
+          py: 2,
+          gap: 1,
+          borderTop: '1px solid #F0F0F0',
+          bgcolor: '#FAFAFA',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button
+          onClick={handleClose}
+          disabled={saving}
+          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          variant="contained"
+          disableElevation
+          sx={{
+            bgcolor: ORACLE_RED,
+            textTransform: 'none',
+            fontWeight: 700,
+            px: 2.5,
+            borderRadius: 2,
+            '&:hover': { bgcolor: '#C62828' },
+            '&.Mui-disabled': { bgcolor: '#E0E0E0', color: '#9E9E9E' },
+          }}
+        >
+          {saving ? 'Creating…' : 'Create sprint'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -333,7 +510,7 @@ export default function SprintsPage() {
             Sprints
           </Typography>
           <Typography variant="body2" sx={{ color: '#999', mt: 0.5 }}>
-            {sprints[0]?.assignedProject?.name ?? 'Project'} · {sprints.length} sprints en total
+            {sprints[0]?.assignedProject?.name ?? 'Project'} · {sprints.length} total sprints
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -344,7 +521,7 @@ export default function SprintsPage() {
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}
             sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, borderRadius: 2,
               '&:hover': { bgcolor: '#C62828' } }}>
-            Crear Nuevo Sprint
+            Create new sprint
           </Button>
         </Box>
       </Box>
@@ -352,7 +529,7 @@ export default function SprintsPage() {
       <Grid container spacing={3}>
         <Grid item xs={4}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#555', mb: 1.5 }}>
-            Historial de Sprints
+            Sprint history
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {sprints.map((sprint) => (
@@ -373,7 +550,7 @@ export default function SprintsPage() {
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
               <Typography variant="body1" sx={{ color: '#CCC' }}>
-                Selecciona un sprint para ver el detalle
+                Select a sprint to view details
               </Typography>
             </Box>
           )}
