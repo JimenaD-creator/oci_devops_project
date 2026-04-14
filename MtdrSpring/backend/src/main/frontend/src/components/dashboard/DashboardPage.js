@@ -37,26 +37,46 @@ export default function DashboardPage() {
       .finally(() => setSprintsLoading(false));
   };
 
+  /** Unique sprint ids that exist in `allSprints` (fixes duplicate ids in state after many toggles). */
+  const normalizedSelectedIds = useMemo(() => {
+    if (!allSprints.length) return [];
+    const valid = new Set(allSprints.map((s) => Number(s.id)));
+    return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))].filter((id) => valid.has(id));
+  }, [selectedSprintIds, allSprints]);
+
+  /** Dedupe / prune invalid ids in state (e.g. [1,1,2] or stale ids) so compareMode matches the UI. */
+  useEffect(() => {
+    if (!allSprints.length || sprintsLoading) return;
+    if (normalizedSelectedIds.length === 0) {
+      const active = allSprints.find((s) => s.status === 'active') ?? allSprints[allSprints.length - 1];
+      setSelectedSprintIds([Number(active.id)]);
+      return;
+    }
+    const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
+    const uniqueRaw = [...new Set(raw)];
+    const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const hasDuplicateEntries = raw.length !== uniqueRaw.length;
+    const needsPrune = uniqSorted !== normSorted;
+    if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
+  }, [allSprints, sprintsLoading, selectedSprintIds, normalizedSelectedIds]);
+
   /**
-   * One sprint per id, numeric id match (API may return number or string).
-   * Dedupes so compare mode only when the user truly selected multiple distinct sprints.
+   * One sprint per id, order follows first occurrence in normalizedSelectedIds.
    */
   const selectedSprints = useMemo(() => {
     const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
-    const orderedUnique = [...new Set(selectedSprintIds.map((id) => Number(id)))].filter((id) =>
-      Number.isFinite(id)
-    );
-    return orderedUnique
+    return normalizedSelectedIds
       .map((id) => byId.get(id))
       .filter(Boolean)
       .sort((a, b) => {
-        const ia = selectedSprintIds.findIndex((x) => Number(x) === Number(a.id));
-        const ib = selectedSprintIds.findIndex((x) => Number(x) === Number(b.id));
+        const ia = normalizedSelectedIds.indexOf(Number(a.id));
+        const ib = normalizedSelectedIds.indexOf(Number(b.id));
         return ia - ib;
       });
-  }, [selectedSprintIds, allSprints]);
+  }, [normalizedSelectedIds, allSprints]);
 
-  const compareMode = selectedSprints.length > 1;
+  const compareMode = normalizedSelectedIds.length > 1;
   const primarySprint = selectedSprints[0];
 
   const projectName = useMemo(() => {
@@ -91,11 +111,10 @@ export default function DashboardPage() {
   const toggleSprint = (id, checked) => {
     const nid = Number(id);
     setSelectedSprintIds((prev) => {
-      const nums = prev.map(Number);
+      const nums = [...new Set(prev.map(Number).filter(Number.isFinite))];
       if (checked) return [...new Set([...nums, nid])];
-      const unique = [...new Set(nums)];
-      if (unique.length <= 1) return prev;
-      return [...new Set(nums.filter((x) => x !== nid))];
+      if (nums.length <= 1) return nums;
+      return nums.filter((x) => x !== nid);
     });
   };
 
@@ -167,29 +186,36 @@ export default function DashboardPage() {
             </Badge>
           </IconButton>
         </Box>
+
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
+            {compareMode ? 'Multi-sprint comparison' : (primarySprint?.name || 'Project Progress')}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
+              {teamDeveloperCount} devs
+            </Typography>
+          </Box>
+        </Box>
       </Paper>
 
       <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 2.5 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {compareMode ? 'Multi-sprint comparison' : (primarySprint?.name || 'Project Progress')}
+        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
+              Completion rate
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{teamDeveloperCount} devs</Typography>
-            </Box>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Completion Rate</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 800, color: ORACLE_RED }}>{heroProgress}%</Typography>
+            <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: ORACLE_RED, lineHeight: 1 }}>
+              {heroProgress}%
+            </Typography>
           </Box>
           <LinearProgress
             variant="determinate"
             value={heroProgress}
             sx={{
-              height: 10,
-              borderRadius: 5,
+              height: 8,
+              borderRadius: 4,
               bgcolor: '#F0F0F0',
               '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED },
             }}
