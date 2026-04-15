@@ -128,12 +128,9 @@ function App() {
         },
       }}>
         <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #2A2A2A' }}>
-          <Box sx={{ width: 36, height: 36, bgcolor: '#E53935', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography sx={{ color: 'white', fontWeight: 900, fontSize: '0.65rem', letterSpacing: 1 }}>ORA</Typography>
-          </Box>
           <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>Oracle Software</Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role} Panel</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>Software Manager Tool</Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role}</Typography>
           </Box>
         </Box>
 

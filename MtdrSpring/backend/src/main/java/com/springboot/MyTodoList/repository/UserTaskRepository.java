@@ -11,4 +11,6 @@ import java.util.List;
 @Transactional
 public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> {
     List<UserTask> findByTask_AssignedSprint_Id(Long sprintId);
+
+    List<UserTask> findByTask_Id(Long taskId);
 }

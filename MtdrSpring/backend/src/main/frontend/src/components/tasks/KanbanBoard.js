@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Menu, MenuItem } from '@mui/material';
+import { developerAvatarColors } from '../../utils/developerColors';
 import './KanbanBoard.css';
 
 const COLUMN_DEFS = [
@@ -10,11 +11,20 @@ const COLUMN_DEFS = [
   { id: 'done',       name: 'Done',        className: 'kanban-col-done' },
 ];
 
-const STATUS_OPTIONS = [
+/** Status labels for any task state (incl. legacy / API values). */
+const STATUS_LABELS = {
+  TODO: 'To Do',
+  IN_PROGRESS: 'In Progress',
+  IN_REVIEW: 'In Review',
+  PENDING: 'Pending',
+  DONE: 'Done',
+};
+
+/** Options in the status menu (Pending omitted — use board columns / other flows). */
+const STATUS_MENU_OPTIONS = [
   { value: 'TODO',        label: 'To Do' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'IN_REVIEW',   label: 'In Review' },
-  { value: 'PENDING',     label: 'Pending' },
   { value: 'DONE',        label: 'Done' },
 ];
 
@@ -84,7 +94,7 @@ function TaskCard({ item, isDone, onStatusChange }) {
 
   const rawStatus = item.rawStatus || (isDone ? 'DONE' : 'TODO');
   const pillStyle = STATUS_PILL_STYLE[rawStatus] || STATUS_PILL_STYLE['TODO'];
-  const pillLabel = STATUS_OPTIONS.find(s => s.value === rawStatus)?.label || rawStatus;
+  const pillLabel = STATUS_LABELS[rawStatus] || rawStatus;
   const classificationKey = normalizeClassification(item.classification || item._raw?.classification);
   const classificationStyle = CLASSIFICATION_PILL_STYLE[classificationKey];
   const priorityKey = normalizePriority(item.priority || item._raw?.priority);
@@ -100,9 +110,15 @@ function TaskCard({ item, isDone, onStatusChange }) {
     if (newStatus !== rawStatus) onStatusChange(item.id, newStatus);
   };
 
+  const developerList = Array.isArray(item.developers) && item.developers.length
+    ? item.developers
+    : (item.developer ? [item.developer] : []);
+
+  const kindClass = `kanban-task-card--kind-${classificationKey.toLowerCase().replace(/_/g, '-')}`;
+
   return (
     <div
-      className={`kanban-task-card kanban-task-card--p-${priorityKey.toLowerCase()}${isDone ? ' kanban-task-card--done' : ''}`}
+      className={`kanban-task-card ${kindClass}${isDone ? ' kanban-task-card--done' : ''}`}
       onClick={(e) => setAnchorEl(e.currentTarget)}
       style={{ cursor: 'pointer' }}
     >
@@ -117,8 +133,7 @@ function TaskCard({ item, isDone, onStatusChange }) {
           {pillLabel} ▾
         </span>
       </div>
-      <p className="kanban-task-title">{item.description || '(No description)'}</p>
-      {item.details ? <p className="kanban-task-subtitle">{item.details}</p> : null}
+      <p className="kanban-task-title">{item.description || '(No title)'}</p>
       <div className="kanban-task-classification-row">
         <span
           className="kanban-task-classification-pill"
@@ -139,11 +154,36 @@ function TaskCard({ item, isDone, onStatusChange }) {
             <Clock style={{ width: 12, height: 12, flexShrink: 0 }} />
             <span>{hours}</span>
           </div>
-          {item.developer && (
-            <div className="kanban-task-avatar" title={item.developer}>
-              {initialsFromLabel(item.developer)}
+          {developerList.length > 0 ? (
+            <div className="kanban-task-avatars">
+              {developerList.slice(0, 4).map((name, idx) => {
+                const av = developerAvatarColors(name);
+                return (
+                  <div
+                    key={`${item.id}-dev-${name}-${idx}`}
+                    className="kanban-task-avatar"
+                    style={{
+                      zIndex: developerList.length - idx,
+                      background: av.bg,
+                      color: av.color,
+                    }}
+                    title={name}
+                  >
+                    {initialsFromLabel(name)}
+                  </div>
+                );
+              })}
+              {developerList.length > 4 ? (
+                <div
+                  className="kanban-task-avatar kanban-task-avatar--overflow"
+                  title={developerList.slice(4).join(', ')}
+                >
+                  +
+                  {developerList.length - 4}
+                </div>
+              ) : null}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -153,7 +193,7 @@ function TaskCard({ item, isDone, onStatusChange }) {
         onClose={() => setAnchorEl(null)}
         onClick={e => e.stopPropagation()}
       >
-        {STATUS_OPTIONS.map(opt => (
+        {STATUS_MENU_OPTIONS.map(opt => (
           <MenuItem
             key={opt.value}
             selected={opt.value === rawStatus}

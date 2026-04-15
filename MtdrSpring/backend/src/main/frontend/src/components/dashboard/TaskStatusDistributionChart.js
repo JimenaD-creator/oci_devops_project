@@ -5,15 +5,15 @@ import { ListTodo } from 'lucide-react';
 
 const ORACLE_RED = '#C74634';
 
-const CHART_HEIGHT = 200;
-const PIE_OUTER_RADIUS = 78;
+const CHART_HEIGHT = 158;
+const PIE_OUTER_RADIUS = 62;
 
 const cardBase = {
   backgroundColor: 'white',
-  borderRadius: '10px',
+  borderRadius: '12px',
   border: '1px solid #EFEFEF',
   boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-  padding: '0.75rem 0.95rem',
+  padding: '1.05rem 1.2rem',
   overflow: 'hidden',
 };
 
@@ -79,7 +79,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         fill={c}
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        fontSize={12}
+        fontSize={10}
         fontWeight={800}
       >
         {value}
@@ -100,12 +100,12 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.45rem' }}>
         <div
           style={{
-            width: '2.5rem',
-            height: '2.5rem',
-            borderRadius: '0.65rem',
+            width: '2.65rem',
+            height: '2.65rem',
+            borderRadius: '10px',
             backgroundColor: 'rgba(199,70,52,0.1)',
             display: 'flex',
             alignItems: 'center',
@@ -116,7 +116,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
           <ListTodo style={{ width: '1.35rem', height: '1.35rem', color: ORACLE_RED }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.95rem', lineHeight: 1.25 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.9rem', lineHeight: 1.3 }}>
             Tasks by status
           </Typography>
           <Typography sx={{ fontSize: '0.72rem', color: '#1565C0', mt: 0.15, fontWeight: 600, lineHeight: 1.3 }}>
@@ -159,7 +159,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
           <Box
             sx={{
               height: CHART_HEIGHT,
-              minHeight: 120,
+              minHeight: CHART_HEIGHT,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -168,7 +168,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
               bgcolor: '#F3E5F5',
             }}
           >
-            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.85rem' }}>
+            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.8rem' }}>
               No tasks in this sprint
             </Typography>
           </Box>
@@ -183,7 +183,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
             gap: '0.35rem 0.75rem',
             justifyContent: 'center',
             alignItems: 'center',
-            mt: 1,
+            mt: 0.65,
             overflowX: 'auto',
             flexShrink: 0,
             width: '100%',
