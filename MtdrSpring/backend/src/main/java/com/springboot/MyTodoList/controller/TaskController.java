@@ -1,10 +1,15 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.model.Task;
+import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
+import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +19,12 @@ public class TaskController {
     
     @Autowired
     private TaskRepository taskRepository;
+
+    @Autowired
+    private UserTaskRepository userTaskRepository;
+
+    @Autowired
+    private TaskAssignmentSyncService taskAssignmentSyncService;
     
     /**
      * Get all tasks
@@ -51,22 +62,60 @@ public class TaskController {
     @PutMapping("/{id}")
     public ResponseEntity<Task> updateTask(@PathVariable Long id, @RequestBody Task taskDetails) {
         Optional<Task> task = taskRepository.findById(id);
-        if (task.isPresent()) {
-            Task existingTask = task.get();
-            existingTask.setAssignedSprint(taskDetails.getAssignedSprint());
-            existingTask.setClassification(taskDetails.getClassification());
-            existingTask.setTitle(taskDetails.getTitle());
-            existingTask.setDescription(taskDetails.getDescription());
-            existingTask.setStatus(taskDetails.getStatus());
-            existingTask.setPriority(taskDetails.getPriority());
-            existingTask.setAssignedHours(taskDetails.getAssignedHours());
-            existingTask.setStartDate(taskDetails.getStartDate());
-            existingTask.setDueDate(taskDetails.getDueDate());
-            existingTask.setFinishDate(taskDetails.getFinishDate());
+        if (task.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Task existingTask = task.get();
+        LocalDateTime previousFinish = existingTask.getFinishDate();
+        String previousStatus = existingTask.getStatus();
+
+        existingTask.setAssignedSprint(taskDetails.getAssignedSprint());
+        existingTask.setClassification(taskDetails.getClassification());
+        existingTask.setTitle(taskDetails.getTitle());
+        existingTask.setDescription(taskDetails.getDescription());
+        existingTask.setPriority(taskDetails.getPriority());
+        existingTask.setAssignedHours(taskDetails.getAssignedHours());
+        existingTask.setStartDate(taskDetails.getStartDate());
+        existingTask.setDueDate(taskDetails.getDueDate());
+        existingTask.setUpdatedAt(LocalDateTime.now());
+
+        List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
+        String newStatus = taskDetails.getStatus();
+
+        if (assignments.isEmpty()) {
+            existingTask.setStatus(newStatus);
+            boolean wasDone = "DONE".equals(previousStatus);
+            boolean nowDone = "DONE".equals(newStatus);
+            if (nowDone && !wasDone) {
+                existingTask.setFinishDate(LocalDateTime.now());
+            } else if (nowDone && wasDone) {
+                existingTask.setFinishDate(previousFinish);
+            } else if (taskDetails.getDueDate() != null) {
+                existingTask.setFinishDate(taskDetails.getDueDate());
+            }
             Task updatedTask = taskRepository.save(existingTask);
             return ResponseEntity.ok(updatedTask);
         }
-        return ResponseEntity.notFound().build();
+
+        /* Multiple assignees: TASK.STATUS is derived from USER_TASK rows; task is DONE only if everyone is DONE. */
+        if (newStatus != null) {
+            if ("DONE".equalsIgnoreCase(newStatus.trim())) {
+                boolean allAssigneesDone = assignments.stream()
+                    .allMatch(ut -> "DONE".equalsIgnoreCase(Optional.ofNullable(ut.getStatus()).orElse("").trim()));
+                if (!allAssigneesDone) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).build();
+                }
+            } else {
+                for (UserTask ut : assignments) {
+                    ut.setStatus(newStatus);
+                    userTaskRepository.save(ut);
+                }
+            }
+        }
+
+        taskRepository.save(existingTask);
+        Task synced = taskAssignmentSyncService.syncTaskStatusFromAssignments(id);
+        return ResponseEntity.ok(synced != null ? synced : taskRepository.findById(id).orElse(existingTask));
     }
     
     /**

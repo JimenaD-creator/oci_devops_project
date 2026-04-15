@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
+import { APP_FONT_FAMILY } from '../../theme';
 
 const initialData = [
   { name: 'Carlos Ruiz', initials: 'CR', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
@@ -48,20 +49,21 @@ const fullColumns = [
   { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
-/** Same look as KPI analytics table (colors, typography, workload bar). */
+/** Dashboard-aligned: DM Sans, #1A1A1A / #666 / Oracle red / soft borders. */
 const SHARED_DEVELOPER_TABLE_CSS = `
           .table-card {
-            background: white;
+            background: #FFFFFF;
             border-radius: 12px;
-            border: 1px solid #f3f4f6;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid #EFEFEF;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             overflow: hidden;
             margin-bottom: 24px;
-            font-family: sans-serif;
+            font-family: ${APP_FONT_FAMILY};
+            -webkit-font-smoothing: antialiased;
           }
           .table-header {
             padding: 20px;
-            border-bottom: 1px solid #f9fafb;
+            border-bottom: 1px solid #F0F0F0;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -69,31 +71,64 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           @media (min-width: 640px) {
             .table-header { flex-direction: row; align-items: center; justify-content: space-between; }
           }
+          .table-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+          }
+          .table-title-icon-wrap {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(199, 70, 52, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          }
+          .table-title {
+            font-family: ${APP_FONT_FAMILY};
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #1A1A1A;
+            letter-spacing: -0.02em;
+            margin: 0;
+            line-height: 1.3;
+          }
           .search-wrapper { position: relative; }
           .search-icon {
             position: absolute;
             left: 10px;
             top: 50%;
             transform: translateY(-50%);
-            color: #6F6F6F;
+            color: #666;
             pointer-events: none;
           }
           .search-wrapper input.search-input[type="text"] {
             box-sizing: border-box;
-            padding: 6px 12px 6px 36px;
-            font-size: 12px;
-            border: 1px solid #e5e7eb;
+            font-family: ${APP_FONT_FAMILY};
+            padding: 8px 12px 8px 36px;
+            font-size: 0.8125rem;
+            border: 1px solid #E5E5E5;
             border-radius: 8px;
-            width: 176px;
+            width: 200px;
             outline: none;
+            color: #1A1A1A;
+            background: #FAFAFA;
           }
-          .search-wrapper input.search-input[type="text"]:focus { border-color: #C74634; }
+          .search-wrapper input.search-input[type="text"]::placeholder { color: #999; }
+          .search-wrapper input.search-input[type="text"]:focus {
+            border-color: #C74634;
+            background: #FFFFFF;
+          }
           .export-btn {
             display: flex;
             align-items: center;
             gap: 6px;
             padding: 6px 12px;
-            font-size: 12px;
+            font-family: ${APP_FONT_FAMILY};
+            font-size: 0.8125rem;
             font-weight: 600;
             border: 1px solid #C74634;
             color: #C74634;
@@ -102,15 +137,15 @@ const SHARED_DEVELOPER_TABLE_CSS = `
             cursor: pointer;
             transition: background 0.2s;
           }
-          .export-btn:hover { background: rgba(199, 70, 52, 0.05); }
+          .export-btn:hover { background: rgba(199, 70, 52, 0.06); }
           .table-scroll { overflow-x: auto; }
-          table { width: 100%; border-collapse: collapse; }
-          thead tr { background: #F5F5F5; }
+          table { width: 100%; border-collapse: collapse; font-family: ${APP_FONT_FAMILY}; }
+          thead tr { background: #FAFAFA; }
           th {
             text-align: left;
-            font-size: 12px;
-            font-weight: 600;
-            color: #6F6F6F;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #555;
             padding: 12px 16px;
             white-space: nowrap;
             user-select: none;
@@ -121,44 +156,60 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           th.th-sprint-compare-group {
             text-align: center;
             vertical-align: bottom;
+            color: #1A1A1A;
+            font-size: 0.8125rem;
           }
-          th.th-sprint-compare-group-bordered { border-left: 1px solid #e5e7eb; }
-          th.th-sprint-compare-sub-bordered { border-left: 1px solid #e5e7eb; }
+          th.th-sprint-compare-group-bordered { border-left: 1px solid #E8E8E8; }
+          th.th-sprint-compare-sub-bordered { border-left: 1px solid #E8E8E8; }
           .sprint-range-caption {
             display: block;
-            font-size: 10px;
-            color: #888;
+            font-size: 0.6875rem;
+            color: #666;
             font-weight: 500;
-            margin-top: 2px;
+            margin-top: 4px;
           }
-          td { padding: 14px 16px; border-top: 1px solid #f9fafb; }
-          td.td-sprint-compare-first { border-left: 1px solid #f3f4f6; }
-          .row-odd { background: rgba(249, 250, 251, 0.3); }
-          tr:hover { background: rgba(249, 250, 251, 0.6); }
+          td {
+            padding: 12px 16px;
+            border-top: 1px solid #F0F0F0;
+            font-size: 0.875rem;
+            color: #1A1A1A;
+          }
+          td.td-sprint-compare-first { border-left: 1px solid #EFEFEF; }
+          .row-odd { background: rgba(250, 250, 250, 0.85); }
+          tbody tr:hover { background: rgba(199, 70, 52, 0.04); }
           .avatar-circle {
             width: 28px; height: 28px; border-radius: 50%;
             background: rgba(199, 70, 52, 0.1);
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
           }
+          .dev-name-text {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1A1A1A;
+            white-space: nowrap;
+          }
+          .cell-muted { color: #666; font-weight: 500; }
+          .cell-strong { color: #1A1A1A; font-weight: 700; }
           .badge-base {
             display: inline-flex;
             align-items: center;
             padding: 2px 8px;
             border-radius: 9999px;
-            font-size: 12px;
+            font-size: 0.75rem;
             font-weight: 700;
             border: 1px solid;
+            font-family: ${APP_FONT_FAMILY};
           }
-          .badge-green { color: #16a34a; background: #f0fdf4; border-color: #bbf7d0; }
-          .badge-yellow { color: #ca8a04; background: #fefce8; border-color: #fef08a; }
-          .badge-red { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+          .badge-green { color: #2E7D32; background: #E8F5E9; border-color: #A5D6A7; }
+          .badge-yellow { color: #F57F17; background: #FFF8E1; border-color: #FFE082; }
+          .badge-red { color: #C62828; background: #FFEBEE; border-color: #FFCDD2; }
           .workload-container { display: flex; align-items: center; gap: 8px; }
-          .workload-track { width: 96px; height: 8px; background: #f3f4f6; border-radius: 9999px; overflow: hidden; }
+          .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
           .workload-fill { height: 100%; background: #C74634; border-radius: 9999px; }
-          .workload-text { font-size: 12px; font-weight: 600; color: #2E2E2E; }
-          .summary-row { background: rgba(243, 244, 246, 0.8); border-top: 2px solid #e5e7eb; }
-          .summary-cell { font-size: 12px; font-weight: 700; color: #4A4A4A; }
+          .workload-text { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
+          .summary-row { background: #F7F7F7; border-top: 2px solid #ECECEC; }
+          .summary-cell { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
           .text-center { text-align: center; }
 `;
 
@@ -245,7 +296,7 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
   const renderHours = (v) => (typeof v === 'number' ? `${v}h` : v);
 
   const renderWorkloadCell = (v) =>
-    typeof v === 'number' ? <WorkloadBar val={v} /> : <span style={{ fontSize: '14px', color: '#4A4A4A' }}>—</span>;
+    typeof v === 'number' ? <WorkloadBar val={v} /> : <span className="cell-muted">—</span>;
 
   const sortIcon = (key) =>
     sort.key === key ? (
@@ -264,11 +315,11 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
 
       <div className="table-card">
         <div className="table-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={20} color="#C74634" />
-            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#2E2E2E', margin: 0 }}>
-              Developer Productivity Breakdown
-            </h3>
+          <div className="table-header-left">
+            <div className="table-title-icon-wrap">
+              <Users size={20} color="#C74634" strokeWidth={2} />
+            </div>
+            <h3 className="table-title">Developer Productivity Breakdown</h3>
           </div>
           <div className="search-wrapper">
             <Search className="search-icon" size={14} />
@@ -391,11 +442,9 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div className="avatar-circle">
-                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#C74634' }}>{r.initials}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#C74634' }}>{r.initials}</span>
                       </div>
-                      <span style={{ fontSize: '14px', fontWeight: '500', color: '#2E2E2E', whiteSpace: 'nowrap' }}>
-                        {r.name}
-                      </span>
+                      <span className="dev-name-text">{r.name}</span>
                     </div>
                   </td>
                   {compareMode
@@ -404,19 +453,17 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
                         return [
                           <td
                             key={`${r.name}-${sp.id}-a`}
-                            className={`text-center${bc}`}
-                            style={{ fontSize: '14px', color: '#4A4A4A' }}
+                            className={`text-center cell-muted${bc}`}
                           >
                             {r[`${sp.id}_assigned`]}
                           </td>,
                           <td
                             key={`${r.name}-${sp.id}-d`}
-                            className="text-center"
-                            style={{ fontSize: '14px', fontWeight: '600', color: '#2E2E2E' }}
+                            className="text-center cell-strong"
                           >
                             {r[`${sp.id}_completed`]}
                           </td>,
-                          <td key={`${r.name}-${sp.id}-h`} className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                          <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">
                             {renderHours(r[`${sp.id}_hours`])}
                           </td>,
                           <td key={`${r.name}-${sp.id}-w`}>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>,
@@ -426,13 +473,13 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
                         const sp = selectedSprints[0];
                         return (
                           <>
-                            <td className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                            <td className="text-center cell-muted">
                               {r[`${sp.id}_assigned`]}
                             </td>
-                            <td className="text-center" style={{ fontSize: '14px', fontWeight: '600', color: '#2E2E2E' }}>
+                            <td className="text-center cell-strong">
                               {r[`${sp.id}_completed`]}
                             </td>
-                            <td className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                            <td className="text-center cell-muted">
                               {renderHours(r[`${sp.id}_hours`])}
                             </td>
                             <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
@@ -458,7 +505,7 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
                           {hoursAvgForSprint(sp.id)}
                         </td>,
                         <td key={`avg-${sp.id}-w`} className="summary-cell">
-                          {wAvg != null ? <WorkloadBar val={wAvg} /> : '—'}
+                          {wAvg != null ? <WorkloadBar val={wAvg} /> : <span className="cell-muted">—</span>}
                         </td>,
                       ];
                     })
@@ -471,7 +518,7 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
                           <td className="summary-cell text-center">{avgForKey(`${sp.id}_completed`)}</td>
                           <td className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>
                           <td className="summary-cell">
-                            {wAvg != null ? <WorkloadBar val={wAvg} /> : '—'}
+                            {wAvg != null ? <WorkloadBar val={wAvg} /> : <span className="cell-muted">—</span>}
                           </td>
                         </>
                       );
@@ -529,23 +576,21 @@ function FullAnalyticsTable() {
 
       <div className="table-card">
         <div className="table-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={20} color="#C74634" />
-            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#2E2E2E', margin: 0 }}>
-              Developer Productivity Breakdown
-            </h3>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="search-wrapper">
-              <Search className="search-icon" size={14} />
-              <input
-                type="text"
-                placeholder="Search developer..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="search-input"
-              />
+          <div className="table-header-left">
+            <div className="table-title-icon-wrap">
+              <Users size={20} color="#C74634" strokeWidth={2} />
             </div>
+            <h3 className="table-title">Developer Productivity Breakdown</h3>
+          </div>
+          <div className="search-wrapper">
+            <Search className="search-icon" size={14} />
+            <input
+              type="text"
+              placeholder="Search developer..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-input"
+            />
           </div>
         </div>
 
@@ -582,26 +627,24 @@ function FullAnalyticsTable() {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div className="avatar-circle">
-                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#C74634' }}>{r.initials}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#C74634' }}>{r.initials}</span>
                       </div>
-                      <span style={{ fontSize: '14px', fontWeight: '500', color: '#2E2E2E', whiteSpace: 'nowrap' }}>
-                        {r.name}
-                      </span>
+                      <span className="dev-name-text">{r.name}</span>
                     </div>
                   </td>
-                  <td className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                  <td className="text-center cell-muted">
                     {r.assigned}
                   </td>
-                  <td className="text-center" style={{ fontSize: '14px', fontWeight: '600', color: '#2E2E2E' }}>
+                  <td className="text-center cell-strong">
                     {r.completed}
                   </td>
                   <td className="text-center">
                     <Badge val={r.completionRate} green={80} yellow={50} />
                   </td>
-                  <td className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                  <td className="text-center cell-muted">
                     {r.hours}h
                   </td>
-                  <td className="text-center" style={{ fontSize: '14px', color: '#4A4A4A' }}>
+                  <td className="text-center cell-muted">
                     {r.avgHours}h
                   </td>
                   <td className="text-center">

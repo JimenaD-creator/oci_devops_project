@@ -11,7 +11,7 @@ const cardBase = {
   borderRadius: '12px',
   border: '1px solid #EFEFEF',
   boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-  padding: '1.1rem 1.15rem',
+  padding: '1.05rem 1.2rem',
   overflow: 'hidden',
 };
 
@@ -41,19 +41,19 @@ export default function SummaryCards({
   const styles = {
     card: {
       ...cardBase,
-      borderTop: `4px solid ${ORACLE_RED}`,
+      borderTop: `3px solid ${ORACLE_RED}`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'flex-start',
-      gap: '1.1rem',
+      gap: '0.95rem',
       width: '100%',
       minHeight: '100%',
       boxSizing: 'border-box',
     },
     iconWrapper: {
-      width: '3.6rem',
-      height: '3.6rem',
-      borderRadius: '0.75rem',
+      width: '2.85rem',
+      height: '2.85rem',
+      borderRadius: '10px',
       backgroundColor: 'rgba(199,70,52,0.1)',
       display: 'flex',
       alignItems: 'center',
@@ -61,9 +61,9 @@ export default function SummaryCards({
       flexShrink: 0,
     },
     content: { flex: 1, minWidth: 0 },
-    label: { fontSize: '0.88rem', fontWeight: 700, color: '#555', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' },
-    value: { fontSize: '2.25rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.08, marginBottom: '0.3rem' },
-    subtitle: { fontSize: '0.88rem', color: '#616161', fontWeight: 500, lineHeight: 1.35 },
+    label: { fontSize: '0.75rem', fontWeight: 700, color: '#555', marginBottom: '0.28rem', textTransform: 'uppercase', letterSpacing: '0.04em' },
+    value: { fontSize: '1.95rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.08, marginBottom: '0.2rem' },
+    subtitle: { fontSize: '0.8rem', color: '#888', fontWeight: 500, lineHeight: 1.35 },
   };
 
   return (
@@ -74,7 +74,7 @@ export default function SummaryCards({
         flexWrap: 'nowrap',
         alignItems: 'stretch',
         justifyContent: 'flex-start',
-        gap: 2,
+        gap: 1.25,
         width: '100%',
         minWidth: 0,
         mb: 2.5,
@@ -96,7 +96,7 @@ export default function SummaryCards({
         >
           <div style={styles.card}>
             <div style={styles.iconWrapper}>
-              <card.icon style={{ width: '1.85rem', height: '1.85rem', color: ORACLE_RED }} />
+              <card.icon style={{ width: '1.4rem', height: '1.4rem', color: ORACLE_RED }} />
             </div>
             <div style={styles.content}>
               <p style={styles.label}>{card.title}</p>
@@ -112,7 +112,7 @@ export default function SummaryCards({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.35 }}
         sx={{
-          flex: '1.4 1 0',
+          flex: '1.3 1 0',
           minWidth: { xs: 0, sm: 260 },
           display: 'flex',
           flexDirection: 'column',

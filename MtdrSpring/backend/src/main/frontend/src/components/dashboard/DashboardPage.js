@@ -7,6 +7,7 @@ import {
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
 import SummaryCards from './SummaryCards';
+import KPICards from './KPICards';
 import SprintComparisonCharts from './SprintComparisonCharts';
 import DeveloperWorkloadCharts from '../analytics/DeveloperWorkloadCharts';
 import DeveloperTable from '../analytics/DeveloperTable';
@@ -101,7 +102,7 @@ export default function DashboardPage() {
     [selectedSprints]
   );
 
-  /** Always from API `Sprint.completionRate` (mapped to `kpis.completionRate`, 0–100). */
+  /** Promedio de `kpis.completionRate` del API (0–100) para la barra bajo el header. */
   const heroProgress = useMemo(() => {
     if (!selectedSprints.length) return 0;
     const sum = selectedSprints.reduce((a, s) => a + (s.kpis?.completionRate ?? 0), 0);
@@ -262,7 +263,7 @@ export default function DashboardPage() {
         </FormGroup>
       </Paper>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}>
         {!compareMode ? (
           <SummaryCards
             totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
@@ -275,7 +276,15 @@ export default function DashboardPage() {
           </Box>
         )}
 
-        <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
+        {selectedSprints.length > 0 ? (
+          <Box sx={{ mb: { xs: 2, sm: 3 }, width: '100%', minWidth: 0 }}>
+            <KPICards compareMode={compareMode} selectedSprints={selectedSprints} />
+          </Box>
+        ) : null}
+
+        <Box sx={{ mt: { xs: 3, sm: 4 }, width: '100%', minWidth: 0 }}>
+          <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
+        </Box>
 
         <Box sx={{ mt: 3 }}>
           <DeveloperTable selectedSprints={selectedSprints} compareMode={compareMode} />

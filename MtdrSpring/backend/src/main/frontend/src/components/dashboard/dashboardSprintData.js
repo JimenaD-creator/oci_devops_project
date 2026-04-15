@@ -126,6 +126,54 @@ function mapApiSprint(apiSprint) {
   };
 }
 
+/**
+ * Replaces stored SPRINT KPI fields with values derived from current tasks and user_task rows,
+ * so the dashboard matches the task board (stored completion_rate in DB may be stale).
+ * Workload balance stays from the API unless we add a client-side model later.
+ */
+function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksList, taskSprintMap, storedKpis) {
+  const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
+  const totalCompleted = _statusCounts.DONE ?? 0;
+  const completionRatePct = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+
+  const tasksInSprint = (tasksList || []).filter((t) => taskSprintId(t) === sprintId);
+
+  let doneForOnTime = 0;
+  let onTimeCount = 0;
+  tasksInSprint.forEach((t) => {
+    if (bucketTaskStatus(t.status) !== 'DONE') return;
+    doneForOnTime++;
+    const fd = t.finishDate;
+    const dd = t.dueDate;
+    if (fd != null && dd != null && new Date(fd).getTime() <= new Date(dd).getTime()) {
+      onTimeCount += 1;
+    }
+  });
+  const onTimeDeliveryPct = doneForOnTime > 0 ? Math.round((onTimeCount / doneForOnTime) * 100) : 0;
+
+  let sumAssignedHours = 0;
+  tasksInSprint.forEach((t) => {
+    sumAssignedHours += Number(t.assignedHours) || 0;
+  });
+  let sumWorkedHours = 0;
+  (userTasksList || []).forEach((ut) => {
+    const tid = ut.task?.id;
+    const info = taskSprintMap[tid];
+    if (!info || info.sprintId !== sprintId) return;
+    sumWorkedHours += Number(ut.workedHours) || 0;
+  });
+  const teamParticipationPct =
+    sumAssignedHours > 0 ? Math.round((sumWorkedHours / sumAssignedHours) * 100) : 0;
+
+  return {
+    ...storedKpis,
+    completionRate: completionRatePct,
+    productivityScore: completionRatePct,
+    onTimeDelivery: onTimeDeliveryPct,
+    teamParticipation: teamParticipationPct,
+  };
+}
+
 function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   const sprintMap = {};
   sprints.forEach((sp) => {
@@ -159,9 +207,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const sp = sprintMap[taskInfo.sprintId];
     if (!sp) return;
 
-    sp.totalTasks += 1;
-    const isDone = taskInfo.status === 'DONE';
-    if (isDone) sp.totalCompleted += 1;
+    /* Sprint totals (totalTasks / totalCompleted) come from distinct tasks via _statusCounts, not from USER_TASK rows. */
+    const isDone = bucketTaskStatus(taskInfo.status) === 'DONE';
 
     const workedHours = ut.workedHours ?? 0;
     sp.totalHours += workedHours;
@@ -191,7 +238,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
     devs.forEach((d) => { d.workload = Math.round((d.hours / maxHours) * 100); });
     const statusPart = sprintTaskStatusRows(_statusCounts);
-    return { ...rest, developers: devs, ...statusPart };
+    const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
+    const totalCompleted = _statusCounts.DONE ?? 0;
+    const kpis = deriveKpisFromLiveData(id, _statusCounts, tasks, userTasks, taskSprintMap, rest.kpis);
+    return { ...rest, kpis, totalTasks, totalCompleted, developers: devs, ...statusPart };
   });
 }
 
