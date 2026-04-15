@@ -216,7 +216,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             px: 2.5,
             py: 2,
             borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
-            background: 'linear-gradient(135deg, #FFF3F0 0%, #E3F2FD 40%, #FFFFFF 100%)',
+            backgroundColor: '#FFFFFF',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -263,7 +263,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
           flex: 1,
           minHeight: 0,
           overflowY: 'auto',
-          background: 'linear-gradient(180deg, #FFF8F5 0%, #E3F2FD 28%, #F3E5F5 52%, #FFFFFF 100%)',
+          backgroundColor: '#FFFFFF',
         }}
       >
         <Stack spacing={2} sx={{ width: '100%', mt: 0.5 }}>
@@ -450,7 +450,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
           pb: 2.25,
           pt: 1.5,
           borderTop: '1px solid rgba(21, 101, 192, 0.12)',
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #E3F2FD 42%, #FFF8F6 100%)',
+          backgroundColor: '#FFFFFF',
         }}
       >
         <Button onClick={handleClose} sx={{ color: '#1565C0', textTransform: 'none', fontWeight: 600 }} disabled={saving}>
@@ -742,11 +742,15 @@ export default function TasksPage() {
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
-                borderColor: '#BDBDBD',
-                color: '#424242',
+                borderColor: ORACLE_RED,
+                color: ORACLE_RED,
                 flexShrink: 0,
                 alignSelf: { xs: 'stretch', sm: 'center' },
                 minHeight: 40,
+                '&:hover': {
+                  borderColor: '#A83B2D',
+                  bgcolor: 'rgba(199, 70, 52, 0.08)',
+                },
               }}
             >
               Clear filters

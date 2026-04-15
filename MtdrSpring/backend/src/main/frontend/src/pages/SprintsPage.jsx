@@ -1159,7 +1159,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
             pt: 2.5,
             pb: 2,
             borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
-            background: 'linear-gradient(135deg, #FFF3F0 0%, #E3F2FD 42%, #FFFFFF 100%)',
+            backgroundColor: '#FFFFFF',
           }}
         >
           <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
@@ -1182,7 +1182,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
               <Typography sx={{ fontWeight: 800, color: '#1A1A1A', lineHeight: 1.25, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>
                 New sprint
               </Typography>
-              <Typography variant="caption" sx={{ color: '#1565C0', fontWeight: 600, display: 'block', mt: 0.35 }}>
+              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
                 Schedule & goal
               </Typography>
             </Box>
@@ -1204,10 +1204,10 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           px: 2.5,
           pt: 2.25,
           pb: 1.5,
-          background: 'linear-gradient(180deg, #FFF8F5 0%, #E8F4FD 38%, #F3E8FF 62%, #FFFFFF 100%)',
+          backgroundColor: '#FFFFFF',
         }}
       >
-        <Typography variant="body2" sx={{ color: '#5E35B1', fontWeight: 600, lineHeight: 1.5, mb: 2 }}>
+        <Typography variant="body2" sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}>
           Pick start and end dates, then add an optional sprint goal if you want one.
         </Typography>
         <Stack spacing={2}>
@@ -1246,6 +1246,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
             sx={{
               ...sprintFormFieldOutline('#6A1B9A'),
               '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
+              '& .MuiFormHelperText-root': { color: '#757575' },
             }}
           />
         </Stack>
@@ -1257,7 +1258,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           py: 2,
           gap: 1,
           borderTop: '1px solid rgba(21, 101, 192, 0.12)',
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #E3F2FD 45%, #FFF8F6 100%)',
+          backgroundColor: '#FFFFFF',
           justifyContent: 'flex-end',
         }}
       >
