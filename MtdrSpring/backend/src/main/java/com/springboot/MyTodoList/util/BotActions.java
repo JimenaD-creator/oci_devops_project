@@ -3,6 +3,8 @@ package com.springboot.MyTodoList.util;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.ToDoItemService;
+import com.springboot.MyTodoList.service.TelegramUserMappingService;
+import com.springboot.MyTodoList.service.UserTaskService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,11 +26,18 @@ public class BotActions{
 
     ToDoItemService todoService;
     DeepSeekService deepSeekService;
+    BotStateManager stateManager;
+    TelegramUserMappingService telegramUserMappingService;
+    UserTaskService userTaskService;
 
-    public BotActions(TelegramClient tc,ToDoItemService ts, DeepSeekService ds){
+    public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds, 
+                      BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts){
         telegramClient = tc;
         todoService = ts;
         deepSeekService = ds;
+        stateManager = sm;
+        telegramUserMappingService = tums;
+        userTaskService = uts;
         exit  = false;
     }
 
@@ -88,7 +97,16 @@ public class BotActions{
             ToDoItem item = todoService.getToDoItemById(id);
             item.setDone(true);
             todoService.updateToDoItem(id, item);
-            BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_DONE.getMessage(), telegramClient);
+            
+            // NEW: Set state to waiting for hours
+            stateManager.setWaitingForHours(chatId, id);
+            
+            // NEW: Ask for hours instead of immediately confirming completion
+            BotHelper.sendMessageToTelegram(
+                chatId, 
+                "How many hours did you work on this task? (Please enter a whole number)", 
+                telegramClient
+            );
 
         } catch (Exception e) {
             logger.error(e.getLocalizedMessage(), e);
@@ -218,6 +236,67 @@ public class BotActions{
     public void fnElse(){
         if(exit)
             return;
+        
+        // NEW: Check if this user is waiting for hours
+        if (stateManager.hasPendingState(chatId)) {
+            Integer taskId = stateManager.getTaskIdWaitingForHours(chatId);
+            
+            if (taskId != null) {
+                try {
+                    // NEW: Try to parse as hours (int)
+                    Integer hours = Integer.parseInt(requestText.trim());
+                    
+                    // NEW: Validate hours (positive and reasonable upper bound)
+                    if (hours < 1) {
+                        BotHelper.sendMessageToTelegram(
+                            chatId,
+                            "Hours must be at least 1. Please try again.",
+                            telegramClient,
+                            null
+                        );
+                        exit = true;
+                        return;
+                    }
+                    
+                    if (hours > 100) {
+                        BotHelper.sendMessageToTelegram(
+                            chatId,
+                            "Please enter a reasonable number of hours (max 100).",
+                            telegramClient,
+                            null
+                        );
+                        exit = true;
+                        return;
+                    }
+                    
+                    // NEW: Save to UserTask
+                    saveWorkedHours(taskId, hours);
+                    
+                    BotHelper.sendMessageToTelegram(
+                        chatId,
+                        hours + " hours recorded! ✓",
+                        telegramClient,
+                        null
+                    );
+                    
+                    // NEW: Clear the pending state
+                    stateManager.clearPendingState(chatId);
+                    
+                } catch (NumberFormatException e) {
+                    // NEW: User entered non-numeric. Ask again.
+                    BotHelper.sendMessageToTelegram(
+                        chatId,
+                        "Please enter a valid whole number (e.g., 2 or 5)",
+                        telegramClient,
+                        null
+                    );
+                }
+                exit = true;
+                return;
+            }
+        }
+        
+        // EXISTING: Handle as new task (only if not waiting for hours)
         ToDoItem newItem = new ToDoItem();
         newItem.setDescription(requestText);
         newItem.setCreation_ts(OffsetDateTime.now());
@@ -244,5 +323,32 @@ public class BotActions{
 
     }
 
+    /**
+     * NEW: Save worked hours for a task
+     * Coordinates between ToDoItem (task is done) and UserTask (hours worked)
+     * 
+     * @param taskId The task ID
+     * @param hours The hours worked (int)
+     */
+    private void saveWorkedHours(Integer taskId, Integer hours) {
+        try {
+            // NEW: Get userId from Telegram chatId mapping
+            Integer userId = telegramUserMappingService.getUserIdByChatId(chatId);
+            
+            // NEW: Save to UserTask table
+            userTaskService.saveWorkedHours(userId, (long) taskId, hours);
+            
+            logger.info("Saved {} hours for task {} by user {}", hours, taskId, userId);
+        } catch (Exception e) {
+            logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
+            // Send error message to user
+            BotHelper.sendMessageToTelegram(
+                chatId,
+                "Sorry, there was an error saving your hours. Please try again.",
+                telegramClient,
+                null
+            );
+        }
+    }
 
 }

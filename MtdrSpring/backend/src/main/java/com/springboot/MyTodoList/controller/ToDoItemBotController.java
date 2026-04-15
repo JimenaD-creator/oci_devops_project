@@ -3,7 +3,10 @@ package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.config.BotProps;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.ToDoItemService;
+import com.springboot.MyTodoList.service.TelegramUserMappingService;
+import com.springboot.MyTodoList.service.UserTaskService;
 import com.springboot.MyTodoList.util.BotActions;
+import com.springboot.MyTodoList.util.BotStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,8 +27,10 @@ public class ToDoItemBotController  implements SpringLongPollingBot, LongPolling
 	private ToDoItemService toDoItemService;
 	private DeepSeekService deepSeekService;
 	private final TelegramClient telegramClient;
-	
 	private final BotProps botProps;
+	private BotStateManager stateManager;
+	private TelegramUserMappingService telegramUserMappingService;
+	private UserTaskService userTaskService;
 
 	@Value("${telegram.bot.token}")
 	private String telegramBotToken;
@@ -41,8 +46,18 @@ public class ToDoItemBotController  implements SpringLongPollingBot, LongPolling
     }
 
 
-	public ToDoItemBotController( BotProps bp, ToDoItemService tsvc, DeepSeekService ds) {
+	public ToDoItemBotController(
+		BotProps bp, 
+		ToDoItemService tsvc, 
+		DeepSeekService ds,
+		BotStateManager stateManager,
+		TelegramUserMappingService telegramUserMappingService,
+		UserTaskService userTaskService
+	) {
 		this.botProps = bp;
+		this.stateManager = stateManager;
+		this.telegramUserMappingService = telegramUserMappingService;
+		this.userTaskService = userTaskService;
 		telegramClient = new OkHttpTelegramClient(getBotToken());
 		toDoItemService = tsvc;
 		deepSeekService = ds;
@@ -63,7 +78,15 @@ public class ToDoItemBotController  implements SpringLongPollingBot, LongPolling
 		String messageTextFromTelegram = update.getMessage().getText();
 		long chatId = update.getMessage().getChatId();
 
-		BotActions actions =  new BotActions(telegramClient,toDoItemService,deepSeekService);
+		// NEW: Create BotActions with all required services
+		BotActions actions = new BotActions(
+			telegramClient, 
+			toDoItemService, 
+			deepSeekService,
+			stateManager,
+			telegramUserMappingService,
+			userTaskService
+		);
 		actions.setRequestText(messageTextFromTelegram);
 		actions.setChatId(chatId);
 		if(actions.getTodoService()==null){
