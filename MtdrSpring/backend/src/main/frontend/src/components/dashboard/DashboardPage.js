@@ -46,7 +46,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setSprintsLoading(true);
     fetchDashboardSprints(projectId)
       .then((sprints) => {
@@ -60,7 +60,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
         });
       })
       .finally(() => setSprintsLoading(false));
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     handleRefresh();

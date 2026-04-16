@@ -84,7 +84,7 @@ public class UserTaskService {
                 userTask = existingUserTask.get();
                 logger.info("Updating hours for userId {} taskId {} to {}", effectiveUserId, taskId, workedHours);
             } else {
-                User user = userRepository.findById(effectiveUserId)
+                User user = userRepository.findById(Long.valueOf(effectiveUserId))
                     .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
                 Task task = taskRepository.findById(taskId)
                     .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));

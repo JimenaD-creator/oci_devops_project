@@ -1,18 +1,18 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.model.Project;
-import com.springboot.MyTodoList.model.TeamMembers;
+import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.repository.TeamMembersRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -39,7 +39,11 @@ public class ProjectController {
 
     @GetMapping("/manager/{managerId}")
     public ResponseEntity<Project> getProjectByManager(@PathVariable Long managerId) {
-        return projectRepository.findByAssignedTeam_Manager_Id(managerId)
+        return projectRepository.findAll().stream()
+                .filter(project -> project.getAssignedTeam() != null)
+                .filter(project -> project.getAssignedTeam().getManager() != null)
+                .filter(project -> managerId.equals(project.getAssignedTeam().getManager().getId()))
+                .findFirst()
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -57,15 +61,15 @@ public class ProjectController {
             return ResponseEntity.ok(List.of());
         }
 
-        List<TeamMembers> members = teamMembersRepository.findByTeam_Id(teamId);
+        List<TeamMember> members = teamMembersRepository.findByTeam_Id(teamId);
         Map<Integer, User> byId = new LinkedHashMap<>();
-        for (TeamMembers tm : members) {
+        for (TeamMember tm : members) {
             User user = tm.getUser();
             if (user != null && isDeveloperUser(user)) {
                 byId.put(user.getID(), user);
             }
         }
-        User manager = project.getAssignedTeam().getAssignedManager();
+        User manager = project.getAssignedTeam().getManager();
         if (manager != null && isDeveloperUser(manager)) {
             byId.put(manager.getID(), manager);
         }

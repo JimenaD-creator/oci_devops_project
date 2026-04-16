@@ -81,6 +81,13 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function toInputDate(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+}
+
 function inferStatusByDate(sprint) {
   const now = new Date();
   const start = new Date(sprint.startDate);
@@ -151,6 +158,7 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved, onDele
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [sprintId, setSprintId] = useState('');
+  const [projectId, setProjectId] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState([]);
 
   const loadProjectDevelopersForSprint = async (sid, taskFallback = null) => {
@@ -386,13 +394,6 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved, onDele
             <IconButton aria-label="Close" onClick={handleDialogClose} disabled={saving} size="small">
               <CloseIcon />
             </IconButton>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {!editMode && task && !loading && (
-              <Button variant="contained" startIcon={<EditIcon />} onClick={handleStartEdit} sx={{ bgcolor: ORACLE_RED_ACTION, textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>
-                Edit
-              </Button>
-            )}
-            <IconButton onClick={handleDialogClose} disabled={saving} size="small"><CloseIcon /></IconButton>
           </Box>
         </Box>
       </DialogTitle>
@@ -637,13 +638,6 @@ function SprintDetail({ sprint, tasks, userTasks, onSelectTask, onEditSprint }) 
         onRowClick={(row) => onSelectTask?.(row._task)}
         scrollMaxHeight={380}
       />
-        <Box><Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}><Typography sx={{ fontWeight: 800, fontSize: '1.35rem' }}>Sprint {sprint.id} — Detail</Typography><Chip label={phaseCfg.label} size="small" sx={{ bgcolor: phaseCfg.color, color: phaseCfg.textColor, fontWeight: 700, fontSize: '0.78rem' }} /></Box><Typography variant="body1" sx={{ color: '#757575', mt: 0.6 }}>{formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}</Typography></Box>
-      </Box>
-      {sprint.goal && (<Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 2, border: '1px solid #ECECEC', bgcolor: '#FAFAFA' }}><Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}><FlagOutlinedIcon sx={{ fontSize: 18, color: ORACLE_RED }} /><Typography variant="caption" sx={{ fontWeight: 800, color: '#616161' }}>Sprint goal</Typography></Box><Typography variant="body2" sx={{ color: '#333', lineHeight: 1.65 }}>{sprint.goal}</Typography></Paper>)}
-      <Grid container spacing={2} sx={{ mb: 3 }}>{[{ label: 'Total', value: total, color: '#555' }, { label: 'Completed', value: done, color: '#2E7D32' }, { label: 'In progress', value: inProgress, color: '#1565C0' }, { label: 'In review', value: inReview, color: '#7B1FA2' }, { label: 'Completion', value: `${progress}%`, color: ORACLE_RED }].map((s) => (<Grid item xs key={s.label}><Paper sx={{ p: 2, borderRadius: 2, border: '1px solid #EFEFEF', boxShadow: 'none', textAlign: 'center' }}><Typography variant="h5" sx={{ fontWeight: 800, color: s.color, fontSize: '1.35rem' }}>{s.value}</Typography><Typography variant="caption" sx={{ color: '#888', fontWeight: 600, display: 'block' }}>{s.label}</Typography></Paper></Grid>))}</Grid>
-      <Box sx={{ mb: 2 }}><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}><Typography sx={{ fontWeight: 700, color: '#424242' }}>Sprint progress</Typography><Typography sx={{ fontWeight: 800, color: ORACLE_RED }}>{progress}%</Typography></Box><LinearProgress variant="determinate" value={progress} sx={{ height: 10, borderRadius: 5, bgcolor: '#F0F0F0', '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED, borderRadius: 5 } }} /><Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}><Typography variant="caption" sx={{ color: '#757575' }}>Start: {formatDate(sprint.startDate)}</Typography><Typography variant="caption" sx={{ color: '#757575' }}>End: {formatDate(sprint.dueDate)}</Typography></Box></Box>
-      <Typography sx={{ display: 'block', color: '#666', fontWeight: 600, mb: 1, fontSize: '0.9rem' }}>Click a task to view details or edit.</Typography>
-      <Paper sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none', overflow: 'hidden' }}>{sprintTasks.length === 0 ? (<Box sx={{ p: 4, textAlign: 'center' }}><Typography variant="body2" sx={{ color: '#CCC' }}>No tasks in this sprint</Typography></Box>) : sprintTasks.map((task, i) => (<Box key={task.id}><Box role="button" tabIndex={0} onClick={() => onSelectTask?.(task)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectTask?.(task); } }} sx={{ display: 'flex', alignItems: 'center', px: 3, py: 2, gap: 2, cursor: 'pointer', '&:hover': { bgcolor: '#FAFAFA' } }}>{statusIcon[task.status] ?? statusIcon['TODO']}<Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 500, color: task.status === 'DONE' ? '#AAA' : '#1A1A1A', textDecoration: task.status === 'DONE' ? 'line-through' : 'none' }}>{taskDisplayName(task)}</Typography><Chip label={(statusLabel[task.status] ?? statusLabel['TODO']).label} size="small" sx={{ bgcolor: (statusLabel[task.status] ?? statusLabel['TODO']).bg, color: (statusLabel[task.status] ?? statusLabel['TODO']).color, fontWeight: 600, fontSize: '0.68rem', height: 20 }} /><Chip label={`${task.assignedHours}h`} size="small" sx={{ bgcolor: '#F5F5F5', color: '#888', fontWeight: 600, fontSize: '0.68rem', height: 20 }} /></Box>{i < sprintTasks.length - 1 && <Divider />}</Box>))}</Paper>
     </Box>
   );
 }
@@ -957,7 +951,6 @@ function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   );
 }
 
-export default function SprintsPage() {
 export default function SprintsPage({ projectId }) {
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -967,52 +960,38 @@ export default function SprintsPage({ projectId }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sprintForEdit, setSprintForEdit] = useState(null);
   const [selectedTaskForDialog, setSelectedTaskForDialog] = useState(null);
-
   const loadData = async () => {
-  setLoading(true);
-  try {
-    const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
-      fetch(`${API_BASE}/api/sprints`),
-      fetch(`${API_BASE}/api/tasks`),
-      fetch(`${API_BASE}/api/user-tasks`),
-    ]);
-    const sprintsData = await sprintsRes.json();
-    const tasksData = await tasksRes.json();
-    const userTasksData = await userTasksRes.json();
-    const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
-    const tasksList = Array.isArray(tasksData) ? tasksData : [];
-    const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
-    const sorted = sortSprintsForDisplay(sprintsList, tasksList);
-    setSprints(sorted);
-    setTasks(tasksList);
-    setUserTasks(userTasksList);
-    setSelectedSprint((prev) =>
-      prev
-        ? sorted.find((s) => s.id === prev.id) ?? sorted[0]
-        : sorted.find((s) => inferSprintStatus(s, tasksList) === 'active')
-          ?? sorted.find((s) => inferSprintStatus(s, tasksList) === 'planned')
-          ?? sorted[0],
-    );
-  } finally {
-    setLoading(false);
-  }
-};
     setLoading(true);
     try {
       const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
-      const [sprintsRes, tasksRes] = await Promise.all([fetch(sprintsUrl), fetch(`${API_BASE}/api/tasks`)]);
+      const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
+        fetch(sprintsUrl),
+        fetch(`${API_BASE}/api/tasks`),
+        fetch(`${API_BASE}/api/user-tasks`),
+      ]);
       let sprintsData = await sprintsRes.json();
       const tasksData = await tasksRes.json();
+      const userTasksData = await userTasksRes.json();
       const tasksList = Array.isArray(tasksData) ? tasksData : [];
+      const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
       if (projectId) {
-        sprintsData = sprintsData.filter(s => s.assignedProject?.id == projectId);
+        sprintsData = sprintsData.filter((s) => s.assignedProject?.id == projectId);
       }
       const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
       const sorted = sortSprintsForDisplay(sprintsList, tasksList);
       setSprints(sorted);
       setTasks(tasksList);
-      setSelectedSprint((prev) => prev ? sorted.find((s) => s.id === prev.id) ?? sorted[0] : sorted.find((s) => inferSprintStatus(s, tasksList) === 'active') ?? sorted.find((s) => inferSprintStatus(s, tasksList) === 'planned') ?? sorted[0]);
-    } finally { setLoading(false); }
+      setUserTasks(userTasksList);
+      setSelectedSprint((prev) =>
+        prev
+          ? sorted.find((s) => s.id === prev.id) ?? sorted[0]
+          : sorted.find((s) => inferSprintStatus(s, tasksList) === 'active')
+            ?? sorted.find((s) => inferSprintStatus(s, tasksList) === 'planned')
+            ?? sorted[0]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadData(); }, [projectId]);
@@ -1068,7 +1047,7 @@ export default function SprintsPage({ projectId }) {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreated={handleSprintCreated}
-        projectId={sprints[0]?.assignedProject?.id ?? 1}
+        projectId={projectId || (sprints[0]?.assignedProject?.id ?? 1)}
       />
 
       <EditSprintDialog
@@ -1101,11 +1080,6 @@ export default function SprintsPage({ projectId }) {
           });
         }}
       />
-        <Grid item xs={4}><Typography sx={{ fontWeight: 800, color: '#333', mb: 1.5 }}>Sprint history</Typography><Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{sprints.map((sprint) => (<SprintCard key={sprint.id} sprint={sprint} tasks={tasks} isSelected={selectedSprint?.id === sprint.id} onClick={() => setSelectedSprint(sprint)} />))}</Box></Grid>
-        <Grid item xs={8}>{selectedSprint ? (<SprintDetail sprint={selectedSprint} tasks={tasks} onSelectTask={(t) => setSelectedTaskForDialog(t)} />) : (<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Typography variant="body1" sx={{ color: '#CCC' }}>Select a sprint to view details</Typography></Box>)}</Grid>
-      </Grid>
-      <NewSprintDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleSprintCreated} projectId={projectId || (sprints[0]?.assignedProject?.id ?? 1)} />
-      <TaskDetailDialog open={Boolean(selectedTaskForDialog)} initialTask={selectedTaskForDialog} sprints={sprints} onClose={() => setSelectedTaskForDialog(null)} onSaved={(updated) => { setTasks((prev) => prev.map((x) => (x.id === updated.id ? updated : x))); }} />
     </Box>
   );
 }

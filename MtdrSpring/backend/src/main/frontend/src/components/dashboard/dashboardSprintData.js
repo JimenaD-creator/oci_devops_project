@@ -185,6 +185,8 @@ function userTaskRowEligibleForWorkedHours(ut) {
   if (st == null || String(st).trim() === '') return false;
   const n = normalizeUserTaskStatusColumn(st);
   return n === 'COMPLETED' || n === 'DONE';
+}
+
 function isUserTaskAssignmentDone(ut, taskInfo) {
   const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
   const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
@@ -375,7 +377,6 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 const fetchJsonNoCache = (url) =>
   fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
 
-export async function fetchDashboardSprints() {
 export async function fetchDashboardSprints(projectId) {
   const now = Date.now();
   
@@ -394,18 +395,14 @@ export async function fetchDashboardSprints(projectId) {
   
   try {
     console.log('Fetching fresh dashboard data');
-    let sprintsUrl = 'http://127.0.0.1:8080/api/sprints';
-    if (projectId) {
-      sprintsUrl = `http://127.0.0.1:8080/api/sprints?projectId=${projectId}`;
-    }
-    
+    const sprintsUrl = projectId
+      ? `${API_BASE}/api/sprints?projectId=${projectId}`
+      : `${API_BASE}/api/sprints`;
+
     const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
-      fetchJsonNoCache(`${API_BASE}/api/sprints`),
+      fetchJsonNoCache(sprintsUrl),
       fetchJsonNoCache(`${API_BASE}/api/tasks`),
       fetchJsonNoCache(`${API_BASE}/api/user-tasks`),
-      fetch(sprintsUrl),
-      fetch('http://127.0.0.1:8080/api/tasks'),
-      fetch('http://127.0.0.1:8080/api/user-tasks'),
     ]);
 
     if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Failed to load data');
