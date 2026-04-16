@@ -1,10 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import {
-  Box, Grid, Typography, Paper, Chip, CircularProgress,
-  FormControl, InputLabel, Select, MenuItem, TextField,
-  Stack, Button, Dialog, DialogTitle, DialogContent, IconButton,
-  DialogActions, OutlinedInput, Checkbox, ListItemText, Alert,
-} from '@mui/material';
+import { Box, Grid, Typography, Paper, Chip, CircularProgress, FormControl, InputLabel, Select, MenuItem, TextField, Stack, Button, Dialog, DialogTitle, DialogContent, IconButton, DialogActions, OutlinedInput, Checkbox, ListItemText, Alert } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -26,20 +21,10 @@ function isUserTaskAssigneeComplete(ut) {
 /** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
 function pageFormFieldOutline() {
   return {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 2,
-      bgcolor: '#FFFFFF',
-    },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(199, 70, 52, 0.35)',
-    },
-    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(199, 70, 52, 0.55)',
-    },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-      borderWidth: 2,
-      borderColor: ORACLE_RED,
-    },
+    '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.35)' },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.55)' },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: ORACLE_RED },
     '& .MuiInputLabel-root': { color: '#616161' },
     '& .MuiInputLabel-root.Mui-focused': { color: ORACLE_RED },
     '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
@@ -49,30 +34,23 @@ function pageFormFieldOutline() {
 }
 
 function mapTaskToKanban(task, developerNames = []) {
-  const statusMap = {
-    'DONE':        'done',
-    'IN_PROGRESS': 'in_progress',
-    'IN_REVIEW':   'in_review',
-    'TODO':        'todo',
-  };
-  const list = Array.isArray(developerNames)
-    ? [...new Set(developerNames.filter(Boolean))]
-    : (developerNames ? [developerNames] : []);
-  return {
-    id: task.id,
-    description: task.title || `Task #${task.id}`,
-    details: task.description || task.classification || '',
-    classification: task.classification ?? '',
-    priority: task.priority ?? 'MEDIUM',
-    done: task.status === 'DONE',
-    status: statusMap[task.status] ?? 'todo',
-    rawStatus: task.status,
-    actualHours: task.assignedHours ?? null,
-    developers: list,
-    developer: list[0] ?? null,
-    dueDate: task.dueDate,
-    sprintId: task.assignedSprint?.id ?? null,
-    _raw: task,
+  const statusMap = { 'DONE': 'done', 'IN_PROGRESS': 'in_progress', 'IN_REVIEW': 'in_review', 'TODO': 'todo' };
+  const list = Array.isArray(developerNames) ? [...new Set(developerNames.filter(Boolean))] : (developerNames ? [developerNames] : []);
+  return { 
+    id: task.id, 
+    description: task.title || `Task #${task.id}`, 
+    details: task.description || task.classification || '', 
+    classification: task.classification ?? '', 
+    priority: task.priority ?? 'MEDIUM', 
+    done: task.status === 'DONE', 
+    status: statusMap[task.status] ?? 'todo', 
+    rawStatus: task.status, 
+    actualHours: task.assignedHours ?? null, 
+    developers: list, 
+    developer: list[0] ?? null, 
+    dueDate: task.dueDate, 
+    sprintId: task.assignedSprint?.id ?? null, 
+    _raw: task 
   };
 }
 
@@ -98,18 +76,10 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setClassification('FEATURE');
-    setStatus('TODO');
-    setPriority('MEDIUM');
-    setAssignedHours('');
-    setStartDate('');
-    setDueDate('');
-    setAssignedToIds([]);
-    setSprintId('');
-    setError('');
+  const resetForm = () => { 
+    setTitle(''); setDescription(''); setClassification('FEATURE'); setStatus('TODO'); 
+    setPriority('MEDIUM'); setAssignedHours(''); setStartDate(''); setDueDate(''); 
+    setAssignedToIds([]); setSprintId(''); setError(''); 
   };
 
   useEffect(() => {
@@ -142,197 +112,95 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
     });
   }, [availableDevelopers]);
 
+  
+  const handleClose = () => { if (!saving) { resetForm(); onClose(); } };
+  
   const handleSave = async () => {
-    const hasSprintPick = sprintId !== '' && sprintId != null && sprintId !== undefined;
-    if (!title.trim() || !description.trim() || !classification || !status || !priority || !startDate || !dueDate || !hasSprintPick || assignedToIds.length === 0) {
-      setError('Please fill in all required fields (including at least one developer).');
-      return;
+    const hasSprintPick = sprintId !== '' && sprintId != null;
+    if (!title.trim() || !description.trim() || !classification || !status || !priority || !startDate || !dueDate || !hasSprintPick || assignedToIds.length === 0) { 
+      setError('Please fill in all required fields (including at least one developer).'); 
+      return; 
     }
-    if (new Date(startDate) > new Date(dueDate)) {
-      setError('Start date must be on or before due date.');
-      return;
+    if (new Date(startDate) > new Date(dueDate)) { 
+      setError('Start date must be on or before due date.'); 
+      return; 
     }
-    if (assignedHours && Number(assignedHours) < 0) {
-      setError('Assigned hours must be zero or greater.');
-      return;
-    }
-    setSaving(true);
+    setSaving(true); 
     setError('');
     try {
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          classification,
-          status,
-          priority,
-          assignedHours: assignedHours ? Number(assignedHours) : null,
-          startDate: new Date(startDate).toISOString(),
-          dueDate: new Date(dueDate).toISOString(),
-          finishDate: new Date(dueDate).toISOString(),
-          assignedSprint: { id: Number(sprintId) },
+        body: JSON.stringify({ 
+          title: title.trim(), 
+          description: description.trim(), 
+          classification, 
+          status, 
+          priority, 
+          assignedHours: assignedHours ? Number(assignedHours) : null, 
+          startDate: new Date(startDate).toISOString(), 
+          dueDate: new Date(dueDate).toISOString(), 
+          finishDate: new Date(dueDate).toISOString(), 
+          assignedSprint: { id: Number(sprintId) } 
         }),
       });
       if (res.ok) {
         const created = await res.json();
-        const successfulIds = [];
-        for (const uid of assignedToIds) {
-          const assignRes = await fetch(`${API_BASE}/api/user-tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: Number(uid),
-              taskId: created.id,
-              status,
-            }),
-          });
-          if (!assignRes.ok) {
-            setError('Task created, but one or more developer assignments failed. You can assign developers from task details.');
-            onCreated(created, successfulIds, status, null);
-            handleClose();
-            return;
-          }
-          successfulIds.push(Number(uid));
+        for (const uid of assignedToIds) { 
+          await fetch(`${API_BASE}/api/user-tasks`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ userId: Number(uid), taskId: created.id, status }) 
+          }); 
         }
-        onCreated(created, successfulIds, status, null);
+        onCreated(created, assignedToIds, status, null);
         handleClose();
-      } else {
-        setError('Could not create task. Please try again.');
+      } else { 
+        setError('Could not create task.'); 
       }
-    } catch {
-      setError('Connection error.');
-    } finally {
-      setSaving(false);
+    } catch { 
+      setError('Connection error.'); 
+    } finally { 
+      setSaving(false); 
     }
   };
-
-  const hasSprintPick = sprintId !== '' && sprintId != null && sprintId !== undefined;
-  const canSave = Boolean(
-    title.trim()
-    && description.trim()
-    && classification
-    && status
-    && priority
-    && startDate
-    && dueDate
-    && hasSprintPick
-    && assignedToIds.length > 0
-  );
+  
+  const canSave = Boolean(title.trim() && description.trim() && classification && status && priority && startDate && dueDate && sprintId && assignedToIds.length > 0);
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        elevation: 0,
-        sx: {
-          borderRadius: 3,
-          border: '1px solid #ECECEC',
-          borderLeft: `4px solid ${ORACLE_RED}`,
-          bgcolor: '#FFFFFF',
-          boxShadow: '0 16px 40px rgba(199, 70, 52, 0.12), 0 8px 28px rgba(30, 136, 229, 0.09)',
-          maxHeight: 'calc(100vh - 48px)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 24px)', sm: 820 },
-        },
-      }}
-    >
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ 
+      elevation: 0, 
+      sx: { 
+        borderRadius: 3, 
+        border: '1px solid #ECECEC', 
+        borderLeft: `4px solid ${ORACLE_RED}`, 
+        bgcolor: '#FFFFFF', 
+        boxShadow: '0 16px 40px rgba(199, 70, 52, 0.12)', 
+        maxHeight: 'calc(100vh - 48px)', 
+        overflow: 'hidden', 
+        maxWidth: { xs: 'calc(100% - 24px)', sm: 820 } 
+      } 
+    }}>
       <DialogTitle sx={{ p: 0 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 1.5,
-            px: 2.5,
-            py: 2,
-            borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, px: 2.5, py: 2, borderBottom: '1px solid rgba(199, 70, 52, 0.12)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 2,
-                bgcolor: 'rgba(199,70,52,0.10)',
-                border: '1px solid rgba(199, 70, 52, 0.18)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: 'rgba(199,70,52,0.10)', border: '1px solid rgba(199, 70, 52, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <TaskAltIcon sx={{ color: ORACLE_RED }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#1A1A1A', lineHeight: 1.2 }}>
-                Create task
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
-                Details, planning & assignees
-              </Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#1A1A1A' }}>Create task</Typography>
+              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block' }}>Details, planning & assignees</Typography>
             </Box>
           </Box>
-          <IconButton
-            onClick={handleClose}
-            size="small"
-            disabled={saving}
-            aria-label="Close"
-            sx={{ color: '#616161', '&:hover': { bgcolor: 'rgba(199, 70, 52, 0.08)' } }}
-          >
-            <CloseIcon />
-          </IconButton>
+          <IconButton onClick={handleClose} size="small" disabled={saving}><CloseIcon /></IconButton>
         </Box>
       </DialogTitle>
-
-      <DialogContent
-        sx={{
-          pt: 2.5,
-          px: { xs: 2.5, sm: 3 },
-          pb: 2,
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        <Stack spacing={2} sx={{ width: '100%', mt: 0.5 }}>
-          <TextField
-            label="Task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            fullWidth
-            multiline
-            minRows={2}
-            size="medium"
-            sx={{
-              ...pageFormFieldOutline(),
-              '& .MuiInputBase-root': { alignItems: 'flex-start' },
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                bgcolor: 'rgba(199, 70, 52, 0.07)',
-              },
-            }}
-          />
-          <TextField
-            label="Task description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            multiline
-            minRows={5}
-            size="medium"
-            sx={pageFormFieldOutline()}
-          />
+      <DialogContent sx={{ pt: 2.5, px: { xs: 2.5, sm: 3 }, pb: 2, flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <Stack spacing={2}>
+          <TextField label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth multiline minRows={2} sx={{ ...pageFormFieldOutline(), '& .MuiOutlinedInput-root': { bgcolor: 'rgba(199, 70, 52, 0.07)' } }} />
+          <TextField label="Task description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={5} sx={pageFormFieldOutline()} />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
+            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
               <InputLabel>Work item type</InputLabel>
               <Select value={classification} onChange={(e) => setClassification(e.target.value)} label="Work item type">
                 <MenuItem value="FEATURE">Feature</MenuItem>
@@ -341,7 +209,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                 <MenuItem value="USER_STORY">User Story</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
+            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
               <InputLabel>Status</InputLabel>
               <Select value={status} onChange={(e) => setStatus(e.target.value)} label="Status">
                 <MenuItem value="TODO">To Do</MenuItem>
@@ -350,7 +218,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                 <MenuItem value="DONE">Done</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
+            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
               <InputLabel>Priority</InputLabel>
               <Select value={priority} onChange={(e) => setPriority(e.target.value)} label="Priority">
                 <MenuItem value="LOW">Low</MenuItem>
@@ -361,51 +229,21 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
             </FormControl>
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
+            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
               <InputLabel>Sprint</InputLabel>
-              <Select
-                value={sprintId}
-                onChange={(e) => setSprintId(e.target.value)}
-                label="Sprint"
-              >
-                {sprints.map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
-                ))}
+              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
+                {sprints.map((s) => (<MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>))}
               </Select>
             </FormControl>
-            <TextField
-              label="Assigned hours"
-              type="number"
-              value={assignedHours}
-              onChange={(e) => setAssignedHours(e.target.value)}
-              fullWidth
-              size="small"
-              inputProps={{ min: 0 }}
-              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
-            />
+            <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} sx={pageFormFieldOutline()} />
           </Stack>
-          <FormControl
-            size="small"
-            fullWidth
-            sx={{
-              ...pageFormFieldOutline(),
-              '& .MuiOutlinedInput-root': {
-                alignItems: 'flex-start',
-                py: 0.75,
-                minHeight: 42,
-              },
-            }}
-          >
+          <FormControl fullWidth size="small" sx={pageFormFieldOutline()}>
             <InputLabel id="create-task-assigned-label">Developers</InputLabel>
             <Select
               labelId="create-task-assigned-label"
               multiple
               value={assignedToIds}
-              onChange={(e) => {
-                const v = e.target.value;
-                const next = typeof v === 'string' ? v.split(',').map(Number) : v.map(Number);
-                setAssignedToIds(next);
-              }}
+              onChange={(e) => setAssignedToIds(typeof e.target.value === 'string' ? e.target.value.split(',').map(Number) : e.target.value.map(Number))}
               input={<OutlinedInput label="Developers" />}
               renderValue={(selected) => (
                 <Box
@@ -438,6 +276,12 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                         }}
                       />
                     );
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: 80, overflowY: 'auto' }}>
+                  {selected.map((id) => { 
+                    const u = users.find((x) => Number(x.id ?? x.ID) === Number(id)); 
+                    const name = u?.name ?? `#${id}`; 
+                    const av = developerAvatarColors(name); 
+                    return <Chip key={id} size="small" label={name} variant="outlined" sx={{ fontWeight: 600, color: av.color, borderColor: av.color }} />; 
                   })}
                 </Box>
               )}
@@ -451,66 +295,28 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                     <ListItemText primary={u.name} primaryTypographyProps={{ variant: 'body2' }} />
                   </MenuItem>
                 );
+              {users.map((u) => { 
+                const uid = Number(u.id ?? u.ID); 
+                return (<MenuItem key={uid} value={uid}><Checkbox checked={assignedToIds.includes(uid)} size="small" /><ListItemText primary={u.name} /></MenuItem>); 
               })}
             </Select>
           </FormControl>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label="Start Date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              size="small"
-              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
-            />
-            <TextField
-              label="Due Date"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              size="small"
-              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
-            />
+            <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={pageFormFieldOutline()} />
+            <TextField label="Due Date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={pageFormFieldOutline()} />
           </Stack>
-
-          {error ? (
-            <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600 }}>
-              {error}
-            </Typography>
-          ) : null}
+          {error && <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600 }}>{error}</Typography>}
         </Stack>
       </DialogContent>
-
-      <DialogActions
-        sx={{
-          px: 2.5,
-          pb: 2.25,
-          pt: 1.5,
-          borderTop: '1px solid rgba(199, 70, 52, 0.12)',
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        <Button onClick={handleClose} sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }} disabled={saving}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          variant="contained"
-          sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#A83B2D' } }}
-        >
-          {saving ? 'Creating...' : 'Create task'}
-        </Button>
+      <DialogActions sx={{ px: 2.5, pb: 2.25, pt: 1.5, borderTop: '1px solid rgba(199, 70, 52, 0.12)' }}>
+        <Button onClick={handleClose} sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }} disabled={saving}>Cancel</Button>
+        <Button onClick={handleSave} disabled={saving || !canSave} variant="contained" sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#A83B2D' } }}>{saving ? 'Creating...' : 'Create task'}</Button>
       </DialogActions>
     </Dialog>
   );
 }
 
-export default function TasksPage() {
+export default function TasksPage({ projectId }) {
   const [rawTasks, setRawTasks] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [users, setUsers] = useState([]);
@@ -524,30 +330,47 @@ export default function TasksPage() {
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  /** When set, show dialog to mark each assignee DONE before the task can move to Done. */
   const [multiDoneTaskId, setMultiDoneTaskId] = useState(null);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
+      // Obtener sprints filtrados por projectId
+      const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
       const [tasksRes, sprintsRes, usersRes, userTasksRes] = await Promise.all([
         fetch(`${API_BASE}/api/tasks`),
-        fetch(`${API_BASE}/api/sprints`),
+        fetch(sprintsUrl),
         fetch(`${API_BASE}/users`),
-        fetch(`${API_BASE}/api/user-tasks`),
+        fetch(`${API_BASE}/api/user-tasks`)
       ]);
-      setRawTasks(await tasksRes.json());
-      setSprints(await sprintsRes.json());
-      const usersData = await usersRes.json();
-      setUsers(Array.isArray(usersData) ? usersData : []);
-      const userTasksData = await userTasksRes.json();
-      setUserTasks(Array.isArray(userTasksData) ? userTasksData : []);
+      
+      let tasksData = await tasksRes.json();
+      let sprintsData = await sprintsRes.json();
+      
+      // Filtrar sprints por projectId (por si acaso)
+      if (projectId) {
+        sprintsData = sprintsData.filter(s => s.assignedProject?.id == projectId);
+        // Filtrar tareas que pertenecen a estos sprints
+        const sprintIds = new Set(sprintsData.map(s => s.id));
+        tasksData = tasksData.filter(t => t.assignedSprint?.id && sprintIds.has(t.assignedSprint.id));
+      }
+      
+      setRawTasks(Array.isArray(tasksData) ? tasksData : []);
+      setSprints(Array.isArray(sprintsData) ? sprintsData : []);
+      setUsers(await usersRes.json());
+      setUserTasks(await userTasksRes.json());
+    } catch (error) {
+      console.error('Error loading tasks data:', error);
+      setRawTasks([]);
+      setSprints([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, [projectId]);
 
   /** Resolved sprint for Kanban: selected value, or first sprint by id, or none. */
   const kanbanSprintId = useMemo(() => {
@@ -608,30 +431,24 @@ export default function TasksPage() {
   const handleStatusChange = async (taskId, newStatus) => {
     const task = rawTasks.find((t) => t.id === taskId);
     if (!task) return;
-    const assignees = userTasks.filter(
-      (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId),
-    );
+    const assignees = userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId));
     const ns = String(newStatus || '').toUpperCase();
-
+    
     const putTask = async () => {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...task, status: newStatus }),
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, { 
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ ...task, status: newStatus }) 
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-        await loadData();
+      if (res.ok) { 
+        const updated = await res.json(); 
+        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t))); 
+        await loadData(); 
       }
     };
-
+    
     try {
-      if (assignees.length === 0) {
-        await putTask();
-        return;
-      }
-
+      if (assignees.length === 0) { await putTask(); return; }
       if (assignees.length === 1) {
         if (ns === 'DONE') {
           const ut = assignees[0];
@@ -644,14 +461,15 @@ export default function TasksPage() {
               taskId: Number(taskId),
               status: 'COMPLETED',
             }),
+          await fetch(`${API_BASE}/api/user-tasks`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'DONE', workedHours: userTaskWorkedHours(ut) }) 
           });
-          if (res.ok) await loadData();
-        } else {
-          await putTask();
-        }
+          await loadData();
+        } else { await putTask(); }
         return;
       }
-
       if (ns === 'DONE') {
         const allDone = assignees.every((ut) => isUserTaskAssigneeComplete(ut));
         if (allDone) {
@@ -659,13 +477,12 @@ export default function TasksPage() {
         } else {
           setMultiDoneTaskId(taskId);
         }
+        const allDone = assignees.every((ut) => String(ut.status || '').toUpperCase() === 'DONE');
+        if (allDone) { await putTask(); } else { setMultiDoneTaskId(taskId); }
         return;
       }
-
       await putTask();
-    } catch (e) {
-      console.error('Error updating task status:', e);
-    }
+    } catch (e) { console.error('Error updating task status:', e); }
   };
 
   const handleDeleteTask = async (taskId) => {
@@ -698,6 +515,13 @@ export default function TasksPage() {
     if (uts.length > 0 && uts.every((ut) => isUserTaskAssigneeComplete(ut))) {
       setMultiDoneTaskId(null);
     }
+  useEffect(() => { 
+    if (multiDoneTaskId != null) { 
+      const uts = userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId)); 
+      if (uts.length > 0 && uts.every((ut) => String(ut.status || '').toUpperCase() === 'DONE')) { 
+        setMultiDoneTaskId(null); 
+      } 
+    } 
   }, [userTasks, multiDoneTaskId]);
 
   const markAssigneeDone = async (taskId, ut) => {
@@ -716,28 +540,31 @@ export default function TasksPage() {
     } catch (e) {
       console.error('Error marking assignee done:', e);
     }
+    try { 
+      await fetch(`${API_BASE}/api/user-tasks`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'DONE', workedHours: userTaskWorkedHours(ut) }) 
+      }); 
+      await loadData(); 
+    } catch (e) { console.error(e); }
   };
 
   const developersByTaskId = useMemo(() => {
     const map = new Map();
-    userTasks.forEach((ut) => {
-      const taskId = ut?.task?.id ?? ut?.id?.taskId;
-      const devName = ut?.user?.name;
-      if (taskId == null || !devName) return;
-      const existing = map.get(taskId);
-      if (!existing) {
-        map.set(taskId, [devName]);
-      } else if (!existing.includes(devName)) {
-        existing.push(devName);
-      }
+    userTasks.forEach((ut) => { 
+      const taskId = ut?.task?.id ?? ut?.id?.taskId; 
+      const devName = ut?.user?.name; 
+      if (taskId && devName) { 
+        const existing = map.get(taskId); 
+        if (!existing) map.set(taskId, [devName]); 
+        else if (!existing.includes(devName)) existing.push(devName); 
+      } 
     });
     return map;
   }, [userTasks]);
 
-  const items = useMemo(
-    () => rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(task.id) ?? [])),
-    [rawTasks, developersByTaskId]
-  );
+  const items = useMemo(() => rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(task.id) ?? [])), [rawTasks, developersByTaskId]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -776,12 +603,36 @@ export default function TasksPage() {
     <Box sx={{ maxWidth: 1200, width: '100%' }}>
       <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+  const filteredItems = useMemo(() => items.filter(item => { 
+    if (developerFilter !== 'all') { 
+      const names = item.developers?.length ? item.developers : (item.developer ? [item.developer] : []); 
+      if (!names.some((n) => String(n) === String(developerFilter))) return false; 
+    } 
+    if (priorityFilter !== 'all' && String(item.priority ?? '').toUpperCase() !== String(priorityFilter).toUpperCase()) return false; 
+    if (sprintFilter !== 'all' && String(item.sprintId) !== String(sprintFilter)) return false; 
+    if (!matchesDueDateRange(item, dueFrom, dueTo)) return false; 
+    return true; 
+  }), [items, developerFilter, priorityFilter, sprintFilter, dueFrom, dueTo]);
+
+  const pendingCount = useMemo(() => items.filter(i => !i.done).length, [items]);
+  const hasActiveFilters = developerFilter !== 'all' || priorityFilter !== 'all' || sprintFilter !== 'all' || Boolean(dueFrom) || Boolean(dueTo);
+  const clearAllFilters = () => { setDeveloperFilter('all'); setPriorityFilter('all'); setSprintFilter('all'); setDueFrom(''); setDueTo(''); };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <CircularProgress sx={{ color: ORACLE_RED }} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ maxWidth: 1200, width: '100%' }}>
+      <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px', fontSize: { xs: '1.65rem', sm: '1.85rem' } }}>
-              Tasks
-            </Typography>
-            <Chip label={`${pendingCount} pending`} size="small"
-              sx={{ mt: 1.5, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700, fontSize: '0.72rem' }} />
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px' }}>Tasks</Typography>
+            <Chip label={`${pendingCount} pending`} size="small" sx={{ mt: 1.5, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700 }} />
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
             <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 }, ...pageFormFieldOutline() }}>
@@ -820,6 +671,7 @@ export default function TasksPage() {
               New task
             </Button>
           </Stack>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)} sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>New task</Button>
         </Box>
         {!sprints.length && !isLoading ? (
           <Typography variant="body2" sx={{ mt: 1.25, color: '#757575' }}>
@@ -828,21 +680,13 @@ export default function TasksPage() {
         ) : null}
       </Paper>
 
-      <Paper elevation={0} sx={{ p: 2.5, mb: 2, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FAFAFA', boxShadow: 'none' }}>
+      <Paper elevation={0} sx={{ p: 2.5, mb: 2, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FAFAFA' }}>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <FilterListIcon sx={{ fontSize: 26, color: ORACLE_RED }} />
-          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Filter tasks</Typography>
+          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.2rem' }}>Filter tasks</Typography>
         </Stack>
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 2,
-            alignItems: 'flex-end',
-            '& .MuiFormControl-root': { flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } },
-          }}
-        >
-          <FormControl size="small" fullWidth>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-end' }}>
+          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}>
             <InputLabel>Developer</InputLabel>
             <Select value={developerFilter} onChange={e => setDeveloperFilter(e.target.value)} label="Developer">
               <MenuItem value="all">All developers</MenuItem>
@@ -854,6 +698,17 @@ export default function TasksPage() {
             </Select>
           </FormControl>
           <FormControl size="small" fullWidth>
+              {users.map((u) => (<MenuItem key={u.id ?? u.ID} value={u.name}>{u.name}</MenuItem>))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}>
+            <InputLabel>Sprint</InputLabel>
+            <Select value={sprintFilter} onChange={e => setSprintFilter(e.target.value)} label="Sprint">
+              <MenuItem value="all">All sprints</MenuItem>
+              {sprints.map(s => (<MenuItem key={s.id} value={String(s.id)}>Sprint {s.id}</MenuItem>))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}>
             <InputLabel>Priority</InputLabel>
             <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} label="Priority">
               <MenuItem value="all">All priorities</MenuItem>
@@ -863,50 +718,10 @@ export default function TasksPage() {
               <MenuItem value="CRITICAL">Critical</MenuItem>
             </Select>
           </FormControl>
-          <TextField
-            size="small"
-            type="date"
-            label="Due from"
-            value={dueFrom}
-            onChange={(e) => setDueFrom(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-            sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="Due to"
-            value={dueTo}
-            onChange={(e) => setDueTo(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-            sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}
-          />
-          {hasActiveFilters ? (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={clearAllFilters}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                borderColor: ORACLE_RED,
-                color: ORACLE_RED,
-                flexShrink: 0,
-                alignSelf: { xs: 'stretch', sm: 'center' },
-                minHeight: 40,
-                '&:hover': {
-                  borderColor: '#A83B2D',
-                  bgcolor: 'rgba(199, 70, 52, 0.08)',
-                },
-              }}
-            >
-              Clear filters
-            </Button>
-          ) : null}
-          <Chip label={`${filteredItems.length} shown`} size="small"
-            sx={{ bgcolor: '#F0F0F0', fontWeight: 700, height: 24, fontSize: '0.72rem', alignSelf: { xs: 'flex-start', sm: 'center' } }} />
+          <TextField size="small" type="date" label="Due from" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }} />
+          <TextField size="small" type="date" label="Due to" value={dueTo} onChange={(e) => setDueTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }} />
+          {hasActiveFilters && <Button size="small" variant="outlined" onClick={clearAllFilters} sx={{ textTransform: 'none', fontWeight: 600, borderColor: ORACLE_RED, color: ORACLE_RED, flexShrink: 0 }}>Clear filters</Button>}
+          <Chip label={`${filteredItems.length} shown`} size="small" sx={{ bgcolor: '#F0F0F0', fontWeight: 700, height: 24 }} />
         </Box>
       </Paper>
 
@@ -933,26 +748,24 @@ export default function TasksPage() {
               />
             </Paper>
           </Grid>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+            <Box sx={{ width: 10, height: 10, bgcolor: ORACLE_RED, borderRadius: '50%' }} />
+            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: '#1A1A1A' }}>Kanban board</Typography>
+            <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: '#F5F5F5', fontWeight: 700 }} />
+          </Box>
+          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF', overflow: 'hidden' }}>
+            <KanbanBoard items={filteredItems} onStatusChange={handleStatusChange} />
+          </Paper>
         </Grid>
-      )}
+      </Grid>
 
-      <Dialog
-        open={multiDoneTaskId != null}
-        onClose={() => setMultiDoneTaskId(null)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}
-      >
+      <Dialog open={multiDoneTaskId != null} onClose={() => setMultiDoneTaskId(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
         <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem' }}>Complete each assignment</DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            The task moves to Done only when every developer assigned has been marked complete (the task counts once in sprint metrics, not once per assignee).
-          </Alert>
-          <Typography variant="body2" sx={{ mb: 2, fontWeight: 600, color: '#1A1A1A' }}>
-            {multiDoneTaskId != null
-              ? (rawTasks.find((t) => t.id === multiDoneTaskId)?.title || `Task #${multiDoneTaskId}`)
-              : ''}
-          </Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>The task moves to Done only when every developer assigned has been marked complete.</Alert>
+          <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>{multiDoneTaskId != null ? (rawTasks.find((t) => t.id === multiDoneTaskId)?.title || `Task #${multiDoneTaskId}`) : ''}</Typography>
           <Stack spacing={1.5}>
             {multiDoneTaskId != null
               ? userTasks
@@ -982,13 +795,14 @@ export default function TasksPage() {
                   );
                 })
               : null}
+            {multiDoneTaskId != null && userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId)).map((ut) => { 
+              const done = String(ut.status || '').toUpperCase() === 'DONE'; 
+              const name = ut.user?.name || `User ${ut.user?.id ?? ut.user?.ID ?? '?'}`; 
+              return (<Box key={`${ut.user?.id ?? ut.user?.ID}-${multiDoneTaskId}`} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}><Typography variant="body2">{name}</Typography>{done ? <Chip label="Done" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700 }} /> : <Button size="small" variant="outlined" onClick={() => markAssigneeDone(multiDoneTaskId, ut)} sx={{ textTransform: 'none', fontWeight: 600 }}>Mark complete</Button>}</Box>); 
+            })}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 2.5, pb: 2 }}>
-          <Button onClick={() => setMultiDoneTaskId(null)} sx={{ textTransform: 'none', fontWeight: 600 }}>
-            Close
-          </Button>
-        </DialogActions>
+        <DialogActions sx={{ px: 2.5, pb: 2 }}><Button onClick={() => setMultiDoneTaskId(null)} sx={{ textTransform: 'none', fontWeight: 600 }}>Close</Button></DialogActions>
       </Dialog>
 
       <NewTaskDialog
@@ -1015,6 +829,15 @@ export default function TasksPage() {
         projectDevelopers={projectDevelopers}
         defaultSprintId={kanbanSprintId}
       />
+      <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={(task, assignedUserIds, assignmentStatus) => { 
+        setRawTasks((prev) => [...prev, task]); 
+        setUserTasks((prev) => [...prev, ...assignedUserIds.map((assignedUserId) => ({ 
+          id: { userId: assignedUserId, taskId: task.id }, 
+          user: users.find((u) => Number(u.id ?? u.ID) === Number(assignedUserId)) ?? null, 
+          task, 
+          status: assignmentStatus 
+        }))]); 
+      }} sprints={sprints} users={users} />
     </Box>
   );
 }

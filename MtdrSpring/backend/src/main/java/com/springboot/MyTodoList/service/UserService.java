@@ -2,9 +2,8 @@ package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.UserRepository;
+import com.springboot.MyTodoList.dto.UserDetailDTO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,50 +15,45 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    public List<User> findAll(){
-        List<User> users = userRepository.findAll();
-        return users;
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
     }
 
-    public ResponseEntity<User> getUserById(int id){
-        Optional<User> userById = userRepository.findById(id);
-        if (userById.isPresent()){
-            return new ResponseEntity<>(userById.get(), HttpStatus.OK);
-        }else{
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    public List<UserDetailDTO> getAllUserDetails() {
+        return userRepository.findAllUserDetails();
+    }
+
+    public Optional<User> getUserById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    public User saveUser(User user) {
+        if (user.getType() == null || 
+           (!user.getType().equalsIgnoreCase("MANAGER") && !user.getType().equalsIgnoreCase("DEVELOPER"))) {
+            throw new RuntimeException("Rol no permitido. Solo se permite MANAGER o DEVELOPER.");
         }
+        // Normalizar a mayúsculas para consistencia
+        user.setType(user.getType().toUpperCase());
+        return userRepository.save(user);
     }
 
-
-    public User addUser(User newUser){
-        return userRepository.save(newUser);
+    public void deleteUser(Long id) {
+        userRepository.deleteById(id);
     }
 
-    public User test(){
-        User newUser = new User(88,"someNumber","pwd");
-
-        return userRepository.save(newUser);
-    }
-
-    public boolean deleteUser(int id){
-        try{
-            userRepository.deleteById(id);
-            return true;
-        }catch(Exception e){
-            return false;
-        }
-    }
-    public User updateUser(int id, User user2update){
-        Optional<User> dbUser = userRepository.findById(id);
-        if(dbUser.isPresent()){
-            User user = dbUser.get();
-            user.setID(id);
-            user.setPhoneNumber(user2update.getPhoneNumber());
-            user.setUserPassword(user2update.getUserPassword());
+    public User updateUser(Long id, User userDetails) {
+        return userRepository.findById(id).map(user -> {
+            user.setName(userDetails.getName());
+            user.setEmail(userDetails.getEmail());
+            user.setPhoneNumber(userDetails.getPhoneNumber());
+            user.setUserPassword(userDetails.getUserPassword());
+            
+            if (userDetails.getType() != null && 
+               (userDetails.getType().equalsIgnoreCase("MANAGER") || userDetails.getType().equalsIgnoreCase("DEVELOPER"))) {
+                user.setType(userDetails.getType().toUpperCase());
+            }
+            
             return userRepository.save(user);
-        }else{
-            return null;
-        }
+        }).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
-
 }

@@ -17,6 +17,16 @@ export const SPRINT_CHART_COLORS = [
   '#5C6BC0',
 ];
 
+// Cache variables
+let cachedData = {
+  sprints: null,
+  tasks: null,
+  userTasks: null,
+  timestamp: 0,
+  projectId: null
+};
+const CACHE_TTL = 30000; // 30 segundos
+
 /**
  * Mutates each sprint: accentColor from palette by order among all sprints (sorted by id).
  */
@@ -56,9 +66,6 @@ function initialsFromName(name) {
   return (name || '').slice(0, 2).toUpperCase();
 }
 
-/**
- * Normalizes task status for dashboards. DONE and COMPLETED both map to DONE (count as completed).
- */
 export function bucketTaskStatus(raw) {
   const s = String(raw || '')
     .trim()
@@ -80,7 +87,6 @@ const STATUS_DIST_META = {
   DONE: { name: 'Completed', color: '#3949AB' },
 };
 
-/** Task id from an assignment (nested task or composite id). */
 export function resolveUserTaskTaskId(ut) {
   if (ut == null) return null;
   const raw =
@@ -179,6 +185,10 @@ function userTaskRowEligibleForWorkedHours(ut) {
   if (st == null || String(st).trim() === '') return false;
   const n = normalizeUserTaskStatusColumn(st);
   return n === 'COMPLETED' || n === 'DONE';
+function isUserTaskAssignmentDone(ut, taskInfo) {
+  const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
+  const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
+  return nonempty.some((s) => bucketTaskStatus(s) === 'DONE');
 }
 
 function sprintTaskStatusRows(counts) {
@@ -219,11 +229,6 @@ function mapApiSprint(apiSprint) {
   };
 }
 
-/**
- * Replaces stored SPRINT KPI fields with values derived from current tasks and user_task rows,
- * so the dashboard matches the task board (stored completion_rate in DB may be stale).
- * Workload balance stays from the API unless we add a client-side model later.
- */
 function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksList, taskSprintMap, storedKpis) {
   const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
   const totalCompleted = _statusCounts.DONE ?? 0;
@@ -357,7 +362,6 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       delete d._taskIds;
       delete d._completedTaskIds;
       d.workload = Math.round((d.hours / maxHours) * 100);
-      /* Pending = assigned tasks not completed per assignmentStatus above. */
       d.pending = Math.max(0, (d.assigned ?? 0) - (d.completed ?? 0));
     });
     const statusPart = sprintTaskStatusRows(_statusCounts);
@@ -372,18 +376,52 @@ const fetchJsonNoCache = (url) =>
   fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
 
 export async function fetchDashboardSprints() {
+export async function fetchDashboardSprints(projectId) {
+  const now = Date.now();
+  
+  // Check cache first
+  if (cachedData.sprints && 
+      cachedData.tasks && 
+      cachedData.userTasks && 
+      cachedData.projectId === projectId &&
+      (now - cachedData.timestamp) < CACHE_TTL) {
+    console.log('Using cached dashboard data');
+    const mapped = cachedData.sprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
+    const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
+    assignSprintAccentColors(enriched);
+    return enriched;
+  }
+  
   try {
+    console.log('Fetching fresh dashboard data');
+    let sprintsUrl = 'http://127.0.0.1:8080/api/sprints';
+    if (projectId) {
+      sprintsUrl = `http://127.0.0.1:8080/api/sprints?projectId=${projectId}`;
+    }
+    
     const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
       fetchJsonNoCache(`${API_BASE}/api/sprints`),
       fetchJsonNoCache(`${API_BASE}/api/tasks`),
       fetchJsonNoCache(`${API_BASE}/api/user-tasks`),
+      fetch(sprintsUrl),
+      fetch('http://127.0.0.1:8080/api/tasks'),
+      fetch('http://127.0.0.1:8080/api/user-tasks'),
     ]);
 
     if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Failed to load data');
 
-    const apiSprints   = await sprintsRes.json();
-    const apiTasks     = await tasksRes.json();
+    const apiSprints = await sprintsRes.json();
+    const apiTasks = await tasksRes.json();
     const apiUserTasks = await userTasksRes.json();
+    
+    // Update cache
+    cachedData = {
+      sprints: apiSprints,
+      tasks: apiTasks,
+      userTasks: apiUserTasks,
+      timestamp: now,
+      projectId: projectId
+    };
 
     const mapped = apiSprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
     let enriched;
@@ -401,6 +439,18 @@ export async function fetchDashboardSprints() {
   }
 }
 
+// Export function to manually invalidate cache when data changes
+export function invalidateDashboardCache() {
+  cachedData = {
+    sprints: null,
+    tasks: null,
+    userTasks: null,
+    timestamp: 0,
+    projectId: null
+  };
+  console.log('Dashboard cache invalidated');
+}
+
 export function shortDevName(fullName) {
   if (!fullName) return '';
   return fullName.split(' ')[0];
@@ -408,9 +458,6 @@ export function shortDevName(fullName) {
 
 const TASK_STATUS_KEYS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
-/**
- * Merge task status counts across selected sprints (same shape as sprint.taskStatusDistribution).
- */
 const MERGE_STATUS_META = {
   TODO: { name: 'To Do', color: '#FB8C00' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
@@ -440,9 +487,6 @@ export function mergeTaskStatusAcrossSprints(selectedSprints) {
   return { taskStatusDistribution: distribution, taskStatusTotal };
 }
 
-/**
- * Global totals and per-developer aggregates for the dashboard (across selected sprints).
- */
 export function aggregateSelectionMetrics(selectedSprints) {
   let totalTasks = 0;
   let totalHours = 0;
@@ -533,10 +577,6 @@ export function buildGroupedWorkloadData(selectedSprints) {
   });
 }
 
-/**
- * Per-sprint keys for developer compare charts (2+ sprints).
- * wc/wo: workload stack keys; hr/ln: hours and combo series keys.
- */
 export function buildCompareDeveloperChartsModel(selectedSprints) {
   const sprints = [...(selectedSprints || [])].filter(Boolean);
   if (sprints.length < 2) return null;

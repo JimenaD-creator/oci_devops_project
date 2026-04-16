@@ -1,9 +1,6 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.model.UserTask;
-import com.springboot.MyTodoList.model.UserTaskId;
-import com.springboot.MyTodoList.model.User;
-import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
@@ -11,30 +8,21 @@ import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/user-tasks")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "http://localhost:3000")
 public class UserTaskController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserTaskController.class);
 
     @Autowired
     private UserTaskRepository userTaskRepository;
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private TaskRepository taskRepository;
-
-    @Autowired
-    private TaskAssignmentSyncService taskAssignmentSyncService;
 
     @GetMapping
     public ResponseEntity<List<UserTask>> getAllUserTasks() {
@@ -44,31 +32,29 @@ public class UserTaskController {
             LOGGER.warn("findAllWithUserAndTask failed, falling back to findAll", e);
             return ResponseEntity.ok(userTaskRepository.findAll());
         }
+    public List<UserTask> getAllUserTasks() {
+        return userTaskRepository.findAll();
     }
 
-    @GetMapping("/sprint/{sprintId}")
-    public ResponseEntity<List<UserTask>> getUserTasksBySprint(@PathVariable Long sprintId) {
-        return ResponseEntity.ok(userTaskRepository.findByTask_AssignedSprint_Id(sprintId));
+    @GetMapping("/{id}")
+    public ResponseEntity<UserTask> getUserTaskById(@PathVariable Long id) {
+        return userTaskRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * All USER_TASK rows for a task (typically zero or one assignee).
-     */
-    @GetMapping("/task/{taskId}")
-    public ResponseEntity<List<UserTask>> getUserTasksByTask(@PathVariable Long taskId) {
-        return ResponseEntity.ok(userTaskRepository.findByTask_Id(taskId));
+    @PostMapping
+    public UserTask createUserTask(@RequestBody UserTask userTask) {
+        return userTaskRepository.save(userTask);
     }
 
-    /**
-     * Remove every assignment for this task (e.g. before reassigning to another user).
-     */
-    @DeleteMapping("/task/{taskId}")
-    public ResponseEntity<Void> deleteAssignmentsForTask(@PathVariable Long taskId) {
-        List<UserTask> list = userTaskRepository.findByTask_Id(taskId);
-        if (!list.isEmpty()) {
-            userTaskRepository.deleteAll(list);
-        }
-        return ResponseEntity.noContent().build();
+    @PutMapping("/{id}")
+    public ResponseEntity<UserTask> updateUserTask(@PathVariable Long id, @RequestBody UserTask userTaskDetails) {
+        return userTaskRepository.findById(id).map(userTask -> {
+            userTask.setTask(userTaskDetails.getTask());
+            userTask.setUser(userTaskDetails.getUser());
+            return ResponseEntity.ok(userTaskRepository.save(userTask));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -127,5 +113,14 @@ public class UserTaskController {
         public void setStatus(String status) {
             this.status = status;
         }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUserTask(@PathVariable Long id) {
+        userTaskRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/user/{userId}")
+    public List<UserTask> getUserTasksByUserId(@PathVariable Long userId) {
+        return userTaskRepository.findByUser_Id(userId);
     }
 }
