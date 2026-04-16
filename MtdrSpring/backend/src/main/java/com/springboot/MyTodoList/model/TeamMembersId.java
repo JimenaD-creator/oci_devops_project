@@ -8,11 +8,11 @@ import java.util.Objects;
 public class TeamMembersId implements Serializable {
     
     private Long teamId;
-    private Integer userId;
+    private Long userId;
     
     public TeamMembersId() {}
     
-    public TeamMembersId(Long teamId, Integer userId) {
+    public TeamMembersId(Long teamId, Long userId) {
         this.teamId = teamId;
         this.userId = userId;
     }
@@ -25,11 +25,11 @@ public class TeamMembersId implements Serializable {
         this.teamId = teamId;
     }
     
-    public Integer getUserId() {
+    public Long getUserId() {
         return userId;
     }
     
-    public void setUserId(Integer userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
     

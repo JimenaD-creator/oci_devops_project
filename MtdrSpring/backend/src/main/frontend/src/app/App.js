@@ -1,28 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
-import API_LIST, { taskAPI } from '../services/API';
-import SprintsPage from '../pages/SprintsPage';
-import TasksPage from '../pages/TasksPage';
-import DashboardPage from '../components/dashboard/DashboardPage';
-import Analytics from '../pages/KPIAnalytics';
-import ProjectSelector from '../pages/ProjectSelector';
+import { taskAPI } from '../services/API';
 
+// Material UI imports - SOLO UNA VEZ CADA UNO
 import {
-  Box, Drawer, List, ListItem, ListItemIcon, ListItemText,
-  Typography, Avatar, IconButton, Menu, MenuItem
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  Avatar,
+  IconButton,
+  Menu,
+  MenuItem,
+  CircularProgress
 } from '@mui/material';
 
+// Icons
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import GroupsIcon from '@mui/icons-material/Groups';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
+// Lazy load pages
+const SprintsPage = lazy(() => import('../pages/SprintsPage'));
+const TasksPage = lazy(() => import('../pages/TasksPage'));
+const DashboardPage = lazy(() => import('../components/dashboard/DashboardPage'));
+const KPIAnalytics = lazy(() => import('../pages/KPIAnalytics'));
+const ProjectSelector = lazy(() => import('../pages/ProjectSelector'));
+
 const DRAWER_WIDTH = 240;
+
+// Componente de loading
+const PageLoader = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+    <CircularProgress sx={{ color: '#E53935' }} />
+  </Box>
+);
 
 const getInitials = (name) => {
   if (!name) return '';
@@ -36,7 +56,8 @@ function App() {
   const [isLoading, setLoading] = useState(false);
   const [isInserting, setInserting] = useState(false);
   const [items, setItems] = useState([]);
-  const [projectSelected, setProjectSelected] = useState(!!localStorage.getItem('selectedProjectId'));
+  const [selectedProjectId, setSelectedProjectId] = useState(localStorage.getItem('currentProjectId'));
+  const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
 
   const [user] = useState(() => {
     try {
@@ -70,6 +91,20 @@ function App() {
     }
   }, [user]);
 
+  const handleSelectProject = (project) => {
+    localStorage.setItem('currentProjectId', project.id);
+    localStorage.setItem('currentProjectName', project.name);
+    setSelectedProjectId(project.id);
+    setSelectedProjectName(project.name);
+  };
+
+  const handleChangeProject = () => {
+    localStorage.removeItem('currentProjectId');
+    localStorage.removeItem('currentProjectName');
+    setSelectedProjectId(null);
+    setSelectedProjectName(null);
+  };
+
   if (!user || user.role === 'DEVELOPER') return null;
 
   const NAV_ITEMS = [
@@ -83,8 +118,8 @@ function App() {
 
   const handleLogout = () => {
     logout();
-    localStorage.removeItem('selectedProjectId');
-    localStorage.removeItem('selectedProjectName');
+    localStorage.removeItem('currentProjectId');
+    localStorage.removeItem('currentProjectName');
     setMenuAnchor(null);
     navigate('/login', { replace: true });
   };
@@ -113,8 +148,12 @@ function App() {
       .catch(() => {});
   };
 
-  if (user.role === 'ADMIN' && !projectSelected) {
-    return <ProjectSelector onSelect={() => setProjectSelected(true)} />;
+  if (user.role === 'ADMIN' && !selectedProjectId) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <ProjectSelector onSelect={handleSelectProject} />
+      </Suspense>
+    );
   }
 
   return (
@@ -129,7 +168,7 @@ function App() {
       }}>
         <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #2A2A2A' }}>
           <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>Software Manager Tool</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>{selectedProjectName || 'Software Manager Tool'}</Typography>
             <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role}</Typography>
           </Box>
         </Box>
@@ -139,8 +178,7 @@ function App() {
             <ListItem button key={item.id} 
               onClick={() => {
                 if (item.id === 'selector') {
-                  localStorage.removeItem('selectedProjectId');
-                  setProjectSelected(false);
+                  handleChangeProject();
                 } else {
                   setActivePage(item.id);
                 }
@@ -185,16 +223,31 @@ function App() {
         position: 'fixed', top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         pt: 2, px: 4, pb: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
-        overflowY: 'auto', p: 4, boxSizing: 'border-box', backgroundColor: '#F7F8FA',
       }}>
-        {activePage === 'dashboard' && (
-          <DashboardPage items={items} isLoading={isLoading} toggleDone={toggleDone} deleteItem={deleteItem} onNavigateToTasks={() => setActivePage('tasks')} />
-        )}
-        {activePage === 'tasks' && (
-          <TasksPage items={items} isLoading={isLoading} isInserting={isInserting} toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem} />
-        )}
-        {activePage === 'sprints' && <SprintsPage />}
-        {activePage === 'analytics' && <Analytics />}
+        <Suspense fallback={<PageLoader />}>
+          {activePage === 'dashboard' && (
+            <DashboardPage 
+              items={items} 
+              isLoading={isLoading} 
+              toggleDone={toggleDone} 
+              deleteItem={deleteItem} 
+              onNavigateToTasks={() => setActivePage('tasks')}
+              projectId={selectedProjectId}
+            />
+          )}
+          {activePage === 'tasks' && (
+            <TasksPage 
+              items={items} 
+              isLoading={isLoading} 
+              isInserting={isInserting} 
+              toggleDone={toggleDone} 
+              deleteItem={deleteItem} 
+              addItem={addItem} 
+            />
+          )}
+          {activePage === 'sprints' && <SprintsPage projectId={selectedProjectId} />}
+          {activePage === 'analytics' && <KPIAnalytics projectId={selectedProjectId} />}
+        </Suspense>
         
         {!['dashboard', 'sprints', 'analytics', 'tasks'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>

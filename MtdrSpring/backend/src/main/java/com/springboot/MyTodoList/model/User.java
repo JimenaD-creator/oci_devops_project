@@ -1,12 +1,16 @@
 package com.springboot.MyTodoList.model;
+
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "USERS")
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    int ID;
+    @Column(name = "ID")
+    private Long id;
 
     @Column(name = "NAME")
     private String name;
@@ -18,34 +22,74 @@ public class User {
     private String type;
 
     @Column(name = "PHONENUMBER")
-    String phonenumber;
+    private String phonenumber;
 
     @Column(name = "PASSWORD")
-    String userpassword;
+    private String userpassword;
 
     public User() {}
 
-    public User(int ID, String number, String password) {
-        this.ID = ID;
+    public User(Long id, String number, String password) {
+        this.id = id;
         this.phonenumber = number;
         this.userpassword = password;
     }
 
-    public int getID() { return ID; }
-    public void setID(int ID) { this.ID = ID; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    @JsonIgnore
+    public int getID() {
+        return id != null ? id.intValue() : 0;
+    }
 
-    public String getPhoneNumber() { return phonenumber; }
-    public void setPhoneNumber(String number) { this.phonenumber = number; }
+    @JsonIgnore
+    public void setID(int ID) {
+        this.id = (long) ID;
+    }
 
-    public String getUserPassword() { return userpassword; }
-    public void setUserPassword(String password) { this.userpassword = password; }
+    public String getName() {
+        return name;
+    }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhoneNumber() {
+        return phonenumber;
+    }
+
+    public void setPhoneNumber(String number) {
+        this.phonenumber = number;
+    }
+
+    public String getUserPassword() {
+        return userpassword;
+    }
+
+    public void setUserPassword(String password) {
+        this.userpassword = password;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
 }

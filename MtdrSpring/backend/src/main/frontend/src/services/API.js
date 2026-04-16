@@ -14,11 +14,5 @@ export const taskAPI = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   }).then(r => r.ok ? r.json() : Promise.reject()),
-  delete: (id) => fetch(`${BASE_URL}/api/tasks/${id}`, { method: 'DELETE' }),
+  delete: (id) => fetch(`${BASE_URL}/api/tasks/${id}`, { method: 'DELETE' }).then(r => r.ok ? r.json() : Promise.reject()),
 };
-
-export const sprintAPI = {
-  getAll: () => fetch(`${BASE_URL}/api/sprints`).then(r => r.ok ? r.json() : Promise.reject()),
-};
-
-export default TODOITEM_API;

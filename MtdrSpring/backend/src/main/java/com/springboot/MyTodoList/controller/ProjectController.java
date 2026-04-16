@@ -9,6 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/projects")
+@CrossOrigin(origins = "http://localhost:3000")
 public class ProjectController {
 
     @Autowired
@@ -19,9 +20,17 @@ public class ProjectController {
         return projectRepository.findAll();
     }
 
-    @GetMapping("/manager/{userId}")
-    public ResponseEntity<Project> getProjectByManager(@PathVariable Integer userId) {
-        Project project = projectRepository.findByManagerId(userId);
-        return project != null ? ResponseEntity.ok(project) : ResponseEntity.notFound().build();
+    @GetMapping("/{id}")
+    public ResponseEntity<Project> getProjectById(@PathVariable Long id) {
+        return projectRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/manager/{managerId}")
+    public ResponseEntity<Project> getProjectByManager(@PathVariable Long managerId) {
+        return projectRepository.findByAssignedTeam_Manager_Id(managerId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
