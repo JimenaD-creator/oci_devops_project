@@ -1,7 +1,7 @@
 package com.springboot.MyTodoList.controller;
+
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.service.ToDoItemService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,59 +10,69 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/todolist")
+@CrossOrigin(origins = "*") 
 public class ToDoItemController {
-    @Autowired
-    private ToDoItemService toDoItemService;
-    //@CrossOrigin
-    @GetMapping(value = "/todolist")
-    public List<ToDoItem> getAllToDoItems(){
+
+    private final ToDoItemService toDoItemService;
+
+    public ToDoItemController(ToDoItemService toDoItemService) {
+        this.toDoItemService = toDoItemService;
+    }
+
+    @GetMapping
+    public List<ToDoItem> getAllToDoItems() {
         return toDoItemService.findAll();
     }
-    //@CrossOrigin
-    @GetMapping(value = "/todolist/{id}")
-    public ResponseEntity<ToDoItem> getToDoItemById(@PathVariable int id){
-        try{
-            ResponseEntity<ToDoItem> responseEntity = toDoItemService.getItemById(id);
-            return new ResponseEntity<ToDoItem>(responseEntity.getBody(), HttpStatus.OK);
-        }catch (Exception e){
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ToDoItem> getToDoItemById(@PathVariable int id) {
+        ToDoItem item = toDoItemService.getToDoItemById(id);
+        if (item != null) {
+            return new ResponseEntity<>(item, HttpStatus.OK);
+        }
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    @PostMapping
+    public ResponseEntity<ToDoItem> addToDoItem(@RequestBody ToDoItem todoItem) {
+        try {
+            ToDoItem td = toDoItemService.addToDoItem(todoItem);
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.set("location", String.valueOf(td.getID()));
+            responseHeaders.set("Access-Control-Expose-Headers", "location");
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .headers(responseHeaders)
+                    .body(td);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ToDoItem> updateToDoItem(@RequestBody ToDoItem toDoItem, @PathVariable int id) {
+        try {
+            ToDoItem updatedItem = toDoItemService.updateToDoItem(id, toDoItem);
+            if (updatedItem != null) {
+                return new ResponseEntity<>(updatedItem, HttpStatus.OK);
+            }
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-    //@CrossOrigin
-    @PostMapping(value = "/todolist")
-    public ResponseEntity<ToDoItem> addToDoItem(@RequestBody ToDoItem todoItem) throws Exception{
-        ToDoItem td = toDoItemService.addToDoItem(todoItem);
-        HttpHeaders responseHeaders = new HttpHeaders();
-        responseHeaders.set("location",""+td.getID());
-        responseHeaders.set("Access-Control-Expose-Headers","location");
-        //URI location = URI.create(""+td.getID())
-
-        return ResponseEntity.ok()
-                .headers(responseHeaders).build();
-    }
-    //@CrossOrigin
-    @PutMapping(value = "todolist/{id}")
-    public ResponseEntity<ToDoItem> updateToDoItem(@RequestBody ToDoItem toDoItem, @PathVariable int id){
-        try{
-            ToDoItem toDoItem1 = toDoItemService.updateToDoItem(id, toDoItem);
-            System.out.println(toDoItem1.toString());
-            return new ResponseEntity<>(toDoItem1,HttpStatus.OK);
-        }catch (Exception e){
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
-    }
-    //@CrossOrigin
-    @DeleteMapping(value = "todolist/{id}")
-    public ResponseEntity<Boolean> deleteToDoItem(@PathVariable("id") int id){
-        Boolean flag = false;
-        try{
-            flag = toDoItemService.deleteToDoItem(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        }catch (Exception e){
-            return new ResponseEntity<>(flag,HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-
-
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Boolean> deleteToDoItem(@PathVariable int id) {
+        try {
+            boolean deleted = toDoItemService.deleteToDoItem(id);
+            if (deleted) {
+                return new ResponseEntity<>(true, HttpStatus.OK);
+            }
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

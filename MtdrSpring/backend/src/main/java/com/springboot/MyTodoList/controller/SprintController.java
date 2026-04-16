@@ -60,6 +60,7 @@ public class SprintController {
             existingSprint.setOnTimeDelivery(sprintDetails.getOnTimeDelivery());
             existingSprint.setTeamParticipation(sprintDetails.getTeamParticipation());
             existingSprint.setWorkloadBalance(sprintDetails.getWorkloadBalance());
+            existingSprint.setGoal(sprintDetails.getGoal());
             Sprint updatedSprint = sprintRepository.save(existingSprint);
             return ResponseEntity.ok(updatedSprint);
         }

@@ -1,116 +1,126 @@
-import React from "react";
-import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
-import { motion } from "framer-motion";
+import React from 'react';
+import { Box } from '@mui/material';
+import { Clock, ClipboardList } from 'lucide-react';
+import { motion } from 'framer-motion';
+import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 
-const hoursCard = {
-  icon: Clock,
-  title: "Total Hours Worked",
-  value: "128.5",
-  subtitle: "hours logged this sprint",
-  trend: "+12% vs last sprint",
+const ORACLE_RED = '#C74634';
+
+const cardBase = {
+  backgroundColor: 'white',
+  borderRadius: '12px',
+  border: '1px solid #EFEFEF',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+  padding: '1.05rem 1.2rem',
+  overflow: 'hidden',
 };
 
-const styles = {
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "1rem",
-    marginBottom: "1.5rem",
-  },
-  card: {
-    backgroundColor: "white",
-    borderRadius: "0.75rem",
-    border: "1px solid #F3F4F6",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-    padding: "1.5rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "1.25rem",
-  },
-  iconWrapper: {
-    width: "3.5rem",
-    height: "3.5rem",
-    borderRadius: "1rem",
-    backgroundColor: "rgba(199,70,52,0.1)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  content: {
-    flex: 1,
-    minWidth: 0,
-  },
-  label: {
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#6F6F6F",
-    marginBottom: "0.25rem",
-  },
-  value: {
-    fontSize: "2.25rem",
-    fontWeight: 700,
-    color: "#2E2E2E",
-    lineHeight: 1,
-    marginBottom: "0.25rem",
-  },
-  subtitle: {
-    fontSize: "0.75rem",
-    color: "#6F6F6F",
-  },
-  trend: {
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    padding: "0.375rem 0.625rem",
-    backgroundColor: "#F0FDF4",
-    border: "1px solid #DCFCE7",
-    borderRadius: "0.5rem",
-  },
-  trendText: {
-    fontSize: "0.75rem",
-    fontWeight: 700,
-    color: "#16A34A",
-  },
-};
-
-export default function SummaryCards({ completedTasksCount = 0 }) {
+/**
+ * KPI cards + task status chart in one row (single-sprint dashboard).
+ */
+export default function SummaryCards({
+  totalHoursDisplay = '0',
+  taskStatusDistribution = [],
+  taskStatusTotal = 0,
+}) {
   const cards = [
     {
-      icon: CheckCircle2,
-      title: "Total Completed Tasks",
-      value: String(completedTasksCount),
-      subtitle: "tasks done this sprint",
-      trend: "+8% vs last sprint",
+      icon: ClipboardList,
+      title: 'Total tasks',
+      value: String(taskStatusTotal),
+      subtitle: 'All tasks assigned to this sprint',
     },
-    hoursCard,
+    {
+      icon: Clock,
+      title: 'Total Hours Worked',
+      value: totalHoursDisplay,
+      subtitle: 'Hours logged this sprint',
+    },
   ];
 
+  const styles = {
+    card: {
+      ...cardBase,
+      borderTop: `3px solid ${ORACLE_RED}`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      gap: '0.95rem',
+      width: '100%',
+      minHeight: '100%',
+      boxSizing: 'border-box',
+    },
+    iconWrapper: {
+      width: '2.85rem',
+      height: '2.85rem',
+      borderRadius: '10px',
+      backgroundColor: 'rgba(199,70,52,0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    content: { flex: 1, minWidth: 0 },
+    label: { fontSize: '0.75rem', fontWeight: 700, color: '#555', marginBottom: '0.28rem', textTransform: 'uppercase', letterSpacing: '0.04em' },
+    value: { fontSize: '1.95rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.08, marginBottom: '0.2rem' },
+    subtitle: { fontSize: '0.8rem', color: '#666', fontWeight: 500, lineHeight: 1.35 },
+  };
+
   return (
-    <div style={styles.grid}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        alignItems: 'stretch',
+        justifyContent: 'flex-start',
+        gap: 1.25,
+        width: '100%',
+        minWidth: 0,
+        mb: 2.5,
+      }}
+    >
       {cards.map((card, i) => (
-        <motion.div
+        <Box
           key={card.title}
-          initial={{ opacity: 0, y: -16 }}
+          component={motion.div}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1, duration: 0.4 }}
-          style={styles.card}
+          transition={{ delay: i * 0.08, duration: 0.35 }}
+          sx={{
+            flex: '1 1 0',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
         >
-          <div style={styles.iconWrapper}>
-            <card.icon style={{ width: "1.75rem", height: "1.75rem", color: "#C74634" }} />
+          <div style={styles.card}>
+            <div style={styles.iconWrapper}>
+              <card.icon style={{ width: '1.4rem', height: '1.4rem', color: ORACLE_RED }} />
+            </div>
+            <div style={styles.content}>
+              <p style={styles.label}>{card.title}</p>
+              <p style={styles.value}>{card.value}</p>
+              <p style={styles.subtitle}>{card.subtitle}</p>
+            </div>
           </div>
-          <div style={styles.content}>
-            <p style={styles.label}>{card.title}</p>
-            <p style={styles.value}>{card.value}</p>
-            <p style={styles.subtitle}>{card.subtitle}</p>
-          </div>
-          <div style={styles.trend}>
-            <TrendingUp style={{ width: "0.875rem", height: "0.875rem", color: "#16A34A" }} />
-            <span style={styles.trendText}>{card.trend}</span>
-          </div>
-        </motion.div>
+        </Box>
       ))}
-    </div>
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.35 }}
+        sx={{
+          flex: '1.3 1 0',
+          minWidth: { xs: 0, sm: 260 },
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+        }}
+      >
+        <TaskStatusDistributionChart distribution={taskStatusDistribution} total={taskStatusTotal} />
+      </Box>
+    </Box>
   );
 }

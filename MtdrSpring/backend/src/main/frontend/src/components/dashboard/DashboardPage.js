@@ -1,248 +1,390 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Box, Grid, Card, CardContent, Chip, Typography,
-  LinearProgress, Table, TableBody, TableCell, TableContainer, TableRow,
-  Paper, CircularProgress, IconButton, Button, Badge,
-  FormControl, InputLabel, Select, MenuItem, TextField,
+  Box, Typography,
+  LinearProgress, Paper, Card, CardContent, IconButton, Badge,
+  FormGroup, FormControlLabel, Checkbox, CircularProgress,
 } from '@mui/material';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import DeleteIcon from '@mui/icons-material/Delete';
-import UndoIcon from '@mui/icons-material/Undo';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
-import NewItem from '../NewItem';
-import SummaryCards from './SummaryCards';
-import KPICards from './KPICards';
+import TaskStatusDistributionChart from './TaskStatusDistributionChart';
+import DashboardTopMetrics from './DashboardTopMetrics';
+import DashboardDeveloperCharts from './DashboardDeveloperCharts';
+import DeveloperTable from '../analytics/DeveloperTable';
+import {
+  fetchDashboardSprints,
+  mergeTaskStatusAcrossSprints,
+  aggregateSelectionMetrics,
+} from './dashboardSprintData';
+import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './dashboardConstants';
+import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 
-export default function DashboardPage({ items, isLoading, isInserting, toggleDone, deleteItem, addItem }) {
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [developerFilter, setDeveloperFilter] = useState('all');
-  const [sprintFilter, setSprintFilter] = useState('all');
-  const [dueBefore, setDueBefore] = useState('');
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      if (statusFilter === 'pending' && item.done) return false;
-      if (statusFilter === 'completed' && !item.done) return false;
-      if (developerFilter !== 'all' && item.developer !== developerFilter) return false;
-      if (sprintFilter !== 'all' && item.sprint !== sprintFilter) return false;
-      if (dueBefore && item.dueDate) {
-        const d = String(item.dueDate).slice(0, 10);
-        if (d > dueBefore) return false;
-      }
-      return true;
+export default function DashboardPage() {
+  const [allSprints, setAllSprints] = useState([]);
+  const [sprintsLoading, setSprintsLoading] = useState(true);
+  const [selectedSprintIds, setSelectedSprintIds] = useState([]);
+
+  useEffect(() => {
+    handleRefresh();
+  }, []);
+
+  const handleRefresh = () => {
+    setSprintsLoading(true);
+    fetchDashboardSprints()
+      .then((sprints) => {
+        setAllSprints(sprints);
+        if (sprints.length > 0 && selectedSprintIds.length === 0) {
+          const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
+          setSelectedSprintIds([Number(active.id)]);
+        }
+      })
+      .finally(() => setSprintsLoading(false));
+  };
+
+  /** Unique sprint ids that exist in `allSprints` (fixes duplicate ids in state after many toggles). */
+  const normalizedSelectedIds = useMemo(() => {
+    if (!allSprints.length) return [];
+    const valid = new Set(allSprints.map((s) => Number(s.id)));
+    return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))].filter((id) => valid.has(id));
+  }, [selectedSprintIds, allSprints]);
+
+  /** Dedupe / prune invalid ids in state (e.g. [1,1,2] or stale ids) so compareMode matches the UI. */
+  useEffect(() => {
+    if (!allSprints.length || sprintsLoading) return;
+    if (normalizedSelectedIds.length === 0) {
+      const active = allSprints.find((s) => s.status === 'active') ?? allSprints[allSprints.length - 1];
+      setSelectedSprintIds([Number(active.id)]);
+      return;
+    }
+    const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
+    const uniqueRaw = [...new Set(raw)];
+    const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const hasDuplicateEntries = raw.length !== uniqueRaw.length;
+    const needsPrune = uniqSorted !== normSorted;
+    if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
+  }, [allSprints, sprintsLoading, selectedSprintIds, normalizedSelectedIds]);
+
+  /**
+   * One sprint per id, order follows first occurrence in normalizedSelectedIds.
+   */
+  const selectedSprints = useMemo(() => {
+    const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
+    return normalizedSelectedIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const ia = normalizedSelectedIds.indexOf(Number(a.id));
+        const ib = normalizedSelectedIds.indexOf(Number(b.id));
+        return ia - ib;
+      });
+  }, [normalizedSelectedIds, allSprints]);
+
+  const compareMode = normalizedSelectedIds.length > 1;
+  const primarySprint = selectedSprints[0];
+
+  const { taskStatusDistribution, taskStatusTotal } = useMemo(
+    () => mergeTaskStatusAcrossSprints(selectedSprints),
+    [selectedSprints]
+  );
+
+  const selectionMetrics = useMemo(
+    () => aggregateSelectionMetrics(selectedSprints),
+    [selectedSprints]
+  );
+
+  const heroProgress = useMemo(() => {
+    if (!taskStatusTotal) return 0;
+    const done = taskStatusDistribution.find((r) => r.key === 'DONE')?.count ?? 0;
+    return Math.round((100 * done) / taskStatusTotal);
+  }, [taskStatusDistribution, taskStatusTotal]);
+
+  const projectName = useMemo(() => {
+    const name = allSprints.find((s) => s.assignedProject?.name)?.assignedProject?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+    return 'Project';
+  }, [allSprints]);
+
+  const sprintDateLabel = useMemo(() => {
+    if (!primarySprint) return '';
+    if (compareMode) {
+      return selectedSprints
+        .map((s) => (s.dateRangeEn || s.dateRange || '').trim())
+        .filter(Boolean)
+        .join(' · ');
+    }
+    return primarySprint.dateRangeEn || primarySprint.dateRange || '';
+  }, [primarySprint, compareMode, selectedSprints]);
+
+  const teamDeveloperCount = useMemo(
+    () => new Set(selectedSprints.flatMap((s) => (s.developers || []).map((d) => d.name))).size,
+    [selectedSprints]
+  );
+
+  const toggleSprint = (id, checked) => {
+    const nid = Number(id);
+    setSelectedSprintIds((prev) => {
+      const nums = [...new Set(prev.map(Number).filter(Number.isFinite))];
+      if (checked) return [...new Set([...nums, nid])];
+      if (nums.length <= 1) return nums;
+      return nums.filter((x) => x !== nid);
     });
-  }, [items, statusFilter, developerFilter, sprintFilter, dueBefore]);
+  };
 
-  const pendingItems = filteredItems.filter(i => !i.done);
-  const completedItems = filteredItems.filter(i => i.done);
-
-  const total = items.length;
-  const doneAllCount = items.filter(i => i.done).length;
-  const pendingCount = pendingItems.length;
-  const doneCount = completedItems.length;
-  const progress = total > 0 ? Math.round((doneAllCount / total) * 100) : 78;
+  if (sprintsLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <CircularProgress sx={{ color: DASHBOARD_PRIMARY_ACCENT }} />
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px' }}>
-            Dashboard — Mobile App Development
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#999', mt: 0.5 }}>
-            Sprint 12 · Abril 8–22, 2024
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <Button startIcon={<RefreshIcon />} variant="outlined" size="small"
-            sx={{ borderColor: '#DDD', color: '#555', textTransform: 'none', fontWeight: 600, borderRadius: 2 }}>
-            Refresh
-          </Button>
-          <IconButton sx={{ bgcolor: 'white', border: '1px solid #EEE', borderRadius: 2 }}>
-            <Badge badgeContent={3} color="error">
-              <NotificationsIcon sx={{ fontSize: 20 }} />
+    <Box
+      sx={{
+        maxWidth: DASHBOARD_CONTENT_MAX_WIDTH,
+        width: '100%',
+        mx: 'auto',
+        pt: 0,
+        px: 2,
+        pb: 2,
+        boxSizing: 'border-box',
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          mb: 1.5,
+          borderRadius: 3,
+          border: '1px solid #ECECEC',
+          bgcolor: '#FFFFFF',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 2,
+            mb: 1.5,
+          }}
+        >
+          <Box sx={{ pr: 1, minWidth: 0, flex: 1 }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 800,
+                color: '#1A1A1A',
+                lineHeight: 1.2,
+                fontSize: { xs: '1.65rem', sm: '2rem', md: '2.25rem' },
+              }}
+            >
+              Dashboard – {projectName}
+            </Typography>
+            {sprintDateLabel ? (
+              <Typography variant="body2" sx={{ color: '#666', fontWeight: 600, mt: 0.75 }}>
+                {compareMode ? 'Sprint dates: ' : 'Sprint Date: '}
+                {sprintDateLabel}
+              </Typography>
+            ) : (
+              <Typography variant="body2" sx={{ color: '#666', fontWeight: 500, mt: 0.5 }}>
+                {compareMode ? 'Multi-sprint comparison' : `${primarySprint?.name ?? 'Sprint'} overview`}
+              </Typography>
+            )}
+          </Box>
+          <IconButton sx={{ bgcolor: '#F5F5F5', flexShrink: 0 }} aria-label="Notifications">
+            <Badge badgeContent={1} color="error">
+              <NotificationsIcon />
             </Badge>
           </IconButton>
         </Box>
-      </Box>
 
-      <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', mb: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Mobile App Development</Typography>
-              <Chip label="Activo" size="small"
-                sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700, fontSize: '0.72rem' }} />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <GroupIcon sx={{ fontSize: 16, color: '#999' }} />
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#999', display: 'block', lineHeight: 1 }}>Equipo</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>5 devs</Typography>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AssignmentIcon sx={{ fontSize: 16, color: '#999' }} />
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#999', display: 'block', lineHeight: 1 }}>Sprint</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>#12</Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-          <Typography variant="body2" sx={{ color: '#888', mb: 2 }}>
-            Enterprise mobile application for client management
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
+            {compareMode ? 'Multi-sprint comparison' : (primarySprint?.name || 'Project Progress')}
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>Progreso del proyecto</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 800, color: '#E53935' }}>{progress}%</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
+              {teamDeveloperCount} devs
+            </Typography>
           </Box>
-          <LinearProgress variant="determinate" value={progress}
-            sx={{ height: 10, borderRadius: 5, bgcolor: '#F0F0F0',
-              '& .MuiLinearProgress-bar': { bgcolor: '#E53935', borderRadius: 5 } }} />
-        </CardContent>
-      </Card>
-      <SummaryCards completedTasksCount={doneAllCount} />
-      <KPICards />
-
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3, border: '1px solid #EFEFEF', boxShadow: 'none' }}>
-        <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>Agregar Nueva Tarea</Typography>
-        <NewItem addItem={addItem} isInserting={isInserting} />
+        </Box>
       </Paper>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, alignItems: 'center' }}>
-        <FormControl sx={{ minWidth: 140 }} size="small">
-          <InputLabel id="status-filter-label">Status</InputLabel>
-          <Select
-            labelId="status-filter-label"
-            id="status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            label="Status"
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="pending">Pending</MenuItem>
-            <MenuItem value="completed">Completed</MenuItem>
-          </Select>
-        </FormControl>
+      <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 2.5 }}>
+        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
+              Completion rate
+            </Typography>
+            <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: DASHBOARD_PRIMARY_ACCENT, lineHeight: 1 }}>
+              {heroProgress}%
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={heroProgress}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: '#F0F0F0',
+              '& .MuiLinearProgress-bar': { bgcolor: DASHBOARD_PRIMARY_ACCENT },
+            }}
+          />
+        </CardContent>
+      </Card>
 
-        <FormControl sx={{ minWidth: 160 }} size="small">
-          <InputLabel id="developer-filter-label">Developer</InputLabel>
-          <Select
-            labelId="developer-filter-label"
-            id="developer-filter"
-            value={developerFilter}
-            onChange={(e) => setDeveloperFilter(e.target.value)}
-            label="Developer"
+      <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
+        <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+          {allSprints.map((sp) => {
+            const sprintColor = sp.accentColor ?? '#607D8B';
+            return (
+              <FormControlLabel
+                key={sp.id}
+                control={(
+                  <Checkbox
+                    size="small"
+                    checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
+                    onChange={(e) => toggleSprint(sp.id, e.target.checked)}
+                    sx={{ '&.Mui-checked': { color: sprintColor } }}
+                  />
+                )}
+                label={(
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: sprintColor,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{sp.name}</Typography>
+                  </Box>
+                )}
+              />
+            );
+          })}
+        </FormGroup>
+      </Paper>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' },
+            alignItems: 'stretch',
+            gap: { xs: 3, md: 3 },
+            width: '100%',
+            minWidth: 0,
+            mb: 4,
+          }}
+        >
+          <Box
+            sx={{
+              flex: { md: compareMode ? 'none' : '1 1 0' },
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+            }}
           >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="developer1">Developer 1</MenuItem>
-            <MenuItem value="developer2">Developer 2</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 140 }} size="small">
-          <InputLabel id="sprint-filter-label">Sprint</InputLabel>
-          <Select
-            labelId="sprint-filter-label"
-            id="sprint-filter"
-            value={sprintFilter}
-            onChange={(e) => setSprintFilter(e.target.value)}
-            label="Sprint"
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="sprint1">Sprint 1</MenuItem>
-            <MenuItem value="sprint2">Sprint 2</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField
-          size="small"
-          type="date"
-          label="Due before"
-          value={dueBefore}
-          onChange={(e) => setDueBefore(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160 }}
+            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}>
+              Scorecards
+            </Typography>
+            <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left' }}>
+              Quick totals and averages for the sprint(s) currently selected above.
+            </Typography>
+            <DashboardTopMetrics
+              showSectionHeader={false}
+              multiSprint={compareMode}
+              scorecardsFourColumn={compareMode}
+              totalTasks={selectionMetrics.totalTasks}
+              totalHours={selectionMetrics.totalHours}
+              avgTasksPerDev={selectionMetrics.avgTasksPerDev}
+              avgHoursPerDev={selectionMetrics.avgHoursPerDev}
+              uniqueDevCount={selectionMetrics.uniqueDevCount}
+            />
+          </Box>
+
+          {!compareMode ? (
+            <Box
+              sx={{
+                flex: { md: '1 1 0' },
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                width: { xs: '100%', md: 'auto' },
+              }}
+            >
+              <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}>
+                Project status
+              </Typography>
+              <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left' }}>
+                Where tasks sit in the workflow for the active sprint.
+              </Typography>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 2, sm: 2.25 },
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: { xs: 260, md: 0 },
+                  width: '100%',
+                  borderRadius: 3,
+                  border: '1px solid #E3F2FD',
+                  borderLeft: '5px solid #1565C0',
+                  background: 'linear-gradient(135deg, rgba(21,101,192,0.07) 0%, #FFFFFF 50%)',
+                  boxShadow: '0 2px 10px rgba(21,101,192,0.08)',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <TaskStatusDistributionChart
+                  distribution={taskStatusDistribution}
+                  total={taskStatusTotal}
+                  embedded
+                  caption="Tasks in each workflow stage for this sprint."
+                />
+              </Paper>
+            </Box>
+          ) : null}
+        </Box>
+
+        <Box sx={{ mb: 0 }}>
+          <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
+            Developer performance
+          </Typography>
+          <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5 }}>
+            Charts for workload, hours, and productivity by developer.
+          </Typography>
+        </Box>
+        <DashboardDeveloperCharts
+          developers={selectionMetrics.developers}
+          selectedSprints={selectedSprints}
+          compareMode={compareMode}
+        />
+
+        <Box sx={{ mt: 4, mb: 0 }}>
+          <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
+            Developer productivity breakdown
+          </Typography>
+          <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5 }}>
+            Detailed per-developer numbers and sprint columns when comparing.
+          </Typography>
+        </Box>
+        <DeveloperTable
+          selectedSprints={selectedSprints}
+          compareMode={compareMode}
+          suppressCardTitle
         />
       </Box>
-      {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress color="error" /></Box>
-      ) : (
-        <Grid container spacing={3}>
-          <Grid item xs={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-              <Box sx={{ width: 8, height: 8, bgcolor: '#E53935', borderRadius: '50%' }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Active Backlog</Typography>
-              <Chip label={pendingCount} size="small"
-                sx={{ ml: 'auto', bgcolor: '#F5F5F5', fontWeight: 700, height: 20, fontSize: '0.7rem' }} />
-            </Box>
-            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none' }}>
-              <Table>
-                <TableBody>
-                  {pendingItems.map((item) => (
-                    <TableRow key={item.id} hover sx={{ '&:last-child td': { border: 0 } }}>
-                      <TableCell sx={{ py: 2, fontWeight: 500, fontSize: '0.9rem' }}>{item.description}</TableCell>
-                      <TableCell align="right">
-                        <Button variant="text" size="small"
-                          sx={{ color: '#E53935', fontWeight: 700, textTransform: 'none' }}
-                          onClick={(e) => toggleDone(e, item.id, item.description, true)}>
-                          Completar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {pendingItems.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={2} sx={{ textAlign: 'center', py: 4, color: '#BBB' }}>
-                        No hay tareas pendientes
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Grid>
-
-          <Grid item xs={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-              <Box sx={{ width: 8, height: 8, bgcolor: '#4CAF50', borderRadius: '50%' }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Completadas</Typography>
-              <Chip label={doneCount} size="small"
-                sx={{ ml: 'auto', bgcolor: '#F0FFF4', color: '#2E7D32', fontWeight: 700, height: 20, fontSize: '0.7rem' }} />
-            </Box>
-            <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none', bgcolor: '#FAFAFA' }}>
-              <Table>
-                <TableBody>
-                  {completedItems.map((item) => (
-                    <TableRow key={item.id} sx={{ '&:last-child td': { border: 0 } }}>
-                      <TableCell sx={{ color: '#AAA', textDecoration: 'line-through', fontSize: '0.9rem' }}>
-                        {item.description}
-                      </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                        <IconButton size="small" onClick={(e) => toggleDone(e, item.id, item.description, false)} color="primary">
-                          <UndoIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => deleteItem(item.id)} sx={{ color: '#FF5252' }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {completedItems.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={2} sx={{ textAlign: 'center', py: 4, color: '#BBB' }}>
-                        Aún no hay tareas completadas
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Grid>
-        </Grid>
-      )}
     </Box>
   );
 }

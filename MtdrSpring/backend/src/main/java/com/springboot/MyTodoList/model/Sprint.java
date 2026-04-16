@@ -33,6 +33,10 @@ public class Sprint {
     
     @Column(name = "WORKLOAD_BALANCE")
     private BigDecimal workloadBalance;
+
+    /** Sprint goal / objective (optional). */
+    @Column(name = "GOAL", length = 2000)
+    private String goal;
     
     public Sprint() {}
     
@@ -104,5 +108,13 @@ public class Sprint {
     
     public void setWorkloadBalance(BigDecimal workloadBalance) {
         this.workloadBalance = workloadBalance;
+    }
+
+    public String getGoal() {
+        return goal;
+    }
+
+    public void setGoal(String goal) {
+        this.goal = goal;
     }
 }

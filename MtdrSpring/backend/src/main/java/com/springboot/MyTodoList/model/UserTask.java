@@ -1,5 +1,7 @@
 package com.springboot.MyTodoList.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -19,6 +21,11 @@ public class UserTask {
     @JoinColumn(name = "TASK_ID")
     private Task task;
     
+    /**
+     * Hours worked on this user–task assignment. Persisted as {@code USER_TASK.WORKED_HOURS}.
+     * Aggregated per developer for dashboards (real hours, not task estimates).
+     */
+    @JsonAlias("hours")
     @Column(name = "WORKED_HOURS")
     private Long workedHours;
     
