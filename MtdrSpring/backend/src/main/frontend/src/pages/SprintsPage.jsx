@@ -17,7 +17,9 @@ import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerAvatarColors } from '../utils/developerColors';
+import TaskTable from '../components/dashboard/TaskTable';
 
 const ORACLE_RED = '#E53935';
 const ORACLE_RED_ACTION = '#C74634';
@@ -132,7 +134,7 @@ function userRecordId(u) {
   return u?.id ?? u?.ID;
 }
 
-function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
+function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved, onDeleted }) {
   const [task, setTask] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadedAssigneeUserIds, setLoadedAssigneeUserIds] = useState([]);
@@ -151,6 +153,25 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
   const [sprintId, setSprintId] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState([]);
 
+  const loadProjectDevelopersForSprint = async (sid, taskFallback = null) => {
+    const sprintFromList = (sprints || []).find((s) => String(s.id) === String(sid));
+    const projectId = Number(
+      sprintFromList?.assignedProject?.id
+      ?? taskFallback?.assignedSprint?.assignedProject?.id,
+    );
+    if (!Number.isFinite(projectId)) {
+      setUsers([]);
+      return;
+    }
+    try {
+      const usersRes = await fetch(`${API_BASE}/api/projects/${projectId}/developers`);
+      const usersData = usersRes.ok ? await usersRes.json() : [];
+      setUsers(Array.isArray(usersData) ? usersData : []);
+    } catch {
+      setUsers([]);
+    }
+  };
+
   useEffect(() => {
     if (!open) {
       setTask(null);
@@ -165,15 +186,11 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
     setLoading(true);
     (async () => {
       try {
-        const [taskRes, usersRes] = await Promise.all([
-          fetch(`${API_BASE}/api/tasks/${initialTask.id}`),
-          fetch(`${API_BASE}/users`),
-        ]);
+        const taskRes = await fetch(`${API_BASE}/api/tasks/${initialTask.id}`);
         const t = taskRes.ok ? await taskRes.json() : null;
-        const usersData = usersRes.ok ? await usersRes.json() : [];
         if (cancelled || !t) return;
         setTask(t);
-        setUsers(Array.isArray(usersData) ? usersData : []);
+        await loadProjectDevelopersForSprint(t.assignedSprint?.id, t);
 
         const utRes = await fetch(`${API_BASE}/api/user-tasks/task/${t.id}`);
         const utList = utRes.ok ? await utRes.json() : [];
@@ -188,6 +205,23 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
     })();
     return () => { cancelled = true; };
   }, [open, initialTask?.id]);
+
+  useEffect(() => {
+    if (!open || !editMode || !sprintId) return;
+    loadProjectDevelopersForSprint(sprintId, task);
+  }, [open, editMode, sprintId, sprints, task]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    setAssignedUserIds((prev) => {
+      const allowed = new Set(
+        users
+          .map((u) => Number(userRecordId(u)))
+          .filter((id) => Number.isFinite(id)),
+      );
+      return prev.filter((id) => allowed.has(Number(id)));
+    });
+  }, [users, editMode]);
 
   const applyTaskToForm = (t) => {
     if (!t) return;
@@ -280,6 +314,28 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
 
   const handleDialogClose = () => { if (!saving) onClose(); };
 
+  const handleDeleteTask = async () => {
+    if (!task?.id) return;
+    if (!window.confirm('Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.')) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${task.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onDeleted?.(task.id);
+        onClose();
+      } else {
+        setError('Could not delete task.');
+      }
+    } catch {
+      setError('Connection error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const statusLabel = task ? (TASK_STATUS_LABEL[task.status] ?? task.status) : '';
   const classificationKey = task?.classification && CLASSIFICATION_CHIP_SX[task.classification] ? task.classification : null;
   const priorityKey = task?.priority && PRIORITY_CHIP_SX[task.priority] ? task.priority : null;
@@ -298,6 +354,38 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
               {task?.id != null && <Typography variant="caption" sx={{ color: ORACLE_RED, fontWeight: 700 }}>ID #{task.id}</Typography>}
             </Box>
           </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            {!editMode && task && !loading ? (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<EditIcon />}
+                  onClick={handleStartEdit}
+                  sx={{
+                    bgcolor: ORACLE_RED_ACTION,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    '&:hover': { bgcolor: '#A83B2D' },
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteOutlineIcon />}
+                  onClick={handleDeleteTask}
+                  disabled={saving}
+                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+                >
+                  Delete
+                </Button>
+              </>
+            ) : null}
+            <IconButton aria-label="Close" onClick={handleDialogClose} disabled={saving} size="small">
+              <CloseIcon />
+            </IconButton>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {!editMode && task && !loading && (
               <Button variant="contained" startIcon={<EditIcon />} onClick={handleStartEdit} sx={{ bgcolor: ORACLE_RED_ACTION, textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>
@@ -401,7 +489,7 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
   );
 }
 
-function SprintDetail({ sprint, tasks, onSelectTask }) {
+function SprintDetail({ sprint, tasks, userTasks, onSelectTask, onEditSprint }) {
   const sprintPhase = inferSprintStatus(sprint, tasks);
   const phaseCfg = STATUS_CONFIG[sprintPhase];
   const sprintTasks = tasks.filter(t => t.assignedSprint?.id === sprint.id);
@@ -411,12 +499,144 @@ function SprintDetail({ sprint, tasks, onSelectTask }) {
   const total = sprintTasks.length;
   const progress = total > 0 ? Math.round((done / total) * 100) : Math.round((sprint.completionRate ?? 0) * 100);
 
+  const userTasksList = Array.isArray(userTasks) ? userTasks : [];
+  const assignmentsByTaskId = userTasksList.reduce((acc, ut) => {
+    const tidRaw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId;
+    const tid = Number(tidRaw);
+    if (!Number.isFinite(tid)) return acc;
+    if (!acc[tid]) acc[tid] = [];
+    acc[tid].push(ut);
+    return acc;
+  }, {});
+
+  const sprintTaskRows = sprintTasks.map((task) => ({
+    ...(function deriveTaskRowFields() {
+      const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
+      const names = [...new Set(
+        taskAssignments
+          .map((ut) => String(ut?.user?.name || '').trim())
+          .filter(Boolean),
+      )];
+      const workedHours = taskAssignments.reduce((sum, ut) => {
+        const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
+      return {
+        developers: names,
+        developer: names[0] ?? null,
+        actualHours: workedHours > 0 ? workedHours : null,
+      };
+    })(),
+    id: task.id,
+    description: taskDisplayName(task),
+    done: task.status === 'DONE',
+    status: task.status,
+    statusRaw: task.status,
+    dueDate: task.dueDate,
+    completedAt: task.finishDate,
+    _task: task,
+  }));
   const statusIcon = { 'DONE': <CheckCircleIcon sx={{ fontSize: 16, color: '#4CAF50' }} />, 'IN_PROGRESS': <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: '#1E88E5' }} />, 'IN_REVIEW': <RateReviewOutlinedIcon sx={{ fontSize: 16, color: '#7B1FA2' }} />, 'PENDING': <PauseCircleIcon sx={{ fontSize: 16, color: ORACLE_RED }} />, 'TODO': <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: '#CCC' }} /> };
   const statusLabel = { 'DONE': { label: 'Done', bg: '#F0FFF4', color: '#2E7D32' }, 'IN_PROGRESS': { label: 'In progress', bg: '#E3F2FD', color: '#1565C0' }, 'IN_REVIEW': { label: 'In review', bg: '#F3E5F5', color: '#7B1FA2' }, 'PENDING': { label: 'Pending', bg: '#FFF1F0', color: '#C62828' }, 'TODO': { label: 'To do', bg: '#F5F5F5', color: '#757575' } };
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.35rem', letterSpacing: '-0.02em' }}>Sprint {sprint.id} — Detail</Typography>
+            <Chip
+              label={phaseCfg.label}
+              size="small"
+              sx={{ bgcolor: phaseCfg.color, color: phaseCfg.textColor, fontWeight: 700, fontSize: '0.78rem' }}
+            />
+          </Box>
+          <Typography variant="body1" sx={{ color: '#757575', mt: 0.6, fontSize: '1.05rem' }}>
+            {formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<EditIcon />}
+          onClick={() => onEditSprint?.(sprint)}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 700,
+            borderColor: ORACLE_RED_ACTION,
+            color: ORACLE_RED_ACTION,
+            flexShrink: 0,
+            '&:hover': { borderColor: '#A83B2D', bgcolor: 'rgba(199, 70, 52, 0.06)' },
+          }}
+        >
+          Edit sprint
+        </Button>
+      </Box>
+
+      {sprint.goal ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 3,
+            borderRadius: 2,
+            border: '1px solid #ECECEC',
+            bgcolor: '#FAFAFA',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <FlagOutlinedIcon sx={{ fontSize: 18, color: ORACLE_RED }} />
+            <Typography variant="caption" sx={{ fontWeight: 800, color: '#616161', letterSpacing: 0.45, fontSize: '0.875rem' }}>
+              Sprint goal
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#333', lineHeight: 1.65, whiteSpace: 'pre-wrap', fontSize: '1.02rem' }}>
+            {sprint.goal}
+          </Typography>
+        </Paper>
+      ) : null}
+
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {[
+          { label: 'Total',       value: total,       color: '#555' },
+          { label: 'Completed',   value: done,        color: '#2E7D32' },
+          { label: 'In progress', value: inProgress,  color: '#1565C0' },
+          { label: 'In review',   value: inReview,    color: '#7B1FA2' },
+          { label: 'Completion',  value: `${progress}%`, color: ORACLE_RED },
+        ].map((s) => (
+          <Grid item xs key={s.label}>
+            <Paper sx={{ p: 2, borderRadius: 2, border: '1px solid #EFEFEF', boxShadow: 'none', textAlign: 'center' }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: s.color, fontSize: '1.35rem' }}>{s.value}</Typography>
+              <Typography variant="caption" sx={{ color: '#888', fontSize: '0.8125rem', fontWeight: 600, mt: 0.5, display: 'block' }}>{s.label}</Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+      <Box sx={{ mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography sx={{ fontWeight: 700, color: '#424242', fontSize: '1.05rem' }}>Sprint progress</Typography>
+          <Typography sx={{ fontWeight: 800, color: ORACLE_RED, fontSize: '1.05rem' }}>{progress}%</Typography>
+        </Box>
+        <LinearProgress variant="determinate" value={progress} sx={{
+          height: 10, borderRadius: 5, bgcolor: '#F0F0F0',
+          '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED, borderRadius: 5 }
+        }} />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+          <Typography variant="caption" sx={{ color: '#757575', fontSize: '0.8125rem' }}>Start: {formatDate(sprint.startDate)}</Typography>
+          <Typography variant="caption" sx={{ color: '#757575', fontSize: '0.8125rem' }}>End: {formatDate(sprint.dueDate)}</Typography>
+        </Box>
+      </Box>
+
+      <Typography sx={{ display: 'block', color: '#666', fontWeight: 600, mb: 1, fontSize: '0.9rem' }}>
+        Click a task to view details or edit.
+      </Typography>
+      <TaskTable
+        items={sprintTaskRows}
+        variant="manager"
+        onRowClick={(row) => onSelectTask?.(row._task)}
+        scrollMaxHeight={380}
+      />
         <Box><Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}><Typography sx={{ fontWeight: 800, fontSize: '1.35rem' }}>Sprint {sprint.id} — Detail</Typography><Chip label={phaseCfg.label} size="small" sx={{ bgcolor: phaseCfg.color, color: phaseCfg.textColor, fontWeight: 700, fontSize: '0.78rem' }} /></Box><Typography variant="body1" sx={{ color: '#757575', mt: 0.6 }}>{formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}</Typography></Box>
       </Box>
       {sprint.goal && (<Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 2, border: '1px solid #ECECEC', bgcolor: '#FAFAFA' }}><Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}><FlagOutlinedIcon sx={{ fontSize: 18, color: ORACLE_RED }} /><Typography variant="caption" sx={{ fontWeight: 800, color: '#616161' }}>Sprint goal</Typography></Box><Typography variant="body2" sx={{ color: '#333', lineHeight: 1.65 }}>{sprint.goal}</Typography></Paper>)}
@@ -477,15 +697,306 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
   );
 }
 
+function sprintKpiNumber(sprint, key) {
+  const v = sprint?.[key];
+  if (v == null || v === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function EditSprintDialog({ open, sprint, onClose, onSaved }) {
+  const [startDate, setStartDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [goal, setGoal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open || !sprint) return;
+    setStartDate(toInputDate(sprint.startDate));
+    setDueDate(toInputDate(sprint.dueDate));
+    setGoal(typeof sprint.goal === 'string' ? sprint.goal : '');
+    setError('');
+  }, [open, sprint]);
+
+  const handleClose = () => {
+    if (!saving) onClose();
+  };
+
+  const sprintId =
+    sprint?.id == null || sprint?.id === ''
+      ? null
+      : Number.isFinite(Number(sprint.id))
+        ? Number(sprint.id)
+        : null;
+
+  const handleSave = async () => {
+    if (sprintId == null || !startDate || !dueDate) return;
+    const projectIdRaw = sprint?.assignedProject?.id ?? sprint?.assignedProject?.ID;
+    const projectId =
+      projectIdRaw == null || projectIdRaw === ''
+        ? null
+        : Number.isFinite(Number(projectIdRaw))
+          ? Number(projectIdRaw)
+          : null;
+    if (projectId == null) {
+      setError('Sprint project is missing. Please refresh and try again.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const goalTrim = goal.trim();
+      const res = await fetch(`${API_BASE}/api/sprints/${sprintId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignedProject: { id: projectId },
+          startDate: new Date(startDate).toISOString(),
+          dueDate: new Date(dueDate).toISOString(),
+          completionRate: sprintKpiNumber(sprint, 'completionRate'),
+          onTimeDelivery: sprintKpiNumber(sprint, 'onTimeDelivery'),
+          teamParticipation: sprintKpiNumber(sprint, 'teamParticipation'),
+          workloadBalance: sprintKpiNumber(sprint, 'workloadBalance'),
+          goal: goalTrim || null,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onSaved(updated);
+        onClose();
+      } else {
+        let detail = '';
+        try {
+          detail = (await res.text()).trim();
+        } catch {
+          detail = '';
+        }
+        if (res.status === 404) {
+          setError(`Sprint #${sprintId} was not found in the API.`);
+        } else if (detail) {
+          setError(`Could not save sprint changes (${res.status}): ${detail}`);
+        } else {
+          setError(`Could not save sprint changes (${res.status}).`);
+        }
+      }
+    } catch {
+      setError('Connection error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave = Boolean(startDate && dueDate && sprintId != null);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      scroll="body"
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          borderRadius: 3,
+          border: '1px solid #ECECEC',
+          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
+          bgcolor: '#FFFFFF',
+          boxShadow: '0 16px 40px rgba(199, 70, 52, 0.1), 0 8px 24px rgba(30, 136, 229, 0.08)',
+          overflow: 'hidden',
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 640 },
+        },
+      }}
+    >
+      <DialogTitle sx={{ p: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+            borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: 'rgba(199, 70, 52, 0.12)',
+                border: '1px solid rgba(199, 70, 52, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <EditIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', lineHeight: 1.25, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>
+                Edit sprint{sprint?.id != null ? ` #${sprint.id}` : ''}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
+                Dates & goal
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            aria-label="Close"
+            onClick={handleClose}
+            disabled={saving}
+            size="small"
+            sx={{ color: '#616161', '&:hover': { bgcolor: 'rgba(199, 70, 52, 0.08)' } }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent
+        sx={{
+          px: 2.5,
+          pt: 2.25,
+          pb: 1.5,
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <Typography variant="body2" sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}>
+          Update the sprint window and optional goal. KPI metrics stored in the database are kept as-is.
+        </Typography>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Start date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
+            <TextField
+              label="End date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
+          </Stack>
+          <TextField
+            label="Sprint goal (optional)"
+            placeholder="What should this sprint achieve?"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            fullWidth
+            multiline
+            minRows={4}
+            inputProps={{ maxLength: 2000 }}
+            helperText={`${goal.length} / 2000 characters`}
+            sx={{
+              ...newSprintDialogFieldOutline(),
+              '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
+            }}
+          />
+        </Stack>
+        {error ? (
+          <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600, mt: 1.5, display: 'block' }}>
+            {error}
+          </Typography>
+        ) : null}
+      </DialogContent>
+
+      <DialogActions
+        sx={{
+          px: 2.5,
+          py: 2,
+          gap: 1,
+          borderTop: '1px solid rgba(199, 70, 52, 0.12)',
+          backgroundColor: '#FFFFFF',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button
+          onClick={handleClose}
+          disabled={saving}
+          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          variant="contained"
+          disableElevation
+          sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            textTransform: 'none',
+            fontWeight: 700,
+            px: 2.5,
+            borderRadius: 2,
+            '&:hover': { bgcolor: '#A83B2D' },
+            '&.Mui-disabled': { bgcolor: '#E0E0E0', color: '#9E9E9E' },
+          }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export default function SprintsPage() {
 export default function SprintsPage({ projectId }) {
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [userTasks, setUserTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprint, setSelectedSprint] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [sprintForEdit, setSprintForEdit] = useState(null);
   const [selectedTaskForDialog, setSelectedTaskForDialog] = useState(null);
 
   const loadData = async () => {
+  setLoading(true);
+  try {
+    const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
+      fetch(`${API_BASE}/api/sprints`),
+      fetch(`${API_BASE}/api/tasks`),
+      fetch(`${API_BASE}/api/user-tasks`),
+    ]);
+    const sprintsData = await sprintsRes.json();
+    const tasksData = await tasksRes.json();
+    const userTasksData = await userTasksRes.json();
+    const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
+    const tasksList = Array.isArray(tasksData) ? tasksData : [];
+    const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
+    const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+    setSprints(sorted);
+    setTasks(tasksList);
+    setUserTasks(userTasksList);
+    setSelectedSprint((prev) =>
+      prev
+        ? sorted.find((s) => s.id === prev.id) ?? sorted[0]
+        : sorted.find((s) => inferSprintStatus(s, tasksList) === 'active')
+          ?? sorted.find((s) => inferSprintStatus(s, tasksList) === 'planned')
+          ?? sorted[0],
+    );
+  } finally {
+    setLoading(false);
+  }
+};
     setLoading(true);
     try {
       const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
@@ -517,6 +1028,79 @@ export default function SprintsPage({ projectId }) {
         <Box><Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} size="small" sx={{ textTransform: 'none', borderColor: '#DDD', color: '#555', borderRadius: 2, mr: 1 }}>Sync</Button><Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)} sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#C62828' } }}>Create new sprint</Button></Box>
       </Box>
       <Grid container spacing={3}>
+        <Grid item xs={4}>
+          <Typography sx={{ fontWeight: 800, color: '#333', mb: 1.5, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
+            Sprint history
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {sprints.map((sprint) => (
+              <SprintCard
+                key={sprint.id}
+                sprint={sprint}
+                tasks={tasks}
+                isSelected={selectedSprint?.id === sprint.id}
+                onClick={() => setSelectedSprint(sprint)}
+              />
+            ))}
+          </Box>
+        </Grid>
+
+        <Grid item xs={8}>
+          {selectedSprint ? (
+            <SprintDetail
+              sprint={selectedSprint}
+              tasks={tasks}
+              userTasks={userTasks}
+              onSelectTask={(t) => setSelectedTaskForDialog(t)}
+              onEditSprint={(s) => setSprintForEdit(s)}
+            />
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
+              <Typography variant="body1" sx={{ color: '#CCC' }}>
+                Select a sprint to view details
+              </Typography>
+            </Box>
+          )}
+        </Grid>
+      </Grid>
+
+      <NewSprintDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onCreated={handleSprintCreated}
+        projectId={sprints[0]?.assignedProject?.id ?? 1}
+      />
+
+      <EditSprintDialog
+        open={Boolean(sprintForEdit)}
+        sprint={sprintForEdit}
+        onClose={() => setSprintForEdit(null)}
+        onSaved={(updated) => {
+          setSprints((prev) => sortSprintsForDisplay(prev.map((s) => (s.id === updated.id ? updated : s)), tasks));
+          setSelectedSprint((prev) => (prev?.id === updated.id ? updated : prev));
+        }}
+      />
+
+      <TaskDetailDialog
+        open={Boolean(selectedTaskForDialog)}
+        initialTask={selectedTaskForDialog}
+        sprints={sprints}
+        onClose={() => setSelectedTaskForDialog(null)}
+        onSaved={(updated) => {
+          setTasks((prev) => {
+            const next = prev.map((x) => (x.id === updated.id ? updated : x));
+            setSprints((sp) => sortSprintsForDisplay(sp, next));
+            return next;
+          });
+        }}
+        onDeleted={(taskId) => {
+          setTasks((prev) => {
+            const next = prev.filter((x) => x.id !== taskId);
+            setSprints((sp) => sortSprintsForDisplay(sp, next));
+            return next;
+          });
+        }}
+      />
         <Grid item xs={4}><Typography sx={{ fontWeight: 800, color: '#333', mb: 1.5 }}>Sprint history</Typography><Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{sprints.map((sprint) => (<SprintCard key={sprint.id} sprint={sprint} tasks={tasks} isSelected={selectedSprint?.id === sprint.id} onClick={() => setSelectedSprint(sprint)} />))}</Box></Grid>
         <Grid item xs={8}>{selectedSprint ? (<SprintDetail sprint={selectedSprint} tasks={tasks} onSelectTask={(t) => setSelectedTaskForDialog(t)} />) : (<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Typography variant="body1" sx={{ color: '#CCC' }}>Select a sprint to view details</Typography></Box>)}</Grid>
       </Grid>

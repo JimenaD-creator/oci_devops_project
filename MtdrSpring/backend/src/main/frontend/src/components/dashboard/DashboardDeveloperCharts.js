@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { motion, useInView } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -25,6 +26,9 @@ import {
   RECHARTS_BAR_TOOLTIP_PROPS,
 } from './dashboardTypography';
 import { buildCompareDeveloperChartsModel } from './dashboardSprintData';
+import { DASHBOARD_SCROLL_VIEWPORT } from './ScrollReveal';
+
+const MotionPaper = motion(Paper);
 
 /** One line under chart titles — what the reader should take away. */
 const CHART_DESC = {
@@ -45,10 +49,14 @@ const COMPLETED_FILL = '#5C6BC0';
 const HOURS_FILL = '#FB8C00';
 const HOURS_LINE = '#F57C00';
 
-const STACK_DONE = '#2E7D32';
-const STACK_PENDING = '#A5D6A7';
+const STACK_DONE = '#1565C0';
+const STACK_PENDING = '#90CAF9';
 
 const GRID = '#E0E0E0';
+
+/** Recharts: bar/line growth when the plot mounts in view. */
+const CHART_BAR_ANIM_MS = 950;
+const CHART_BAR_EASING = 'ease-out';
 
 const Y_AXIS_HOURS = 'Hours';
 
@@ -186,45 +194,59 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
   const p = payload[0];
   const row = p.payload;
   const key = String(p.dataKey ?? '');
-  let sp = null;
-  let metricLabel = '';
-  let valueText = '';
-  if (key.startsWith('cb_')) {
-    const id = Number(key.replace('cb_', ''));
-    sp = sprintDefs.find((s) => Number(s.id) === id);
-    const v = p.value != null ? p.value : row[`cb_${id}`];
-    metricLabel = 'Completed tasks';
-    valueText = `${v ?? 0} tasks`;
-  } else if (key.startsWith('ln_')) {
-    const id = Number(key.replace('ln_', ''));
-    sp = sprintDefs.find((s) => Number(s.id) === id);
-    const v = p.value != null ? p.value : row[`ln_${id}`];
-    metricLabel = 'Hours worked';
-    valueText = `${Number(v ?? 0).toFixed(1)} h`;
-  }
-  if (!sp || !row) return null;
+  let focusedSprintId = null;
+  if (key.startsWith('cb_')) focusedSprintId = Number(key.replace('cb_', ''));
+  if (key.startsWith('ln_')) focusedSprintId = Number(key.replace('ln_', ''));
+  if (!row) return null;
   return (
     <Box
       sx={{
         ...CHART_TOOLTIP_SX,
         bgcolor: '#fff',
-        borderLeft: '4px solid',
-        borderLeftColor: sp.accentColor,
+        border: '1px solid #B0BEC5',
         boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        minWidth: 230,
       }}
     >
       <Typography sx={{ fontWeight: 800, color: '#37474F', fontSize: '0.95rem', lineHeight: 1.3 }}>
         {row.name}
       </Typography>
-      <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.9rem', mt: 0.5 }}>
-        {sp.shortLabel}
-      </Typography>
-      <Typography sx={{ color: sp.accentColor, fontSize: '0.875rem', mt: 0.75, fontWeight: 600 }}>
-        {metricLabel}
-      </Typography>
-      <Typography sx={{ color: sp.accentColor, fontSize: '0.95rem', mt: 0.25, fontWeight: 700 }}>
-        {valueText}
-      </Typography>
+      {sprintDefs.map((sp, idx) => {
+        const tasks = Number(row[`cb_${sp.id}`]) || 0;
+        const hours = Number(row[`ln_${sp.id}`]) || 0;
+        const focused = Number(sp.id) === Number(focusedSprintId);
+        return (
+          <Box
+            key={sp.id}
+            sx={{
+              mt: idx === 0 ? 1 : 0,
+              pt: idx === 0 ? 0 : 1,
+              borderTop: idx === 0 ? 'none' : '1px solid #ECEFF1',
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: sp.accentColor,
+                fontSize: '0.88rem',
+                opacity: focused || focusedSprintId == null ? 1 : 0.85,
+              }}
+            >
+              {sp.shortLabel}
+            </Typography>
+            <Typography
+              sx={{
+                color: sp.accentColor,
+                fontSize: '0.84rem',
+                mt: 0.35,
+                fontWeight: focused ? 700 : 600,
+              }}
+            >
+              Tasks: {tasks} · Hours: {hours.toFixed(1)} h
+            </Typography>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
@@ -242,17 +264,27 @@ function compareChartHeights(base) {
 }
 
 function ChartShell({ title, description, height, children, accent, tint, compact, belowDescription }) {
+  const chartRef = useRef(null);
+  const chartVisible = useInView(chartRef, {
+    once: true,
+    margin: '0px 0px -12% 0px',
+    amount: 0.12,
+  });
   const a = accent ?? '#5C6BC0';
   const bg = tint ?? 'rgba(92, 107, 192, 0.06)';
   const chartBoxSx =
     typeof height === 'object' && height !== null
-      ? { width: '100%', minWidth: 0, overflow: 'hidden', height }
-      : { width: '100%', minWidth: 0, overflow: 'hidden', height: typeof height === 'number' ? height : 400 };
+      ? { width: '100%', minWidth: 0, overflow: 'visible', height }
+      : { width: '100%', minWidth: 0, overflow: 'visible', height: typeof height === 'number' ? height : 400 };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
   return (
-    <Paper
+    <MotionPaper
       elevation={0}
+      initial={{ opacity: 0, y: 26 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={DASHBOARD_SCROLL_VIEWPORT}
+      transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
       sx={{
         ...(compact
           ? { p: { xs: 1.5, sm: 1.75 }, pt: 1.75, pb: 1.25 }
@@ -265,6 +297,7 @@ function ChartShell({ title, description, height, children, accent, tint, compac
         boxSizing: 'border-box',
         background: `linear-gradient(135deg, ${bg} 0%, #FFFFFF 48%)`,
         boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        overflow: 'visible',
       }}
     >
       <Typography sx={{ ...CHART_TITLE_SX, color: a, mb: description ? 0.5 : 1.5 }}>
@@ -298,12 +331,14 @@ function ChartShell({ title, description, height, children, accent, tint, compac
           {belowDescription}
         </Box>
       ) : null}
-      <Box sx={{ ...chartBoxSx, mt: chartMt }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
+      <Box ref={chartRef} sx={{ ...chartBoxSx, mt: chartMt }}>
+        {chartVisible ? (
+          <ResponsiveContainer width="100%" height="100%">
+            {children}
+          </ResponsiveContainer>
+        ) : null}
       </Box>
-    </Paper>
+    </MotionPaper>
   );
 }
 
@@ -653,26 +688,26 @@ export default function DashboardDeveloperCharts({
 
   const nSprints = compareModel?.sprintDefs?.length ?? 1;
   /** Extra chart pixels for compare mode: more when many sprints; little when few (avoids “floating” legend). */
-  const WORKLOAD_COMPARE_LEGEND_EXTRA = Math.min(72, 10 + nSprints * 13);
+  const WORKLOAD_COMPARE_LEGEND_EXTRA = Math.min(44, 4 + nSprints * 9);
 
-  /** Más alto → más píxeles entre cada banda del eje de tareas (rangos más “aireados”). */
+  /** Altura total más contenida; pocas filas de devs no fuerzan un canvas enorme. */
   const hWorkloadCompareBase = hasCompareData
     ? Math.max(
-        540 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+        330 + WORKLOAD_COMPARE_LEGEND_EXTRA,
         Math.min(
-          1120 + WORKLOAD_COMPARE_LEGEND_EXTRA,
-          430 + compareModel.workloadRows.length * (70 + nSprints * 12) + WORKLOAD_COMPARE_LEGEND_EXTRA
+          740 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+          270 + compareModel.workloadRows.length * (42 + nSprints * 7) + WORKLOAD_COMPARE_LEGEND_EXTRA
         )
       )
     : null;
   const hHoursCompareBase = hasCompareData
-    ? Math.max(380, Math.min(680, 280 + compareModel.hoursRows.length * (40 + nSprints * 6)))
+    ? Math.max(340, Math.min(620, 240 + compareModel.hoursRows.length * (34 + nSprints * 5)))
     : null;
   const hComboCompareBase = hasCompareData
-    ? Math.max(340, Math.min(680, 260 + compareModel.comboRows.length * (36 + nSprints * 4)))
+    ? Math.max(300, Math.min(620, 220 + compareModel.comboRows.length * (30 + nSprints * 4)))
     : null;
 
-  const hWorkloadSingleBase = Math.max(520, Math.min(960, 400 + workloadStack.length * 72));
+  const hWorkloadSingleBase = Math.max(340, Math.min(700, 235 + workloadStack.length * 42));
   const hHoursSingleBase = Math.max(340, Math.min(580, 240 + byHoursDesc.length * 44));
   const hComboSingleBase = Math.max(320, Math.min(520, 240 + forCombo.length * 38));
 
@@ -682,7 +717,12 @@ export default function DashboardDeveloperCharts({
   const hHours = hasCompareData ? compareChartHeights(hHoursCompareBase) : compareChartHeights(hHoursSingleBase);
   const hCombo = hasCompareData ? compareChartHeights(hComboCompareBase) : compareChartHeights(hComboSingleBase);
 
-  const maxBarCompare = Math.max(8, Math.min(28, Math.floor(80 / Math.max(1, nSprints))));
+  /** Pocos sprints → barras más gruesas (tope mayor + menos hueco entre categorías abajo). */
+  const maxBarCompareCap = nSprints <= 2 ? 40 : nSprints <= 3 ? 34 : 28;
+  const maxBarCompare = Math.max(
+    8,
+    Math.min(maxBarCompareCap, Math.floor(96 / Math.max(1, nSprints)))
+  );
 
   if (!hasCompareData && !hasSingleData) {
     return (
@@ -729,7 +769,9 @@ export default function DashboardDeveloperCharts({
       104,
       74 + Math.max(0, nSprints - 4) * 10 + Math.min(12, Math.max(0, nDevRows - 5) * 2)
     );
-    const barCategoryGapCompare = nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : '18%';
+    /** Menos hueco entre desarrolladores cuando hay pocos sprints → barras más anchas. */
+    const barCategoryGapCompare =
+      nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : nSprints >= 3 ? '8%' : '5%';
     const lineStrokeW = nSprints > 5 ? 1.5 : 2;
     const lineDotR = nSprints > 5 ? 2 : nSprints > 3 ? 3 : 4;
 
@@ -785,6 +827,8 @@ export default function DashboardDeveloperCharts({
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
               shared
+              allowEscapeViewBox={{ x: true, y: true }}
+              reverseDirectionAllowInDimension={{ x: true, y: true }}
               content={(props) => <CompareWorkloadTooltip {...props} sprintDefs={sprintDefs} />}
             />
             <Legend
@@ -809,6 +853,8 @@ export default function DashboardDeveloperCharts({
                   fill={sp.accentColor}
                   radius={[0, 0, 0, 0]}
                   maxBarSize={maxBarCompare}
+                  animationDuration={CHART_BAR_ANIM_MS}
+                  animationEasing={CHART_BAR_EASING}
                   activeBar={false}
                 />
                 <Bar
@@ -818,6 +864,8 @@ export default function DashboardDeveloperCharts({
                   fill={alpha(sp.accentColor, 0.42)}
                   radius={[6, 6, 0, 0]}
                   maxBarSize={maxBarCompare}
+                  animationDuration={CHART_BAR_ANIM_MS}
+                  animationEasing={CHART_BAR_EASING}
                   activeBar={false}
                 />
               </React.Fragment>
@@ -871,6 +919,8 @@ export default function DashboardDeveloperCharts({
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
               shared
+              allowEscapeViewBox={{ x: true, y: true }}
+              reverseDirectionAllowInDimension={{ x: true, y: true }}
               content={(props) => <CompareHoursTooltip {...props} sprintDefs={sprintDefs} />}
             />
             <Legend
@@ -887,6 +937,8 @@ export default function DashboardDeveloperCharts({
                 fill={sp.accentColor}
                 radius={[6, 6, 0, 0]}
                 maxBarSize={maxBarCompare + 8}
+                animationDuration={CHART_BAR_ANIM_MS}
+                animationEasing={CHART_BAR_EASING}
                 activeBar={false}
               />
             ))}
@@ -958,6 +1010,8 @@ export default function DashboardDeveloperCharts({
                 fill={sp.accentColor}
                 radius={[6, 6, 0, 0]}
                 maxBarSize={Math.max(8, maxBarCompare)}
+                animationDuration={CHART_BAR_ANIM_MS}
+                animationEasing={CHART_BAR_EASING}
                 activeBar={false}
               />
             ))}
@@ -970,6 +1024,7 @@ export default function DashboardDeveloperCharts({
                 name={`${sp.shortLabel} · hours`}
                 stroke={sp.accentColor}
                 strokeWidth={lineStrokeW}
+                animationDuration={CHART_BAR_ANIM_MS}
                 dot={{ r: lineDotR, fill: sp.accentColor, strokeWidth: 0 }}
               />
             ))}
@@ -992,7 +1047,7 @@ export default function DashboardDeveloperCharts({
           layout="vertical"
           data={workloadStack}
           margin={{ top: 48, right: 24, left: 4, bottom: 56 }}
-          barCategoryGap="16%"
+          barCategoryGap="10%"
         >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
           <XAxis
@@ -1042,7 +1097,9 @@ export default function DashboardDeveloperCharts({
             name="Completed tasks"
             fill={STACK_DONE}
             radius={[0, 6, 6, 0]}
-            maxBarSize={32}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
             activeBar={false}
           />
           <Bar
@@ -1051,7 +1108,9 @@ export default function DashboardDeveloperCharts({
             name="Pending tasks"
             fill={STACK_PENDING}
             radius={[6, 0, 0, 6]}
-            maxBarSize={32}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
             activeBar={false}
           />
         </BarChart>
@@ -1103,6 +1162,8 @@ export default function DashboardDeveloperCharts({
             fill={HOURS_FILL}
             radius={[6, 6, 0, 0]}
             maxBarSize={48}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
             activeBar={false}
           >
             <LabelList
@@ -1179,6 +1240,8 @@ export default function DashboardDeveloperCharts({
             fill={COMPLETED_FILL}
             radius={[6, 6, 0, 0]}
             maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
             activeBar={false}
           />
           <Line
@@ -1188,6 +1251,7 @@ export default function DashboardDeveloperCharts({
             name={Y_AXIS_HOURS}
             stroke={HOURS_LINE}
             strokeWidth={3}
+            animationDuration={CHART_BAR_ANIM_MS}
             dot={{ r: 5, fill: HOURS_LINE, strokeWidth: 0 }}
           />
         </ComposedChart>

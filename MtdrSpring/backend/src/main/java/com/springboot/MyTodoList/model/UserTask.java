@@ -25,7 +25,7 @@ public class UserTask {
      * Hours worked on this user–task assignment. Persisted as {@code USER_TASK.WORKED_HOURS}.
      * Aggregated per developer for dashboards (real hours, not task estimates).
      */
-    @JsonAlias("hours")
+    @JsonAlias({ "hours", "worked_hours" })
     @Column(name = "WORKED_HOURS")
     private Long workedHours;
     

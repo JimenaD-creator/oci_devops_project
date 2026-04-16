@@ -1,3 +1,6 @@
+/** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
+const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+
 /** Distinct chart series colors (no red/green — reserved for KPI / status cues elsewhere). */
 export const SPRINT_CHART_COLORS = [
   '#1E88E5',
@@ -86,14 +89,66 @@ const STATUS_DIST_META = {
 
 export function resolveUserTaskTaskId(ut) {
   if (ut == null) return null;
-  const raw = ut.task?.id ?? ut.id?.taskId ?? ut.taskId;
+  const raw =
+    ut.task?.id
+    ?? ut.task?.ID
+    ?? ut.id?.taskId
+    ?? ut.id?.task_id
+    ?? ut.taskId
+    ?? ut.task_id;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
 
+/** DB user id for this assignment (stable key for aggregating hours per developer). */
+export function resolveUserTaskUserId(ut) {
+  if (ut == null) return null;
+  const raw =
+    ut.user?.id
+    ?? ut.user?.ID
+    ?? ut.id?.userId
+    ?? ut.id?.user_id;
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Sprint for a USER_TASK row: prefer TASK list lookup, else nested task from the assignment (API graph).
+ */
+function resolveSprintIdForUserTaskRow(ut, taskId, taskSprintMap) {
+  if (taskId != null && taskSprintMap[taskId] != null) {
+    return taskSprintMap[taskId].sprintId;
+  }
+  return taskSprintId(ut.task);
+}
+
+/** One map entry per developer: userId when present (avoids splitting "Jimena Díaz" vs "User 5" when user was lazy). */
+function developerAggregateKey(ut) {
+  const uid = resolveUserTaskUserId(ut);
+  if (uid != null) return `u:${uid}`;
+  const label = String(ut.user?.name || ut.user?.phoneNumber || '').trim();
+  if (label) return `n:${label}`;
+  const tid = resolveUserTaskTaskId(ut);
+  return tid != null ? `t:${tid}` : 'unknown';
+}
+
+function pickDeveloperDisplayName(ut, previousName) {
+  const fromApi = String(ut.user?.name || ut.user?.phoneNumber || '').trim();
+  if (fromApi) return fromApi;
+  if (previousName && !/^User\s+\d+$/.test(String(previousName))) return previousName;
+  const uid = resolveUserTaskUserId(ut);
+  if (uid != null) return `User ${uid}`;
+  return previousName || 'Unknown';
+}
+
+/**
+ * Real hours for a USER_TASK row: maps to DB WORKED_HOURS / API {@code workedHours}.
+ * Accepts {@code hours} as an alias when present in JSON.
+ */
 export function userTaskWorkedHours(ut) {
   if (ut == null) return 0;
-  const v = ut.workedHours ?? ut.hours;
+  const v = ut.workedHours ?? ut.worked_hours ?? ut.hours;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
@@ -111,6 +166,25 @@ export function taskSprintId(task) {
   return null;
 }
 
+/**
+ * Normalizes USER_TASK.STATUS for comparison (matches DB VARCHAR / API casing).
+ */
+function normalizeUserTaskStatusColumn(st) {
+  return String(st ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+/**
+ * Whether USER_TASK.WORKED_HOURS counts: assignment row is finished (STATUS COMPLETED or legacy DONE).
+ * Does not infer from TASK status alone.
+ */
+function userTaskRowEligibleForWorkedHours(ut) {
+  const st = ut?.status;
+  if (st == null || String(st).trim() === '') return false;
+  const n = normalizeUserTaskStatusColumn(st);
+  return n === 'COMPLETED' || n === 'DONE';
 function isUserTaskAssignmentDone(ut, taskInfo) {
   const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
   const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
@@ -182,9 +256,9 @@ function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksLis
   let sumWorkedHours = 0;
   (userTasksList || []).forEach((ut) => {
     const tid = resolveUserTaskTaskId(ut);
-    const info = tid != null ? taskSprintMap[tid] : null;
-    if (!info || info.sprintId !== sprintId) return;
-    if (!isUserTaskAssignmentDone(ut, info)) return;
+    const sid = resolveSprintIdForUserTaskRow(ut, tid, taskSprintMap);
+    if (sid == null || Number(sid) !== Number(sprintId)) return;
+    if (!userTaskRowEligibleForWorkedHours(ut)) return;
     sumWorkedHours += userTaskWorkedHours(ut);
   });
   const teamParticipationPct =
@@ -228,38 +302,55 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 
   userTasks.forEach((ut) => {
     const taskId = resolveUserTaskTaskId(ut);
-    const taskInfo = taskId != null ? taskSprintMap[taskId] : null;
-    if (!taskInfo) return;
+    const sprintIdForUt = resolveSprintIdForUserTaskRow(ut, taskId, taskSprintMap);
+    if (sprintIdForUt == null || !Number.isFinite(Number(sprintIdForUt))) return;
 
-    const sp = sprintMap[taskInfo.sprintId];
+    const sp = sprintMap[Number(sprintIdForUt)];
     if (!sp) return;
 
-    const isDone = isUserTaskAssignmentDone(ut, taskInfo);
+    const utCompleted = userTaskRowEligibleForWorkedHours(ut);
 
-    const workedHours = isDone ? userTaskWorkedHours(ut) : 0;
+    /** USER_TASK.WORKED_HOURS only when USER_TASK.STATUS is COMPLETED/DONE (not inferred from TASK alone). */
+    const workedHours = utCompleted ? userTaskWorkedHours(ut) : 0;
     sp.totalHours += workedHours;
 
-    const devName = ut.user?.name || ut.user?.phoneNumber || `User ${ut.user?.id ?? '?'}`;
-
-    if (!sp._devMap[devName]) {
-      sp._devMap[devName] = {
-        name: devName,
-        initials: initialsFromName(devName),
+    const devKey = developerAggregateKey(ut);
+    if (!sp._devMap[devKey]) {
+      const initialName = pickDeveloperDisplayName(ut, null);
+      sp._devMap[devKey] = {
+        name: initialName,
+        initials: initialsFromName(initialName),
         _taskIds: new Set(),
         _completedTaskIds: new Set(),
         hours: 0,
         workload: 0,
       };
     }
-    const dm = sp._devMap[devName];
-    dm._taskIds.add(taskId);
-    if (isDone) dm._completedTaskIds.add(taskId);
+    const dm = sp._devMap[devKey];
+    dm.name = pickDeveloperDisplayName(ut, dm.name);
+    dm.initials = initialsFromName(dm.name);
+    if (taskId != null) {
+      dm._taskIds.add(taskId);
+      if (utCompleted) dm._completedTaskIds.add(taskId);
+    }
     dm.hours += workedHours;
   });
 
   return sprints.map((sp) => {
     const id = Number(sp.id);
     const entry = sprintMap[id];
+    if (!entry) {
+      return {
+        ...sp,
+        developers: [],
+        totalTasks: 0,
+        totalCompleted: 0,
+        totalHours: 0,
+        taskStatusDistribution: [],
+        taskStatusTotal: 0,
+        kpis: sp.kpis ?? {},
+      };
+    }
     const { _devMap, _statusCounts, ...rest } = entry;
     const devs = Object.values(_devMap);
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
@@ -281,6 +372,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   });
 }
 
+const fetchJsonNoCache = (url) =>
+  fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+
+export async function fetchDashboardSprints() {
 export async function fetchDashboardSprints(projectId) {
   const now = Date.now();
   
@@ -305,6 +400,9 @@ export async function fetchDashboardSprints(projectId) {
     }
     
     const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
+      fetchJsonNoCache(`${API_BASE}/api/sprints`),
+      fetchJsonNoCache(`${API_BASE}/api/tasks`),
+      fetchJsonNoCache(`${API_BASE}/api/user-tasks`),
       fetch(sprintsUrl),
       fetch('http://127.0.0.1:8080/api/tasks'),
       fetch('http://127.0.0.1:8080/api/user-tasks'),
@@ -326,7 +424,13 @@ export async function fetchDashboardSprints(projectId) {
     };
 
     const mapped = apiSprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
-    const enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
+    let enriched;
+    try {
+      enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
+    } catch (e) {
+      console.error('enrichSprintsWithUserTasks failed, using sprints without user-task rollups:', e);
+      enriched = mapped;
+    }
     assignSprintAccentColors(enriched);
     return enriched;
   } catch (error) {

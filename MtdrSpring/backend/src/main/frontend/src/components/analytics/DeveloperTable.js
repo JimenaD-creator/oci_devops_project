@@ -214,6 +214,60 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           .text-center { text-align: center; }
 `;
 
+/** Dashboard: “Developer Productivity Breakdown” (SprintMetricsTable) — texto más legible. */
+const SPRINT_METRICS_DASHBOARD_TEXT_CSS = `
+          .dev-productivity-dashboard .table-title {
+            font-size: 1.2rem;
+          }
+          .dev-productivity-dashboard .table-title-icon-wrap {
+            width: 40px;
+            height: 40px;
+          }
+          .dev-productivity-dashboard th {
+            font-size: 0.875rem;
+            padding: 14px 16px;
+          }
+          .dev-productivity-dashboard th.th-sprint-compare-group {
+            font-size: 0.9375rem;
+          }
+          .dev-productivity-dashboard .sprint-range-caption {
+            font-size: 0.75rem;
+            margin-top: 5px;
+          }
+          .dev-productivity-dashboard td {
+            font-size: 1rem;
+            padding: 14px 16px;
+          }
+          .dev-productivity-dashboard .dev-name-text {
+            font-size: 1rem;
+          }
+          .dev-productivity-dashboard .badge-base {
+            font-size: 0.8125rem;
+            padding: 3px 9px;
+          }
+          .dev-productivity-dashboard .workload-text {
+            font-size: 0.875rem;
+          }
+          .dev-productivity-dashboard .workload-track {
+            width: 104px;
+            height: 9px;
+          }
+          .dev-productivity-dashboard .summary-cell {
+            font-size: 0.9375rem;
+          }
+          .dev-productivity-dashboard .search-wrapper input.search-input[type="text"] {
+            font-size: 0.875rem;
+            padding: 9px 12px 9px 36px;
+          }
+          .dev-productivity-dashboard .avatar-circle {
+            width: 32px;
+            height: 32px;
+          }
+          .dev-productivity-dashboard .avatar-circle span {
+            font-size: 11px !important;
+          }
+`;
+
 function initialsFromName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -254,7 +308,21 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   );
 
   const sorted = useMemo(() => {
-    if (!sort.key) return filtered;
+    if (!sort.key) {
+      return [...filtered].sort((a, b) => {
+        const totalCompletedA = selectedSprints.reduce(
+          (acc, sp) => acc + (Number(a[`${sp.id}_completed`]) || 0),
+          0,
+        );
+        const totalCompletedB = selectedSprints.reduce(
+          (acc, sp) => acc + (Number(b[`${sp.id}_completed`]) || 0),
+          0,
+        );
+        const diff = totalCompletedB - totalCompletedA;
+        if (diff !== 0) return diff;
+        return String(a.name).localeCompare(String(b.name));
+      });
+    }
     return [...filtered].sort((a, b) => {
       const av = sortValue(a[sort.key]);
       const bv = sortValue(b[sort.key]);
@@ -313,14 +381,15 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   return (
     <>
       <style>{SHARED_DEVELOPER_TABLE_CSS}</style>
+      <style>{SPRINT_METRICS_DASHBOARD_TEXT_CSS}</style>
 
-      <div className="table-card">
+      <div className="table-card dev-productivity-dashboard">
         <div className="table-header">
           <div className="table-header-left">
             {!suppressCardTitle ? (
               <>
                 <div className="table-title-icon-wrap">
-                  <Users size={20} color="#C74634" strokeWidth={2} />
+                  <Users size={22} color="#C74634" strokeWidth={2} />
                 </div>
                 <h3 className="table-title">Developer Productivity Breakdown</h3>
               </>

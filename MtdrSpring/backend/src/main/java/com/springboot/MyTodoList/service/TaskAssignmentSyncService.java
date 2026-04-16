@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * Keeps {@link Task#getStatus()} aligned with assignee rows in {@code USER_TASK}:
- * the task is DONE only when every assignee has status DONE (one logical task, not N completions).
+ * the task is DONE only when every assignee has status DONE or COMPLETED (one logical task, not N completions).
  */
 @Service
 public class TaskAssignmentSyncService {
@@ -28,6 +28,12 @@ public class TaskAssignmentSyncService {
     private static String norm(String s) {
         if (s == null) return "";
         return s.trim().toUpperCase();
+    }
+
+    /** Assignee row finished: DONE (legacy) or COMPLETED (canonical for worked-hours / bot). */
+    private static boolean isAssigneeDone(String status) {
+        String n = norm(status);
+        return "DONE".equals(n) || "COMPLETED".equals(n);
     }
 
     /**
@@ -46,10 +52,10 @@ public class TaskAssignmentSyncService {
             return taskRepository.save(task);
         }
 
-        boolean allDone = uts.stream().allMatch(ut -> "DONE".equals(norm(ut.getStatus())));
+        boolean allDone = uts.stream().allMatch(ut -> isAssigneeDone(ut.getStatus()));
         boolean anyInProgress = uts.stream().anyMatch(ut -> "IN_PROGRESS".equals(norm(ut.getStatus())));
         boolean anyInReview = uts.stream().anyMatch(ut -> "IN_REVIEW".equals(norm(ut.getStatus())));
-        boolean anyDone = uts.stream().anyMatch(ut -> "DONE".equals(norm(ut.getStatus())));
+        boolean anyDone = uts.stream().anyMatch(ut -> isAssigneeDone(ut.getStatus()));
 
         String newStatus;
         if (allDone) {

@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useInView } from 'framer-motion';
 import { Box, Typography } from '@mui/material';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { ListTodo } from 'lucide-react';
@@ -11,6 +12,7 @@ const PIE_OUTER_RADIUS = 62;
 /** Larger pie when shown beside scorecards (DashboardPage). */
 const CHART_HEIGHT_EMBEDDED = 300;
 const PIE_OUTER_RADIUS_EMBEDDED = 118;
+const PIE_ANIM_MS = 1000;
 
 const cardBase = {
   backgroundColor: 'white',
@@ -64,6 +66,13 @@ export default function TaskStatusDistributionChart({
   const hasTasks = total > 0;
   const plotHeight = embedded ? CHART_HEIGHT_EMBEDDED : CHART_HEIGHT;
   const pieRadius = embedded ? PIE_OUTER_RADIUS_EMBEDDED : PIE_OUTER_RADIUS;
+
+  const plotRef = useRef(null);
+  const plotInView = useInView(plotRef, {
+    once: true,
+    margin: '0px 0px -12% 0px',
+    amount: 0.15,
+  });
 
   const pieData = useMemo(
     () =>
@@ -148,6 +157,7 @@ export default function TaskStatusDistributionChart({
       )}
 
       <Box
+        ref={plotRef}
         sx={{
           width: '100%',
           height: plotHeight,
@@ -159,7 +169,7 @@ export default function TaskStatusDistributionChart({
           justifyContent: 'center',
         }}
       >
-        {hasTasks && pieData.length > 0 ? (
+        {hasTasks && pieData.length > 0 && plotInView ? (
           <ResponsiveContainer width="100%" height={plotHeight}>
             <PieChart>
               <Pie
@@ -173,6 +183,8 @@ export default function TaskStatusDistributionChart({
                 paddingAngle={2}
                 labelLine={false}
                 label={renderSliceLabel}
+                animationDuration={PIE_ANIM_MS}
+                animationEasing="ease-out"
               >
                 {pieData.map((entry, index) => (
                   <Cell key={`cell-${entry.name}-${index}`} fill={entry.fill} stroke="#fff" strokeWidth={2} />
