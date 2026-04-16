@@ -1,51 +1,12 @@
 import React from 'react';
-import { Box, Paper, Typography, Tooltip, IconButton } from '@mui/material';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { KpiTooltipBody, tooltipChromeSx, tooltipArrowSx } from './DashboardKpiTooltipParts';
+import { Box, Paper, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import KpiDonutChart from './KpiDonutChart';
 
-const ORACLE_RED = '#C74634';
+const GAUGE_HEADER_ACCENT = '#1565C0';
 
 const GOAL_PCT = 80;
-
-const pulseIconSx = {
-  '@keyframes prodGaugeInfoPulse': {
-    '0%, 100%': { transform: 'scale(1)', opacity: 1 },
-    '50%': { transform: 'scale(1.12)', opacity: 0.88 },
-  },
-  animation: 'prodGaugeInfoPulse 2.2s ease-in-out infinite',
-  color: '#1565C0',
-  '&:hover': {
-    animation: 'none',
-    opacity: 1,
-    bgcolor: 'rgba(21, 101, 192, 0.08)',
-  },
-};
-
-const PRODUCTIVITY_TOOLTIP = {
-  what:
-    'A score from 0 to 100 that summarizes sprint productivity for quick comparison. It reflects how many tasks are completed in the sprint.',
-  representation:
-    'Shown as a donut gauge: filled arc is the score, the rest is the track. The goal line is 80%. With several sprints selected, the gauge shows the average of each sprint’s score.',
-  formula: {
-    type: 'stack',
-    parts: [
-      {
-        type: 'fraction',
-        label: 'Productivity =',
-        numerator: 'DONE tasks in the sprint',
-        denominator: 'all tasks in the sprint',
-        suffix: '× 100',
-      },
-      {
-        type: 'plain',
-        text: 'P̄ = (P₁ + P₂ + ⋯ + Pₙ) / n   (several sprints selected)',
-      },
-    ],
-  },
-};
 
 export default function ProductivityGaugeCard({ selectedSprints, compareMode }) {
   const score = React.useMemo(() => {
@@ -92,35 +53,19 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
               width: 36,
               height: 36,
               borderRadius: 2,
-              bgcolor: 'rgba(199,70,52,0.1)',
+              bgcolor: 'rgba(21, 101, 192, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
             }}
           >
-            <TrackChangesIcon sx={{ color: ORACLE_RED, fontSize: 22 }} />
+            <TrackChangesIcon sx={{ color: GAUGE_HEADER_ACCENT, fontSize: 22 }} />
           </Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A', lineHeight: 1.25 }}>
             Productivity Score
           </Typography>
         </Box>
-        <Tooltip
-          arrow
-          placement="left"
-          describeChild
-          enterTouchDelay={0}
-          leaveTouchDelay={4000}
-          title={<KpiTooltipBody {...PRODUCTIVITY_TOOLTIP} />}
-          componentsProps={{
-            tooltip: { sx: tooltipChromeSx },
-            arrow: { sx: tooltipArrowSx },
-          }}
-        >
-          <IconButton size="small" aria-label="About Productivity Score" sx={pulseIconSx}>
-            <InfoOutlinedIcon sx={{ fontSize: '1.15rem' }} />
-          </IconButton>
-        </Tooltip>
       </Box>
 
       <Box
@@ -175,11 +120,6 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
               </Typography>
             )}
           </Box>
-          {compareMode && selectedSprints.length > 1 && (
-            <Typography variant="caption" sx={{ color: '#AAA', mt: 0.25, lineHeight: 1.3 }}>
-              Average of selected sprints
-            </Typography>
-          )}
         </Box>
       </Box>
     </Paper>

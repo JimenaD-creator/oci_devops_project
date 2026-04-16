@@ -13,14 +13,14 @@ export const KPI_DEFS = [
     icon: Clock,
     tooltip: {
       what:
-        "The share of completed tasks in the sprint that were finished on or before their due date.",
+        "Share of completed tasks that were delivered on or before the due date.",
       representation:
-        "Shown as a percentage (0–100%). In compare mode, each sprint row shows its own value; the trend icon compares that row to the previous sprint (up or down).",
+        "Percentage from 0–100%. In compare mode, each sprint shows its own value.",
       formula: {
         type: "fraction",
-        label: "On-Time (%) =",
-        numerator: "tasks completed on or before due date",
-        denominator: "tasks marked DONE",
+        label: "On-time (%) =",
+        numerator: "completed on or before due date",
+        denominator: "completed tasks",
         suffix: "× 100",
       },
     },
@@ -32,13 +32,13 @@ export const KPI_DEFS = [
     icon: Users,
     tooltip: {
       what:
-        "How much time logged on assignments compares to the planned hours on tasks for this sprint.",
-      representation: "Shown as a percentage from 0 to 100.",
+        "How logged hours compare to the planned hours on tasks this sprint.",
+      representation: "Percentage from 0 to 100.",
       formula: {
         type: "fraction",
         label: "Participation (%) =",
-        numerator: "Σ hours worked on assignments",
-        denominator: "Σ assigned hours (expected effort)",
+        numerator: "hours logged",
+        denominator: "planned hours on tasks",
         suffix: "× 100",
       },
     },
@@ -57,7 +57,7 @@ export const KPI_DEFS = [
       formula: {
         type: "plain",
         text:
-          "Balance = 100 × ( 1 − (max − min) / T )\nT = tasks in the sprint; max, min = assignment counts per member",
+          "Higher means work is spread more evenly across people with assignments.",
       },
     },
   },

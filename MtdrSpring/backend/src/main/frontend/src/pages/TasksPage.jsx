@@ -11,32 +11,34 @@ import CloseIcon from '@mui/icons-material/Close';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import KanbanBoard from '../components/tasks/KanbanBoard';
 import { matchesDueDateRange } from '../components/dashboard/taskFilters';
+import { userTaskWorkedHours } from '../components/dashboard/dashboardSprintData';
 import { developerAvatarColors } from '../utils/developerColors';
 
 const ORACLE_RED = '#C74634';
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-/** Border + label/input text color only (no fill). */
-function createTaskFieldOutline(accent) {
+/** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
+function pageFormFieldOutline() {
   return {
     '& .MuiOutlinedInput-root': {
       borderRadius: 2,
       bgcolor: '#FFFFFF',
     },
     '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
-      borderColor: `${accent}AA`,
+      borderColor: 'rgba(199, 70, 52, 0.35)',
     },
     '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: accent,
+      borderColor: 'rgba(199, 70, 52, 0.55)',
     },
     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
       borderWidth: 2,
-      borderColor: accent,
+      borderColor: ORACLE_RED,
     },
-    '& .MuiInputLabel-root': { color: `${accent}DD` },
-    '& .MuiInputLabel-root.Mui-focused': { color: accent },
+    '& .MuiInputLabel-root': { color: '#616161' },
+    '& .MuiInputLabel-root.Mui-focused': { color: ORACLE_RED },
     '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
     '& .MuiSelect-select': { color: '#1A1A1A' },
+    '& .MuiSelect-icon': { color: '#616161' },
   };
 }
 
@@ -138,7 +140,6 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
       });
       if (res.ok) {
         const created = await res.json();
-        const worked = assignedHours ? Number(assignedHours) : 0;
         const successfulIds = [];
         for (const uid of assignedToIds) {
           const assignRes = await fetch(`${API_BASE}/api/user-tasks`, {
@@ -147,19 +148,18 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             body: JSON.stringify({
               userId: Number(uid),
               taskId: created.id,
-              workedHours: worked,
               status,
             }),
           });
           if (!assignRes.ok) {
             setError('Task created, but one or more developer assignments failed. You can assign developers from task details.');
-            onCreated(created, successfulIds, status, worked);
+            onCreated(created, successfulIds, status, null);
             handleClose();
             return;
           }
           successfulIds.push(Number(uid));
         }
-        onCreated(created, successfulIds, status, worked);
+        onCreated(created, successfulIds, status, null);
         handleClose();
       } else {
         setError('Could not create task. Please try again.');
@@ -194,7 +194,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
         elevation: 0,
         sx: {
           borderRadius: 3,
-          border: '1px solid rgba(21, 101, 192, 0.2)',
+          border: '1px solid #ECECEC',
           borderLeft: `4px solid ${ORACLE_RED}`,
           bgcolor: '#FFFFFF',
           boxShadow: '0 16px 40px rgba(199, 70, 52, 0.12), 0 8px 28px rgba(30, 136, 229, 0.09)',
@@ -238,7 +238,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
               <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#1A1A1A', lineHeight: 1.2 }}>
                 Create task
               </Typography>
-              <Typography variant="caption" sx={{ color: '#1565C0', fontWeight: 600, display: 'block', mt: 0.35 }}>
+              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
                 Details, planning & assignees
               </Typography>
             </Box>
@@ -248,7 +248,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             size="small"
             disabled={saving}
             aria-label="Close"
-            sx={{ color: '#5C6BC0', '&:hover': { bgcolor: 'rgba(30, 136, 229, 0.08)' } }}
+            sx={{ color: '#616161', '&:hover': { bgcolor: 'rgba(199, 70, 52, 0.08)' } }}
           >
             <CloseIcon />
           </IconButton>
@@ -276,8 +276,12 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             minRows={2}
             size="medium"
             sx={{
-              ...createTaskFieldOutline(ORACLE_RED),
+              ...pageFormFieldOutline(),
               '& .MuiInputBase-root': { alignItems: 'flex-start' },
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                bgcolor: 'rgba(199, 70, 52, 0.07)',
+              },
             }}
           />
           <TextField
@@ -288,10 +292,10 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             multiline
             minRows={5}
             size="medium"
-            sx={createTaskFieldOutline('#1565C0')}
+            sx={pageFormFieldOutline()}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#2E7D32') }}>
+            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
               <InputLabel>Work item type</InputLabel>
               <Select value={classification} onChange={(e) => setClassification(e.target.value)} label="Work item type">
                 <MenuItem value="FEATURE">Feature</MenuItem>
@@ -300,7 +304,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
                 <MenuItem value="USER_STORY">User Story</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#546E7A') }}>
+            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
               <InputLabel>Status</InputLabel>
               <Select value={status} onChange={(e) => setStatus(e.target.value)} label="Status">
                 <MenuItem value="TODO">To Do</MenuItem>
@@ -309,7 +313,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
                 <MenuItem value="DONE">Done</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#F57F17') }}>
+            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
               <InputLabel>Priority</InputLabel>
               <Select value={priority} onChange={(e) => setPriority(e.target.value)} label="Priority">
                 <MenuItem value="LOW">Low</MenuItem>
@@ -320,7 +324,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
             </FormControl>
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#6A1B9A') }}>
+            <FormControl size="small" fullWidth sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}>
               <InputLabel>Sprint</InputLabel>
               <Select
                 value={sprintId}
@@ -340,14 +344,14 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
               fullWidth
               size="small"
               inputProps={{ min: 0 }}
-              sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#00897B') }}
+              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
             />
           </Stack>
           <FormControl
             size="small"
             fullWidth
             sx={{
-              ...createTaskFieldOutline('#5E35B1'),
+              ...pageFormFieldOutline(),
               '& .MuiOutlinedInput-root': {
                 alignItems: 'flex-start',
                 py: 0.75,
@@ -422,7 +426,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#558B2F') }}
+              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
             />
             <TextField
               label="Due Date"
@@ -432,7 +436,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={{ flex: 1, minWidth: 0, ...createTaskFieldOutline('#0277BD') }}
+              sx={{ flex: 1, minWidth: 0, ...pageFormFieldOutline() }}
             />
           </Stack>
 
@@ -449,11 +453,11 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, users }) {
           px: 2.5,
           pb: 2.25,
           pt: 1.5,
-          borderTop: '1px solid rgba(21, 101, 192, 0.12)',
+          borderTop: '1px solid rgba(199, 70, 52, 0.12)',
           backgroundColor: '#FFFFFF',
         }}
       >
-        <Button onClick={handleClose} sx={{ color: '#1565C0', textTransform: 'none', fontWeight: 600 }} disabled={saving}>
+        <Button onClick={handleClose} sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }} disabled={saving}>
           Cancel
         </Button>
         <Button
@@ -544,7 +548,7 @@ export default function TasksPage() {
               userId: uid,
               taskId: Number(taskId),
               status: 'DONE',
-              workedHours: ut.workedHours ?? 0,
+              workedHours: userTaskWorkedHours(ut),
             }),
           });
           if (res.ok) await loadData();
@@ -592,7 +596,7 @@ export default function TasksPage() {
           userId: uid,
           taskId: Number(taskId),
           status: 'DONE',
-          workedHours: ut.workedHours ?? 0,
+          workedHours: userTaskWorkedHours(ut),
         }),
       });
       if (res.ok) await loadData();

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
 import { APP_FONT_FAMILY } from '../../theme';
+import { DASHBOARD_PRIMARY_ACCENT } from '../dashboard/dashboardConstants';
 
 const initialData = [
   { name: 'Carlos Ruiz', initials: 'CR', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
@@ -206,7 +207,7 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           .badge-red { color: #C62828; background: #FFEBEE; border-color: #FFCDD2; }
           .workload-container { display: flex; align-items: center; gap: 8px; }
           .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
-          .workload-fill { height: 100%; background: #C74634; border-radius: 9999px; }
+          .workload-fill { height: 100%; background: ${DASHBOARD_PRIMARY_ACCENT}; border-radius: 9999px; }
           .workload-text { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
           .summary-row { background: #F7F7F7; border-top: 2px solid #ECECEC; }
           .summary-cell { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
@@ -224,7 +225,7 @@ function sortValue(v) {
   return null;
 }
 
-function SprintMetricsTable({ selectedSprints, compareMode }) {
+function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
@@ -316,10 +317,14 @@ function SprintMetricsTable({ selectedSprints, compareMode }) {
       <div className="table-card">
         <div className="table-header">
           <div className="table-header-left">
-            <div className="table-title-icon-wrap">
-              <Users size={20} color="#C74634" strokeWidth={2} />
-            </div>
-            <h3 className="table-title">Developer Productivity Breakdown</h3>
+            {!suppressCardTitle ? (
+              <>
+                <div className="table-title-icon-wrap">
+                  <Users size={20} color="#C74634" strokeWidth={2} />
+                </div>
+                <h3 className="table-title">Developer Productivity Breakdown</h3>
+              </>
+            ) : null}
           </div>
           <div className="search-wrapper">
             <Search className="search-icon" size={14} />
@@ -690,10 +695,16 @@ function FullAnalyticsTable() {
  * KPI Analytics: omit `selectedSprints` for the full table (demo data).
  * Dashboard: pass `selectedSprints` and `compareMode` for the same visual style plus sprint columns.
  */
-export default function DeveloperTable({ selectedSprints, compareMode }) {
+export default function DeveloperTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
   if (selectedSprints != null) {
     if (!selectedSprints.length) return null;
-    return <SprintMetricsTable selectedSprints={selectedSprints} compareMode={!!compareMode} />;
+    return (
+      <SprintMetricsTable
+        selectedSprints={selectedSprints}
+        compareMode={!!compareMode}
+        suppressCardTitle={!!suppressCardTitle}
+      />
+    );
   }
   return <FullAnalyticsTable />;
 }

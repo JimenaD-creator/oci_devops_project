@@ -1,7 +1,9 @@
 package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.ToDoItem;
+import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.ToDoItemRepository;
+import com.springboot.MyTodoList.repository.UserTaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,12 @@ public class ToDoItemService {
 
     @Autowired
     private ToDoItemRepository toDoItemRepository;
+
+    @Autowired
+    private UserTaskRepository userTaskRepository;
+
+    @Autowired
+    private TaskAssignmentSyncService taskAssignmentSyncService;
 
     public List<ToDoItem> findAll() {
         return toDoItemRepository.findAll();
@@ -90,7 +98,8 @@ public class ToDoItemService {
 
         if (toDoItemData.isPresent()) {
             ToDoItem toDoItem = toDoItemData.get();
-            
+            boolean wasDone = toDoItem.isDone();
+
             toDoItem.setDescription(td.getDescription());
             toDoItem.setTitle(td.getTitle());
             toDoItem.setPriority(td.getPriority());
@@ -113,8 +122,39 @@ public class ToDoItemService {
                 toDoItem.setCreation_ts(td.getCreation_ts());
             }
 
-            return toDoItemRepository.save(toDoItem);
+            ToDoItem saved = toDoItemRepository.save(toDoItem);
+            syncUserTasksWithTelegramTaskState(id, td.isDone() && !wasDone, !td.isDone() && wasDone);
+            return saved;
         }
         return null;
+    }
+
+    /**
+     * Telegram updates only the TASK row (ToDoItem). Keep USER_TASK assignment status aligned: when the task is
+     * completed or reopened from the bot, update assignee rows accordingly. WORKED_HOURS is never set here (that
+     * remains for explicit logging via the API/UI).
+     */
+    private void syncUserTasksWithTelegramTaskState(int taskIdInt, boolean justMarkedDone, boolean justReopened) {
+        if (!justMarkedDone && !justReopened) {
+            return;
+        }
+        long taskId = taskIdInt;
+        List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
+        if (uts.isEmpty()) {
+            return;
+        }
+
+        if (justMarkedDone) {
+            for (UserTask ut : uts) {
+                ut.setStatus("DONE");
+                userTaskRepository.save(ut);
+            }
+        } else if (justReopened) {
+            for (UserTask ut : uts) {
+                ut.setStatus("TODO");
+                userTaskRepository.save(ut);
+            }
+        }
+        taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
     }
 }
