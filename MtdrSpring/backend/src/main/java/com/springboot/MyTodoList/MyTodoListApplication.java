@@ -1,19 +1,15 @@
 package com.springboot.MyTodoList;
 
-import com.springboot.MyTodoList.config.BotProps;
-import com.springboot.MyTodoList.config.DeepSeekConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Import;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableConfigurationProperties(BotProps.class)
-@Import(DeepSeekConfig.class)
+@EnableCaching
+@EnableScheduling
 public class MyTodoListApplication {
-
-	public static void main(String[] args) {
-		SpringApplication.run(MyTodoListApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(MyTodoListApplication.class, args);
+    }
 }

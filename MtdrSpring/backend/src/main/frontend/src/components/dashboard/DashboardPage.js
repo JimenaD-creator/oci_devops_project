@@ -18,19 +18,36 @@ import {
 import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 
-
-export default function DashboardPage() {
+export default function DashboardPage({ projectId: propProjectId }) {
   const [allSprints, setAllSprints] = useState([]);
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
+  const [currentProject, setCurrentProject] = useState(null);
+
+  const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
   useEffect(() => {
-    handleRefresh();
-  }, []);
+    if (projectId) {
+      loadProjectInfo();
+      handleRefresh();
+    }
+  }, [projectId]);
+
+  const loadProjectInfo = async () => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/projects/${projectId}`);
+      if (response.ok) {
+        const project = await response.json();
+        setCurrentProject(project);
+      }
+    } catch (err) {
+      console.error('Error loading project:', err);
+    }
+  };
 
   const handleRefresh = () => {
     setSprintsLoading(true);
-    fetchDashboardSprints()
+    fetchDashboardSprints(projectId)
       .then((sprints) => {
         setAllSprints(sprints);
         if (sprints.length > 0 && selectedSprintIds.length === 0) {
@@ -41,14 +58,12 @@ export default function DashboardPage() {
       .finally(() => setSprintsLoading(false));
   };
 
-  /** Unique sprint ids that exist in `allSprints` (fixes duplicate ids in state after many toggles). */
   const normalizedSelectedIds = useMemo(() => {
     if (!allSprints.length) return [];
     const valid = new Set(allSprints.map((s) => Number(s.id)));
     return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))].filter((id) => valid.has(id));
   }, [selectedSprintIds, allSprints]);
 
-  /** Dedupe / prune invalid ids in state (e.g. [1,1,2] or stale ids) so compareMode matches the UI. */
   useEffect(() => {
     if (!allSprints.length || sprintsLoading) return;
     if (normalizedSelectedIds.length === 0) {
@@ -65,9 +80,6 @@ export default function DashboardPage() {
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
   }, [allSprints, sprintsLoading, selectedSprintIds, normalizedSelectedIds]);
 
-  /**
-   * One sprint per id, order follows first occurrence in normalizedSelectedIds.
-   */
   const selectedSprints = useMemo(() => {
     const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
     return normalizedSelectedIds
@@ -99,11 +111,7 @@ export default function DashboardPage() {
     return Math.round((100 * done) / taskStatusTotal);
   }, [taskStatusDistribution, taskStatusTotal]);
 
-  const projectName = useMemo(() => {
-    const name = allSprints.find((s) => s.assignedProject?.name)?.assignedProject?.name;
-    if (typeof name === 'string' && name.trim()) return name.trim();
-    return 'Project';
-  }, [allSprints]);
+  const projectName = currentProject?.name || (allSprints.find((s) => s.assignedProject?.name)?.assignedProject?.name) || 'Project';
 
   const sprintDateLabel = useMemo(() => {
     if (!primarySprint) return '';
@@ -243,15 +251,15 @@ export default function DashboardPage() {
             return (
               <FormControlLabel
                 key={sp.id}
-                control={(
+                control={
                   <Checkbox
                     size="small"
                     checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
                     onChange={(e) => toggleSprint(sp.id, e.target.checked)}
                     sx={{ '&.Mui-checked': { color: sprintColor } }}
                   />
-                )}
-                label={(
+                }
+                label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Box
                       component="span"
@@ -265,7 +273,7 @@ export default function DashboardPage() {
                     />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{sp.name}</Typography>
                   </Box>
-                )}
+                }
               />
             );
           })}

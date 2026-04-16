@@ -3,7 +3,7 @@ package com.springboot.MyTodoList.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "TEAM")
+@Table(name = "TEAM", schema = "MANAGER")
 public class Team {
     
     @Id
@@ -13,38 +13,16 @@ public class Team {
     @Column(name = "NAME", nullable = false, length = 100)
     private String name;
     
-    @ManyToOne
-    @JoinColumn(name = "ASSIGNED_MANAGER", nullable = false)
-    private User assignedManager;
-    
+    @OneToOne
+    @JoinColumn(name = "ASSIGNED_MANAGER", referencedColumnName = "ID", unique = true)
+    private User manager;
+
     public Team() {}
-    
-    public Team(String name, User assignedManager) {
-        this.name = name;
-        this.assignedManager = assignedManager;
-    }
-    
-    public Long getId() {
-        return id;
-    }
-    
-    public void setId(Long id) {
-        this.id = id;
-    }
-    
-    public String getName() {
-        return name;
-    }
-    
-    public void setName(String name) {
-        this.name = name;
-    }
-    
-    public User getAssignedManager() {
-        return assignedManager;
-    }
-    
-    public void setAssignedManager(User assignedManager) {
-        this.assignedManager = assignedManager;
-    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public User getManager() { return manager; }
+    public void setManager(User manager) { this.manager = manager; }
 }

@@ -3,26 +3,19 @@ package com.springboot.MyTodoList.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "PROJECT")
+@Table(name = "project")
 public class Project {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "project_seq")
+    @SequenceGenerator(name = "project_seq", sequenceName = "PROJECT_SEQ", allocationSize = 1)
     private Long id;
     
-    @Column(name = "NAME", nullable = false, length = 100)
     private String name;
     
     @ManyToOne
-    @JoinColumn(name = "ASSIGNED_TEAM", nullable = false)
+    @JoinColumn(name = "assigned_team")
     private Team assignedTeam;
-    
-    public Project() {}
-    
-    public Project(String name, Team assignedTeam) {
-        this.name = name;
-        this.assignedTeam = assignedTeam;
-    }
     
     public Long getId() {
         return id;
