@@ -199,57 +199,8 @@ public class BotActions {
         exit = true;
     }
 
-    public void fnDone() {
-        if (requestText.indexOf(BotLabels.DONE.getLabel()) == -1 || exit) return;
-        try {
-            String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
-            int id = Integer.parseInt(idStr);
-            ToDoItem item = todoService.getToDoItemById(id);
-            if (item != null) {
-                item.setDone(true);
-                todoService.updateToDoItem(id, item);
-                BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_DONE.getMessage(), telegramClient);
-                fnListAll(); // Actualiza la lista automáticamente
-            }
-        } catch (Exception e) {
-            logger.error("Error en fnDone: " + e.getMessage());
-        }
-        exit = true;
-    }
 
-    public void fnUndo() {
-        if (requestText.indexOf(BotLabels.UNDO.getLabel()) == -1 || exit) return;
-        try {
-            String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
-            int id = Integer.parseInt(idStr);
-            ToDoItem item = todoService.getToDoItemById(id);
-            if (item != null) {
-                item.setDone(false);
-                todoService.updateToDoItem(id, item);
-                BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_UNDONE.getMessage(), telegramClient);
-                fnListAll();
-            }
-        } catch (Exception e) {
-            logger.error("Error en fnUndo: " + e.getMessage());
-        }
-        exit = true;
-    }
-
-    public void fnDelete() {
-        if (requestText.indexOf(BotLabels.DELETE.getLabel()) == -1 || exit) return;
-        try {
-            String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
-            int id = Integer.parseInt(idStr);
-            todoService.deleteToDoItem(id);
-            BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_DELETED.getMessage(), telegramClient);
-            fnListAll();
-        } catch (Exception e) {
-            logger.error("Error en fnDelete: " + e.getMessage());
-        }
-        exit = true;
-    }
-
-    public void fnHide() {
+    public void fnElse() {
         if (!(requestText.equals(BotCommands.HIDE_COMMAND.getCommand()) 
             || requestText.equals(BotLabels.HIDE_MAIN_SCREEN.getLabel())) || exit) 
             return;
