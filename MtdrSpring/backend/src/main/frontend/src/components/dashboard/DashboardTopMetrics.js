@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
@@ -10,6 +11,7 @@ import {
   METRIC_VALUE_SX,
   METRIC_HELPER_SX,
 } from './dashboardTypography';
+import { DASHBOARD_SCROLL_VIEWPORT } from './ScrollReveal';
 
 function formatAverage(n, devCount) {
   if (!devCount) return '—';
@@ -112,9 +114,16 @@ export default function DashboardTopMetrics({
           alignItems: 'stretch',
         }}
       >
-        {items.map((item) => (
-          <Paper
+        {items.map((item, i) => (
+          <motion.div
             key={item.title}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={DASHBOARD_SCROLL_VIEWPORT}
+            transition={{ duration: 0.42, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+            style={{ minWidth: 0 }}
+          >
+          <Paper
             elevation={0}
             sx={{
               px: { xs: scorecardsFourColumn ? 1.25 : 2, sm: 2 },
@@ -188,6 +197,7 @@ export default function DashboardTopMetrics({
               {item.subtitle}
             </Typography>
           </Paper>
+          </motion.div>
         ))}
       </Box>
     </Box>

@@ -17,7 +17,9 @@ import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerAvatarColors } from '../utils/developerColors';
+import TaskTable from '../components/dashboard/TaskTable';
 
 const ORACLE_RED = '#E53935';
 /** Same primary red as Tasks page (Create task / New task). */
@@ -172,7 +174,7 @@ function userRecordId(u) {
   return u?.id ?? u?.ID;
 }
 
-function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
+function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved, onDeleted }) {
   const [task, setTask] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadedAssigneeUserIds, setLoadedAssigneeUserIds] = useState([]);
@@ -191,6 +193,25 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
   const [sprintId, setSprintId] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState([]);
 
+  const loadProjectDevelopersForSprint = async (sid, taskFallback = null) => {
+    const sprintFromList = (sprints || []).find((s) => String(s.id) === String(sid));
+    const projectId = Number(
+      sprintFromList?.assignedProject?.id
+      ?? taskFallback?.assignedSprint?.assignedProject?.id,
+    );
+    if (!Number.isFinite(projectId)) {
+      setUsers([]);
+      return;
+    }
+    try {
+      const usersRes = await fetch(`${API_BASE}/api/projects/${projectId}/developers`);
+      const usersData = usersRes.ok ? await usersRes.json() : [];
+      setUsers(Array.isArray(usersData) ? usersData : []);
+    } catch {
+      setUsers([]);
+    }
+  };
+
   useEffect(() => {
     if (!open) {
       setTask(null);
@@ -205,15 +226,11 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
     setLoading(true);
     (async () => {
       try {
-        const [taskRes, usersRes] = await Promise.all([
-          fetch(`${API_BASE}/api/tasks/${initialTask.id}`),
-          fetch(`${API_BASE}/users`),
-        ]);
+        const taskRes = await fetch(`${API_BASE}/api/tasks/${initialTask.id}`);
         const t = taskRes.ok ? await taskRes.json() : null;
-        const usersData = usersRes.ok ? await usersRes.json() : [];
         if (cancelled || !t) return;
         setTask(t);
-        setUsers(Array.isArray(usersData) ? usersData : []);
+        await loadProjectDevelopersForSprint(t.assignedSprint?.id, t);
 
         const utRes = await fetch(`${API_BASE}/api/user-tasks/task/${t.id}`);
         const utList = utRes.ok ? await utRes.json() : [];
@@ -235,6 +252,23 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
       cancelled = true;
     };
   }, [open, initialTask?.id]);
+
+  useEffect(() => {
+    if (!open || !editMode || !sprintId) return;
+    loadProjectDevelopersForSprint(sprintId, task);
+  }, [open, editMode, sprintId, sprints, task]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    setAssignedUserIds((prev) => {
+      const allowed = new Set(
+        users
+          .map((u) => Number(userRecordId(u)))
+          .filter((id) => Number.isFinite(id)),
+      );
+      return prev.filter((id) => allowed.has(Number(id)));
+    });
+  }, [users, editMode]);
 
   const applyTaskToForm = (t) => {
     if (!t) return;
@@ -364,6 +398,28 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
     if (!saving) onClose();
   };
 
+  const handleDeleteTask = async () => {
+    if (!task?.id) return;
+    if (!window.confirm('Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.')) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${task.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onDeleted?.(task.id);
+        onClose();
+      } else {
+        setError('Could not delete task.');
+      }
+    } catch {
+      setError('Connection error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const statusLabel = task ? (TASK_STATUS_LABEL[task.status] ?? task.status) : '';
   const classificationKey = task?.classification && CLASSIFICATION_CHIP_SX[task.classification] ? task.classification : null;
   const priorityKey = task?.priority && PRIORITY_CHIP_SX[task.priority] ? task.priority : null;
@@ -441,20 +497,32 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
             {!editMode && task && !loading ? (
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={handleStartEdit}
-                sx={{
-                  bgcolor: ORACLE_RED_ACTION,
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  '&:hover': { bgcolor: '#A83B2D' },
-                }}
-              >
-                Edit
-              </Button>
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<EditIcon />}
+                  onClick={handleStartEdit}
+                  sx={{
+                    bgcolor: ORACLE_RED_ACTION,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    '&:hover': { bgcolor: '#A83B2D' },
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteOutlineIcon />}
+                  onClick={handleDeleteTask}
+                  disabled={saving}
+                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+                >
+                  Delete
+                </Button>
+              </>
             ) : null}
             <IconButton aria-label="Close" onClick={handleDialogClose} disabled={saving} size="small">
               <CloseIcon />
@@ -913,7 +981,7 @@ function SprintCard({ sprint, tasks, isSelected, onClick }) {
   );
 }
 
-function SprintDetail({ sprint, tasks, onSelectTask }) {
+function SprintDetail({ sprint, tasks, userTasks, onSelectTask, onEditSprint }) {
   const sprintPhase = inferSprintStatus(sprint, tasks);
   const phaseCfg = STATUS_CONFIG[sprintPhase];
   const sprintTasks = tasks.filter(t => t.assignedSprint?.id === sprint.id);
@@ -923,21 +991,43 @@ function SprintDetail({ sprint, tasks, onSelectTask }) {
   const total = sprintTasks.length;
   const progress = total > 0 ? Math.round((done / total) * 100) : Math.round((sprint.completionRate ?? 0) * 100);
 
-  const statusIcon = {
-    'DONE': <CheckCircleIcon sx={{ fontSize: 16, color: '#4CAF50' }} />,
-    'IN_PROGRESS': <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: '#1E88E5' }} />,
-    'IN_REVIEW': <RateReviewOutlinedIcon sx={{ fontSize: 16, color: '#7B1FA2' }} />,
-    'PENDING': <PauseCircleIcon sx={{ fontSize: 16, color: ORACLE_RED }} />,
-    'TODO': <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: '#CCC' }} />,
-  };
+  const userTasksList = Array.isArray(userTasks) ? userTasks : [];
+  const assignmentsByTaskId = userTasksList.reduce((acc, ut) => {
+    const tidRaw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId;
+    const tid = Number(tidRaw);
+    if (!Number.isFinite(tid)) return acc;
+    if (!acc[tid]) acc[tid] = [];
+    acc[tid].push(ut);
+    return acc;
+  }, {});
 
-  const statusLabel = {
-    'DONE':        { label: 'Done',        bg: '#F0FFF4', color: '#2E7D32' },
-    'IN_PROGRESS': { label: 'In progress', bg: '#E3F2FD', color: '#1565C0' },
-    'IN_REVIEW':   { label: 'In review',   bg: '#F3E5F5', color: '#7B1FA2' },
-    'PENDING':     { label: 'Pending',     bg: '#FFF1F0', color: '#C62828' },
-    'TODO':        { label: 'To do',       bg: '#F5F5F5', color: '#757575' },
-  };
+  const sprintTaskRows = sprintTasks.map((task) => ({
+    ...(function deriveTaskRowFields() {
+      const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
+      const names = [...new Set(
+        taskAssignments
+          .map((ut) => String(ut?.user?.name || '').trim())
+          .filter(Boolean),
+      )];
+      const workedHours = taskAssignments.reduce((sum, ut) => {
+        const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
+      return {
+        developers: names,
+        developer: names[0] ?? null,
+        actualHours: workedHours > 0 ? workedHours : null,
+      };
+    })(),
+    id: task.id,
+    description: taskDisplayName(task),
+    done: task.status === 'DONE',
+    status: task.status,
+    statusRaw: task.status,
+    dueDate: task.dueDate,
+    completedAt: task.finishDate,
+    _task: task,
+  }));
 
   return (
     <Box>
@@ -955,6 +1045,22 @@ function SprintDetail({ sprint, tasks, onSelectTask }) {
             {formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}
           </Typography>
         </Box>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<EditIcon />}
+          onClick={() => onEditSprint?.(sprint)}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 700,
+            borderColor: ORACLE_RED_ACTION,
+            color: ORACLE_RED_ACTION,
+            flexShrink: 0,
+            '&:hover': { borderColor: '#A83B2D', bgcolor: 'rgba(199, 70, 52, 0.06)' },
+          }}
+        >
+          Edit sprint
+        </Button>
       </Box>
 
       {sprint.goal ? (
@@ -1015,58 +1121,12 @@ function SprintDetail({ sprint, tasks, onSelectTask }) {
       <Typography sx={{ display: 'block', color: '#666', fontWeight: 600, mb: 1, fontSize: '0.9rem' }}>
         Click a task to view details or edit.
       </Typography>
-      <Paper sx={{ borderRadius: 3, border: '1px solid #EFEFEF', boxShadow: 'none', overflow: 'hidden' }}>
-        {sprintTasks.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ color: '#CCC' }}>No tasks in this sprint</Typography>
-          </Box>
-        ) : sprintTasks.map((task, i) => (
-          <Box key={task.id}>
-            <Box
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectTask?.(task)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSelectTask?.(task);
-                }
-              }}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                px: 3,
-                py: 2,
-                gap: 2,
-                cursor: 'pointer',
-                '&:hover': { bgcolor: '#FAFAFA' },
-                transition: 'background 0.1s',
-              }}
-            >
-              {statusIcon[task.status] ?? statusIcon['TODO']}
-              <Typography variant="body2" sx={{
-                flexGrow: 1, fontWeight: 500,
-                color: task.status === 'DONE' ? '#AAA' : '#1A1A1A',
-                textDecoration: task.status === 'DONE' ? 'line-through' : 'none',
-              }}>
-                {taskDisplayName(task)}
-              </Typography>
-              <Chip
-                label={(statusLabel[task.status] ?? statusLabel['TODO']).label}
-                size="small"
-                sx={{
-                  bgcolor: (statusLabel[task.status] ?? statusLabel['TODO']).bg,
-                  color: (statusLabel[task.status] ?? statusLabel['TODO']).color,
-                  fontWeight: 600, fontSize: '0.68rem', height: 20,
-                }}
-              />
-              <Chip label={`${task.assignedHours}h`} size="small"
-                sx={{ bgcolor: '#F5F5F5', color: '#888', fontWeight: 600, fontSize: '0.68rem', height: 20 }} />
-            </Box>
-            {i < sprintTasks.length - 1 && <Divider />}
-          </Box>
-        ))}
-      </Paper>
+      <TaskTable
+        items={sprintTaskRows}
+        variant="manager"
+        onRowClick={(row) => onSelectTask?.(row._task)}
+        scrollMaxHeight={380}
+      />
     </Box>
   );
 }
@@ -1290,28 +1350,294 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
   );
 }
 
+function sprintKpiNumber(sprint, key) {
+  const v = sprint?.[key];
+  if (v == null || v === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function EditSprintDialog({ open, sprint, onClose, onSaved }) {
+  const [startDate, setStartDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [goal, setGoal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open || !sprint) return;
+    setStartDate(toInputDate(sprint.startDate));
+    setDueDate(toInputDate(sprint.dueDate));
+    setGoal(typeof sprint.goal === 'string' ? sprint.goal : '');
+    setError('');
+  }, [open, sprint]);
+
+  const handleClose = () => {
+    if (!saving) onClose();
+  };
+
+  const sprintId =
+    sprint?.id == null || sprint?.id === ''
+      ? null
+      : Number.isFinite(Number(sprint.id))
+        ? Number(sprint.id)
+        : null;
+
+  const handleSave = async () => {
+    if (sprintId == null || !startDate || !dueDate) return;
+    const projectIdRaw = sprint?.assignedProject?.id ?? sprint?.assignedProject?.ID;
+    const projectId =
+      projectIdRaw == null || projectIdRaw === ''
+        ? null
+        : Number.isFinite(Number(projectIdRaw))
+          ? Number(projectIdRaw)
+          : null;
+    if (projectId == null) {
+      setError('Sprint project is missing. Please refresh and try again.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const goalTrim = goal.trim();
+      const res = await fetch(`${API_BASE}/api/sprints/${sprintId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignedProject: { id: projectId },
+          startDate: new Date(startDate).toISOString(),
+          dueDate: new Date(dueDate).toISOString(),
+          completionRate: sprintKpiNumber(sprint, 'completionRate'),
+          onTimeDelivery: sprintKpiNumber(sprint, 'onTimeDelivery'),
+          teamParticipation: sprintKpiNumber(sprint, 'teamParticipation'),
+          workloadBalance: sprintKpiNumber(sprint, 'workloadBalance'),
+          goal: goalTrim || null,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onSaved(updated);
+        onClose();
+      } else {
+        let detail = '';
+        try {
+          detail = (await res.text()).trim();
+        } catch {
+          detail = '';
+        }
+        if (res.status === 404) {
+          setError(`Sprint #${sprintId} was not found in the API.`);
+        } else if (detail) {
+          setError(`Could not save sprint changes (${res.status}): ${detail}`);
+        } else {
+          setError(`Could not save sprint changes (${res.status}).`);
+        }
+      }
+    } catch {
+      setError('Connection error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave = Boolean(startDate && dueDate && sprintId != null);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      scroll="body"
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          borderRadius: 3,
+          border: '1px solid #ECECEC',
+          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
+          bgcolor: '#FFFFFF',
+          boxShadow: '0 16px 40px rgba(199, 70, 52, 0.1), 0 8px 24px rgba(30, 136, 229, 0.08)',
+          overflow: 'hidden',
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 640 },
+        },
+      }}
+    >
+      <DialogTitle sx={{ p: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+            borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: 'rgba(199, 70, 52, 0.12)',
+                border: '1px solid rgba(199, 70, 52, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <EditIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', lineHeight: 1.25, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>
+                Edit sprint{sprint?.id != null ? ` #${sprint.id}` : ''}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
+                Dates & goal
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            aria-label="Close"
+            onClick={handleClose}
+            disabled={saving}
+            size="small"
+            sx={{ color: '#616161', '&:hover': { bgcolor: 'rgba(199, 70, 52, 0.08)' } }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent
+        sx={{
+          px: 2.5,
+          pt: 2.25,
+          pb: 1.5,
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <Typography variant="body2" sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}>
+          Update the sprint window and optional goal. KPI metrics stored in the database are kept as-is.
+        </Typography>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Start date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
+            <TextField
+              label="End date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
+          </Stack>
+          <TextField
+            label="Sprint goal (optional)"
+            placeholder="What should this sprint achieve?"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            fullWidth
+            multiline
+            minRows={4}
+            inputProps={{ maxLength: 2000 }}
+            helperText={`${goal.length} / 2000 characters`}
+            sx={{
+              ...newSprintDialogFieldOutline(),
+              '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
+            }}
+          />
+        </Stack>
+        {error ? (
+          <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600, mt: 1.5, display: 'block' }}>
+            {error}
+          </Typography>
+        ) : null}
+      </DialogContent>
+
+      <DialogActions
+        sx={{
+          px: 2.5,
+          py: 2,
+          gap: 1,
+          borderTop: '1px solid rgba(199, 70, 52, 0.12)',
+          backgroundColor: '#FFFFFF',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button
+          onClick={handleClose}
+          disabled={saving}
+          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          variant="contained"
+          disableElevation
+          sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            textTransform: 'none',
+            fontWeight: 700,
+            px: 2.5,
+            borderRadius: 2,
+            '&:hover': { bgcolor: '#A83B2D' },
+            '&.Mui-disabled': { bgcolor: '#E0E0E0', color: '#9E9E9E' },
+          }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function SprintsPage() {
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [userTasks, setUserTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprint, setSelectedSprint] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [sprintForEdit, setSprintForEdit] = useState(null);
   const [selectedTaskForDialog, setSelectedTaskForDialog] = useState(null);
 
   const loadData = async () => {
   setLoading(true);
   try {
-    const [sprintsRes, tasksRes] = await Promise.all([
+    const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
       fetch(`${API_BASE}/api/sprints`),
       fetch(`${API_BASE}/api/tasks`),
+      fetch(`${API_BASE}/api/user-tasks`),
     ]);
     const sprintsData = await sprintsRes.json();
     const tasksData = await tasksRes.json();
+    const userTasksData = await userTasksRes.json();
     const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
     const tasksList = Array.isArray(tasksData) ? tasksData : [];
+    const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
     const sorted = sortSprintsForDisplay(sprintsList, tasksList);
     setSprints(sorted);
     setTasks(tasksList);
+    setUserTasks(userTasksList);
     setSelectedSprint((prev) =>
       prev
         ? sorted.find((s) => s.id === prev.id) ?? sorted[0]
@@ -1386,7 +1712,9 @@ export default function SprintsPage() {
             <SprintDetail
               sprint={selectedSprint}
               tasks={tasks}
+              userTasks={userTasks}
               onSelectTask={(t) => setSelectedTaskForDialog(t)}
+              onEditSprint={(s) => setSprintForEdit(s)}
             />
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
@@ -1405,6 +1733,16 @@ export default function SprintsPage() {
         projectId={sprints[0]?.assignedProject?.id ?? 1}
       />
 
+      <EditSprintDialog
+        open={Boolean(sprintForEdit)}
+        sprint={sprintForEdit}
+        onClose={() => setSprintForEdit(null)}
+        onSaved={(updated) => {
+          setSprints((prev) => sortSprintsForDisplay(prev.map((s) => (s.id === updated.id ? updated : s)), tasks));
+          setSelectedSprint((prev) => (prev?.id === updated.id ? updated : prev));
+        }}
+      />
+
       <TaskDetailDialog
         open={Boolean(selectedTaskForDialog)}
         initialTask={selectedTaskForDialog}
@@ -1413,6 +1751,13 @@ export default function SprintsPage() {
         onSaved={(updated) => {
           setTasks((prev) => {
             const next = prev.map((x) => (x.id === updated.id ? updated : x));
+            setSprints((sp) => sortSprintsForDisplay(sp, next));
+            return next;
+          });
+        }}
+        onDeleted={(taskId) => {
+          setTasks((prev) => {
+            const next = prev.filter((x) => x.id !== taskId);
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });

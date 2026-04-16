@@ -146,7 +146,7 @@ public class ToDoItemService {
 
         if (justMarkedDone) {
             for (UserTask ut : uts) {
-                ut.setStatus("DONE");
+                ut.setStatus("COMPLETED");
                 userTaskRepository.save(ut);
             }
         } else if (justReopened) {

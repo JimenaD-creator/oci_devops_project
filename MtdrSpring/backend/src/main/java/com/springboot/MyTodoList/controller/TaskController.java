@@ -101,7 +101,10 @@ public class TaskController {
         if (newStatus != null) {
             if ("DONE".equalsIgnoreCase(newStatus.trim())) {
                 boolean allAssigneesDone = assignments.stream()
-                    .allMatch(ut -> "DONE".equalsIgnoreCase(Optional.ofNullable(ut.getStatus()).orElse("").trim()));
+                    .allMatch(ut -> {
+                        String st = Optional.ofNullable(ut.getStatus()).orElse("").trim();
+                        return "DONE".equalsIgnoreCase(st) || "COMPLETED".equalsIgnoreCase(st);
+                    });
                 if (!allAssigneesDone) {
                     return ResponseEntity.status(HttpStatus.CONFLICT).build();
                 }
@@ -119,14 +122,18 @@ public class TaskController {
     }
     
     /**
-     * Delete task
+     * Delete task and its USER_TASK rows (FK-safe).
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
-        if (taskRepository.existsById(id)) {
-            taskRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
+        if (!taskRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.notFound().build();
+        List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
+        if (!assignments.isEmpty()) {
+            userTaskRepository.deleteAll(assignments);
+        }
+        taskRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

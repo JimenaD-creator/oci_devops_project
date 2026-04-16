@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
-import { Menu, MenuItem } from '@mui/material';
+import { Menu, MenuItem, Divider } from '@mui/material';
 import { developerAvatarColors } from '../../utils/developerColors';
 import './KanbanBoard.css';
 
@@ -86,7 +86,7 @@ function bucketForItem(item) {
   return 'todo';
 }
 
-function TaskCard({ item, isDone, onStatusChange }) {
+function TaskCard({ item, isDone, onStatusChange, onDeleteTask }) {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const hours = item.actualHours != null && item.actualHours !== ''
@@ -203,12 +203,26 @@ function TaskCard({ item, isDone, onStatusChange }) {
             {opt.label}
           </MenuItem>
         ))}
+        {typeof onDeleteTask === 'function' ? (
+          <>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setAnchorEl(null);
+                onDeleteTask(item.id);
+              }}
+              sx={{ fontSize: '0.875rem', color: '#C62828', fontWeight: 600 }}
+            >
+              Delete task
+            </MenuItem>
+          </>
+        ) : null}
       </Menu>
     </div>
   );
 }
 
-export default function KanbanBoard({ items = [], onStatusChange }) {
+export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask }) {
   const columnsWithTasks = useMemo(() => {
     const buckets = { todo: [], inProgress: [], review: [], done: [] };
     items.forEach((item) => {
@@ -239,6 +253,7 @@ export default function KanbanBoard({ items = [], onStatusChange }) {
                   item={item}
                   isDone={col.id === 'done'}
                   onStatusChange={onStatusChange}
+                  onDeleteTask={onDeleteTask}
                 />
               ))
             )}

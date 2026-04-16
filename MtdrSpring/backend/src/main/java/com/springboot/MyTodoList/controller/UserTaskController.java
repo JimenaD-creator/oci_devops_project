@@ -8,17 +8,21 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
-import com.fasterxml.jackson.annotation.JsonAlias;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api/user-tasks")
 @CrossOrigin(origins = "*")
 public class UserTaskController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserTaskController.class);
 
     @Autowired
     private UserTaskRepository userTaskRepository;
@@ -34,7 +38,12 @@ public class UserTaskController {
 
     @GetMapping
     public ResponseEntity<List<UserTask>> getAllUserTasks() {
-        return ResponseEntity.ok(userTaskRepository.findAll());
+        try {
+            return ResponseEntity.ok(userTaskRepository.findAllWithUserAndTask());
+        } catch (Exception e) {
+            LOGGER.warn("findAllWithUserAndTask failed, falling back to findAll", e);
+            return ResponseEntity.ok(userTaskRepository.findAll());
+        }
     }
 
     @GetMapping("/sprint/{sprintId}")
@@ -82,10 +91,7 @@ public class UserTaskController {
         userTask.setId(id);
         userTask.setUser(user);
         userTask.setTask(task);
-        /* Only persist worked hours when the client sends a value (0 clears). Omitting the field preserves existing. */
-        if (request.getWorkedHours() != null) {
-            userTask.setWorkedHours(request.getWorkedHours());
-        }
+        /* Estimación de la tarea va en TASK.ASSIGNED_HOURS; WORKED_HOURS no se escribe aquí (solo vía UserTaskService / bot). */
         userTask.setStatus(request.getStatus());
 
         UserTask saved = userTaskRepository.save(userTask);
@@ -96,9 +102,6 @@ public class UserTaskController {
     public static class CreateUserTaskRequest {
         private Integer userId;
         private Long taskId;
-        /** Same as USER_TASK.WORKED_HOURS; JSON may use {@code hours} as an alias. */
-        @JsonAlias("hours")
-        private Long workedHours;
         private String status;
 
         public Integer getUserId() {
@@ -115,14 +118,6 @@ public class UserTaskController {
 
         public void setTaskId(Long taskId) {
             this.taskId = taskId;
-        }
-
-        public Long getWorkedHours() {
-            return workedHours;
-        }
-
-        public void setWorkedHours(Long workedHours) {
-            this.workedHours = workedHours;
         }
 
         public String getStatus() {

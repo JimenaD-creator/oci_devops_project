@@ -98,51 +98,44 @@ public class BotActions {
     }
 
     public void fnUndo() {
-        if (requestText.indexOf(BotLabels.UNDO.getLabel()) == -1 || exit)
-            return;
-
-        String undo = requestText.substring(0,
-                requestText.indexOf(BotLabels.DASH.getLabel()));
-        Integer id = Integer.valueOf(undo);
-
+        if (requestText.indexOf(BotLabels.UNDO.getLabel()) == -1 || exit) return;
         try {
-
+            String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
+            int id = Integer.parseInt(idStr);
             ToDoItem item = todoService.getToDoItemById(id);
-            item.setDone(false);
-            todoService.updateToDoItem(id, item);
-            BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_UNDONE.getMessage(), telegramClient);
-
+            if (item != null) {
+                item.setDone(false);
+                todoService.updateToDoItem(id, item);
+                BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_UNDONE.getMessage(), telegramClient);
+            }
         } catch (Exception e) {
-            logger.error(e.getLocalizedMessage(), e);
+            logger.error("Error en fnUndo: " + e.getMessage());
         }
         exit = true;
     }
 
-    public void fnDelete(){
-        if (requestText.indexOf(BotLabels.DELETE.getLabel()) == -1 || exit)
-            return;
-
-        String delete = requestText.substring(0,
-                requestText.indexOf(BotLabels.DASH.getLabel()));
-        Integer id = Integer.valueOf(delete);
-
+    public void fnDelete() {
+        if (requestText.indexOf(BotLabels.DELETE.getLabel()) == -1 || exit) return;
         try {
+            String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
+            int id = Integer.parseInt(idStr);
             todoService.deleteToDoItem(id);
             BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_DELETED.getMessage(), telegramClient);
-
         } catch (Exception e) {
-            logger.error(e.getLocalizedMessage(), e);
+            logger.error("Error en fnDelete: " + e.getMessage());
         }
         exit = true;
     }
 
-    public void fnHide(){
-        if (requestText.equals(BotCommands.HIDE_COMMAND.getCommand())
-				|| requestText.equals(BotLabels.HIDE_MAIN_SCREEN.getLabel()) && !exit)
-			BotHelper.sendMessageToTelegram(chatId, BotMessages.BYE.getMessage(), telegramClient);
-        else
-            return;
-        exit = true;
+    /** Texto del botón en el teclado del bot: título (si hay), si no descripción, si no fallback por id. */
+    private static String keyboardLabelForItem(ToDoItem item) {
+        if (item.getTitle() != null && !item.getTitle().trim().isEmpty()) {
+            return item.getTitle().trim();
+        }
+        if (item.getDescription() != null && !item.getDescription().isEmpty()) {
+            return item.getDescription();
+        }
+        return "Tarea #" + item.getID();
     }
 
     public void fnListAll(){
@@ -164,11 +157,7 @@ public class BotActions {
 
         for (ToDoItem item : activeItems) {
             KeyboardRow currentRow = new KeyboardRow();
-            // Solución al NullPointerException: Validamos la descripción
-            String desc = (item.getDescription() != null && !item.getDescription().isEmpty()) 
-                          ? item.getDescription() : "Tarea #" + item.getID();
-            
-            currentRow.add(desc);
+            currentRow.add(keyboardLabelForItem(item));
             currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.DONE.getLabel());
             keyboard.add(currentRow);
         }
@@ -180,10 +169,7 @@ public class BotActions {
 
         for (ToDoItem item : doneItems) {
             KeyboardRow currentRow = new KeyboardRow();
-            String desc = (item.getDescription() != null && !item.getDescription().isEmpty()) 
-                          ? item.getDescription() : "Tarea #" + item.getID();
-            
-            currentRow.add(desc);
+            currentRow.add(keyboardLabelForItem(item));
             currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.UNDO.getLabel());
             currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.DELETE.getLabel());
             keyboard.add(currentRow);
@@ -199,22 +185,27 @@ public class BotActions {
         exit = true;
     }
 
-
-    public void fnElse() {
-        if (!(requestText.equals(BotCommands.HIDE_COMMAND.getCommand()) 
-            || requestText.equals(BotLabels.HIDE_MAIN_SCREEN.getLabel())) || exit) 
+    public void fnHide() {
+        if (!(requestText.equals(BotCommands.HIDE_COMMAND.getCommand())
+            || requestText.equals(BotLabels.HIDE_MAIN_SCREEN.getLabel())) || exit) {
             return;
-        
-        // NEW: Check if this user is waiting for hours
+        }
+        BotHelper.sendMessageToTelegram(chatId, BotMessages.BYE.getMessage(), telegramClient);
+        exit = true;
+    }
+
+    /**
+     * Free text after other handlers: hours entry after marking a task done, or new task description.
+     */
+    public void fnElse() {
+        if (exit) {
+            return;
+        }
         if (stateManager.hasPendingState(chatId)) {
             Integer taskId = stateManager.getTaskIdWaitingForHours(chatId);
-            
             if (taskId != null) {
                 try {
-                    // NEW: Try to parse as hours (int)
                     Integer hours = Integer.parseInt(requestText.trim());
-                    
-                    // NEW: Validate hours (positive and reasonable upper bound)
                     if (hours < 1) {
                         BotHelper.sendMessageToTelegram(
                             chatId,
@@ -225,7 +216,6 @@ public class BotActions {
                         exit = true;
                         return;
                     }
-                    
                     if (hours > 100) {
                         BotHelper.sendMessageToTelegram(
                             chatId,
@@ -236,22 +226,15 @@ public class BotActions {
                         exit = true;
                         return;
                     }
-                    
-                    // NEW: Save to UserTask
                     saveWorkedHours(taskId, hours);
-                    
                     BotHelper.sendMessageToTelegram(
                         chatId,
                         hours + " hours recorded! ✓",
                         telegramClient,
                         null
                     );
-                    
-                    // NEW: Clear the pending state
                     stateManager.clearPendingState(chatId);
-                    
                 } catch (NumberFormatException e) {
-                    // NEW: User entered non-numeric. Ask again.
                     BotHelper.sendMessageToTelegram(
                         chatId,
                         "Please enter a valid whole number (e.g., 2 or 5)",
@@ -263,15 +246,13 @@ public class BotActions {
                 return;
             }
         }
-        
-        // EXISTING: Handle as new task (only if not waiting for hours)
         ToDoItem newItem = new ToDoItem();
         newItem.setDescription(requestText);
         newItem.setCreation_ts(OffsetDateTime.now());
         newItem.setDone(false);
         todoService.addToDoItem(newItem);
-
         BotHelper.sendMessageToTelegram(chatId, BotMessages.NEW_ITEM_ADDED.getMessage(), telegramClient, null);
+        exit = true;
     }
 
     public void fnAddItem() {

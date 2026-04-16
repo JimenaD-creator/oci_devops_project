@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography,
   LinearProgress, Paper, Card, CardContent, IconButton, Badge,
@@ -17,6 +17,7 @@ import {
 } from './dashboardSprintData';
 import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
+import ScrollReveal from './ScrollReveal';
 
 
 export default function DashboardPage() {
@@ -24,22 +25,25 @@ export default function DashboardPage() {
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
 
-  useEffect(() => {
-    handleRefresh();
-  }, []);
-
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setSprintsLoading(true);
     fetchDashboardSprints()
       .then((sprints) => {
         setAllSprints(sprints);
-        if (sprints.length > 0 && selectedSprintIds.length === 0) {
-          const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
-          setSelectedSprintIds([Number(active.id)]);
-        }
+        setSelectedSprintIds((prev) => {
+          if (sprints.length > 0 && prev.length === 0) {
+            const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
+            return [Number(active.id)];
+          }
+          return prev;
+        });
       })
       .finally(() => setSprintsLoading(false));
-  };
+  }, []);
+
+  useEffect(() => {
+    handleRefresh();
+  }, [handleRefresh]);
 
   /** Unique sprint ids that exist in `allSprints` (fixes duplicate ids in state after many toggles). */
   const normalizedSelectedIds = useMemo(() => {
@@ -134,7 +138,7 @@ export default function DashboardPage() {
   if (sprintsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: DASHBOARD_PRIMARY_ACCENT }} />
+        <CircularProgress sx={{ color: '#C74634' }} />
       </Box>
     );
   }
@@ -151,6 +155,7 @@ export default function DashboardPage() {
         boxSizing: 'border-box',
       }}
     >
+      <ScrollReveal>
       <Paper
         elevation={0}
         sx={{
@@ -212,7 +217,9 @@ export default function DashboardPage() {
           </Box>
         </Box>
       </Paper>
+      </ScrollReveal>
 
+      <ScrollReveal delay={0.04}>
       <Card sx={{ borderRadius: 3, border: '1px solid #EFEFEF', mb: 2.5 }}>
         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
@@ -235,7 +242,9 @@ export default function DashboardPage() {
           />
         </CardContent>
       </Card>
+      </ScrollReveal>
 
+      <ScrollReveal delay={0.07}>
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
         <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
           {allSprints.map((sp) => {
@@ -271,8 +280,10 @@ export default function DashboardPage() {
           })}
         </FormGroup>
       </Paper>
+      </ScrollReveal>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}>
+        <ScrollReveal delay={0.05}>
         <Box
           sx={{
             display: 'flex',
@@ -356,7 +367,9 @@ export default function DashboardPage() {
             </Box>
           ) : null}
         </Box>
+        </ScrollReveal>
 
+        <ScrollReveal delay={0.06}>
         <Box sx={{ mb: 0 }}>
           <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
             Developer performance
@@ -365,12 +378,14 @@ export default function DashboardPage() {
             Charts for workload, hours, and productivity by developer.
           </Typography>
         </Box>
+        </ScrollReveal>
         <DashboardDeveloperCharts
           developers={selectionMetrics.developers}
           selectedSprints={selectedSprints}
           compareMode={compareMode}
         />
 
+        <ScrollReveal delay={0.05}>
         <Box sx={{ mt: 4, mb: 0 }}>
           <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
             Developer productivity breakdown
@@ -379,11 +394,14 @@ export default function DashboardPage() {
             Detailed per-developer numbers and sprint columns when comparing.
           </Typography>
         </Box>
+        </ScrollReveal>
+        <ScrollReveal delay={0.06}>
         <DeveloperTable
           selectedSprints={selectedSprints}
           compareMode={compareMode}
           suppressCardTitle
         />
+        </ScrollReveal>
       </Box>
     </Box>
   );
