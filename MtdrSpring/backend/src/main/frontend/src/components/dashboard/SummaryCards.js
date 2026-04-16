@@ -28,13 +28,13 @@ export default function SummaryCards({
       icon: ClipboardList,
       title: 'Total tasks',
       value: String(taskStatusTotal),
-      subtitle: 'all tasks assigned to this sprint',
+      subtitle: 'All tasks assigned to this sprint',
     },
     {
       icon: Clock,
       title: 'Total Hours Worked',
       value: totalHoursDisplay,
-      subtitle: 'hours logged this sprint',
+      subtitle: 'Hours logged this sprint',
     },
   ];
 
@@ -63,7 +63,7 @@ export default function SummaryCards({
     content: { flex: 1, minWidth: 0 },
     label: { fontSize: '0.75rem', fontWeight: 700, color: '#555', marginBottom: '0.28rem', textTransform: 'uppercase', letterSpacing: '0.04em' },
     value: { fontSize: '1.95rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.08, marginBottom: '0.2rem' },
-    subtitle: { fontSize: '0.8rem', color: '#888', fontWeight: 500, lineHeight: 1.35 },
+    subtitle: { fontSize: '0.8rem', color: '#666', fontWeight: 500, lineHeight: 1.35 },
   };
 
   return (

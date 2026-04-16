@@ -8,6 +8,7 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -81,7 +82,10 @@ public class UserTaskController {
         userTask.setId(id);
         userTask.setUser(user);
         userTask.setTask(task);
-        userTask.setWorkedHours(request.getWorkedHours());
+        /* Only persist worked hours when the client sends a value (0 clears). Omitting the field preserves existing. */
+        if (request.getWorkedHours() != null) {
+            userTask.setWorkedHours(request.getWorkedHours());
+        }
         userTask.setStatus(request.getStatus());
 
         UserTask saved = userTaskRepository.save(userTask);
@@ -92,6 +96,8 @@ public class UserTaskController {
     public static class CreateUserTaskRequest {
         private Integer userId;
         private Long taskId;
+        /** Same as USER_TASK.WORKED_HOURS; JSON may use {@code hours} as an alias. */
+        @JsonAlias("hours")
         private Long workedHours;
         private String status;
 
