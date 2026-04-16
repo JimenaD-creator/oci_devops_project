@@ -29,6 +29,10 @@ public class ToDoItemService {
         return toDoItemRepository.findAll();
     }
 
+    public List<ToDoItem> findByAssignedSprint(Integer assignedSprint) {
+        return toDoItemRepository.findByAssignedSprint(assignedSprint);
+    }
+
     public ResponseEntity<ToDoItem> getItemById(int id) {
         return toDoItemRepository.findById(id)
                 .map(item -> new ResponseEntity<>(item, HttpStatus.OK))

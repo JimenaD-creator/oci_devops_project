@@ -37,9 +37,32 @@ public class BotStateManager {
      * @param taskId The task ID that is waiting for hours
      */
     public void setWaitingForHours(Long chatId, Integer taskId) {
-        BotUserState state = new BotUserState(chatId, taskId, "WAITING_FOR_HOURS");
+        BotUserState state = new BotUserState(chatId, taskId, null, "WAITING_FOR_HOURS");
         userStates.put(chatId, state);
         logger.info("Set chat {} to waiting for hours for task {}", chatId, taskId);
+    }
+    
+    /**
+     * Set user state to "selecting sprint"
+     * 
+     * @param chatId The Telegram chat ID
+     */
+    public void setSelectingSprint(Long chatId) {
+        BotUserState state = new BotUserState(chatId, null, null, "SELECTING_SPRINT");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting sprint", chatId);
+    }
+    
+    /**
+     * Set user state to "viewing sprint tasks"
+     * 
+     * @param chatId The Telegram chat ID
+     * @param sprintId The sprint ID being viewed
+     */
+    public void setViewingSprintTasks(Long chatId, Long sprintId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, "VIEWING_SPRINT_TASKS");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to viewing sprint tasks for sprint {}", chatId, sprintId);
     }
     
     /**
@@ -70,6 +93,42 @@ public class BotStateManager {
         }
         
         return state.getTaskId();
+    }
+    
+    /**
+     * Check if user is selecting a sprint
+     * 
+     * @param chatId The Telegram chat ID
+     * @return true if selecting sprint
+     */
+    public boolean isSelectingSprint(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_SPRINT".equals(state.getState()) && !isStateExpired(state);
+    }
+    
+    /**
+     * Check if user is viewing sprint tasks
+     * 
+     * @param chatId The Telegram chat ID
+     * @return true if viewing sprint tasks
+     */
+    public boolean isViewingSprintTasks(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state);
+    }
+    
+    /**
+     * Get the sprint ID being viewed
+     * 
+     * @param chatId The Telegram chat ID
+     * @return Sprint ID or null
+     */
+    public Long getViewingSprintId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
+            return state.getSprintId();
+        }
+        return null;
     }
     
     /**

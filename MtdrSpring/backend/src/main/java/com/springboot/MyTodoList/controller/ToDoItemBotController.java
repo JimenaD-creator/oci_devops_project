@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.config.BotProps;
 import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
 import com.springboot.MyTodoList.service.UserTaskService;
@@ -25,6 +26,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 	private static final Logger logger = LoggerFactory.getLogger(ToDoItemBotController.class);
 	private ToDoItemService toDoItemService;
 	private DeepSeekService deepSeekService;
+	private SprintService sprintService;
 	private final TelegramClient telegramClient;
 	private final BotProps botProps;
 	private BotStateManager stateManager;
@@ -40,6 +42,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		BotProps bp, 
 		ToDoItemService tsvc, 
 		DeepSeekService ds,
+		SprintService ss,
 		BotStateManager stateManager,
 		TelegramUserMappingService telegramUserMappingService,
 		UserTaskService userTaskService
@@ -47,6 +50,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		this.botProps = bp;
 		this.toDoItemService = tsvc;
 		this.deepSeekService = ds;
+		this.sprintService = ss;
 		this.stateManager = stateManager;
 		this.telegramUserMappingService = telegramUserMappingService;
 		this.userTaskService = userTaskService;
@@ -71,7 +75,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 			deepSeekService,
 			stateManager,
 			telegramUserMappingService,
-			userTaskService
+			userTaskService,
+			sprintService
 		);
 		actions.setRequestText(messageTextFromTelegram);
 		actions.setChatId(chatId);
@@ -87,6 +92,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		actions.fnDelete();
 		actions.fnHide();
 		actions.fnListAll();
+		actions.fnSelectSprint();
+		actions.fnViewSprintTasks();
 		actions.fnAddItem();
 		actions.fnLLM();
 		actions.fnElse();

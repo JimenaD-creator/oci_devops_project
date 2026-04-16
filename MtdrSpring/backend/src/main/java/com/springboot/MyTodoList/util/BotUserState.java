@@ -10,15 +10,17 @@ public class BotUserState {
     
     private Long chatId;              // Telegram chat ID
     private Integer taskId;           // Task waiting for hours (if in WAITING_FOR_HOURS state)
-    private String state;             // Current state: "WAITING_FOR_HOURS" or null
+    private Long sprintId;            // Sprint ID (if in sprint-related state)
+    private String state;             // Current state
     private LocalDateTime timestamp;  // When state was created (for timeout)
     
     // Constructors
     public BotUserState() {}
     
-    public BotUserState(Long chatId, Integer taskId, String state) {
+    public BotUserState(Long chatId, Integer taskId, Long sprintId, String state) {
         this.chatId = chatId;
         this.taskId = taskId;
+        this.sprintId = sprintId;
         this.state = state;
         this.timestamp = LocalDateTime.now();
     }
@@ -38,6 +40,14 @@ public class BotUserState {
     
     public void setTaskId(Integer taskId) {
         this.taskId = taskId;
+    }
+    
+    public Long getSprintId() {
+        return sprintId;
+    }
+    
+    public void setSprintId(Long sprintId) {
+        this.sprintId = sprintId;
     }
     
     public String getState() {

@@ -1,7 +1,9 @@
 package com.springboot.MyTodoList.util;
 
+import com.springboot.MyTodoList.model.Sprint;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
 import com.springboot.MyTodoList.service.UserTaskService;
@@ -26,18 +28,20 @@ public class BotActions {
 
     ToDoItemService todoService;
     DeepSeekService deepSeekService;
+    SprintService sprintService;
     BotStateManager stateManager;
     TelegramUserMappingService telegramUserMappingService;
     UserTaskService userTaskService;
 
     public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds, 
-                      BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts){
+                      BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts, SprintService ss){
         telegramClient = tc;
         todoService = ts;
         deepSeekService = ds;
         stateManager = sm;
         telegramUserMappingService = tums;
         userTaskService = uts;
+        sprintService = ss;
         exit  = false;
     }
 
@@ -144,14 +148,62 @@ public class BotActions {
                 || requestText.equals(BotLabels.MY_TODO_LIST.getLabel())) || exit)
             return;
 
-        List<ToDoItem> allItems = todoService.findAll();
+        // Set state to selecting sprint
+        stateManager.setSelectingSprint(chatId);
+
+        List<Sprint> allSprints = sprintService.findAll();
         List<KeyboardRow> keyboard = new ArrayList<>();
 
         // Botón superior de navegación
         keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel()));
 
-        // Tareas Pendientes (Filtrado y validación anti-null)
-        List<ToDoItem> activeItems = allItems.stream()
+        // Sprints
+        for (Sprint sprint : allSprints) {
+            KeyboardRow currentRow = new KeyboardRow();
+            currentRow.add("Sprint " + sprint.getId());
+            keyboard.add(currentRow);
+        }
+
+        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
+            .keyboard(keyboard)
+            .resizeKeyboard(true)
+            .selective(true)
+            .build();
+
+        BotHelper.sendMessageToTelegram(chatId, "📋 *Select a Sprint to view tasks:*", telegramClient, keyboardMarkup);
+        exit = true;
+    }
+
+    public void fnSelectSprint() {
+        if (!stateManager.isSelectingSprint(chatId) || exit) return;
+
+        if (requestText.startsWith("Sprint ")) {
+            try {
+                String sprintIdStr = requestText.substring(7); // Remove "Sprint "
+                Long sprintId = Long.parseLong(sprintIdStr);
+
+                // Set state to viewing sprint tasks
+                stateManager.setViewingSprintTasks(chatId, sprintId);
+
+                // Show tasks for this sprint
+                showSprintTasks(sprintId);
+                exit = true;
+            } catch (NumberFormatException e) {
+                BotHelper.sendMessageToTelegram(chatId, "Invalid sprint selection. Please try again.", telegramClient);
+                exit = true;
+            }
+        }
+    }
+
+    private void showSprintTasks(Long sprintId) {
+        List<ToDoItem> sprintItems = todoService.findByAssignedSprint(Math.toIntExact(sprintId));
+        List<KeyboardRow> keyboard = new ArrayList<>();
+
+        // Botón de back
+        keyboard.add(new KeyboardRow("⬅️ Back to Sprints"));
+
+        // Tareas Pendientes
+        List<ToDoItem> activeItems = sprintItems.stream()
                 .filter(item -> !item.isDone())
                 .collect(Collectors.toList());
 
@@ -163,7 +215,7 @@ public class BotActions {
         }
 
         // Tareas Completadas
-        List<ToDoItem> doneItems = allItems.stream()
+        List<ToDoItem> doneItems = sprintItems.stream()
                 .filter(ToDoItem::isDone)
                 .collect(Collectors.toList());
 
@@ -177,12 +229,26 @@ public class BotActions {
 
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
             .keyboard(keyboard)
-            .resizeKeyboard(true) // Lista desplegable
+            .resizeKeyboard(true)
             .selective(true)
             .build();
 
-        BotHelper.sendMessageToTelegram(chatId, "📋 *Tu lista de tareas actual:*", telegramClient, keyboardMarkup);
-        exit = true;
+        String message = sprintItems.isEmpty() 
+            ? "📋 *No tasks found for Sprint " + sprintId + "*\n\n⬅️ Use 'Back to Sprints' to return."
+            : "📋 *Tasks for Sprint " + sprintId + ":*";
+
+        BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
+    }
+
+    public void fnViewSprintTasks() {
+        if (!stateManager.isViewingSprintTasks(chatId) || exit) return;
+
+        if (requestText.equals("⬅️ Back to Sprints")) {
+            // Go back to sprint selection
+            stateManager.setSelectingSprint(chatId);
+            fnListAll(); // Reuse the sprint listing logic
+            exit = true;
+        }
     }
 
     public void fnHide() {
