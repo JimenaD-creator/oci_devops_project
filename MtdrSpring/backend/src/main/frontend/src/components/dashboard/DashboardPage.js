@@ -6,15 +6,18 @@ import {
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
-import SummaryCards from './SummaryCards';
-import KPICards from './KPICards';
-import SprintComparisonCharts from './SprintComparisonCharts';
-import DeveloperWorkloadCharts from '../analytics/DeveloperWorkloadCharts';
+import TaskStatusDistributionChart from './TaskStatusDistributionChart';
+import DashboardTopMetrics from './DashboardTopMetrics';
+import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DeveloperTable from '../analytics/DeveloperTable';
-import { fetchDashboardSprints } from './dashboardSprintData';
-import { DASHBOARD_CONTENT_MAX_WIDTH } from './dashboardConstants';
+import {
+  fetchDashboardSprints,
+  mergeTaskStatusAcrossSprints,
+  aggregateSelectionMetrics,
+} from './dashboardSprintData';
+import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './dashboardConstants';
+import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 
-const ORACLE_RED = '#C74634';
 
 export default function DashboardPage() {
   const [allSprints, setAllSprints] = useState([]);
@@ -80,6 +83,22 @@ export default function DashboardPage() {
   const compareMode = normalizedSelectedIds.length > 1;
   const primarySprint = selectedSprints[0];
 
+  const { taskStatusDistribution, taskStatusTotal } = useMemo(
+    () => mergeTaskStatusAcrossSprints(selectedSprints),
+    [selectedSprints]
+  );
+
+  const selectionMetrics = useMemo(
+    () => aggregateSelectionMetrics(selectedSprints),
+    [selectedSprints]
+  );
+
+  const heroProgress = useMemo(() => {
+    if (!taskStatusTotal) return 0;
+    const done = taskStatusDistribution.find((r) => r.key === 'DONE')?.count ?? 0;
+    return Math.round((100 * done) / taskStatusTotal);
+  }, [taskStatusDistribution, taskStatusTotal]);
+
   const projectName = useMemo(() => {
     const name = allSprints.find((s) => s.assignedProject?.name)?.assignedProject?.name;
     if (typeof name === 'string' && name.trim()) return name.trim();
@@ -102,13 +121,6 @@ export default function DashboardPage() {
     [selectedSprints]
   );
 
-  /** Promedio de `kpis.completionRate` del API (0–100) para la barra bajo el header. */
-  const heroProgress = useMemo(() => {
-    if (!selectedSprints.length) return 0;
-    const sum = selectedSprints.reduce((a, s) => a + (s.kpis?.completionRate ?? 0), 0);
-    return Math.round(sum / selectedSprints.length);
-  }, [selectedSprints]);
-
   const toggleSprint = (id, checked) => {
     const nid = Number(id);
     setSelectedSprintIds((prev) => {
@@ -122,7 +134,7 @@ export default function DashboardPage() {
   if (sprintsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: ORACLE_RED }} />
+        <CircularProgress sx={{ color: DASHBOARD_PRIMARY_ACCENT }} />
       </Box>
     );
   }
@@ -207,7 +219,7 @@ export default function DashboardPage() {
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
               Completion rate
             </Typography>
-            <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: ORACLE_RED, lineHeight: 1 }}>
+            <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: DASHBOARD_PRIMARY_ACCENT, lineHeight: 1 }}>
               {heroProgress}%
             </Typography>
           </Box>
@@ -218,16 +230,13 @@ export default function DashboardPage() {
               height: 8,
               borderRadius: 4,
               bgcolor: '#F0F0F0',
-              '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED },
+              '& .MuiLinearProgress-bar': { bgcolor: DASHBOARD_PRIMARY_ACCENT },
             }}
           />
         </CardContent>
       </Card>
 
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
-        <Typography variant="body2" sx={{ color: '#555', fontWeight: 600, mb: 1.25 }}>
-          Select one or more sprints to view or compare metrics.
-        </Typography>
         <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
           {allSprints.map((sp) => {
             const sprintColor = sp.accentColor ?? '#607D8B';
@@ -264,31 +273,117 @@ export default function DashboardPage() {
       </Paper>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}>
-        {!compareMode ? (
-          <SummaryCards
-            totalHoursDisplay={Number(primarySprint?.totalHours || 0).toFixed(1)}
-            taskStatusDistribution={primarySprint?.taskStatusDistribution ?? []}
-            taskStatusTotal={primarySprint?.taskStatusTotal ?? 0}
-          />
-        ) : (
-          <Box sx={{ mb: 3 }}>
-            <SprintComparisonCharts selectedSprints={selectedSprints} />
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' },
+            alignItems: 'stretch',
+            gap: { xs: 3, md: 3 },
+            width: '100%',
+            minWidth: 0,
+            mb: 4,
+          }}
+        >
+          <Box
+            sx={{
+              flex: { md: compareMode ? 'none' : '1 1 0' },
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+            }}
+          >
+            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}>
+              Scorecards
+            </Typography>
+            <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left' }}>
+              Quick totals and averages for the sprint(s) currently selected above.
+            </Typography>
+            <DashboardTopMetrics
+              showSectionHeader={false}
+              multiSprint={compareMode}
+              scorecardsFourColumn={compareMode}
+              totalTasks={selectionMetrics.totalTasks}
+              totalHours={selectionMetrics.totalHours}
+              avgTasksPerDev={selectionMetrics.avgTasksPerDev}
+              avgHoursPerDev={selectionMetrics.avgHoursPerDev}
+              uniqueDevCount={selectionMetrics.uniqueDevCount}
+            />
           </Box>
-        )}
 
-        {selectedSprints.length > 0 ? (
-          <Box sx={{ mb: { xs: 2, sm: 3 }, width: '100%', minWidth: 0 }}>
-            <KPICards compareMode={compareMode} selectedSprints={selectedSprints} />
-          </Box>
-        ) : null}
-
-        <Box sx={{ mt: { xs: 3, sm: 4 }, width: '100%', minWidth: 0 }}>
-          <DeveloperWorkloadCharts selectedSprints={selectedSprints} compareMode={compareMode} />
+          {!compareMode ? (
+            <Box
+              sx={{
+                flex: { md: '1 1 0' },
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                width: { xs: '100%', md: 'auto' },
+              }}
+            >
+              <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}>
+                Project status
+              </Typography>
+              <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left' }}>
+                Where tasks sit in the workflow for the active sprint.
+              </Typography>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 2, sm: 2.25 },
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: { xs: 260, md: 0 },
+                  width: '100%',
+                  borderRadius: 3,
+                  border: '1px solid #E3F2FD',
+                  borderLeft: '5px solid #1565C0',
+                  background: 'linear-gradient(135deg, rgba(21,101,192,0.07) 0%, #FFFFFF 50%)',
+                  boxShadow: '0 2px 10px rgba(21,101,192,0.08)',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <TaskStatusDistributionChart
+                  distribution={taskStatusDistribution}
+                  total={taskStatusTotal}
+                  embedded
+                  caption="Tasks in each workflow stage for this sprint."
+                />
+              </Paper>
+            </Box>
+          ) : null}
         </Box>
 
-        <Box sx={{ mt: 3 }}>
-          <DeveloperTable selectedSprints={selectedSprints} compareMode={compareMode} />
+        <Box sx={{ mb: 0 }}>
+          <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
+            Developer performance
+          </Typography>
+          <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5 }}>
+            Charts for workload, hours, and productivity by developer.
+          </Typography>
         </Box>
+        <DashboardDeveloperCharts
+          developers={selectionMetrics.developers}
+          selectedSprints={selectedSprints}
+          compareMode={compareMode}
+        />
+
+        <Box sx={{ mt: 4, mb: 0 }}>
+          <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5 }}>
+            Developer productivity breakdown
+          </Typography>
+          <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5 }}>
+            Detailed per-developer numbers and sprint columns when comparing.
+          </Typography>
+        </Box>
+        <DeveloperTable
+          selectedSprints={selectedSprints}
+          compareMode={compareMode}
+          suppressCardTitle
+        />
       </Box>
     </Box>
   );

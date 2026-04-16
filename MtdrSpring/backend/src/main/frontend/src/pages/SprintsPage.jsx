@@ -39,17 +39,19 @@ const PLANNING_DATE_START_LABEL = '#E65100';
 const PLANNING_DATE_DUE_BORDER = '#1E88E5';
 const PLANNING_DATE_DUE_LABEL = '#1565C0';
 
-/** New sprint dialog: colored outlines + labels (same idea as Tasks create form). */
-function sprintFormFieldOutline(accent) {
+/** New sprint dialog: Oracle red + grays (aligned with Sprints / Tasks). */
+function newSprintDialogFieldOutline() {
+  const accent = ORACLE_RED_ACTION;
   return {
     '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: `${accent}AA` },
-    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: accent },
+    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.35)' },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.55)' },
     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: accent },
-    '& .MuiInputLabel-root': { color: `${accent}DD` },
+    '& .MuiInputLabel-root': { color: '#616161' },
     '& .MuiInputLabel-root.Mui-focused': { color: accent },
     '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
-    '& .MuiFormHelperText-root': { color: `${accent}AA` },
+    '& .MuiFormHelperText-root': { color: '#757575' },
+    '& .MuiSelect-icon': { color: '#616161' },
   };
 }
 
@@ -97,7 +99,7 @@ function inferStatusByDate(sprint) {
 /**
  * Sprint phase from task completion:
  * - No tasks in sprint → same as calendar (planned / in progress by dates / completed by dates).
- * - Has tasks, none DONE → planned (work not finished yet).
+ * - Has tasks, none DONE → planned.
  * - Has tasks, some but not all DONE → active ("In progress").
  * - Has tasks, all DONE → completed.
  */
@@ -323,7 +325,6 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
           } else if (!sameSet) {
             const del = await fetch(`${API_BASE}/api/user-tasks/task/${updated.id}`, { method: 'DELETE' });
             if (!del.ok) throw new Error('Task saved, but updating assignment failed.');
-            const wh = assignedHours === '' ? 0 : Number(assignedHours);
             for (const uid of nextIds) {
               const post = await fetch(`${API_BASE}/api/user-tasks`, {
                 method: 'POST',
@@ -331,7 +332,6 @@ function TaskDetailDialog({ open, initialTask, sprints, onClose, onSaved }) {
                 body: JSON.stringify({
                   userId: uid,
                   taskId: updated.id,
-                  workedHours: wh,
                   status,
                 }),
               });
@@ -1139,7 +1139,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
         elevation: 0,
         sx: {
           borderRadius: 3,
-          border: '1px solid rgba(21, 101, 192, 0.2)',
+          border: '1px solid #ECECEC',
           borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
           bgcolor: '#FFFFFF',
           boxShadow: '0 16px 40px rgba(199, 70, 52, 0.1), 0 8px 24px rgba(30, 136, 229, 0.08)',
@@ -1192,7 +1192,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
             onClick={handleClose}
             disabled={saving}
             size="small"
-            sx={{ color: '#5C6BC0', '&:hover': { bgcolor: 'rgba(30, 136, 229, 0.08)' } }}
+            sx={{ color: '#616161', '&:hover': { bgcolor: 'rgba(199, 70, 52, 0.08)' } }}
           >
             <CloseIcon />
           </IconButton>
@@ -1220,7 +1220,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={sprintFormFieldOutline(PLANNING_DATE_START_BORDER)}
+              sx={newSprintDialogFieldOutline()}
             />
             <TextField
               label="End date"
@@ -1230,7 +1230,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={sprintFormFieldOutline(PLANNING_DATE_DUE_BORDER)}
+              sx={newSprintDialogFieldOutline()}
             />
           </Stack>
           <TextField
@@ -1244,9 +1244,8 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
             inputProps={{ maxLength: 2000 }}
             helperText={`${goal.length} / 2000 characters`}
             sx={{
-              ...sprintFormFieldOutline('#6A1B9A'),
+              ...newSprintDialogFieldOutline(),
               '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
-              '& .MuiFormHelperText-root': { color: '#757575' },
             }}
           />
         </Stack>
@@ -1257,7 +1256,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           px: 2.5,
           py: 2,
           gap: 1,
-          borderTop: '1px solid rgba(21, 101, 192, 0.12)',
+          borderTop: '1px solid rgba(199, 70, 52, 0.12)',
           backgroundColor: '#FFFFFF',
           justifyContent: 'flex-end',
         }}
@@ -1265,7 +1264,7 @@ function NewSprintDialog({ open, onClose, onCreated, projectId }) {
         <Button
           onClick={handleClose}
           disabled={saving}
-          sx={{ color: '#1565C0', textTransform: 'none', fontWeight: 600, px: 2 }}
+          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
         >
           Cancel
         </Button>

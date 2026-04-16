@@ -2,11 +2,15 @@ import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { ListTodo } from 'lucide-react';
+import { RECHARTS_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography';
 
-const ORACLE_RED = '#C74634';
+const CHART_CARD_ACCENT = '#1565C0';
 
-const CHART_HEIGHT = 158;
+const CHART_HEIGHT = 172;
 const PIE_OUTER_RADIUS = 62;
+/** Larger pie when shown beside scorecards (DashboardPage). */
+const CHART_HEIGHT_EMBEDDED = 300;
+const PIE_OUTER_RADIUS_EMBEDDED = 118;
 
 const cardBase = {
   backgroundColor: 'white',
@@ -20,7 +24,7 @@ const cardBase = {
 function StatusTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
-  const fill = row.fill || ORACLE_RED;
+  const fill = row.fill || CHART_CARD_ACCENT;
   const pct = typeof row.percent === 'number' ? `${Math.round(row.percent * 100)}%` : '';
   return (
     <Box
@@ -47,9 +51,19 @@ function StatusTooltip({ active, payload }) {
 
 /**
  * Full pie chart (not donut): task counts by status. Tooltips use each status color.
+ * @param {{ embedded?: boolean, caption?: string }} props — optional line under title or above chart when embedded.
  */
-export default function TaskStatusDistributionChart({ distribution = [], total = 0 }) {
+export default function TaskStatusDistributionChart({
+  distribution = [],
+  total = 0,
+  embedded = false,
+  caption,
+}) {
+  const embeddedCaption =
+    caption ?? 'Task counts by workflow stage for the current sprint.';
   const hasTasks = total > 0;
+  const plotHeight = embedded ? CHART_HEIGHT_EMBEDDED : CHART_HEIGHT;
+  const pieRadius = embedded ? PIE_OUTER_RADIUS_EMBEDDED : PIE_OUTER_RADIUS;
 
   const pieData = useMemo(
     () =>
@@ -79,7 +93,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         fill={c}
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        fontSize={10}
+        fontSize={12}
         fontWeight={800}
       >
         {value}
@@ -91,50 +105,62 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
     <div
       style={{
         ...cardBase,
-        borderTop: `3px solid ${ORACLE_RED}`,
+        borderTop: embedded ? 'none' : `3px solid ${CHART_CARD_ACCENT}`,
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
         height: '100%',
+        flex: embedded ? 1 : undefined,
         minHeight: 0,
         boxSizing: 'border-box',
+        padding: embedded ? '0.25rem 0 0 0' : cardBase.padding,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.45rem' }}>
-        <div
-          style={{
-            width: '2.65rem',
-            height: '2.65rem',
-            borderRadius: '10px',
-            backgroundColor: 'rgba(199,70,52,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <ListTodo style={{ width: '1.35rem', height: '1.35rem', color: ORACLE_RED }} />
+      {!embedded ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.45rem' }}>
+          <div
+            style={{
+              width: '2.65rem',
+              height: '2.65rem',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(21, 101, 192, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <ListTodo style={{ width: '1.35rem', height: '1.35rem', color: CHART_CARD_ACCENT }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.125rem', lineHeight: 1.35, letterSpacing: '-0.02em' }}>
+              Tasks by status
+            </Typography>
+            <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block' }}>
+              How workload is split across task stages.
+            </Typography>
+          </div>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.9rem', lineHeight: 1.3 }}>
-            Tasks by status
-          </Typography>
-          <Typography sx={{ fontSize: '0.72rem', color: '#1565C0', mt: 0.15, fontWeight: 600, lineHeight: 1.3 }}>
-            To Do · In Progress · In Review · Done
-          </Typography>
-        </div>
-      </div>
+      ) : (
+        <Typography sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 1.25, px: 0.5 }}>
+          {embeddedCaption}
+        </Typography>
+      )}
 
       <Box
         sx={{
           width: '100%',
-          height: CHART_HEIGHT,
-          minHeight: CHART_HEIGHT,
+          height: plotHeight,
+          minHeight: plotHeight,
           flexShrink: 0,
+          flex: embedded ? 1 : undefined,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         {hasTasks && pieData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <ResponsiveContainer width="100%" height={plotHeight}>
             <PieChart>
               <Pie
                 data={pieData}
@@ -143,7 +169,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
                 cx="50%"
                 cy="50%"
                 innerRadius={0}
-                outerRadius={PIE_OUTER_RADIUS}
+                outerRadius={pieRadius}
                 paddingAngle={2}
                 labelLine={false}
                 label={renderSliceLabel}
@@ -152,14 +178,14 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
                   <Cell key={`cell-${entry.name}-${index}`} fill={entry.fill} stroke="#fff" strokeWidth={2} />
                 ))}
               </Pie>
-              <Tooltip content={<StatusTooltip />} />
+              <Tooltip {...RECHARTS_TOOLTIP_PROPS} content={<StatusTooltip />} />
             </PieChart>
           </ResponsiveContainer>
         ) : (
           <Box
             sx={{
-              height: CHART_HEIGHT,
-              minHeight: CHART_HEIGHT,
+              height: plotHeight,
+              minHeight: plotHeight,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -168,7 +194,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
               bgcolor: '#F3E5F5',
             }}
           >
-            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.8rem' }}>
+            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.95rem' }}>
               No tasks in this sprint
             </Typography>
           </Box>
@@ -179,11 +205,11 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
         <Box
           sx={{
             display: 'flex',
-            flexWrap: 'nowrap',
-            gap: '0.35rem 0.75rem',
+            flexWrap: embedded ? 'wrap' : 'nowrap',
+            gap: embedded ? '0.5rem 1rem' : '0.35rem 0.75rem',
             justifyContent: 'center',
             alignItems: 'center',
-            mt: 0.65,
+            mt: embedded ? 1.25 : 0.65,
             overflowX: 'auto',
             flexShrink: 0,
             width: '100%',
@@ -194,7 +220,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
               key={d.key}
               component="span"
               sx={{
-                fontSize: '0.75rem',
+                fontSize: '1rem',
                 color: d.color,
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -202,7 +228,7 @@ export default function TaskStatusDistributionChart({ distribution = [], total =
                 fontWeight: 700,
               }}
             >
-              <Box component="span" sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: d.color }} />
+              <Box component="span" sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: d.color }} />
               {d.name}: {d.count}
             </Typography>
           ))}

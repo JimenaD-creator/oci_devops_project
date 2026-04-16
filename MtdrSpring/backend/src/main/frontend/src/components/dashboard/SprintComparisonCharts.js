@@ -12,8 +12,9 @@ import {
   Cell,
 } from 'recharts';
 import { avgHoursPerTask } from './dashboardSprintData';
+import { RECHARTS_BAR_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography';
 
-const CHART_H = 228;
+const CHART_H_BASE = 228;
 
 const Y_AXIS_TICK = { fontSize: 12, fill: '#1A1A1A', fontWeight: 500 };
 const X_AXIS_LINE = { stroke: '#BDBDBD' };
@@ -62,11 +63,17 @@ function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
 
 function SprintCompareBarBlock({
   title,
-  subtitle,
+  description,
   data,
   dataKey,
   valueFormatter,
 }) {
+  const n = data?.length ?? 0;
+  const chartH = Math.min(340, CHART_H_BASE + Math.max(0, n - 4) * 16);
+  const marginBottom = Math.min(64, 40 + Math.max(0, n - 4) * 6);
+  const barCategoryGap = n >= 7 ? '12%' : n >= 5 ? '16%' : '24%';
+  const tickFontSize = n > 7 ? 9 : n > 5 ? 10 : 11;
+
   const renderSprintXTick = (props) => {
     const { x, y, payload } = props;
     const row = data.find((d) => d.shortLabel === payload.value);
@@ -77,7 +84,7 @@ function SprintCompareBarBlock({
           transform="rotate(-38)"
           textAnchor="end"
           fill={fill}
-          fontSize={11}
+          fontSize={tickFontSize}
           fontWeight={600}
           dy={8}
           dx={-2}
@@ -90,16 +97,14 @@ function SprintCompareBarBlock({
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography sx={{ fontWeight: 800, color: '#1A1A1A', mb: 0.35, fontSize: '1.02rem' }}>
+      <Typography sx={{ fontWeight: 800, color: '#1A1A1A', mb: description ? 0.35 : 1, fontSize: '1.02rem' }}>
         {title}
       </Typography>
-      {subtitle ? (
-        <Typography sx={{ color: '#666', display: 'block', mb: 1, fontSize: '0.92rem', fontWeight: 500 }}>
-          {subtitle}
-        </Typography>
+      {description ? (
+        <Typography sx={{ ...CHART_DESC_SX, mb: 1 }}>{description}</Typography>
       ) : null}
-      <ResponsiveContainer width="100%" height={CHART_H}>
-        <BarChart data={data} margin={{ top: 8, right: 10, left: 4, bottom: 42 }} barCategoryGap="24%">
+      <ResponsiveContainer width="100%" height={chartH}>
+        <BarChart data={data} margin={{ top: 8, right: 10, left: 4, bottom: marginBottom }} barCategoryGap={barCategoryGap}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis
             dataKey="shortLabel"
@@ -110,7 +115,11 @@ function SprintCompareBarBlock({
             height={48}
           />
           <YAxis tick={Y_AXIS_TICK} axisLine={false} width={48} />
-          <Tooltip content={<SprintMetricTooltip metric={dataKey} valueFormatter={valueFormatter} />} />
+          <Tooltip
+            {...RECHARTS_BAR_TOOLTIP_PROPS}
+            shared={false}
+            content={<SprintMetricTooltip metric={dataKey} valueFormatter={valueFormatter} />}
+          />
           <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={44}>
             {data.map((row) => (
               <Cell key={row.shortLabel} fill={row.accentColor} />
@@ -167,20 +176,20 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
             width: 36,
             height: 36,
             borderRadius: 2,
-            bgcolor: 'rgba(199,70,52,0.08)',
+            bgcolor: 'rgba(21, 101, 192, 0.09)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <CompareArrowsIcon sx={{ color: '#C74634', fontSize: 26 }} />
+          <CompareArrowsIcon sx={{ color: '#1565C0', fontSize: 26 }} />
         </Box>
-        <Box>
+        <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.12rem' }}>
             Sprint comparison
           </Typography>
-          <Typography sx={{ color: '#666', display: 'block', fontSize: '0.95rem', mt: 0.35, fontWeight: 500 }}>
-            Completed tasks per sprint, hours worked and average hours per task
+          <Typography sx={{ ...CHART_DESC_SX, mt: 0.5, display: 'block' }}>
+            Side-by-side bars for each selected sprint (chronological on the X axis).
           </Typography>
         </Box>
       </Box>
@@ -188,28 +197,28 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
           gap: 2,
           alignItems: 'stretch',
         }}
       >
         <SprintCompareBarBlock
           title="Completed tasks per sprint"
-          subtitle="Total tasks marked done"
+          description="Tasks marked completed in each sprint."
           data={data}
           dataKey="completed"
           valueFormatter={(v) => `${v} tasks`}
         />
         <SprintCompareBarBlock
           title="Hours worked"
-          subtitle="Total hours worked per sprint"
+          description="Total hours logged per sprint."
           data={data}
           dataKey="hours"
           valueFormatter={(v) => `${v} h`}
         />
         <SprintCompareBarBlock
           title="Average hours / task"
-          subtitle="Total hours / completed tasks"
+          description="Average hours spent per completed task (effort per closure)."
           data={data}
           dataKey="avgPerTask"
           valueFormatter={(v) => `${v} hrs/task`}

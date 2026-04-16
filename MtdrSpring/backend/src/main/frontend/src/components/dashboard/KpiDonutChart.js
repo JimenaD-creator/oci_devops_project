@@ -2,7 +2,8 @@ import React from "react";
 import { Box, Typography } from "@mui/material";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
-const ORACLE_RED = "#C74634";
+/** Chart arc color (indigo — avoid red/green in chart fills). */
+const CHART_ARC = "#3949AB";
 
 /**
  * Donut gauge 0–100 (arc fill). Default size matches KPI cards; pass larger radii for emphasis.
@@ -48,7 +49,7 @@ export default function KpiDonutChart({
             dataKey="value"
             stroke="none"
           >
-            <Cell fill={ORACLE_RED} />
+            <Cell fill={CHART_ARC} />
             <Cell fill="#F0F0F0" />
           </Pie>
         </PieChart>

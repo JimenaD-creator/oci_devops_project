@@ -1,17 +1,17 @@
-/** Distinct chart colors; assignment is by sprint rank (sorted id), not raw id % length, to avoid collisions (e.g. ids 1, 6, 11). */
+/** Distinct chart series colors (no red/green — reserved for KPI / status cues elsewhere). */
 export const SPRINT_CHART_COLORS = [
-  '#C74634',
   '#1E88E5',
-  '#43A047',
   '#FB8C00',
   '#8E24AA',
-  '#00897B',
+  '#455A64',
   '#5E35B1',
-  '#C62828',
   '#0277BD',
-  '#2E7D32',
   '#F57C00',
   '#6D4C41',
+  '#3949AB',
+  '#00ACC1',
+  '#7E57C2',
+  '#5C6BC0',
 ];
 
 /**
@@ -53,13 +53,15 @@ function initialsFromName(name) {
   return (name || '').slice(0, 2).toUpperCase();
 }
 
-/** Dashboard chart buckets: To Do, In Progress, In Review, Done (TASK.STATUS). */
+/**
+ * Normalizes task status for dashboards. DONE and COMPLETED both map to DONE (count as completed).
+ */
 export function bucketTaskStatus(raw) {
   const s = String(raw || '')
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
-  if (s === 'DONE' || s === 'COMPLETED') return 'DONE';
+  if (s === 'DONE' || s === 'COMPLETED' || s === 'COMPLETE') return 'DONE';
   if (s === 'IN_REVIEW' || s === 'REVIEW') return 'IN_REVIEW';
   if (s === 'IN_PROGRESS') return 'IN_PROGRESS';
   if (s === 'PENDING' || s === 'TODO' || s === 'TO_DO' || s === '') return 'TODO';
@@ -72,8 +74,27 @@ const STATUS_DIST_META = {
   TODO: { name: 'To Do', color: '#FB8C00' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
   IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
-  DONE: { name: 'Done', color: '#43A047' },
+  DONE: { name: 'Completed', color: '#3949AB' },
 };
+
+/** Task id from an assignment (nested task or composite id). */
+export function resolveUserTaskTaskId(ut) {
+  if (ut == null) return null;
+  const raw = ut.task?.id ?? ut.id?.taskId ?? ut.taskId;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Real hours for a USER_TASK row: maps to DB WORKED_HOURS / API {@code workedHours}.
+ * Accepts {@code hours} as an alias when present in JSON.
+ */
+export function userTaskWorkedHours(ut) {
+  if (ut == null) return 0;
+  const v = ut.workedHours ?? ut.hours;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export function taskSprintId(task) {
   if (task == null) return null;
@@ -86,6 +107,15 @@ export function taskSprintId(task) {
   if (task.assignedSprintId != null) return Number(task.assignedSprintId);
   if (task.sprintId != null) return Number(task.sprintId);
   return null;
+}
+
+/**
+ * True if any persisted status for this assignment reads as DONE (USER_TASK row, nested task, or TASK row).
+ */
+function isUserTaskAssignmentDone(ut, taskInfo) {
+  const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
+  const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
+  return nonempty.some((s) => bucketTaskStatus(s) === 'DONE');
 }
 
 function sprintTaskStatusRows(counts) {
@@ -157,10 +187,11 @@ function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksLis
   });
   let sumWorkedHours = 0;
   (userTasksList || []).forEach((ut) => {
-    const tid = ut.task?.id;
-    const info = taskSprintMap[tid];
+    const tid = resolveUserTaskTaskId(ut);
+    const info = tid != null ? taskSprintMap[tid] : null;
     if (!info || info.sprintId !== sprintId) return;
-    sumWorkedHours += Number(ut.workedHours) || 0;
+    if (!isUserTaskAssignmentDone(ut, info)) return;
+    sumWorkedHours += userTaskWorkedHours(ut);
   });
   const teamParticipationPct =
     sumAssignedHours > 0 ? Math.round((sumWorkedHours / sumAssignedHours) * 100) : 0;
@@ -190,7 +221,9 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   (tasks || []).forEach((task) => {
     const sid = taskSprintId(task);
     if (sid == null || !Number.isFinite(sid) || !sprintMap[sid]) return;
-    taskSprintMap[task.id] = {
+    const tid = Number(task.id);
+    if (!Number.isFinite(tid)) return;
+    taskSprintMap[tid] = {
       sprintId: sid,
       status: task.status,
       assignedHours: task.assignedHours ?? 0,
@@ -200,17 +233,17 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   });
 
   userTasks.forEach((ut) => {
-    const taskId = ut.task?.id;
-    const taskInfo = taskSprintMap[taskId];
+    const taskId = resolveUserTaskTaskId(ut);
+    const taskInfo = taskId != null ? taskSprintMap[taskId] : null;
     if (!taskInfo) return;
 
     const sp = sprintMap[taskInfo.sprintId];
     if (!sp) return;
 
-    /* Sprint totals (totalTasks / totalCompleted) come from distinct tasks via _statusCounts, not from USER_TASK rows. */
-    const isDone = bucketTaskStatus(taskInfo.status) === 'DONE';
+    const isDone = isUserTaskAssignmentDone(ut, taskInfo);
 
-    const workedHours = ut.workedHours ?? 0;
+    /** USER_TASK.WORKED_HOURS only counts toward totals when the task/assignment is DONE. */
+    const workedHours = isDone ? userTaskWorkedHours(ut) : 0;
     sp.totalHours += workedHours;
 
     const devName = ut.user?.name || ut.user?.phoneNumber || `User ${ut.user?.id ?? '?'}`;
@@ -219,15 +252,16 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       sp._devMap[devName] = {
         name: devName,
         initials: initialsFromName(devName),
-        assigned: 0,
-        completed: 0,
+        _taskIds: new Set(),
+        _completedTaskIds: new Set(),
         hours: 0,
         workload: 0,
       };
     }
-    sp._devMap[devName].assigned += 1;
-    if (isDone) sp._devMap[devName].completed += 1;
-    sp._devMap[devName].hours += workedHours;
+    const dm = sp._devMap[devName];
+    dm._taskIds.add(taskId);
+    if (isDone) dm._completedTaskIds.add(taskId);
+    dm.hours += workedHours;
   });
 
   return sprints.map((sp) => {
@@ -236,7 +270,17 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const { _devMap, _statusCounts, ...rest } = entry;
     const devs = Object.values(_devMap);
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
-    devs.forEach((d) => { d.workload = Math.round((d.hours / maxHours) * 100); });
+    devs.forEach((d) => {
+      const taskIds = d._taskIds;
+      const completedIds = d._completedTaskIds;
+      d.assigned = taskIds ? taskIds.size : 0;
+      d.completed = completedIds ? completedIds.size : 0;
+      delete d._taskIds;
+      delete d._completedTaskIds;
+      d.workload = Math.round((d.hours / maxHours) * 100);
+      /* Pending = assigned tasks not completed per assignmentStatus above. */
+      d.pending = Math.max(0, (d.assigned ?? 0) - (d.completed ?? 0));
+    });
     const statusPart = sprintTaskStatusRows(_statusCounts);
     const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
     const totalCompleted = _statusCounts.DONE ?? 0;
@@ -272,6 +316,84 @@ export async function fetchDashboardSprints() {
 export function shortDevName(fullName) {
   if (!fullName) return '';
   return fullName.split(' ')[0];
+}
+
+const TASK_STATUS_KEYS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+
+/**
+ * Merge task status counts across selected sprints (same shape as sprint.taskStatusDistribution).
+ */
+const MERGE_STATUS_META = {
+  TODO: { name: 'To Do', color: '#FB8C00' },
+  IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
+  IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
+  DONE: { name: 'Completed', color: '#3949AB' },
+};
+
+export function mergeTaskStatusAcrossSprints(selectedSprints) {
+  const acc = { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 };
+  (selectedSprints || []).forEach((sp) => {
+    (sp.taskStatusDistribution || []).forEach((row) => {
+      if (acc[row.key] !== undefined) acc[row.key] += row.count ?? 0;
+    });
+  });
+  const template = (selectedSprints && selectedSprints[0]?.taskStatusDistribution) || [];
+  const distribution = TASK_STATUS_KEYS.map((key) => {
+    const t = template.find((r) => r.key === key);
+    const fb = MERGE_STATUS_META[key];
+    return {
+      key,
+      name: t?.name ?? fb.name,
+      count: acc[key],
+      color: t?.color ?? fb.color,
+    };
+  });
+  const taskStatusTotal = TASK_STATUS_KEYS.reduce((a, k) => a + acc[k], 0);
+  return { taskStatusDistribution: distribution, taskStatusTotal };
+}
+
+/**
+ * Global totals and per-developer aggregates for the dashboard (across selected sprints).
+ */
+export function aggregateSelectionMetrics(selectedSprints) {
+  let totalTasks = 0;
+  let totalHours = 0;
+  const devMap = new Map();
+
+  (selectedSprints || []).forEach((sp) => {
+    totalTasks += Number(sp.totalTasks) || 0;
+    totalHours += Number(sp.totalHours) || 0;
+    (sp.developers || []).forEach((d) => {
+      const cur = devMap.get(d.name) || { name: d.name, assigned: 0, completed: 0, hours: 0 };
+      cur.assigned += Number(d.assigned) || 0;
+      cur.completed += Number(d.completed) || 0;
+      cur.hours += Number(d.hours) || 0;
+      devMap.set(d.name, cur);
+    });
+  });
+
+  const uniqueDevCount = devMap.size;
+  const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
+  const avgHoursPerDev = uniqueDevCount > 0 ? totalHours / uniqueDevCount : 0;
+
+  const developers = Array.from(devMap.values()).map((d) => {
+    const assigned = d.assigned ?? 0;
+    const completed = d.completed ?? 0;
+    return {
+      ...d,
+      shortName: shortDevName(d.name),
+      pending: Math.max(0, assigned - completed),
+    };
+  });
+
+  return {
+    totalTasks,
+    totalHours,
+    uniqueDevCount,
+    avgTasksPerDev,
+    avgHoursPerDev,
+    developers,
+  };
 }
 
 export function avgHoursPerTask(sprint) {
@@ -321,6 +443,58 @@ export function buildGroupedWorkloadData(selectedSprints) {
     });
     return row;
   });
+}
+
+/**
+ * Per-sprint keys for developer compare charts (2+ sprints).
+ * wc/wo: workload stack keys; hr/ln: hours and combo series keys.
+ */
+export function buildCompareDeveloperChartsModel(selectedSprints) {
+  const sprints = [...(selectedSprints || [])].filter(Boolean);
+  if (sprints.length < 2) return null;
+
+  const sprintDefs = sprints.map((sp, idx) => ({
+    id: Number(sp.id),
+    shortLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
+    accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
+  }));
+
+  const nameSet = new Set();
+  sprints.forEach((sp) => (sp.developers || []).forEach((d) => nameSet.add(d.name)));
+  const names = Array.from(nameSet);
+
+  const baseRows = names.map((fullName) => {
+    const row = { name: fullName, shortName: shortDevName(fullName) };
+    sprints.forEach((sp) => {
+      const dev = (sp.developers || []).find((d) => d.name === fullName);
+      const assigned = Number(dev?.assigned) || 0;
+      const completedRaw = Number(dev?.completed) || 0;
+      const completed = Math.min(completedRaw, assigned);
+      const open = Math.max(0, assigned - completed);
+      const hours = Number(dev?.hours) || 0;
+      const id = Number(sp.id);
+      row[`wc_${id}`] = completed;
+      row[`wo_${id}`] = open;
+      row[`hr_${id}`] = hours;
+      row[`cb_${id}`] = completed;
+      row[`ln_${id}`] = hours;
+    });
+    return row;
+  });
+
+  const sumWorkload = (row) =>
+    sprintDefs.reduce((s, d) => s + (row[`wc_${d.id}`] || 0) + (row[`wo_${d.id}`] || 0), 0);
+  const sumHours = (row) => sprintDefs.reduce((s, d) => s + (row[`hr_${d.id}`] || 0), 0);
+  const sumComboTasks = (row) => sprintDefs.reduce((s, d) => s + (row[`cb_${d.id}`] || 0), 0);
+
+  const workloadRows = [...baseRows].sort((a, b) => {
+    const diff = sumWorkload(b) - sumWorkload(a);
+    return diff !== 0 ? diff : String(a.name).localeCompare(String(b.name));
+  });
+  const hoursRows = [...baseRows].sort((a, b) => sumHours(b) - sumHours(a));
+  const comboRows = [...baseRows].sort((a, b) => sumComboTasks(b) - sumComboTasks(a));
+
+  return { sprintDefs, workloadRows, hoursRows, comboRows };
 }
 
 export function buildSprintInsights(selectedSprints) {

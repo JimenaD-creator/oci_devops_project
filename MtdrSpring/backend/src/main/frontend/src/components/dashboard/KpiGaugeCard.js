@@ -1,36 +1,16 @@
 import React, { useMemo } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { Box, Paper, Typography, Tooltip, IconButton } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Box, Paper, Typography } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import KpiDonutChart from "./KpiDonutChart";
-import {
-  KpiTooltipBody,
-  tooltipChromeSx,
-  tooltipArrowSx,
-} from "./DashboardKpiTooltipParts";
 
-const ORACLE_RED = "#C74634";
+const GAUGE_HEADER_ACCENT = "#1565C0";
 
 /** Chart arc is 0–100; participation can exceed 100% — cap fill only. */
 const GAUGE_GOALS = {
   onTimeDelivery: 80,
   teamParticipation: 100,
   workloadBalance: 80,
-};
-
-const pulseIconSx = {
-  "@keyframes kpiGaugeInfoPulse": {
-    "0%, 100%": { transform: "scale(1)", opacity: 1 },
-    "50%": { transform: "scale(1.12)", opacity: 0.88 },
-  },
-  animation: "kpiGaugeInfoPulse 2.2s ease-in-out infinite",
-  color: "#1565C0",
-  "&:hover": {
-    animation: "none",
-    opacity: 1,
-    bgcolor: "rgba(21, 101, 192, 0.08)",
-  },
 };
 
 function numericForKpi(def, kpis) {
@@ -77,14 +57,14 @@ function TrendIcon({ trend }) {
   if (trend === "up") {
     return (
       <Box sx={wrap} aria-hidden>
-        <TrendingUp style={{ ...icon, color: "#2E7D32" }} />
+        <TrendingUp style={{ ...icon, color: "#1565C0" }} />
       </Box>
     );
   }
   if (trend === "down") {
     return (
       <Box sx={wrap} aria-hidden>
-        <TrendingDown style={{ ...icon, color: "#C62828" }} />
+        <TrendingDown style={{ ...icon, color: "#FB8C00" }} />
       </Box>
     );
   }
@@ -230,37 +210,19 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
               width: 36,
               height: 36,
               borderRadius: 2,
-              bgcolor: "rgba(199,70,52,0.1)",
+              bgcolor: "rgba(21, 101, 192, 0.1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <Icon style={{ width: "1.25rem", height: "1.25rem", color: ORACLE_RED }} />
+            <Icon style={{ width: "1.25rem", height: "1.25rem", color: GAUGE_HEADER_ACCENT }} />
           </Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25 }}>
             {def.title}
           </Typography>
         </Box>
-        {def.tooltip ? (
-          <Tooltip
-            arrow
-            placement="left"
-            describeChild
-            enterTouchDelay={0}
-            leaveTouchDelay={4000}
-            title={<KpiTooltipBody {...def.tooltip} />}
-            componentsProps={{
-              tooltip: { sx: tooltipChromeSx },
-              arrow: { sx: tooltipArrowSx },
-            }}
-          >
-            <IconButton size="small" aria-label={`About ${def.title}`} sx={pulseIconSx}>
-              <InfoOutlinedIcon sx={{ fontSize: "1.15rem" }} />
-            </IconButton>
-          </Tooltip>
-        ) : null}
       </Box>
 
       <Box
@@ -305,11 +267,6 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
               </Typography>
             )}
           </Box>
-          {compareMode && selectedSprints.length > 1 && (
-            <Typography variant="caption" sx={{ color: "#AAA", mt: 0.5 }}>
-              Average of selected sprints
-            </Typography>
-          )}
         </Box>
       </Box>
 
