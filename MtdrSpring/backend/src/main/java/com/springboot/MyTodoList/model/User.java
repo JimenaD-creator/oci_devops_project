@@ -43,16 +43,7 @@ public class User {
         this.id = id;
     }
 
-    @JsonIgnore
-    public int getID() {
-        return id != null ? id.intValue() : 0;
-    }
-
-    @JsonIgnore
-    public void setID(int ID) {
-        this.id = (long) ID;
-    }
-
+    
     public String getName() {
         return name;
     }

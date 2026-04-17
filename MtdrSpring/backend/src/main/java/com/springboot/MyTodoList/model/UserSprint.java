@@ -28,7 +28,7 @@ public class UserSprint {
     public UserSprint(User user, Sprint sprint) {
         this.user = user;
         this.sprint = sprint;
-        this.id = new UserSprintId(user.getID(), sprint.getId());
+        this.id = new UserSprintId(user.getId().intValue(), sprint.getId());
     }
     
     public UserSprintId getId() {

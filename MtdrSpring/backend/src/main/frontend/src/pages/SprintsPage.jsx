@@ -964,24 +964,28 @@ export default function SprintsPage({ projectId }) {
     setLoading(true);
     try {
       const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
-      const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
+      const [sprintsRes, userTasksRes] = await Promise.all([
         fetch(sprintsUrl),
-        fetch(`${API_BASE}/api/tasks`),
         fetch(`${API_BASE}/api/user-tasks`),
       ]);
-      let sprintsData = await sprintsRes.json();
-      const tasksData = await tasksRes.json();
+      const sprintsData = await sprintsRes.json();
       const userTasksData = await userTasksRes.json();
-      const tasksList = Array.isArray(tasksData) ? tasksData : [];
-      const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
-      if (projectId) {
-        sprintsData = sprintsData.filter((s) => s.assignedProject?.id == projectId);
-      }
       const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
-      const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+      const filteredSprints = projectId
+        ? sprintsList.filter(s => String(s.assignedProject?.id) === String(projectId))
+        : sprintsList;
+      const sprintIds = new Set(filteredSprints.map(s => Number(s.id)));
+      const tasksRes = await fetch(`${API_BASE}/api/tasks`);
+      const tasksData = await tasksRes.json();
+      const tasksList = (Array.isArray(tasksData) ? tasksData : [])
+        .filter(t => sprintIds.has(Number(t.assignedSprint?.id)));
+      const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
+      const sorted = sortSprintsForDisplay(filteredSprints, tasksList);
       setSprints(sorted);
       setTasks(tasksList);
       setUserTasks(userTasksList);
+      
+      
       setSelectedSprint((prev) =>
         prev
           ? sorted.find((s) => s.id === prev.id) ?? sorted[0]

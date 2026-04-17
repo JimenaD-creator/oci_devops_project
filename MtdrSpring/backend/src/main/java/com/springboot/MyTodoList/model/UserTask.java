@@ -37,7 +37,7 @@ public class UserTask {
     public UserTask(User user, Task task) {
         this.user = user;
         this.task = task;
-        this.id = new UserTaskId(user.getID(), task.getId());
+        this.id = new UserTaskId(user.getId().intValue(), task.getId());
     }
     
     public UserTaskId getId() {

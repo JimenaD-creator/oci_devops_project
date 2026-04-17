@@ -339,8 +339,8 @@ export default function TasksPage({ projectId }) {
       if (projectId) {
         sprintsData = sprintsData.filter(s => s.assignedProject?.id == projectId);
         // Filtrar tareas que pertenecen a estos sprints
-        const sprintIds = new Set(sprintsData.map(s => s.id));
-        tasksData = tasksData.filter(t => t.assignedSprint?.id && sprintIds.has(t.assignedSprint.id));
+        const sprintIds = new Set(sprintsData.map(s => Number(s.id)));
+        tasksData = tasksData.filter(t => t.assignedSprint?.id != null && sprintIds.has(Number(t.assignedSprint.id)));
       }
       
       setRawTasks(Array.isArray(tasksData) ? tasksData : []);
