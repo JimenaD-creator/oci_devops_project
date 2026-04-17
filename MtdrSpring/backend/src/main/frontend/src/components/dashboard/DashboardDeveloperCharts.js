@@ -1404,7 +1404,7 @@ export default function DashboardDeveloperCharts({
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload;
               if (!row) return label;
-              return `${row.name} · ${row.pctOfPlan}% of plan`;
+              return row.name;
             }}
           />
           <Legend

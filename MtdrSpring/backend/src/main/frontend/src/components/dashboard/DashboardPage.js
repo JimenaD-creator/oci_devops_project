@@ -294,6 +294,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
       <ScrollReveal delay={0.07}>
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC' }}>
+        <Typography variant="body2" sx={{ color: '#616161', fontWeight: 600, mb: 1.25 }}>
+          Select one or more sprints below to filter the dashboard. Check additional boxes to compare sprints side by side.
+        </Typography>
         <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
           {allSprints.map((sp) => {
             const sprintColor = sp.accentColor ?? '#607D8B';
