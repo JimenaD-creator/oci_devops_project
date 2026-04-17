@@ -39,11 +39,7 @@ public class ProjectController {
 
     @GetMapping("/manager/{managerId}")
     public ResponseEntity<Project> getProjectByManager(@PathVariable Long managerId) {
-        return projectRepository.findAll().stream()
-                .filter(project -> project.getAssignedTeam() != null)
-                .filter(project -> project.getAssignedTeam().getManager() != null)
-                .filter(project -> managerId.equals(project.getAssignedTeam().getManager().getId()))
-                .findFirst()
+        return projectRepository.findByManagerId(managerId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -66,12 +62,12 @@ public class ProjectController {
         for (TeamMember tm : members) {
             User user = tm.getUser();
             if (user != null && isDeveloperUser(user)) {
-                byId.put(user.getID(), user);
+                byId.put(user.getId().intValue(), user);
             }
         }
         User manager = project.getAssignedTeam().getManager();
         if (manager != null && isDeveloperUser(manager)) {
-            byId.put(manager.getID(), manager);
+            byId.put(manager.getId().intValue(), manager);
         }
 
         return ResponseEntity.ok(List.copyOf(byId.values()));

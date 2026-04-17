@@ -74,6 +74,22 @@ function App() {
   });
 
   useEffect(() => {
+  if (user?.role === 'MANAGER' && !selectedProjectId) {
+    fetch(`http://localhost:8080/api/projects/manager/${user.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(project => {
+        if (project) {
+          localStorage.setItem('currentProjectId', project.id);
+          localStorage.setItem('currentProjectName', project.name);
+          setSelectedProjectId(String(project.id));
+          setSelectedProjectName(project.name);
+        }
+      })
+      .catch(() => {});
+  }
+}, [user]);
+
+  useEffect(() => {
     if (user && user.role === 'DEVELOPER') {
       logout();
       localStorage.clear();

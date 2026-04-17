@@ -40,17 +40,17 @@ public class UserTaskService {
     private int resolveAssigneeUserIdForWorkedHours(Integer telegramHintUserId, Long taskId) {
         List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
         if (uts.size() == 1) {
-            int id = uts.get(0).getUser().getID();
+            int id = uts.get(0).getUser().getId().intValue();
             logger.info("Worked hours: using single assignee userId {} for task {} (Telegram hint was {})", id, taskId, telegramHintUserId);
             return id;
         }
         if (uts.size() > 1 && telegramHintUserId != null) {
             for (UserTask ut : uts) {
-                if (ut.getUser().getID() == telegramHintUserId) {
+                if (ut.getUser().getId().intValue() == telegramHintUserId) {
                     return telegramHintUserId;
                 }
             }
-            int fallback = uts.get(0).getUser().getID();
+            int fallback = uts.get(0).getUser().getId().intValue();
             logger.warn("Telegram userId {} not among assignees for task {}; using userId {}", telegramHintUserId, taskId, fallback);
             return fallback;
         }

@@ -1,7 +1,11 @@
+FROM maven:3.9.6-eclipse-temurin-22 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
+
 FROM openjdk:22-jdk
-#COPY pom.xml /tmp/
-#COPY src /tmp/src/
 WORKDIR /tmp/
+COPY --from=build /app/target/MyTodoList-0.0.1-SNAPSHOT.jar MyTodoList.jar
 EXPOSE 8080
-COPY target/MyTodoList-0.0.1-SNAPSHOT.jar MyTodoList.jar
-ENTRYPOINT ["java","-jar","MyTodoList.jar"]
+ENTRYPOINT ["java", "-jar", "MyTodoList.jar"]

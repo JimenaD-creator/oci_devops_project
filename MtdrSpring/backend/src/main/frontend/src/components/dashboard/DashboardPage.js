@@ -25,15 +25,14 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
 
-  const projectId = propProjectId || localStorage.getItem('currentProjectId');
+  const rawId = propProjectId || localStorage.getItem('currentProjectId');
+  const projectId = rawId && rawId !== 'undefined' && rawId !== 'null' ? rawId : null;
 
   useEffect(() => {
-    if (projectId) {
-      loadProjectInfo();
-      handleRefresh();
-    }
+    if (!projectId) return;
+    loadProjectInfo();
+    handleRefresh();
   }, [projectId]);
-
   const loadProjectInfo = async () => {
     try {
       const response = await fetch(`http://localhost:8080/api/projects/${projectId}`);

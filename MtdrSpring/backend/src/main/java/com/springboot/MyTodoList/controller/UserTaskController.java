@@ -85,7 +85,7 @@ public class UserTaskController {
 
         User user = userOpt.get();
         Task task = taskOpt.get();
-        UserTaskId id = new UserTaskId(user.getID(), task.getId());
+        UserTaskId id = new UserTaskId(user.getId().intValue(), task.getId());
         UserTask userTask = userTaskRepository.findById(id).orElseGet(UserTask::new);
 
         userTask.setId(id);
