@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, CircularProgress, Grid, Paper, Chip } from "@mui/material";
-import { Calendar, Target, TrendingUp, CheckCircle, Timer, Users } from "lucide-react";
-import KPIComparisonCards from "../components/analytics/KPIComparisonCards";
+import { motion } from "framer-motion";
+import { Box, Typography, CircularProgress, Grid, Paper, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { Target } from "lucide-react";
+import KpiDonutChart from "../components/dashboard/KpiDonutChart";
 import IndividualTable from "../components/analytics/IndividualTable";
 import DeveloperTable from "../components/analytics/DeveloperTable";
+import DeveloperWorkloadCharts from "../components/analytics/DeveloperWorkloadCharts";
+import { fetchDashboardSprints } from "../components/dashboard/dashboardSprintData";
+import { SECTION_BRAND_DARK, SECTION_ACCENT, sectionRgba } from "../components/dashboard/dashboardConstants";
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
-const ORACLE_RED = '#C74634';
+const pageEase = [0.22, 1, 0.36, 1];
 
 export default function KPIAnalytics({ projectId }) {
   const [sprints, setSprints] = useState([]);
@@ -21,31 +25,60 @@ export default function KPIAnalytics({ projectId }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
-      const [sprintsRes, tasksRes] = await Promise.all([
-        fetch(sprintsUrl),
-        fetch(`${API_BASE}/api/tasks`)
+      const pid =
+        projectId != null && String(projectId).trim() !== ''
+          ? String(projectId).trim()
+          : (typeof localStorage !== 'undefined'
+              ? String(localStorage.getItem('currentProjectId') || '').trim()
+              : '');
+      const projectKey = pid || null;
+
+      const tasksUrl =
+        projectKey != null
+          ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectKey)}`
+          : `${API_BASE}/api/tasks`;
+
+      const [enrichedSprints, tasksRes] = await Promise.all([
+        fetchDashboardSprints(projectKey),
+        fetch(tasksUrl),
       ]);
-      let sprintsData = await sprintsRes.json();
-      const tasksData = await tasksRes.json();
-      
-      if (projectId) {
-        sprintsData = sprintsData.filter(s => s.assignedProject?.id == projectId);
+
+      let sprintsData = Array.isArray(enrichedSprints) ? enrichedSprints : [];
+      let tasksData = [];
+      if (tasksRes.ok) {
+        try {
+          tasksData = await tasksRes.json();
+        } catch {
+          tasksData = [];
+        }
       }
-      
+
+      if (pid) {
+        sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
+        const sprintIds = new Set(sprintsData.map((s) => s.id));
+        tasksData = tasksData.filter(
+          (t) => t.assignedSprint?.id != null && sprintIds.has(t.assignedSprint.id)
+        );
+      }
+
       setSprints(sprintsData);
       setTasks(tasksData);
-      if (sprintsData.length > 0 && !selectedSprintId) {
-        const activeSprint = sprintsData.find(s => {
+
+      setSelectedSprintId((prev) => {
+        if (sprintsData.length === 0) return null;
+        if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
+        const activeSprint = sprintsData.find((s) => {
           const now = new Date();
           const start = new Date(s.startDate);
           const due = new Date(s.dueDate);
           return now >= start && now <= due;
         });
-        setSelectedSprintId(activeSprint?.id || sprintsData[0]?.id);
-      }
+        return activeSprint?.id ?? sprintsData[0]?.id ?? null;
+      });
     } catch (error) {
       console.error('Error loading KPI data:', error);
+      setSprints([]);
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -97,115 +130,133 @@ export default function KPIAnalytics({ projectId }) {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: ORACLE_RED }} />
+        <CircularProgress sx={{ color: SECTION_ACCENT }} />
       </Box>
     );
   }
 
   return (
     <>
-      <style>
-        {`
-          .kpi-progress-card {
-            background-color: white;
-            border-radius: 12px;
-            border: 1px solid #F3F4F6;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            padding: 20px;
-            margin-bottom: 24px;
-          }
-          .progress-info { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
-          @media (min-width: 640px) { .progress-info { flex-direction: row; align-items: center; } }
-          .progress-percentage { font-size: 36px; font-weight: 700; color: #C74634; margin: 0; }
-          .progress-track { width: 100%; height: 12px; background-color: #F3F4F6; border-radius: 9999px; overflow: hidden; margin-top: 12px; }
-          .progress-fill { height: 100%; background: linear-gradient(to right, #C74634, #e05a4a); border-radius: 9999px; transition: width 1s ease-in-out; }
-          .progress-labels { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #6F6F6F; }
-        `}
-      </style>
-
-      <Box sx={{ maxWidth: 1200, width: "100%" }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 4, flexWrap: "wrap", gap: 2 }}>
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: pageEase }}
+        sx={{ maxWidth: 1200, width: "100%" }}
+      >
+        <Box
+          component={motion.div}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
+          sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 4, flexWrap: "wrap", gap: 2 }}
+        >
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.5px" }}>KPI Analytics</Typography>
-            <Typography variant="body2" sx={{ color: "#999", mt: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Calendar size={14} aria-hidden />
-              {currentSprint ? `${new Date(currentSprint.startDate).toLocaleDateString()} – ${new Date(currentSprint.dueDate).toLocaleDateString()}` : 'No sprint selected'}
+            <Typography variant="h4" sx={{ fontWeight: 800, color: SECTION_BRAND_DARK, letterSpacing: "-0.5px" }}>KPI Analytics</Typography>
+            <Typography variant="body2" sx={{ color: "#607D8B", mt: 0.5, fontWeight: 600 }}>
+              {currentSprint ? `Sprint ${currentSprint.id} selected` : 'No sprint selected'}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             {sprints.length > 0 && (
-              <select value={selectedSprintId || ''} onChange={(e) => setSelectedSprintId(Number(e.target.value))} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${ORACLE_RED}`, background: 'white', fontWeight: 600 }}>
-                {sprints.map(s => <option key={s.id} value={s.id}>Sprint {s.id} - {new Date(s.startDate).toLocaleDateString()}</option>)}
-              </select>
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { xs: "100%", sm: 220 },
+                  '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+                  '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: sectionRgba(0.32) },
+                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: sectionRgba(0.48) },
+                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: SECTION_ACCENT },
+                  '& .MuiInputLabel-root.Mui-focused': { color: SECTION_ACCENT },
+                }}
+              >
+                <InputLabel id="kpi-analytics-sprint-filter">Sprint</InputLabel>
+                <Select
+                  labelId="kpi-analytics-sprint-filter"
+                  value={selectedSprintId || ''}
+                  label="Sprint"
+                  onChange={(e) => setSelectedSprintId(Number(e.target.value))}
+                >
+                  {sprints.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      Sprint {s.id}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "rgba(199, 70, 52, 0.1)", border: "1px solid rgba(199, 70, 52, 0.2)", borderRadius: 2, px: 2, py: 1 }}>
-              <Target size={16} color="#C74634" aria-hidden />
-              <Typography sx={{ fontWeight: 700, fontSize: "0.875rem", color: "#C74634" }}>Goal: +20% productivity</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: sectionRgba(0.08), border: `1px solid ${sectionRgba(0.22)}`, borderRadius: 2, px: 2, py: 1 }}>
+              <Target size={16} color={SECTION_ACCENT} aria-hidden />
+              <Typography sx={{ fontWeight: 700, fontSize: "0.875rem", color: SECTION_BRAND_DARK }}>Goal: +20% productivity</Typography>
             </Box>
           </Box>
         </Box>
 
-        <div className="kpi-progress-card">
-          <div className="progress-info">
-            <div>
-              <h2 style={{ fontSize: "16px", fontWeight: "bold", color: "#2E2E2E", margin: "0 0 4px 0" }}>Overall Productivity</h2>
-              <p style={{ fontSize: "14px", color: "#6F6F6F", margin: 0 }}>Sprint {currentSprint?.id} · {kpis.totalTasks} tasks, {kpis.completedTasks} completed</p>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <p className="progress-percentage">{kpis.productivityScore}%</p>
-              <p style={{ fontSize: "12px", color: "#6F6F6F", margin: 0 }}>Productivity Score</p>
-            </div>
-          </div>
-          <div style={{ marginTop: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span style={{ fontSize: "12px", fontWeight: "500", color: "#6F6F6F" }}>Progress toward +20% goal</span>
-              <span style={{ fontSize: "12px", fontWeight: "bold", color: "#C74634" }}>{Math.min(100, Math.round((kpis.productivityScore / 120) * 100))}% complete</span>
-            </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${Math.min(100, Math.round((kpis.productivityScore / 120) * 100))}%` }} />
-            </div>
-            <div className="progress-labels">
-              <span>Baseline (Sprint 1)</span>
-              <span style={{ fontWeight: "600", color: "#C74634" }}>Actual: {kpis.productivityScore}%</span>
-              <span>Goal: 120%</span>
-            </div>
-          </div>
-        </div>
-
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, border: '1px solid #EFEFEF' }}>
-              <CheckCircle size={24} color={ORACLE_RED} style={{ marginBottom: 8 }} />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: ORACLE_RED }}>{kpis.completionRate}%</Typography>
-              <Typography variant="caption" sx={{ color: '#666' }}>Completion Rate</Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, border: '1px solid #EFEFEF' }}>
-              <Timer size={24} color={ORACLE_RED} style={{ marginBottom: 8 }} />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: ORACLE_RED }}>{kpis.onTimeDelivery}%</Typography>
-              <Typography variant="caption" sx={{ color: '#666' }}>On-Time Delivery</Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, border: '1px solid #EFEFEF' }}>
-              <Users size={24} color={ORACLE_RED} style={{ marginBottom: 8 }} />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: ORACLE_RED }}>{kpis.teamParticipation}%</Typography>
-              <Typography variant="caption" sx={{ color: '#666' }}>Team Participation</Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, border: '1px solid #EFEFEF' }}>
-              <TrendingUp size={24} color={ORACLE_RED} style={{ marginBottom: 8 }} />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: ORACLE_RED }}>{kpis.productivityScore}%</Typography>
-              <Typography variant="caption" sx={{ color: '#666' }}>Productivity Score</Typography>
-            </Paper>
-          </Grid>
+        <Grid
+          component={motion.div}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
+          container
+          spacing={3}
+          sx={{ mb: 4 }}
+        >
+          {[
+            { label: 'Completion Rate', pct: kpis.completionRate, arcColor: '#1565C0', borderColor: '#5C6BC0' },
+            { label: 'On-Time Delivery', pct: kpis.onTimeDelivery, arcColor: '#FB8C00', borderColor: '#FFB74D' },
+            { label: 'Team Participation', pct: kpis.teamParticipation, arcColor: '#8E24AA', borderColor: '#BA68C8' },
+            { label: 'Productivity Score', pct: kpis.productivityScore, arcColor: '#2E7D32', borderColor: '#66BB6A' },
+          ].map(({ label, pct, arcColor, borderColor }) => (
+            <Grid item xs={12} sm={6} md={3} key={label}>
+              <Paper
+                sx={{
+                  p: 2,
+                  textAlign: 'center',
+                  borderRadius: 2,
+                  border: `1px solid ${sectionRgba(0.22)}`,
+                  borderLeft: `4px solid ${borderColor}`,
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  minHeight: 232,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}>
+                  {label}
+                </Typography>
+                <KpiDonutChart
+                  pct={pct}
+                  displayValue={`${Math.round(pct)}%`}
+                  displaySuffix=""
+                  arcColor={arcColor}
+                  height={{ xs: 150, sm: 160 }}
+                  innerRadius={50}
+                  outerRadius={68}
+                  width={{ xs: '100%', sm: '100%' }}
+                  maxWidth={260}
+                  valueFontSize={{ xs: '1.5rem', sm: '1.65rem' }}
+                />
+              </Paper>
+            </Grid>
+          ))}
         </Grid>
 
-        <KPIComparisonCards sprints={sprints} tasks={tasks} />
-        <DeveloperTable selectedSprints={sprints.filter(s => s.id === selectedSprintId)} compareMode={false} />
-        <IndividualTable />
+        <Box
+          component={motion.div}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
+        >
+          <DeveloperWorkloadCharts
+            selectedSprints={sprints.filter((s) => s.id === selectedSprintId)}
+            compareMode={false}
+          />
+          <DeveloperTable selectedSprints={sprints.filter(s => s.id === selectedSprintId)} compareMode={false} />
+          <IndividualTable />
+        </Box>
       </Box>
     </>
   );

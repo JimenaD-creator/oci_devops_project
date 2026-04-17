@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Box, Grid, Typography, Paper, Chip, CircularProgress, FormControl, InputLabel, Select, MenuItem, TextField, Stack, Button, Dialog, DialogTitle, DialogContent, IconButton, DialogActions, OutlinedInput, Checkbox, ListItemText, Alert } from '@mui/material';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { Box, Grid, Typography, Paper, Chip, CircularProgress, FormControl, InputLabel, Select, MenuItem, TextField, Stack, Button, Dialog, DialogTitle, DialogContent, IconButton, DialogActions, OutlinedInput, Checkbox, Alert } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -8,9 +9,30 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import KanbanBoard from '../components/tasks/KanbanBoard';
 import { matchesDueDateRange } from '../components/dashboard/taskFilters';
 import { developerAvatarColors } from '../utils/developerColors';
+import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../utils/userIds';
 
 const ORACLE_RED = '#C74634';
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+const pageEase = [0.22, 1, 0.36, 1];
+
+function resolveActiveProjectId(projectIdProp) {
+  const trim = (v) => (v == null ? '' : String(v).trim());
+  const fromProp = trim(projectIdProp);
+  const fromLs =
+    typeof localStorage !== 'undefined' ? trim(localStorage.getItem('currentProjectId')) : '';
+  const raw = fromProp !== '' ? fromProp : fromLs;
+  if (raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Project id on sprint JSON (nested or flat — Oracle/JPA shapes differ). */
+function sprintProjectIdFromJson(s) {
+  const raw = s?.assignedProject?.id ?? s?.assignedProject?.ID ?? s?.assignedProjectId;
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 /** USER_TASK row finished: COMPLETED (canonical) or DONE (legacy rows). */
 function isUserTaskAssigneeComplete(ut) {
@@ -22,14 +44,21 @@ function isUserTaskAssigneeComplete(ut) {
 function pageFormFieldOutline() {
   return {
     '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+    '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
     '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.35)' },
     '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.55)' },
     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: ORACLE_RED },
     '& .MuiInputLabel-root': { color: '#616161' },
     '& .MuiInputLabel-root.Mui-focused': { color: ORACLE_RED },
-    '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
     '& .MuiSelect-select': { color: '#1A1A1A' },
     '& .MuiSelect-icon': { color: '#616161' },
+  };
+}
+
+function createTaskSelectFillSx() {
+  return {
+    ...pageFormFieldOutline(),
+    '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'rgba(199, 70, 52, 0.08)' },
   };
 }
 
@@ -62,7 +91,7 @@ function inferSprintIsActive(sprint) {
   return start <= now && now <= due;
 }
 
-function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, defaultSprintId }) {
+function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, defaultSprintId, pickerProjectId }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classification, setClassification] = useState('FEATURE');
@@ -75,11 +104,14 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
   const [sprintId, setSprintId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  /** null = not loaded for this open session; avoids empty list while parent list is still loading. */
+  const [fetchedDevelopers, setFetchedDevelopers] = useState(null);
+  const [developersLoading, setDevelopersLoading] = useState(false);
 
   const resetForm = () => { 
     setTitle(''); setDescription(''); setClassification('FEATURE'); setStatus('TODO'); 
     setPriority('MEDIUM'); setAssignedHours(''); setStartDate(''); setDueDate(''); 
-    setAssignedToIds([]); setSprintId(''); setError(''); 
+    setAssignedToIds([]); setSprintId(''); setError(''); setFetchedDevelopers(null); 
   };
 
   useEffect(() => {
@@ -96,21 +128,77 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
     }
   };
 
-  const availableDevelopers = useMemo(
-    () => (Array.isArray(projectDevelopers) ? projectDevelopers : []),
-    [projectDevelopers],
-  );
-
   useEffect(() => {
-    setAssignedToIds((prev) => {
-      const allowed = new Set(
-        (availableDevelopers || [])
-          .map((u) => Number(u?.id ?? u?.ID))
-          .filter((id) => Number.isFinite(id)),
-      );
-      return prev.filter((id) => allowed.has(Number(id)));
+    if (!open) {
+      setFetchedDevelopers(null);
+      setDevelopersLoading(false);
+      return;
+    }
+    const pid = pickerProjectId != null && Number.isFinite(Number(pickerProjectId)) ? Number(pickerProjectId) : null;
+    console.log('NewTaskDialog project fetch', { open, pickerProjectId, pid });
+    if (pid == null) {
+      setFetchedDevelopers([]);
+      setDevelopersLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setDevelopersLoading(true);
+    (async () => {
+      try {
+        const url = `${API_BASE}/api/projects/${pid}/developers`;
+        console.log('Fetching developers URL:', url);
+        const res = await fetch(url, {
+          headers: { Accept: 'application/json' },
+        });
+        const data = res.ok ? await res.json() : [];
+        console.log('Developers response', { status: res.status, ok: res.ok, data });
+        if (!cancelled) {
+          setFetchedDevelopers(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Failed fetching developers:', error);
+        if (!cancelled) setFetchedDevelopers([]);
+      } finally {
+        if (!cancelled) setDevelopersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, pickerProjectId]);
+
+  const availableDevelopers = useMemo(() => {
+    if (Array.isArray(fetchedDevelopers) && fetchedDevelopers.length > 0) return fetchedDevelopers;
+    return Array.isArray(projectDevelopers) ? projectDevelopers : [];
+  }, [fetchedDevelopers, projectDevelopers]);
+
+  const normalizedAvailableDevelopers = useMemo(() => {
+    return (availableDevelopers || []).map((u, index) => {
+      const uid = developerNumericId(u);
+      const displayName = u?.name ?? u?.NAME ?? u?.email ?? u?.phoneNumber ?? `Developer ${index + 1}`;
+      return { ...u, uid, displayName };
     });
   }, [availableDevelopers]);
+
+  const validAvailableDevelopers = useMemo(() => {
+    return normalizedAvailableDevelopers.filter((u) => u.uid != null && Number.isFinite(u.uid));
+  }, [normalizedAvailableDevelopers]);
+
+  useEffect(() => {
+    console.groupCollapsed('NewTaskDialog developers debug');
+    console.log('availableDevelopers raw:', availableDevelopers);
+    console.log('normalizedAvailableDevelopers:', normalizedAvailableDevelopers);
+    console.log('validAvailableDevelopers:', validAvailableDevelopers.map((u) => ({ uid: u.uid, displayName: u.displayName })));
+    console.groupEnd();
+
+    if (normalizedAvailableDevelopers.length > 0 && validAvailableDevelopers.length === 0) {
+      console.warn('NewTaskDialog has developers but no valid numeric IDs', normalizedAvailableDevelopers);
+    }
+    setAssignedToIds((prev) => {
+      const allowed = new Set(validAvailableDevelopers.map((u) => u.uid));
+      return finiteUserIds(prev).filter((id) => allowed.has(id));
+    });
+  }, [availableDevelopers, normalizedAvailableDevelopers, validAvailableDevelopers]);
 
   const handleSave = async () => {
   const hasSprintPick = sprintId !== '' && sprintId != null;
@@ -185,7 +273,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
   }
 };
   
-  const canSave = Boolean(title.trim() && description.trim() && classification && status && priority && startDate && dueDate && sprintId && assignedToIds.length > 0);
+  const canSave = Boolean(title.trim() && description.trim() && classification && status && priority && startDate && dueDate && sprintId && finiteUserIds(assignedToIds).length > 0);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ 
@@ -196,9 +284,10 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
         borderLeft: `4px solid ${ORACLE_RED}`, 
         bgcolor: '#FFFFFF', 
         boxShadow: '0 16px 40px rgba(199, 70, 52, 0.12)', 
-        maxHeight: 'calc(100vh - 48px)', 
+        height: { xs: 'auto', sm: '88vh' },
+        maxHeight: 'calc(100vh - 24px)', 
         overflow: 'hidden', 
-        maxWidth: { xs: 'calc(100% - 24px)', sm: 820 } 
+        maxWidth: { xs: 'calc(100% - 32px)', sm: 980 } 
       } 
     }}>
       <DialogTitle sx={{ p: 0 }}>
@@ -215,12 +304,12 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
           <IconButton onClick={handleClose} size="small" disabled={saving}><CloseIcon /></IconButton>
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ pt: 2.5, px: { xs: 2.5, sm: 3 }, pb: 2, flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        <Stack spacing={2}>
+      <DialogContent sx={{ pt: 3.5, px: { xs: 3.5, sm: 5 }, pb: 3.25, flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <Stack spacing={2.25} sx={{ mx: { xs: 0.75, sm: 1.25 }, my: { xs: 0.5, sm: 0.75 } }}>
           <TextField label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth multiline minRows={2} sx={{ ...pageFormFieldOutline(), '& .MuiOutlinedInput-root': { bgcolor: 'rgba(199, 70, 52, 0.07)' } }} />
           <TextField label="Task description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={5} sx={pageFormFieldOutline()} />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
+            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Work item type</InputLabel>
               <Select value={classification} onChange={(e) => setClassification(e.target.value)} label="Work item type">
                 <MenuItem value="FEATURE">Feature</MenuItem>
@@ -238,7 +327,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                 <MenuItem value="DONE">Done</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
+            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Priority</InputLabel>
               <Select value={priority} onChange={(e) => setPriority(e.target.value)} label="Priority">
                 <MenuItem value="LOW">Low</MenuItem>
@@ -249,7 +338,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
             </FormControl>
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
+            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Sprint</InputLabel>
               <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
                 {sprints.map((s) => (<MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>))}
@@ -257,13 +346,29 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
             </FormControl>
             <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} sx={pageFormFieldOutline()} />
           </Stack>
+          {pickerProjectId == null || !Number.isFinite(Number(pickerProjectId)) ? (
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              No se pudo determinar el proyecto activo. Vuelve a elegir un proyecto en la app (Change project) y abre de nuevo esta ventana.
+            </Alert>
+          ) : null}
+          {developersLoading ? (
+            <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600 }}>
+              Cargando equipo del proyecto…
+            </Typography>
+          ) : null}
+          {!developersLoading && pickerProjectId != null && Number.isFinite(Number(pickerProjectId)) && validAvailableDevelopers.length === 0 ? (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              No hay desarrolladores asignables en este proyecto (equipo vacío o solo managers). Revisa el equipo en base de datos o el endpoint{' '}
+              <Typography component="span" variant="caption" sx={{ fontWeight: 700 }}>{`/api/projects/${pickerProjectId}/developers`}</Typography>.
+            </Alert>
+          ) : null}
           <FormControl fullWidth size="small" sx={pageFormFieldOutline()}>
             <InputLabel id="create-task-assigned-label">Developers</InputLabel>
             <Select
               labelId="create-task-assigned-label"
               multiple
-              value={assignedToIds}
-              onChange={(e) => setAssignedToIds(typeof e.target.value === 'string' ? e.target.value.split(',').map(Number) : e.target.value.map(Number))}
+              value={finiteUserIds(assignedToIds)}
+              onChange={(e) => setAssignedToIds(multiselectNumericIds(e.target.value))}
               input={<OutlinedInput label="Developers" />}
               renderValue={(selected) => (
                 <Box
@@ -277,9 +382,9 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
                     width: '100%',
                   }}
                 >
-                  {selected.map((id) => {
-                    const u = availableDevelopers.find((x) => Number(x.id ?? x.ID) === Number(id));
-                    const name = u?.name ?? `#${id}`;
+                  {finiteUserIds(selected).map((id) => {
+                    const u = normalizedAvailableDevelopers.find((x) => x.uid === id);
+                    const name = u?.displayName ?? `#${id}`;
                     const av = developerAvatarColors(name);
                     return (
                       <Chip
@@ -301,12 +406,15 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
               )}
               MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
             >
-              {availableDevelopers.map((u) => {
-                const uid = Number(u.id ?? u.ID);
+              {validAvailableDevelopers.map((u) => {
+                const uid = u.uid;
+                const selectedIds = finiteUserIds(assignedToIds);
                 return (
                   <MenuItem key={uid} value={uid}>
-                    <Checkbox checked={assignedToIds.includes(uid)} size="small" sx={{ py: 0 }} />
-                    <ListItemText primary={u.name} primaryTypographyProps={{ variant: 'body2' }} />
+                    <Checkbox checked={selectedIds.includes(uid)} size="small" sx={{ py: 0 }} />
+                    <Typography variant="body2" sx={{ color: '#1A1A1A' }}>
+                      {u.displayName}
+                    </Typography>
                   </MenuItem>
                 );
               })}
@@ -328,6 +436,7 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
 }
 
 export default function TasksPage({ projectId }) {
+  const effectiveProjectId = resolveActiveProjectId(projectId);
   const [rawTasks, setRawTasks] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [users, setUsers] = useState([]);
@@ -346,30 +455,47 @@ export default function TasksPage({ projectId }) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Obtener sprints filtrados por projectId
-      const sprintsUrl = projectId ? `${API_BASE}/api/sprints?projectId=${projectId}` : `${API_BASE}/api/sprints`;
-      const [tasksRes, sprintsRes, usersRes, userTasksRes] = await Promise.all([
-        fetch(`${API_BASE}/api/tasks`),
+      const pid = effectiveProjectId;
+      const sprintsUrl =
+        pid != null
+          ? `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`
+          : `${API_BASE}/api/sprints`;
+      const tasksUrl =
+        pid != null
+          ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`
+          : `${API_BASE}/api/tasks`;
+      const userTasksUrl =
+        pid != null
+          ? `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`
+          : `${API_BASE}/api/user-tasks`;
+      const [tasksRes, sprintsRes, userTasksRes] = await Promise.all([
+        fetch(tasksUrl),
         fetch(sprintsUrl),
-        fetch(`${API_BASE}/users`),
-        fetch(`${API_BASE}/api/user-tasks`)
+        fetch(userTasksUrl),
       ]);
       
       let tasksData = await tasksRes.json();
       let sprintsData = await sprintsRes.json();
+      let userTasksData = await userTasksRes.json();
       
-      // Filtrar sprints por projectId (por si acaso)
-      if (projectId) {
-        sprintsData = sprintsData.filter(s => s.assignedProject?.id == projectId);
-        // Filtrar tareas que pertenecen a estos sprints
-        const sprintIds = new Set(sprintsData.map(s => Number(s.id)));
-        tasksData = tasksData.filter(t => t.assignedSprint?.id != null && sprintIds.has(Number(t.assignedSprint.id)));
+      if (pid != null) {
+        sprintsData = sprintsData.filter((s) => sprintProjectIdFromJson(s) === Number(pid));
+        const sprintIds = new Set(sprintsData.map((s) => Number(s.id)));
+        tasksData = tasksData.filter((t) => {
+          const sid = t.assignedSprint?.id;
+          return sid != null && sprintIds.has(Number(sid));
+        });
+        const taskIds = new Set((Array.isArray(tasksData) ? tasksData : []).map((t) => Number(t.id)));
+        userTasksData = (Array.isArray(userTasksData) ? userTasksData : []).filter((ut) => {
+          const tid = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;
+          const n = Number(tid);
+          return Number.isFinite(n) && taskIds.has(n);
+        });
       }
       
       setRawTasks(Array.isArray(tasksData) ? tasksData : []);
       setSprints(Array.isArray(sprintsData) ? sprintsData : []);
-      setUsers(await usersRes.json());
-      setUserTasks(await userTasksRes.json());
+      setUserTasks(userTasksData);
     } catch (error) {
       console.error('Error loading tasks data:', error);
       setRawTasks([]);
@@ -381,13 +507,24 @@ export default function TasksPage({ projectId }) {
 
   useEffect(() => {
     loadData();
-  }, [projectId]);
+  }, [effectiveProjectId]);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('openCreateTaskDialog') === '1') {
+        setDialogOpen(true);
+        localStorage.removeItem('openCreateTaskDialog');
+      }
+    } catch (e) {
+      // ignore localStorage errors
+    }
+  }, []);
 
   /** Resolved sprint for Kanban: selected value, or first sprint by id, or none. */
   const kanbanSprintId = useMemo(() => {
     if (!Array.isArray(sprints) || sprints.length === 0) return '';
     const ids = sprints.map((s) => String(s.id));
-    if (selectedSprintId && ids.includes(String(selectedSprintId))) {
+    if (selectedSprintId !== '' && selectedSprintId != null && ids.includes(String(selectedSprintId))) {
       return String(selectedSprintId);
     }
     const active = sprints.find((s) => inferSprintIsActive(s));
@@ -397,11 +534,23 @@ export default function TasksPage({ projectId }) {
   }, [selectedSprintId, sprints]);
 
   const selectedProjectId = useMemo(() => {
+    if (effectiveProjectId != null) return effectiveProjectId;
+    const fromProp = Number(projectId);
+    if (Number.isFinite(fromProp) && fromProp > 0) return fromProp;
     if (!kanbanSprintId) return null;
     const sprint = (sprints || []).find((s) => String(s.id) === String(kanbanSprintId));
-    const pid = Number(sprint?.assignedProject?.id);
-    return Number.isFinite(pid) ? pid : null;
-  }, [kanbanSprintId, sprints]);
+    return sprint ? sprintProjectIdFromJson(sprint) : null;
+  }, [effectiveProjectId, projectId, kanbanSprintId, sprints]);
+
+  useEffect(() => {
+    if (selectedProjectId != null) {
+      try {
+        localStorage.setItem('currentProjectId', String(selectedProjectId));
+      } catch (e) {
+        // ignore localStorage errors
+      }
+    }
+  }, [selectedProjectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,7 +579,7 @@ export default function TasksPage({ projectId }) {
 
   const sprintsForActiveProject = useMemo(() => {
     if (!selectedProjectId) return [];
-    return (sprints || []).filter((s) => Number(s?.assignedProject?.id) === Number(selectedProjectId));
+    return (sprints || []).filter((s) => sprintProjectIdFromJson(s) === Number(selectedProjectId));
   }, [sprints, selectedProjectId]);
 
   useEffect(() => {
@@ -453,8 +602,7 @@ export default function TasksPage({ projectId }) {
       });
       if (res.ok) { 
         const updated = await res.json(); 
-        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t))); 
-        await loadData(); 
+        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
       }
     };
     
@@ -464,7 +612,7 @@ export default function TasksPage({ projectId }) {
         if (ns === 'DONE') {
           const ut = assignees[0];
           const uid = Number(ut.user?.id ?? ut.user?.ID);
-          const res = await fetch(`${API_BASE}/api/user-tasks`, {
+          const markDoneRes = await fetch(`${API_BASE}/api/user-tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -473,7 +621,17 @@ export default function TasksPage({ projectId }) {
               status: 'COMPLETED',
             }),
           });
-          await loadData();
+          if (markDoneRes.ok) {
+            setUserTasks((prev) =>
+              prev.map((row) => {
+                const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+                const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
+                if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
+                return { ...row, status: 'COMPLETED' };
+              }),
+            );
+            await putTask();
+          }
         } else { await putTask(); }
         return;
       }
@@ -536,21 +694,41 @@ export default function TasksPage({ projectId }) {
     }
   };
 
+  const resolveUserTaskDeveloperName = useCallback((ut) => {
+    if (!ut) return null;
+    const user = ut.user;
+    const numericUserId = developerNumericId(ut?.id?.userId) ?? developerNumericId(ut?.userId) ?? developerNumericId(ut?.user?.ID) ?? developerNumericId(user);
+    if (numericUserId != null && Number.isFinite(numericUserId)) {
+      const known = users.find((u) => developerNumericId(u) === numericUserId)
+        || projectDevelopers.find((u) => developerNumericId(u) === numericUserId);
+      if (known) return String(known.name ?? known.displayName ?? known.email ?? `User ${numericUserId}`);
+      return `User ${numericUserId}`;
+    }
+    const directName = String(
+      user?.name ?? user?.NAME ?? user?.fullName ?? user?.displayName ?? user?.email ?? user?.username ?? user?.userName ?? ''
+    ).trim();
+    if (directName) return directName;
+    return null;
+  }, [users, projectDevelopers]);
+
   const developersByTaskId = useMemo(() => {
     const map = new Map();
-    userTasks.forEach((ut) => { 
-      const taskId = ut?.task?.id ?? ut?.id?.taskId; 
-      const devName = ut?.user?.name; 
-      if (taskId && devName) { 
-        const existing = map.get(taskId); 
-        if (!existing) map.set(taskId, [devName]); 
-        else if (!existing.includes(devName)) existing.push(devName); 
-      } 
+    userTasks.forEach((ut) => {
+      const rawTaskId = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;
+      const taskId = rawTaskId != null ? String(rawTaskId) : null;
+      const devName = resolveUserTaskDeveloperName(ut);
+      if (!taskId || !devName) return;
+      const existing = map.get(taskId);
+      if (!existing) map.set(taskId, [devName]);
+      else if (!existing.includes(devName)) existing.push(devName);
     });
     return map;
-  }, [userTasks]);
+  }, [userTasks, resolveUserTaskDeveloperName]);
 
-  const items = useMemo(() => rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(task.id) ?? [])), [rawTasks, developersByTaskId]);
+  const items = useMemo(
+    () => rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [])),
+    [rawTasks, developersByTaskId],
+  );
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -594,12 +772,25 @@ export default function TasksPage({ projectId }) {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%' }}>
-      <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}>
+    <Box
+      component={motion.div}
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: pageEase }}
+      sx={{ maxWidth: 1200, width: '100%' }}
+    >
+      <Paper
+        component={motion.div}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
+        elevation={0}
+        sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF' }}
+      >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px' }}>Tasks</Typography>
-            <Chip label={`${pendingCount} pending`} size="small" sx={{ mt: 1.5, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700 }} />
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px' }}>Kanban Board</Typography>
+            <Chip label={`${pendingCount} pending`} size="small" sx={{ mt: 1, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700 }} />
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
             <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 }, ...pageFormFieldOutline() }}>
@@ -649,24 +840,34 @@ export default function TasksPage({ projectId }) {
         ) : null}
       </Paper>
 
-      <Paper elevation={0} sx={{ p: 2.5, mb: 2, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FAFAFA' }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <FilterListIcon sx={{ fontSize: 26, color: ORACLE_RED }} />
-          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.2rem' }}>Filter tasks</Typography>
+      <Paper
+        component={motion.div}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
+        elevation={0}
+        sx={{ p: 1.5, mb: 1.25, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FAFAFA' }}
+      >
+        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+          <FilterListIcon sx={{ fontSize: 21, color: ORACLE_RED }} />
+          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1rem' }}>Filter tasks</Typography>
         </Stack>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-end' }}>
-          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'flex-end' }}>
+          <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}>
             <InputLabel>Developer</InputLabel>
             <Select value={developerFilter} onChange={e => setDeveloperFilter(e.target.value)} label="Developer">
               <MenuItem value="all">All developers</MenuItem>
-              {developerFilterOptions.map((u) => (
-                <MenuItem key={u.id ?? u.ID} value={u.name}>
-                  {u.name}
-                </MenuItem>
-              ))}
+              {developerFilterOptions.map((u) => {
+                const uid = developerNumericId(u);
+                return (
+                  <MenuItem key={uid ?? u.name} value={u.name}>
+                    {u.name}
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }}>
+          <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}>
             <InputLabel>Priority</InputLabel>
             <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} label="Priority">
               <MenuItem value="all">All priorities</MenuItem>
@@ -676,18 +877,25 @@ export default function TasksPage({ projectId }) {
               <MenuItem value="CRITICAL">Critical</MenuItem>
             </Select>
           </FormControl>
-          <TextField size="small" type="date" label="Due from" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }} />
-          <TextField size="small" type="date" label="Due to" value={dueTo} onChange={(e) => setDueTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 }, maxWidth: { sm: 200 } }} />
-          {hasActiveFilters && <Button size="small" variant="outlined" onClick={clearAllFilters} sx={{ textTransform: 'none', fontWeight: 600, borderColor: ORACLE_RED, color: ORACLE_RED, flexShrink: 0 }}>Clear filters</Button>}
-          <Chip label={`${filteredItems.length} shown`} size="small" sx={{ bgcolor: '#F0F0F0', fontWeight: 700, height: 24 }} />
+          <TextField size="small" type="date" label="Due from" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }} />
+          <TextField size="small" type="date" label="Due to" value={dueTo} onChange={(e) => setDueTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }} />
+          {hasActiveFilters && <Button size="small" variant="outlined" onClick={clearAllFilters} sx={{ textTransform: 'none', fontWeight: 600, borderColor: ORACLE_RED, color: ORACLE_RED, flexShrink: 0, minHeight: 34, py: 0.25 }}>Clear filters</Button>}
+          <Chip label={`${filteredItems.length} shown`} size="small" sx={{ bgcolor: '#F0F0F0', fontWeight: 700, height: 22 }} />
         </Box>
       </Paper>
 
-      <Grid container spacing={3}>
+      <Grid
+        component={motion.div}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
+        container
+        spacing={3}
+      >
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
             <Box sx={{ width: 10, height: 10, bgcolor: ORACLE_RED, borderRadius: '50%' }} />
-            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: '#1A1A1A' }}>Kanban board</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: '#1A1A1A' }}>Tasks</Typography>
             <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: '#F5F5F5', fontWeight: 700 }} />
           </Box>
           <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF', overflow: 'hidden' }}>
@@ -747,6 +955,7 @@ export default function TasksPage({ projectId }) {
       sprints={sprintsForActiveProject}
       projectDevelopers={projectDevelopers}
       defaultSprintId={selectedSprintId}
+      pickerProjectId={effectiveProjectId}
     />
     </Box>
   );

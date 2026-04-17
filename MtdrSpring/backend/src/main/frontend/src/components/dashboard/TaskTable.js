@@ -45,9 +45,21 @@ function OnTimeChip({item}) {
 
 }
 
+function resolveDeveloperName(developer) {
+  if (!developer) return null;
+  if (typeof developer === 'string') return developer.trim();
+  if (typeof developer === 'object') {
+    return (
+      developer.name || developer.NAME || developer.fullName || developer.displayName || developer.email || developer.userName || developer.username || developer.user?.name || developer.user?.NAME || developer.user?.email || String(developer.id || developer.ID || developer.userId || developer.USER_ID || '')
+    );
+  }
+  return String(developer);
+}
+
 function DevChip({ developer }) {
-  const d = DEV_COLORS[developer];
-  const label = getDeveloperLabel(developer);
+  const resolved = resolveDeveloperName(developer);
+  const d = DEV_COLORS[resolved];
+  const label = getDeveloperLabel(resolved);
   const pickFromName = (name) => {
     const palettes = [
       { bg: '#E3F2FD', color: '#0D47A1' },
@@ -64,7 +76,7 @@ function DevChip({ developer }) {
   };
   const palette = d ?? pickFromName(label);
   const style = { bgcolor: palette.bg, color: palette.color };
-  if (!developer) return <Typography variant="caption" sx={{ color: '#BBB' }}>—</Typography>;
+  if (!resolved) return <Typography variant="caption" sx={{ color: '#BBB' }}>—</Typography>;
   return (
     <Chip
       label={label}
@@ -82,13 +94,13 @@ function DevChip({ developer }) {
 
 function DevelopersCell({ developers, developer }) {
   const list = Array.isArray(developers)
-    ? developers.filter(Boolean)
-    : (developer ? [developer] : []);
+    ? developers.map(resolveDeveloperName).filter(Boolean)
+    : [resolveDeveloperName(developer)].filter(Boolean);
   if (list.length === 0) return <Typography variant="caption" sx={{ color: '#BBB' }}>—</Typography>;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {list.map((name) => (
-        <DevChip key={name} developer={name} />
+      {list.map((name, idx) => (
+        <DevChip key={`${name}-${idx}`} developer={name} />
       ))}
     </div>
   );
@@ -146,14 +158,14 @@ function taskStatusChipProps(item) {
 
 
 const DEFAULT_LAYOUT = {
-  colWidths: ['23%', '11%', '11%', '9%', '13%', '8%', '8%', '11%'],
-  headers: ['Task', 'Developer', 'Status', 'Worked hrs', 'Due Date', 'On Time', 'Completed', ''],
+  colWidths: ['19%', '11%', '10%', '9%', '9%', '9%', '11%', '8%', '8%', '10%'],
+  headers: ['Task', 'Developer', 'Status', 'Priority', 'Assigned hrs', 'Worked hrs', 'Due Date', 'On Time', 'Completed', ''],
 };
 
 /** Manager view: same core columns + due date + completed (no On time). */
 const MANAGER_LAYOUT = {
-  colWidths: ['21%', '12%', '12%', '10%', '15%', '12%', '18%'],
-  headers: ['Task', 'Developer', 'Status', 'Worked hrs', 'Due Date', 'On-time', ''],
+  colWidths: ['17%', '12%', '10%', '10%', '10%', '10%', '13%', '10%', '8%'],
+  headers: ['Task', 'Developer', 'Status', 'Priority', 'Assigned hrs', 'Worked hrs', 'Due Date', 'On-time', ''],
 };
 
 export default function TaskTable({
@@ -180,30 +192,19 @@ export default function TaskTable({
   const headCellSx = {
     fontSize: '0.7rem',
     fontWeight: 800,
-    color: '#546E7A',
+    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     py: 1.35,
     px: 1.5,
-    borderBottom: '1px solid #E3F2FD',
-    background: 'linear-gradient(180deg, #F3F8FF 0%, #FFFFFF 100%)',
+    borderBottom: '1px solid rgba(255,255,255,0.24)',
+    backgroundColor: '#C74634',
   };
 
-  const columnCellSx = (idx) => {
-    const palette = [
-      { bg: 'rgba(255, 243, 224, 0.35)', border: '#FFCC80' }, // Task
-      { bg: 'rgba(227, 242, 253, 0.35)', border: '#90CAF9' }, // Developer
-      { bg: 'rgba(243, 229, 245, 0.35)', border: '#CE93D8' }, // Status
-      { bg: 'rgba(255, 249, 196, 0.35)', border: '#FFF59D' }, // Worked
-      { bg: 'rgba(232, 245, 233, 0.35)', border: '#A5D6A7' }, // Due Date
-      { bg: 'rgba(255, 235, 238, 0.35)', border: '#EF9A9A' }, // On-time
-      { bg: 'rgba(245, 245, 245, 0.45)', border: '#E0E0E0' }, // Actions
-      { bg: 'rgba(245, 245, 245, 0.45)', border: '#E0E0E0' }, // extra
-    ];
-    const p = palette[idx] ?? palette[palette.length - 1];
+  const columnCellSx = (_idx) => {
     return {
-      bgcolor: p.bg,
-      borderLeft: `1px solid ${p.border}66`,
+      bgcolor: '#FFFFFF',
+      borderLeft: '1px solid #F0F0F0',
     };
   };
 
@@ -296,15 +297,49 @@ export default function TaskTable({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(3) }}>
+                <TableCell sx={{ px: 1.5, ...columnCellSx(3) }}>
+                  <Chip
+                    label={String(item.priority || '—').replace(/_/g, ' ')}
+                    size="small"
+                    sx={{
+                      bgcolor:
+                        item.priority === 'CRITICAL'
+                          ? '#FFEBEE'
+                          : item.priority === 'HIGH'
+                            ? '#FFF3E0'
+                            : item.priority === 'MEDIUM'
+                              ? '#FFF8E1'
+                              : item.priority === 'LOW'
+                                ? '#ECEFF1'
+                                : '#F5F5F5',
+                      color:
+                        item.priority === 'CRITICAL'
+                          ? '#B71C1C'
+                          : item.priority === 'HIGH'
+                            ? '#E65100'
+                            : item.priority === 'MEDIUM'
+                              ? '#F57F17'
+                              : item.priority === 'LOW'
+                                ? '#455A64'
+                                : '#757575',
+                      fontWeight: 700,
+                      fontSize: '0.7rem',
+                      height: 20,
+                    }}
+                  />
+                </TableCell>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(4) }}>
+                  {item.assignedHours != null ? `${item.assignedHours}h` : '—'}
+                </TableCell>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(5) }}>
                   {isCompletedStatus(item) && item.actualHours != null ? `${item.actualHours}h` : '—'}
                 </TableCell>
                 {managerView && (
                   <>
-                    <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(4) }}>
+                    <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}>
                       {fmtDate(item.dueDate)}
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(5) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(7) }}>
                       <Chip
                         label={completionOnTimeDisplay(item)}
                         size="small"
@@ -331,13 +366,13 @@ export default function TaskTable({
                 )}
                 {!managerView && (
                   <>
-                    <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(4) }}>
+                    <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}>
                       {fmtDate(item.dueDate)}
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(5) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(7) }}>
                       <OnTimeChip item={item} />
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(6) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(8) }}>
                       <Chip
                         label={completionOnTimeDisplay(item)}
                         size="small"
@@ -363,7 +398,7 @@ export default function TaskTable({
                   </>
                 )}
                 {hasActions ? (
-                  <TableCell sx={{ px: 1, whiteSpace: 'nowrap', ...columnCellSx(managerView ? 6 : 7) }} align="right">
+                  <TableCell sx={{ px: 1, whiteSpace: 'nowrap', ...columnCellSx(managerView ? 8 : 9) }} align="right">
                     {onComplete && !item.done && (
                       <Button
                         variant="text"
