@@ -259,6 +259,7 @@ function App() {
               toggleDone={toggleDone} 
               deleteItem={deleteItem} 
               addItem={addItem} 
+              projectId={selectedProjectId}
             />
           )}
           {activePage === 'sprints' && <SprintsPage projectId={selectedProjectId} />}

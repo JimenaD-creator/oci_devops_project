@@ -7,21 +7,21 @@ import java.util.Objects;
 @Embeddable
 public class UserTaskId implements Serializable {
     
-    private Integer userId;
+    private Long userId;
     private Long taskId;
     
     public UserTaskId() {}
     
-    public UserTaskId(Integer userId, Long taskId) {
+    public UserTaskId(Long userId, Long taskId) {
         this.userId = userId;
         this.taskId = taskId;
     }
     
-    public Integer getUserId() {
+    public Long getUserId() {
         return userId;
     }
     
-    public void setUserId(Integer userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
     

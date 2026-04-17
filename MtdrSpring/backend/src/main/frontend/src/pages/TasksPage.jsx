@@ -113,54 +113,77 @@ function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, d
   }, [availableDevelopers]);
 
   const handleSave = async () => {
-    const hasSprintPick = sprintId !== '' && sprintId != null;
-    if (!title.trim() || !description.trim() || !classification || !status || !priority || !startDate || !dueDate || !hasSprintPick || assignedToIds.length === 0) { 
-      setError('Please fill in all required fields (including at least one developer).'); 
-      return; 
-    }
-    if (new Date(startDate) > new Date(dueDate)) { 
-      setError('Start date must be on or before due date.'); 
-      return; 
-    }
-    setSaving(true); 
-    setError('');
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          title: title.trim(), 
-          description: description.trim(), 
-          classification, 
-          status, 
-          priority, 
-          assignedHours: assignedHours ? Number(assignedHours) : null, 
-          startDate: new Date(startDate).toISOString(), 
-          dueDate: new Date(dueDate).toISOString(), 
-          finishDate: new Date(dueDate).toISOString(), 
-          assignedSprint: { id: Number(sprintId) } 
-        }),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        for (const uid of assignedToIds) { 
-          await fetch(`${API_BASE}/api/user-tasks`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ userId: Number(uid), taskId: created.id, status }) 
-          }); 
+  const hasSprintPick = sprintId !== '' && sprintId != null;
+  if (!title.trim() || !description.trim() || !classification || !status || !priority || !startDate || !dueDate || !hasSprintPick || assignedToIds.length === 0) { 
+    setError('Please fill in all required fields (including at least one developer).'); 
+    return; 
+  }
+  if (new Date(startDate) > new Date(dueDate)) { 
+    setError('Start date must be on or before due date.'); 
+    return; 
+  }
+  setSaving(true); 
+  setError('');
+  try {
+    // 1. Crear la tarea
+    const res = await fetch(`${API_BASE}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        title: title.trim(), 
+        description: description.trim(), 
+        classification, 
+        status, 
+        priority, 
+        assignedHours: assignedHours ? Number(assignedHours) : null, 
+        startDate: new Date(startDate).toISOString(), 
+        dueDate: new Date(dueDate).toISOString(), 
+        finishDate: new Date(dueDate).toISOString(), 
+        assignedSprint: { id: Number(sprintId) } 
+      }),
+    });
+    
+    if (res.ok) {
+      const createdTask = await res.json();
+      console.log('Task created:', createdTask);
+      
+      // 2. Crear asignaciones USER_TASK para cada developer
+      const assignmentPromises = assignedToIds.map(async (uid) => {
+        const assignRes = await fetch(`${API_BASE}/api/user-tasks`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ 
+            userId: Number(uid), 
+            taskId: createdTask.id, 
+            status: status,
+            workedHours: 0
+          }) 
+        });
+        if (!assignRes.ok) {
+          const errorText = await assignRes.text();
+          console.error('Assignment failed for user', uid, errorText);
+          throw new Error(`Assignment failed for user ${uid}`);
         }
-        onCreated(created, assignedToIds, status, null);
-        handleClose();
-      } else { 
-        setError('Could not create task.'); 
-      }
-    } catch { 
-      setError('Connection error.'); 
-    } finally { 
-      setSaving(false); 
+        return assignRes.json();
+      });
+      
+      await Promise.all(assignmentPromises);
+      console.log('All assignments created successfully');
+      
+      onCreated(createdTask, assignedToIds, status, null);
+      handleClose();
+    } else { 
+      const errorText = await res.text();
+      console.error('Task creation failed:', errorText);
+      setError('Could not create task: ' + errorText); 
     }
-  };
+  } catch (err) { 
+    console.error('Error:', err);
+    setError('Connection error: ' + err.message); 
+  } finally { 
+    setSaving(false); 
+  }
+};
   
   const canSave = Boolean(title.trim() && description.trim() && classification && status && priority && startDate && dueDate && sprintId && assignedToIds.length > 0);
 
@@ -588,11 +611,14 @@ export default function TasksPage({ projectId }) {
                 onChange={(e) => setSelectedSprintId(String(e.target.value))}
                 disabled={!sprints.length}
               >
-                {sprints.map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>
-                    Sprint {s.id}
-                  </MenuItem>
-                ))}
+                {(projectId
+                    ? sprints.filter(s => s.assignedProject?.id == projectId)
+                    : sprints
+                    ).map((s) => (
+                    <MenuItem key={s.id} value={String(s.id)}>
+                      Sprint {s.id}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
             <Button
@@ -709,30 +735,19 @@ export default function TasksPage({ projectId }) {
         <DialogActions sx={{ px: 2.5, pb: 2 }}><Button onClick={() => setMultiDoneTaskId(null)} sx={{ textTransform: 'none', fontWeight: 600 }}>Close</Button></DialogActions>
       </Dialog>
 
-      <NewTaskDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreated={(task, assignedUserIds, assignmentStatus, workedHours) => {
-          const ids = Array.isArray(assignedUserIds) ? assignedUserIds : [];
-          setRawTasks((prev) => [...prev, task]);
-          setUserTasks((prev) => [
-            ...prev,
-            ...ids.map((assignedUserId) => {
-              const user = users.find((u) => Number(u.id ?? u.ID) === Number(assignedUserId));
-              return {
-                id: { userId: assignedUserId, taskId: task.id },
-                user: user ?? null,
-                task,
-                status: assignmentStatus,
-                workedHours,
-              };
-            }),
-          ]);
-        }}
-        sprints={sprintsForActiveProject}
-        projectDevelopers={projectDevelopers}
-        defaultSprintId={kanbanSprintId}
-      />
+    <NewTaskDialog
+      open={dialogOpen}
+      onClose={() => setDialogOpen(false)}
+      onCreated={(task, assignedUserIds, assignmentStatus) => {
+        console.log('Task created:', task);
+        console.log('Assigned user IDs:', assignedUserIds);
+        // Recargar todos los datos para que las asignaciones aparezcan
+        loadData();
+      }}
+      sprints={sprintsForActiveProject}
+      projectDevelopers={projectDevelopers}
+      defaultSprintId={selectedSprintId}
+    />
     </Box>
   );
 }
