@@ -86,7 +86,7 @@ function bucketForItem(item) {
   return 'todo';
 }
 
-function TaskCard({ item, isDone, onStatusChange, onDeleteTask }) {
+function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const hours = item.actualHours != null && item.actualHours !== ''
@@ -116,10 +116,18 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask }) {
 
   const kindClass = `kanban-task-card--kind-${classificationKey.toLowerCase().replace(/_/g, '-')}`;
 
+  const handleCardClick = (e) => {
+    if (typeof onOpenTask === 'function') {
+      onOpenTask(item);
+      return;
+    }
+    setAnchorEl(e.currentTarget);
+  };
+
   return (
     <div
       className={`kanban-task-card ${kindClass}${isDone ? ' kanban-task-card--done' : ''}`}
-      onClick={(e) => setAnchorEl(e.currentTarget)}
+      onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
     >
       <div className="kanban-task-card-top">
@@ -222,7 +230,7 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask }) {
   );
 }
 
-export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask }) {
+export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask, onOpenTask }) {
   const columnsWithTasks = useMemo(() => {
     const buckets = { todo: [], inProgress: [], review: [], done: [] };
     items.forEach((item) => {
@@ -254,6 +262,7 @@ export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask }
                   isDone={col.id === 'done'}
                   onStatusChange={onStatusChange}
                   onDeleteTask={onDeleteTask}
+                  onOpenTask={onOpenTask}
                 />
               ))
             )}

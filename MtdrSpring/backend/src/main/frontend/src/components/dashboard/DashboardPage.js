@@ -25,14 +25,15 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
 
-  const rawId = propProjectId || localStorage.getItem('currentProjectId');
-  const projectId = rawId && rawId !== 'undefined' && rawId !== 'null' ? rawId : null;
+  const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
   useEffect(() => {
-    if (!projectId) return;
-    loadProjectInfo();
-    handleRefresh();
+    if (projectId) {
+      loadProjectInfo();
+      handleRefresh();
+    }
   }, [projectId]);
+
   const loadProjectInfo = async () => {
     try {
       const response = await fetch(`http://localhost:8080/api/projects/${projectId}`);
@@ -111,6 +112,42 @@ export default function DashboardPage({ projectId: propProjectId }) {
     () => aggregateSelectionMetrics(selectedSprints),
     [selectedSprints]
   );
+
+  const averageTrends = useMemo(() => {
+    const chronological = [...selectedSprints].sort((a, b) => {
+      const ta = new Date(a?.startDate || 0).getTime();
+      const tb = new Date(b?.startDate || 0).getTime();
+      return ta - tb;
+    });
+    const avgTasks = (sp) => {
+      const devCount = Array.isArray(sp?.developers) ? sp.developers.length : 0;
+      return devCount > 0 ? (Number(sp?.totalTasks) || 0) / devCount : 0;
+    };
+    const avgHours = (sp) => {
+      const devCount = Array.isArray(sp?.developers) ? sp.developers.length : 0;
+      return devCount > 0 ? (Number(sp?.totalHours) || 0) / devCount : 0;
+    };
+    const series = chronological.map((sp, index) => ({
+      sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
+      avgTasksPerDev: Number(avgTasks(sp).toFixed(2)),
+      avgHoursPerDev: Number(avgHours(sp).toFixed(2)),
+    }));
+
+    if (chronological.length < 2) {
+      return { avgTasksTrend: null, avgHoursTrend: null, series };
+    }
+    const current = chronological[chronological.length - 1];
+    const previous = chronological[chronological.length - 2];
+
+    const tasksDelta = avgTasks(current) - avgTasks(previous);
+    const hoursDelta = avgHours(current) - avgHours(previous);
+
+    return {
+      avgTasksTrend: { delta: tasksDelta },
+      avgHoursTrend: { delta: hoursDelta },
+      series,
+    };
+  }, [selectedSprints]);
 
   const heroProgress = useMemo(() => {
     if (!taskStatusTotal) return 0;
@@ -330,6 +367,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
               avgTasksPerDev={selectionMetrics.avgTasksPerDev}
               avgHoursPerDev={selectionMetrics.avgHoursPerDev}
               uniqueDevCount={selectionMetrics.uniqueDevCount}
+              avgTasksTrend={averageTrends.avgTasksTrend}
+              avgHoursTrend={averageTrends.avgHoursTrend}
+              avgTrendSeries={averageTrends.series}
             />
           </Box>
 

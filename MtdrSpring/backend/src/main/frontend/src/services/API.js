@@ -3,7 +3,13 @@ const BASE_URL = 'http://localhost:8080';
 export const TODOITEM_API = `${BASE_URL}/api/todolist`;
 
 export const taskAPI = {
-  getAll: () => fetch(`${BASE_URL}/api/tasks`).then(r => r.ok ? r.json() : Promise.reject()),
+  getAll: (projectId) => {
+    const q =
+      projectId != null && String(projectId).trim() !== ''
+        ? `?projectId=${encodeURIComponent(String(projectId).trim())}`
+        : '';
+    return fetch(`${BASE_URL}/api/tasks${q}`).then((r) => (r.ok ? r.json() : Promise.reject()));
+  },
   create: (data) => fetch(`${BASE_URL}/api/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

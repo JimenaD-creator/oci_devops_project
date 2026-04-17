@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
 import { APP_FONT_FAMILY } from '../../theme';
-import { DASHBOARD_PRIMARY_ACCENT } from '../dashboard/dashboardConstants';
+import { developerAvatarColors } from '../../utils/developerColors';
 
 const initialData = [
   { name: 'Carlos Ruiz', initials: 'CR', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
@@ -13,10 +13,10 @@ const initialData = [
 const rate = (completed, assigned) => Math.round((completed / assigned) * 100);
 const avgHours = (hours, completed) => (hours / completed).toFixed(1);
 
-function getBadgeClass(val, greenThreshold, yellowThreshold) {
-  if (val >= greenThreshold) return 'badge-green';
-  if (val >= yellowThreshold) return 'badge-yellow';
-  return 'badge-red';
+function getBadgeClass(val, highThreshold, midThreshold) {
+  if (val >= highThreshold) return 'badge-tier-high';
+  if (val >= midThreshold) return 'badge-tier-mid';
+  return 'badge-tier-low';
 }
 
 function Badge({ val, green, yellow }) {
@@ -55,7 +55,7 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           .table-card {
             background: #FFFFFF;
             border-radius: 12px;
-            border: 1px solid #EFEFEF;
+            border: 1px solid #1A1A1A;
             box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             overflow: hidden;
             margin-bottom: 24px;
@@ -82,7 +82,7 @@ const SHARED_DEVELOPER_TABLE_CSS = `
             width: 36px;
             height: 36px;
             border-radius: 8px;
-            background: rgba(199, 70, 52, 0.08);
+            background: rgba(26, 26, 26, 0.06);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -131,14 +131,14 @@ const SHARED_DEVELOPER_TABLE_CSS = `
             font-family: ${APP_FONT_FAMILY};
             font-size: 0.8125rem;
             font-weight: 600;
-            border: 1px solid #C74634;
-            color: #C74634;
+            border: 1px solid #1A1A1A;
+            color: #1A1A1A;
             background: transparent;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
           }
-          .export-btn:hover { background: rgba(199, 70, 52, 0.06); }
+          .export-btn:hover { background: rgba(26, 26, 26, 0.06); }
           .table-scroll { overflow-x: auto; }
           table { width: 100%; border-collapse: collapse; font-family: ${APP_FONT_FAMILY}; }
           thead tr { background: #FAFAFA; }
@@ -177,10 +177,9 @@ const SHARED_DEVELOPER_TABLE_CSS = `
           }
           td.td-sprint-compare-first { border-left: 1px solid #EFEFEF; }
           .row-odd { background: rgba(250, 250, 250, 0.85); }
-          tbody tr:hover { background: rgba(199, 70, 52, 0.04); }
+          tbody tr:hover { background: rgba(0, 0, 0, 0.03); }
           .avatar-circle {
             width: 28px; height: 28px; border-radius: 50%;
-            background: rgba(199, 70, 52, 0.1);
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
           }
@@ -202,12 +201,12 @@ const SHARED_DEVELOPER_TABLE_CSS = `
             border: 1px solid;
             font-family: ${APP_FONT_FAMILY};
           }
-          .badge-green { color: #2E7D32; background: #E8F5E9; border-color: #A5D6A7; }
-          .badge-yellow { color: #F57F17; background: #FFF8E1; border-color: #FFE082; }
-          .badge-red { color: #C62828; background: #FFEBEE; border-color: #FFCDD2; }
+          .badge-tier-high { color: #1B5E20; background: #E8F5E9; border-color: #A5D6A7; }
+          .badge-tier-mid { color: #E65100; background: #FFF3E0; border-color: #FFCC80; }
+          .badge-tier-low { color: #4A148C; background: #F3E5F5; border-color: #CE93D8; }
           .workload-container { display: flex; align-items: center; gap: 8px; }
           .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
-          .workload-fill { height: 100%; background: ${DASHBOARD_PRIMARY_ACCENT}; border-radius: 9999px; }
+          .workload-fill { height: 100%; background: #607D8B; border-radius: 9999px; }
           .workload-text { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
           .summary-row { background: #F7F7F7; border-top: 2px solid #ECECEC; }
           .summary-cell { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
@@ -285,12 +284,12 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
 
   const rows = useMemo(() => {
     const names = new Set();
-    selectedSprints.forEach((sp) => sp.developers.forEach((d) => names.add(d.name)));
+    selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
     return Array.from(names).map((name) => {
       const row = { name };
       let initials = '';
       selectedSprints.forEach((sp) => {
-        const d = sp.developers.find((x) => x.name === name);
+        const d = (sp.developers || []).find((x) => x.name === name);
         if (d && !initials) initials = d.initials || initialsFromName(name);
         row[`${sp.id}_assigned`] = d ? d.assigned : '—';
         row[`${sp.id}_completed`] = d ? d.completed : '—';
@@ -389,7 +388,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
             {!suppressCardTitle ? (
               <>
                 <div className="table-title-icon-wrap">
-                  <Users size={22} color="#C74634" strokeWidth={2} />
+                  <Users size={22} color="#1A1A1A" strokeWidth={2} />
                 </div>
                 <h3 className="table-title">Developer Productivity Breakdown</h3>
               </>
@@ -511,12 +510,14 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
               )}
             </thead>
             <tbody>
-              {sorted.map((r, i) => (
+              {sorted.map((r, i) => {
+                const av = developerAvatarColors(r.name);
+                return (
                 <tr key={r.name} className={i % 2 === 1 ? 'row-odd' : ''}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div className="avatar-circle">
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#C74634' }}>{r.initials}</span>
+                      <div className="avatar-circle" style={{ background: av.bg }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: av.color }}>{r.initials}</span>
                       </div>
                       <span className="dev-name-text">{r.name}</span>
                     </div>
@@ -561,7 +562,8 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                         );
                       })()}
                 </tr>
-              ))}
+                );
+              })}
               <tr className="summary-row">
                 <td className="summary-cell">Team Average</td>
                 {compareMode
@@ -652,7 +654,7 @@ function FullAnalyticsTable() {
         <div className="table-header">
           <div className="table-header-left">
             <div className="table-title-icon-wrap">
-              <Users size={20} color="#C74634" strokeWidth={2} />
+              <Users size={20} color="#1A1A1A" strokeWidth={2} />
             </div>
             <h3 className="table-title">Developer Productivity Breakdown</h3>
           </div>
@@ -696,12 +698,14 @@ function FullAnalyticsTable() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r, i) => (
+              {sorted.map((r, i) => {
+                const av = developerAvatarColors(r.name);
+                return (
                 <tr key={r.name} className={i % 2 === 1 ? 'row-odd' : ''}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div className="avatar-circle">
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#C74634' }}>{r.initials}</span>
+                      <div className="avatar-circle" style={{ background: av.bg }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: av.color }}>{r.initials}</span>
                       </div>
                       <span className="dev-name-text">{r.name}</span>
                     </div>
@@ -731,7 +735,8 @@ function FullAnalyticsTable() {
                     <WorkloadBar val={r.workload} />
                   </td>
                 </tr>
-              ))}
+                );
+              })}
 
               <tr className="summary-row">
                 <td className="summary-cell">Team Average</td>

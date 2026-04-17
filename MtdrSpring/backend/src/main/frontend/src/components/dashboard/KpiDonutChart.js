@@ -12,6 +12,7 @@ export default function KpiDonutChart({
   pct,
   displayValue,
   displaySuffix,
+  arcColor = CHART_ARC,
   height = { xs: 150, sm: 168 },
   innerRadius = 54,
   outerRadius = 72,
@@ -49,7 +50,7 @@ export default function KpiDonutChart({
             dataKey="value"
             stroke="none"
           >
-            <Cell fill={CHART_ARC} />
+            <Cell fill={arcColor} />
             <Cell fill="#F0F0F0" />
           </Pie>
         </PieChart>

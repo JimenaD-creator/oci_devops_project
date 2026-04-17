@@ -53,12 +53,12 @@ export default function KPIComparisonCards() {
           .kpi-value-actual { font-size: 24px; font-weight: 700; color: #2E2E2E; }
           .kpi-badge {
             padding: 4px 8px;
-            background-color: #f0fdf4;
-            color: #15803d;
+            background-color: rgba(199, 70, 52, 0.08);
+            color: #C74634;
             font-size: 12px;
             font-weight: 700;
             border-radius: 8px;
-            border: 1px solid #dcfce7;
+            border: 1px solid rgba(199, 70, 52, 0.28);
             display: flex;
             align-items: center;
             gap: 4px;
@@ -90,7 +90,7 @@ export default function KPIComparisonCards() {
             <div className="chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={kpi.data}>
-                  <Line type="monotone" dataKey="v" stroke="#C74634" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="v" stroke="#546E7A" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

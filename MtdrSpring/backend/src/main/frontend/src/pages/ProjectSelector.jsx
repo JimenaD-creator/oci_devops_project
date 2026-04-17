@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Container, Typography, Grid, Card, Button, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Divider,
@@ -11,10 +11,11 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-const ProjectSelector = ({ onSelect }) => {
+const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
   const [projects, setProjects] = useState([]);
   const [userDetails, setUserDetails] = useState([]);
   const [loading, setLoading] = useState(true);
+  const managerAutoSelectedRef = useRef(false);
   const [openModal, setOpenModal] = useState(null);
   const [formData, setFormData] = useState({});
 
@@ -34,7 +35,57 @@ const ProjectSelector = ({ onSelect }) => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  /** Only projects where this user is the team's manager (same rules as backend listProjectsForManager). */
+  const fetchManagerProjects = async () => {
+    setLoading(true);
+    try {
+      let managerId = null;
+      try {
+        const raw = localStorage.getItem('currentUser');
+        if (raw) {
+          const u = JSON.parse(raw);
+          const id = u?.id ?? u?.ID;
+          if (id != null && String(id).trim() !== '') managerId = String(id).trim();
+        }
+      } catch {
+        managerId = null;
+      }
+      if (!managerId) {
+        setProjects([]);
+        return;
+      }
+      const resProj = await fetch(
+        `${API_BASE}/api/projects/manager/${encodeURIComponent(managerId)}/list`
+      );
+      if (resProj.ok) {
+        const data = await resProj.json();
+        setProjects(Array.isArray(data) ? data : []);
+      } else {
+        setProjects([]);
+      }
+    } catch (err) {
+      console.error('Error loading projects:', err);
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === 'manager') {
+      fetchManagerProjects();
+    } else {
+      fetchData();
+    }
+  }, [mode]);
+
+  /** If the manager has exactly one assigned project, enter the app without an extra click (previous behavior). */
+  useEffect(() => {
+    if (mode !== 'manager' || loading) return;
+    if (projects.length !== 1 || !onSelect || managerAutoSelectedRef.current) return;
+    managerAutoSelectedRef.current = true;
+    onSelect(projects[0]);
+  }, [mode, loading, projects, onSelect]);
 
   const openAndClear = (modalName) => {
     setFormData({});
@@ -76,9 +127,12 @@ const ProjectSelector = ({ onSelect }) => {
             ORACLE
           </Typography>
           <div style={{ margin: '0 auto', width: '60px', height: '4px', backgroundColor: '#E53935', marginBottom: '20px' }} />
-          <Typography variant="h5">System Administration</Typography>
+          <Typography variant="h5">
+            {mode === 'manager' ? 'Selecciona tu proyecto' : 'System Administration'}
+          </Typography>
         </Box>
 
+        {mode === 'admin' && (
         <Grid container spacing={2} sx={{ mb: 6, justifyContent: 'center' }}>
           <Grid item>
             <Button variant="contained" startIcon={<AddBoxIcon />} onClick={() => openAndClear('project')} sx={{ bgcolor: '#000' }}>
@@ -101,12 +155,17 @@ const ProjectSelector = ({ onSelect }) => {
             </Button>
           </Grid>
         </Grid>
+        )}
 
         <Divider sx={{ mb: 4 }}>PROYECTOS ACTIVOS</Divider>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
             <CircularProgress />
           </Box>
+        ) : projects.length === 0 && mode === 'manager' ? (
+          <Typography sx={{ textAlign: 'center', color: '#666', mb: 6 }}>
+            No hay proyectos registrados. Si acabas de iniciar sesión, recarga la página; si el problema continúa, contacta a un administrador.
+          </Typography>
         ) : (
           <Grid container spacing={3} sx={{ mb: 8 }}>
             {projects.map((proj) => (
@@ -128,6 +187,8 @@ const ProjectSelector = ({ onSelect }) => {
           </Grid>
         )}
 
+        {mode === 'admin' && (
+        <>
         <Divider sx={{ mb: 4 }}>DETALLES DE USUARIOS</Divider>
         <TableContainer component={Paper} sx={{ border: '1px solid #EEE', boxShadow: 'none', mb: 4 }}>
           <Table>
@@ -155,6 +216,8 @@ const ProjectSelector = ({ onSelect }) => {
             </TableBody>
           </Table>
         </TableContainer>
+        </>
+        )}
 
         <Dialog open={openModal === 'project'} onClose={() => setOpenModal(null)}>
           <DialogTitle>NUEVO PROYECTO</DialogTitle>

@@ -8,7 +8,7 @@ import {
   Box,
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Typography,
@@ -16,17 +16,20 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  CircularProgress
+  CircularProgress,
+  Collapse,
 } from '@mui/material';
 
 // Icons
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import TaskAltIcon from '@mui/icons-material/TaskAlt';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 
 // Lazy load pages
 const SprintsPage = lazy(() => import('../pages/SprintsPage'));
@@ -53,6 +56,7 @@ function App() {
   const navigate = useNavigate();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [activePage, setActivePage] = useState('dashboard');
+  const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
   const [isLoading, setLoading] = useState(false);
   const [isInserting, setInserting] = useState(false);
   const [items, setItems] = useState([]);
@@ -107,6 +111,12 @@ function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (activePage === 'tasks' || activePage === 'sprints') {
+      setSprintsNavOpen(true);
+    }
+  }, [activePage]);
+
   const handleSelectProject = (project) => {
     localStorage.setItem('currentProjectId', project.id);
     localStorage.setItem('currentProjectName', project.name);
@@ -125,12 +135,18 @@ function App() {
 
   const NAV_ITEMS = [
     { text: 'Dashboard', icon: <DashboardIcon />, id: 'dashboard', roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Sprints', icon: <AssignmentIcon />, id: 'sprints', roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Tasks', icon: <TaskAltIcon />, id: 'tasks', roles: ['ADMIN', 'MANAGER'] },
     { text: 'KPI Analytics', icon: <AnalyticsIcon />, id: 'analytics', roles: ['ADMIN', 'MANAGER'] },
-    { text: 'AI Insights', icon: <AutoAwesomeIcon />, id: 'ai', roles: ['ADMIN', 'MANAGER'] },
     { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter(item => item.roles.includes(user.role));
+  const primaryNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard');
+  const secondaryNavItems = NAV_ITEMS.filter((item) => item.id !== 'dashboard');
+
+  const SPRINTS_SUBITEMS = [
+    { text: 'Tasks', id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },
+    { text: 'Kanban board', id: 'tasks', icon: <ViewKanbanIcon fontSize="small" /> },
+  ];
+
+  const sprintsSectionActive = activePage === 'tasks' || activePage === 'sprints';
 
   const handleLogout = () => {
     logout();
@@ -189,28 +205,114 @@ function App() {
           </Box>
         </Box>
 
-        <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }}>
-          {NAV_ITEMS.map((item) => (
-            <ListItem button key={item.id} 
+        <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }} component="nav">
+          {primaryNavItems.map((item) => (
+            <ListItemButton
+              key={item.id}
               onClick={() => {
                 if (item.id === 'selector') {
                   handleChangeProject();
                 } else {
                   setActivePage(item.id);
                 }
-              }} 
+              }}
               sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
+                borderRadius: '8px',
+                mb: 0.5,
+                py: 1.1,
                 backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
                 '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
                 transition: 'background-color 0.15s ease',
-              }}>
+              }}
+            >
               <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text}
-                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }} />
-            </ListItem>
+              <ListItemText
+                primary={item.text}
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+              />
+            </ListItemButton>
+          ))}
+
+          <ListItemButton
+            onClick={() => setSprintsNavOpen((o) => !o)}
+            sx={{
+              borderRadius: '8px',
+              mb: 0.5,
+              py: 1.1,
+              backgroundColor: sprintsSectionActive ? '#E53935' : 'transparent',
+              '&:hover': { backgroundColor: sprintsSectionActive ? '#C62828' : '#2A2A2A' },
+              transition: 'background-color 0.15s ease',
+            }}
+          >
+            <ListItemIcon sx={{ color: sprintsSectionActive ? 'white' : '#777', minWidth: 38 }}>
+              <AssignmentIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary="Sprints"
+              primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: sprintsSectionActive ? 600 : 400 }}
+            />
+            {sprintsNavOpen ? (
+              <ExpandLess sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+            ) : (
+              <ExpandMore sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+            )}
+          </ListItemButton>
+          <Collapse in={sprintsNavOpen} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {SPRINTS_SUBITEMS.map((sub) => {
+                const subActive = activePage === sub.id;
+                return (
+                  <ListItemButton
+                    key={sub.id}
+                    onClick={() => setActivePage(sub.id)}
+                    sx={{
+                      pl: 3,
+                      py: 1,
+                      borderRadius: '8px',
+                      mb: 0.25,
+                      backgroundColor: subActive ? 'rgba(229, 57, 53, 0.35)' : 'transparent',
+                      '&:hover': { backgroundColor: subActive ? 'rgba(229, 57, 53, 0.45)' : '#2A2A2A' },
+                    }}
+                  >
+                    <ListItemIcon sx={{ color: subActive ? '#fff' : '#999', minWidth: 36 }}>{sub.icon}</ListItemIcon>
+                    <ListItemText
+                      primary={sub.text}
+                      primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: subActive ? 600 : 400 }}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Collapse>
+          {secondaryNavItems.map((item) => (
+            <ListItemButton
+              key={item.id}
+              onClick={() => {
+                if (item.id === 'selector') {
+                  handleChangeProject();
+                } else {
+                  setActivePage(item.id);
+                }
+              }}
+              sx={{
+                borderRadius: '8px',
+                mb: 0.5,
+                py: 1.1,
+                backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
+                '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={item.text}
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+              />
+            </ListItemButton>
           ))}
         </List>
 
@@ -262,7 +364,12 @@ function App() {
               projectId={selectedProjectId}
             />
           )}
-          {activePage === 'sprints' && <SprintsPage projectId={selectedProjectId} />}
+          {activePage === 'sprints' && (
+            <SprintsPage
+              projectId={selectedProjectId}
+              onNavigateToTasks={() => setActivePage('tasks')}
+            />
+          )}
           {activePage === 'analytics' && <KPIAnalytics projectId={selectedProjectId} />}
         </Suspense>
         
