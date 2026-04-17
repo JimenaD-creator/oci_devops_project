@@ -19,7 +19,6 @@ public class SprintController {
     private SprintRepository sprintRepository;
 
     @GetMapping
-    @Cacheable(value = "sprints", key = "#projectId != null ? #projectId : 'all'")
     public ResponseEntity<List<Sprint>> getAllSprints(@RequestParam(required = false) Long projectId) {
         List<Sprint> sprints;
         if (projectId != null) {

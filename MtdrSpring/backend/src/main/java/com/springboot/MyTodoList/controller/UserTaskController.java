@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,60 +72,80 @@ public class UserTaskController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping
-    public ResponseEntity<UserTask> createUserTask(@RequestBody CreateUserTaskRequest request) {
-        if (request == null || request.getUserId() == null || request.getTaskId() == null) {
+        @PostMapping
+        public ResponseEntity<UserTask> createUserTask(@RequestBody Map<String, Object> payload) {
+        try {
+        Number userIdNum = (Number) payload.get("userId");
+        Number taskIdNum = (Number) payload.get("taskId");
+        String status    = (String) payload.get("status");
+        Number workedHoursNum = (Number) payload.getOrDefault("workedHours", 0);
+
+        if (userIdNum == null || taskIdNum == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<User> userOpt = userRepository.findById(Long.valueOf(request.getUserId()));
-        Optional<Task> taskOpt = taskRepository.findById(request.getTaskId());
-        if (userOpt.isEmpty() || taskOpt.isEmpty()) {
+        Long userId = userIdNum.longValue();
+        Long taskId = taskIdNum.longValue();
+        Long workedHours = workedHoursNum != null ? workedHoursNum.longValue() : 0L;
+
+        User user = userRepository.findById(userId).orElse(null);
+        Task task = taskRepository.findById(taskId).orElse(null);
+
+        if (user == null || task == null) {
             return ResponseEntity.notFound().build();
         }
 
-        User user = userOpt.get();
-        Task task = taskOpt.get();
-        UserTaskId id = new UserTaskId(user.getId().intValue(), task.getId());
-        UserTask userTask = userTaskRepository.findById(id).orElseGet(UserTask::new);
+        // ✅ Look up existing record by composite key
+        UserTaskId id = new UserTaskId(userId, taskId);
+        UserTask userTask = userTaskRepository.findById(id)
+                .orElseGet(() -> new UserTask(user, task)); // ✅ use constructor — lets @MapsId work
 
-        userTask.setId(id);
-        userTask.setUser(user);
-        userTask.setTask(task);
-        userTask.setStatus(request.getStatus());
+        // ✅ Only update scalar fields, never touch the ID or re-set associations on existing records
+        userTask.setStatus(status != null ? status.toUpperCase() : "TODO");
+        userTask.setWorkedHours(workedHours);
 
         UserTask saved = userTaskRepository.save(userTask);
-        taskAssignmentSyncService.syncTaskStatusFromAssignments(request.getTaskId());
+        taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+
         return ResponseEntity.ok(saved);
+
+    } catch (Exception e) {
+        LOGGER.error("Error creating user task", e);
+        return ResponseEntity.internalServerError().build(); // ✅ 500, not 400
+    }}
+    
+    @PostMapping("/test")
+public ResponseEntity<String> testInsert() {
+    try {
+        // Cambia estos IDs por unos que SÍ existan en tu BD
+        Long userId = 1L;
+        Long taskId = 1L;
+
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("USER NOT FOUND: " + userId));
+        Task task = taskRepository.findById(taskId)
+            .orElseThrow(() -> new RuntimeException("TASK NOT FOUND: " + taskId));
+
+        UserTask ut = new UserTask(user, task);
+        ut.setStatus("TODO");
+        ut.setWorkedHours(0L);
+
+        UserTask saved = userTaskRepository.save(ut);
+        return ResponseEntity.ok("OK — saved with id: " + saved.getId());
+
+    } catch (Exception e) {
+        // Imprime TODA la cadena de errores
+        StringBuilder sb = new StringBuilder();
+        Throwable t = e;
+        while (t != null) {
+            sb.append(t.getClass().getSimpleName())
+              .append(": ")
+              .append(t.getMessage())
+              .append("\n");
+            t = t.getCause();
+        }
+        LOGGER.error("TEST INSERT FAILED:\n{}", sb.toString());
+        return ResponseEntity.internalServerError().body(sb.toString());
     }
-
-    public static class CreateUserTaskRequest {
-        private Integer userId;
-        private Long taskId;
-        private String status;
-
-        public Integer getUserId() {
-            return userId;
-        }
-
-        public void setUserId(Integer userId) {
-            this.userId = userId;
-        }
-
-        public Long getTaskId() {
-            return taskId;
-        }
-
-        public void setTaskId(Long taskId) {
-            this.taskId = taskId;
-        }
-
-        public String getStatus() {
-            return status;
-        }
-
-        public void setStatus(String status) {
-            this.status = status;
-        }
-    }
+}
 }

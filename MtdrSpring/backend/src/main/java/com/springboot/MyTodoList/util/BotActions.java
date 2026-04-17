@@ -349,25 +349,21 @@ public class BotActions {
      * @param taskId The task ID
      * @param hours The hours worked (int)
      */
-    private void saveWorkedHours(Integer taskId, Integer hours) {
-        try {
-            // NEW: Get userId from Telegram chatId mapping
-            Integer userId = telegramUserMappingService.getUserIdByChatId(chatId);
-            
-            // NEW: Save to UserTask table
-            userTaskService.saveWorkedHours(userId, (long) taskId, hours);
-            
-            logger.info("Saved {} hours for task {} by user {}", hours, taskId, userId);
-        } catch (Exception e) {
-            logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
-            // Send error message to user
-            BotHelper.sendMessageToTelegram(
-                chatId,
-                "Sorry, there was an error saving your hours. Please try again.",
-                telegramClient,
-                null
-            );
-        }
+private void saveWorkedHours(Integer taskId, Integer hours) {
+    try {
+        Integer userId = telegramUserMappingService.getUserIdByChatId(chatId);
+        
+        // ✅ CORREGIDO: Convertir userId a Long
+        userTaskService.saveWorkedHours(Long.valueOf(userId), (long) taskId, hours);
+        
+        logger.info("Saved {} hours for task {} by user {}", hours, taskId, userId);
+    } catch (Exception e) {
+        logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
+        BotHelper.sendMessageToTelegram(
+            chatId,
+            "Sorry, there was an error saving your hours. Please try again.",
+            telegramClient,
+            null
+        );
     }
-
-}
+} } 
