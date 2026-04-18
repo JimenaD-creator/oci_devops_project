@@ -1,5 +1,5 @@
 import { APP_FONT_FAMILY } from '../../theme';
-import { DEFINED_DEVELOPER_IDS, DEVELOPER_DISPLAY_NAME } from './dashboardSprintData';
+import { DEFINED_DEVELOPER_IDS, DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
 
 /** Sprint id on a task item (API may use sprintId or sprint). */
 export function itemSprintKey(item) {

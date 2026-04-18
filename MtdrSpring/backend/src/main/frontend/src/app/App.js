@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import { taskAPI } from '../services/API';
+import { API_BASE } from '../features/sprints/constants/sprintConstants';
 
 // Material UI imports - SOLO UNA VEZ CADA UNO
 import {
@@ -32,11 +33,11 @@ import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 
 // Lazy load pages
-const SprintsPage = lazy(() => import('../pages/SprintsPage'));
-const TasksPage = lazy(() => import('../pages/TasksPage'));
-const DashboardPage = lazy(() => import('../components/dashboard/DashboardPage'));
-const KPIAnalytics = lazy(() => import('../pages/KPIAnalytics'));
-const ProjectSelector = lazy(() => import('../pages/ProjectSelector'));
+const SprintsPage = lazy(() => import('../features/sprints/SprintsPage'));
+const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
+const KPIAnalytics = lazy(() => import('../features/kpis/KPIAnalytics'));
+const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
 
 const DRAWER_WIDTH = 240;
 
@@ -78,20 +79,20 @@ function App() {
   });
 
   useEffect(() => {
-  if (user?.role === 'MANAGER' && !selectedProjectId) {
-    fetch(`http://localhost:8080/api/projects/manager/${user.id}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(project => {
-        if (project) {
-          localStorage.setItem('currentProjectId', project.id);
-          localStorage.setItem('currentProjectName', project.name);
-          setSelectedProjectId(String(project.id));
-          setSelectedProjectName(project.name);
-        }
-      })
-      .catch(() => {});
-  }
-}, [user]);
+    if (user?.role === 'MANAGER' && !selectedProjectId) {
+      fetch(`${API_BASE}/api/projects/manager/${user.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((project) => {
+          if (project) {
+            localStorage.setItem('currentProjectId', project.id);
+            localStorage.setItem('currentProjectName', project.name);
+            setSelectedProjectId(String(project.id));
+            setSelectedProjectName(project.name);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user && user.role === 'DEVELOPER') {

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Box, Typography, CircularProgress, Grid, Paper, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { Target } from "lucide-react";
-import KpiDonutChart from "../components/dashboard/KpiDonutChart";
-import IndividualTable from "../components/analytics/IndividualTable";
-import DeveloperTable from "../components/analytics/DeveloperTable";
-import DeveloperWorkloadCharts from "../components/analytics/DeveloperWorkloadCharts";
-import { fetchDashboardSprints } from "../components/dashboard/dashboardSprintData";
-import { SECTION_BRAND_DARK, SECTION_ACCENT, sectionRgba } from "../components/dashboard/dashboardConstants";
+import KpiDonutChart from './KpiDonutChart';
+import IndividualTable from './IndividualTable';
+import DeveloperTable from './DeveloperTable';
+import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
+import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { SECTION_BRAND_DARK, SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 const pageEase = [0.22, 1, 0.36, 1];

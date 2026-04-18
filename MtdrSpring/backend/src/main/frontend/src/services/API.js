@@ -1,4 +1,5 @@
-const BASE_URL = 'http://localhost:8080';
+/** Same rule as sprintConstants: dev → local backend; prod → same origin as the SPA. */
+const BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export const TODOITEM_API = `${BASE_URL}/api/todolist`;
 

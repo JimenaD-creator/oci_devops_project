@@ -26,145 +26,33 @@ import {
 } from './dashboardTypography';
 import { buildCompareDeveloperChartsModel } from './dashboardSprintData';
 import { DASHBOARD_SCROLL_VIEWPORT } from './ScrollReveal';
+import {
+  CHART_DESC,
+  COMPLETED_FILL,
+  HOURS_FILL,
+  HOURS_LINE,
+  HOURS_ASSIGNED,
+  STACK_DONE,
+  STACK_PENDING,
+  GRID,
+  CHART_BAR_ANIM_MS,
+  CHART_BAR_EASING,
+  Y_AXIS_HOURS,
+} from './constants/dashboardChartConstants';
+import {
+  maxCompareWorkloadStack,
+  maxSingleWorkloadStack,
+  buildTaskAxisDomainTicks,
+  maxSingleHoursGrouped,
+  maxCompareHoursGrouped,
+  buildHoursAxisDomainTicks,
+  maxSingleComboRange,
+  maxCompareComboRange,
+  comboHeightExtraFromRange,
+  compareChartHeights,
+} from './utils/chartUtils';
 
 const MotionPaper = motion(Paper);
-
-/** One line under chart titles — what the reader should take away. */
-const CHART_DESC = {
-  compare: {
-    workload:
-      'Completed vs pending tasks per developer; bars are stacked by sprint color.',
-    hours:
-      'Per sprint: solid bar = hours worked; lighter bar = estimated hours from task estimates.',
-    combo: 'Bars show completed tasks; lines show hours — both broken down by sprint.',
-  },
-  single: {
-    workload: 'Completed and pending tasks assigned to each developer in this sprint.',
-    hours:
-      'Hours worked (logged) next to estimated hours from task estimates per developer.',
-    combo: 'Side-by-side view of completed tasks (bars) and hours worked (line) per developer.',
-  },
-};
-
-const COMPLETED_FILL = '#5C6BC0';
-const HOURS_FILL = '#FB8C00';
-const HOURS_LINE = '#F57C00';
-/** Planned / estimated hours (lighter bar next to worked). */
-const HOURS_ASSIGNED = alpha(HOURS_FILL, 0.45);
-
-const STACK_DONE = '#1565C0';
-const STACK_PENDING = '#90CAF9';
-
-const GRID = '#E0E0E0';
-
-/** Recharts: bar/line growth when the plot mounts in view. */
-const CHART_BAR_ANIM_MS = 950;
-const CHART_BAR_EASING = 'ease-out';
-
-const Y_AXIS_HOURS = 'Hours';
-
-function maxCompareWorkloadStack(rows, sprintDefs) {
-  let m = 0;
-  if (!rows?.length || !sprintDefs?.length) return m;
-  for (const row of rows) {
-    for (const sp of sprintDefs) {
-      const h = (Number(row[`wc_${sp.id}`]) || 0) + (Number(row[`wo_${sp.id}`]) || 0);
-      m = Math.max(m, h);
-    }
-  }
-  return m;
-}
-
-function maxSingleWorkloadStack(rows) {
-  let m = 0;
-  for (const row of rows || []) {
-    m = Math.max(m, (Number(row.completed) || 0) + (Number(row.pending) || 0));
-  }
-  return m;
-}
-
-function buildTaskAxisDomainTicks(maxStack) {
-  const padded = Math.max(maxStack * 1.25, maxStack + 3, 8);
-  /** Mismo tope que con ticks de 1 en 1 (ceil del padded). */
-  const domainMax = Math.max(1, Math.ceil(padded));
-  /** Ticks más separados: nunca de 1 en 1; el dominio [0, domainMax] no cambia. */
-  let step = 2;
-  if (domainMax > 48) step = 5;
-  if (domainMax > 120) step = 10;
-  const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
-  return { domain: [0, domainMax], ticks, domainMax };
-}
-
-function maxSingleHoursGrouped(rows) {
-  let m = 0;
-  for (const row of rows || []) {
-    const a = Number(row.hWorked) || 0;
-    const b = Number(row.hAssigned) || 0;
-    m = Math.max(m, a, b);
-  }
-  return m;
-}
-
-function maxCompareHoursGrouped(rows, sprintDefs) {
-  let m = 0;
-  if (!rows?.length || !sprintDefs?.length) return m;
-  for (const row of rows) {
-    for (const sp of sprintDefs) {
-      const id = sp.id;
-      const w = Number(row[`hw_${id}`] || 0);
-      const a = Number(row[`ha_${id}`] || 0);
-      m = Math.max(m, w, a);
-    }
-  }
-  return m;
-}
-
-/** Same tick strategy as tasks axis, for hour totals on stacked bullet bars. */
-function buildHoursAxisDomainTicks(maxHours) {
-  const padded = Math.max(maxHours * 1.45, maxHours + 4, 10);
-  const domainMax = Math.max(1, Math.ceil(padded));
-  let step = 4;
-  if (domainMax > 40) step = 6;
-  if (domainMax > 80) step = 10;
-  if (domainMax > 160) step = 20;
-  const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
-  return { domain: [0, domainMax], ticks, domainMax };
-}
-
-function maxSingleComboRange(developers) {
-  let maxT = 0;
-  let maxH = 0;
-  for (const d of developers || []) {
-    maxT = Math.max(maxT, Number(d.completed) || 0);
-    maxH = Math.max(maxH, Number(d.hours) || 0);
-  }
-  return { maxTasks: maxT, maxHours: maxH };
-}
-
-function maxCompareComboRange(comboRows, sprintDefs) {
-  let maxT = 0;
-  let maxH = 0;
-  if (!comboRows?.length || !sprintDefs?.length) return { maxTasks: 0, maxHours: 0 };
-  for (const row of comboRows) {
-    for (const sp of sprintDefs) {
-      maxT = Math.max(maxT, Number(row[`cb_${sp.id}`]) || 0);
-      maxH = Math.max(maxH, Number(row[`ln_${sp.id}`]) || 0);
-    }
-  }
-  return { maxTasks: maxT, maxHours: maxH };
-}
-
-/** Extra chart height when task/hour values are large (dual-axis combo needs more vertical room). */
-function comboHeightExtraFromRange(maxTasks, maxHours) {
-  const t = Math.max(0, Number(maxTasks) || 0);
-  const h = Math.max(0, Number(maxHours) || 0);
-  if (t === 0 && h === 0) return 0;
-  return Math.min(220, Math.round(8 + 3.2 * t + 1.2 * h));
-}
 
 function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
   if (!active || !payload?.length || !sprintDefs?.length) return null;
@@ -372,18 +260,6 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
       })}
     </Box>
   );
-}
-
-/**
- * Height derived from selection (sprints × devs). Only extra‑small viewports get a slight shrink;
- * from `sm` (600px) up — tablet/escritorio — se usa el 100 % del valor calculado.
- */
-function compareChartHeights(base) {
-  const b = Math.max(280, base);
-  return {
-    xs: Math.round(Math.max(280, b * 0.9)),
-    sm: Math.round(b),
-  };
 }
 
 function ChartShell({ title, description, height, children, accent, tint, compact, belowDescription }) {

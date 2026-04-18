@@ -1,3 +1,5 @@
+import { inferStatusByDate } from '../sprints/utils/sprintUtils';
+
 /** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
@@ -40,15 +42,6 @@ export function assignSprintAccentColors(sprints) {
     s.accentColor = SPRINT_CHART_COLORS[i % n];
   });
   return sprints;
-}
-
-function inferStatus(apiSprint) {
-  const now = new Date();
-  const start = new Date(apiSprint.startDate);
-  const due = new Date(apiSprint.dueDate);
-  if (now < start) return 'planned';
-  if (now > due) return 'completed';
-  return 'active';
 }
 
 function formatDateRange(startIso, endIso, locale = 'en') {
@@ -221,12 +214,15 @@ function mapApiSprint(apiSprint) {
   return {
     id,
     assignedProject: apiSprint.assignedProject ?? null,
+    startDate: apiSprint.startDate,
+    dueDate: apiSprint.dueDate,
     shortLabel: `Sprint ${id}`,
     accentColor: SPRINT_CHART_COLORS[0],
     name: `Sprint ${id}`,
     dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     dateRangeEn: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
-    status: inferStatus(apiSprint),
+    /** Dashboard: planned / active / completed from sprint date range (not task completion). */
+    status: inferStatusByDate(apiSprint),
     totalTasks: 0,
     totalCompleted: 0,
     totalHours: 0,
@@ -365,6 +361,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     if (!entry) {
       return {
         ...sp,
+        status: inferStatusByDate(sp),
         developers: [],
         totalTasks: 0,
         totalCompleted: 0,
@@ -394,7 +391,14 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
     const totalCompleted = _statusCounts.DONE ?? 0;
     const kpis = deriveKpisFromLiveData(id, _statusCounts, tasks, userTasks, taskSprintMap, rest.kpis);
-    return { ...rest, kpis, totalTasks, totalCompleted, developers: devs, ...statusPart };
+    return {
+      ...rest,
+      kpis,
+      totalTasks,
+      totalCompleted,
+      developers: devs,
+      ...statusPart,
+    };
   });
 }
 

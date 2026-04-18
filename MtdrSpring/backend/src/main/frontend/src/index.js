@@ -15,7 +15,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import './index.css';
 import { appTheme } from './theme';
 import App from './app/App';
-import Login from './pages/Login';
+import Login from './features/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 
 ReactDOM.render(

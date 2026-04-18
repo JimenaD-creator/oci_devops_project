@@ -9,15 +9,17 @@ import GroupIcon from '@mui/icons-material/Group';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
-import DeveloperTable from '../analytics/DeveloperTable';
+import DeveloperTable from '../kpis/DeveloperTable';
 import {
   fetchDashboardSprints,
   mergeTaskStatusAcrossSprints,
   aggregateSelectionMetrics,
 } from './dashboardSprintData';
-import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './dashboardConstants';
+import { DASHBOARD_CONTENT_MAX_WIDTH, DASHBOARD_PRIMARY_ACCENT } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
+import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { API_BASE } from '../sprints/constants/sprintConstants';
 
 export default function DashboardPage({ projectId: propProjectId }) {
   const [allSprints, setAllSprints] = useState([]);
@@ -28,15 +30,19 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
   useEffect(() => {
-    if (projectId) {
-      loadProjectInfo();
-      handleRefresh();
-    }
+    if (!projectId) return;
+    loadProjectInfo();
+    handleRefresh();
+  }, [projectId]);
+
+  /** Avoid infinite spinner when no project is selected (e.g. admin not yet chose). */
+  useEffect(() => {
+    if (!projectId) setSprintsLoading(false);
   }, [projectId]);
 
   const loadProjectInfo = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/api/projects/${projectId}`);
+      const response = await fetch(`${API_BASE}/api/projects/${projectId}`);
       if (response.ok) {
         const project = await response.json();
         setCurrentProject(project);
@@ -53,18 +59,14 @@ export default function DashboardPage({ projectId: propProjectId }) {
         setAllSprints(sprints);
         setSelectedSprintIds((prev) => {
           if (sprints.length > 0 && prev.length === 0) {
-            const active = sprints.find((s) => s.status === 'active') ?? sprints[sprints.length - 1];
-            return [Number(active.id)];
+            const picked = pickDefaultSelectedSprint(sprints);
+            if (picked?.id != null) return [Number(picked.id)];
           }
           return prev;
         });
       })
       .finally(() => setSprintsLoading(false));
   }, [projectId]);
-
-  useEffect(() => {
-    handleRefresh();
-  }, [handleRefresh]);
 
   const normalizedSelectedIds = useMemo(() => {
     if (!allSprints.length) return [];
@@ -75,8 +77,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
   useEffect(() => {
     if (!allSprints.length || sprintsLoading) return;
     if (normalizedSelectedIds.length === 0) {
-      const active = allSprints.find((s) => s.status === 'active') ?? allSprints[allSprints.length - 1];
-      setSelectedSprintIds([Number(active.id)]);
+      const picked = pickDefaultSelectedSprint(allSprints);
+      if (picked?.id != null) setSelectedSprintIds([Number(picked.id)]);
       return;
     }
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);

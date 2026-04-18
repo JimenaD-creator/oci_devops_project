@@ -2,7 +2,7 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { Clock, ClipboardList } from 'lucide-react';
 import { motion } from 'framer-motion';
-import TaskStatusDistributionChart from './TaskStatusDistributionChart';
+import TaskStatusDistributionChart from '../dashboard/TaskStatusDistributionChart';
 
 const ORACLE_RED = '#C74634';
 

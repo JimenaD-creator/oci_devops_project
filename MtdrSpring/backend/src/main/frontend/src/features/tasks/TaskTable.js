@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { DeleteIcon } from "lucide-react";
 import { UndoIcon } from "lucide-react";
-import { DEVELOPER_DISPLAY_NAME } from './dashboardSprintData';
+import { DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
 
 export const DEV_COLORS = {
   developer1: { bg: '#E3F2FD', color: '#0D47A1', label: 'Dev 1' },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated, login as setSessionAuthenticated } from "../utils/auth";
+import { isAuthenticated, login as setSessionAuthenticated } from '../../utils/auth';
 
 const EyeIcon = ({ open }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -105,13 +105,14 @@ export default function Login() {
             const projRes = await fetch(`${API_BASE}/api/projects/manager/${match.id}`);
             if (projRes.ok) {
               const project = await projRes.json();
-              localStorage.setItem('selectedProjectId', project.id);
-              localStorage.setItem('selectedProjectName', project.name);
+              // Same keys as App.js — avoids empty dashboard on first paint (selected* was never read).
+              localStorage.setItem('currentProjectId', String(project.id));
+              localStorage.setItem('currentProjectName', project.name);
             }
-          } catch (e) { 
-            console.error('Could not pre-load the manager project'); 
+          } catch (e) {
+            console.error('Could not pre-load the manager project');
           }
-          navigate('/'); // Go to dashboard
+          navigate('/');
         }
       } else {
         setFormError('Invalid credentials. Please try again.');

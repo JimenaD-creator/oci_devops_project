@@ -4,10 +4,10 @@ import { APP_FONT_FAMILY } from '../../theme';
 import { developerAvatarColors } from '../../utils/developerColors';
 
 const initialData = [
-  { name: 'Carlos Ruiz', initials: 'CR', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
-  { name: 'Maria Garcia', initials: 'MG', assigned: 10, completed: 8, hours: 45.0, onTime: 85, participation: 90, workload: 100 },
-  { name: 'Juan Perez', initials: 'JP', assigned: 6, completed: 5, hours: 20.0, onTime: 60, participation: 80, workload: 60 },
-  { name: 'Laura Sanchez', initials: 'LS', assigned: 7, completed: 6, hours: 31.0, onTime: 75, participation: 95, workload: 70 },
+  { name: 'Developer 1', initials: 'D1', assigned: 8, completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
+  { name: 'Developer 2', initials: 'D2', assigned: 10, completed: 8, hours: 45.0, onTime: 85, participation: 90, workload: 100 },
+  { name: 'Developer 3', initials: 'D3', assigned: 6, completed: 5, hours: 20.0, onTime: 60, participation: 80, workload: 60 },
+  { name: 'Developer 4', initials: 'D4', assigned: 7, completed: 6, hours: 31.0, onTime: 75, participation: 95, workload: 70 },
 ];
 
 const rate = (completed, assigned) => Math.round((completed / assigned) * 100);
