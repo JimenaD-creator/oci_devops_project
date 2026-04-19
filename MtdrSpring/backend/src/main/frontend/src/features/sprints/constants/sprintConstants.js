@@ -35,6 +35,7 @@ export const STATUS_CHIP_SX = {
 
 export const STATUS_CONFIG = {
   active: { label: 'In progress', color: '#E3F2FD', textColor: '#1565C0' },
+  pending: { label: 'Pending', color: '#FFF3E0', textColor: '#E65100' },
   completed: { label: 'Completed', color: '#E8F5E9', textColor: '#1B5E20' },
   planned: { label: 'Planned', color: '#FFF8E1', textColor: '#F57F17' },
 };

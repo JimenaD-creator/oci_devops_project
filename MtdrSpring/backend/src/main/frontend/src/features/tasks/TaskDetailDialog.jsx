@@ -29,6 +29,11 @@ import {
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
+import { isUserTaskAssigneeComplete } from './utils/taskUtils';
+import {
+  ASSIGNEE_IDENTITY_PALETTE,
+  assigneeIdentityPaletteIndex,
+} from './utils/assigneeIdentityPalette';
 
 export function TaskDetailDialog({
   open,
@@ -61,6 +66,8 @@ export function TaskDetailDialog({
   /** Fetched inside dialog so assignees always match the task’s project / sprint (parent list can be empty or stale). */
   const [pickerDevelopers, setPickerDevelopers] = useState([]);
   const [pickerLoading, setPickerLoading] = useState(false);
+  /** USER_TASK rows for this task (names + per-assignee completion for shared tasks). */
+  const [taskUserTasks, setTaskUserTasks] = useState([]);
 
   const resolvedDeveloperProjectId = useMemo(() => {
     const source =
@@ -122,6 +129,7 @@ export function TaskDetailDialog({
       setTask(null);
       setLoadedAssigneeUserIds([]);
       setAssigneeNamesByUserId({});
+      setTaskUserTasks([]);
       setPickerDevelopers([]);
       setPickerLoading(false);
       setEditMode(false);
@@ -141,18 +149,16 @@ export function TaskDetailDialog({
         const utRes = await fetch(`${API_BASE}/api/user-tasks/task/${t.id}`);
         const utList = utRes.ok ? await utRes.json() : [];
         if (cancelled) return;
-        const ids = Array.isArray(utList)
-          ? [...new Set(utList.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)))]
-          : [];
+        const list = Array.isArray(utList) ? utList : [];
+        setTaskUserTasks(list);
+        const ids = [...new Set(list.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)))];
         const nameMap = {};
-        if (Array.isArray(utList)) {
-          utList.forEach((row) => {
-            const uid = userIdFromUserTaskRow(row);
-            if (uid == null) return;
-            const nm = String(row?.user?.name ?? '').trim();
-            if (nm) nameMap[String(uid)] = nm;
-          });
-        }
+        list.forEach((row) => {
+          const uid = userIdFromUserTaskRow(row);
+          if (uid == null) return;
+          const nm = String(row?.user?.name ?? '').trim();
+          if (nm) nameMap[String(uid)] = nm;
+        });
         setAssigneeNamesByUserId(nameMap);
         setLoadedAssigneeUserIds(ids);
       } finally {
@@ -235,6 +241,7 @@ export function TaskDetailDialog({
               return;
             }
             setLoadedAssigneeUserIds([]);
+            setTaskUserTasks([]);
           }
         } else {
           const delRes = await fetch(`${API_BASE}/api/user-tasks/task/${tid}`, { method: 'DELETE' });
@@ -254,6 +261,9 @@ export function TaskDetailDialog({
             }
           }
           setLoadedAssigneeUserIds(nextIds);
+          const refreshUt = await fetch(`${API_BASE}/api/user-tasks/task/${tid}`);
+          const refreshed = refreshUt.ok ? await refreshUt.json() : [];
+          setTaskUserTasks(Array.isArray(refreshed) ? refreshed : []);
         }
       }
 
@@ -403,6 +413,106 @@ export function TaskDetailDialog({
                 <Box sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid #1E88E5` }}><Typography variant="caption" sx={{ fontWeight: 800, color: '#1565C0' }}>Due Date</Typography><Typography variant="body2" sx={{ mt: 0.5, fontWeight: 700 }}>{formatDate(task.dueDate)}</Typography></Box>
               </Stack>
             </Paper>
+            {taskUserTasks.length > 1 ? (
+              <Paper elevation={0} sx={{ ...PLANNING_CARD_SX, borderTop: `3px solid #5C6BC0` }}>
+                <Typography variant="overline" sx={{ color: '#3949AB', fontWeight: 800, display: 'block', mb: 1.25 }}>Assignee progress</Typography>
+                <Stack spacing={1.1}>
+                  {[...taskUserTasks]
+                    .map((ut) => {
+                      const uid = userIdFromUserTaskRow(ut);
+                      const name = displayNameForAssignee(uid);
+                      const done = isUserTaskAssigneeComplete(ut);
+                      const hrs = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0) || 0;
+                      return { ut, uid, name, done, hrs };
+                    })
+                    .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))
+                    .map(({ ut, uid, name, done, hrs }) => {
+                      const pal = ASSIGNEE_IDENTITY_PALETTE[
+                        assigneeIdentityPaletteIndex({ userId: uid, name })
+                      ];
+                      return (
+                        <Box
+                          key={`${uid ?? 'x'}-${ut?.id?.taskId ?? task.id}`}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'stretch',
+                            flexWrap: 'wrap',
+                            gap: 0.75,
+                            py: 0.5,
+                            borderBottom: '1px solid #EEEEEE',
+                            '&:last-of-type': { borderBottom: 'none' },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flex: 1,
+                              minWidth: 140,
+                              maxWidth: '100%',
+                              borderRadius: '10px',
+                              overflow: 'hidden',
+                              border: '1px solid rgba(0,0,0,0.1)',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                flex: 1,
+                                minWidth: 0,
+                                pl: 0.9,
+                                pr: 0.5,
+                                py: 0.45,
+                                display: 'flex',
+                                alignItems: 'center',
+                                bgcolor: pal.light,
+                                borderLeft: `4px solid ${pal.strip}`,
+                                color: pal.name,
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {name}
+                            </Box>
+                            <Box
+                              sx={{
+                                flexShrink: 0,
+                                px: 0.85,
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                color: '#fff',
+                                bgcolor: done ? '#1B5E20' : '#E65100',
+                              }}
+                            >
+                              {done ? 'Finished' : 'Pending'}
+                            </Box>
+                          </Box>
+                          {hrs > 0 ? (
+                            <Chip
+                              size="small"
+                              label={`${hrs}h`}
+                              sx={{
+                                alignSelf: 'center',
+                                fontWeight: 700,
+                                height: 24,
+                                bgcolor: '#E3F2FD',
+                                color: '#0D47A1',
+                                border: '1px solid rgba(13, 71, 161, 0.2)',
+                              }}
+                            />
+                          ) : null}
+                        </Box>
+                      );
+                    })}
+                </Stack>
+              </Paper>
+            ) : null}
           </Stack>
         )}
         {task && editMode && (
@@ -426,7 +536,24 @@ export function TaskDetailDialog({
                   <FormControl size="small" fullWidth><InputLabel>Sprint</InputLabel><Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">{sprints.map((s) => (<MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>))}</Select></FormControl>
                   <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} />
                 </Stack>
-                <FormControl fullWidth size="small">
+                <FormControl
+                  fullWidth
+                  size="small"
+                  sx={{
+                    '& .MuiSelect-select': {
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      alignContent: 'center',
+                      gap: 0.5,
+                      minHeight: 40,
+                      whiteSpace: 'normal',
+                      overflow: 'visible',
+                      textOverflow: 'clip',
+                      py: 0.75,
+                    },
+                  }}
+                >
                   <InputLabel id="task-assignees-label">Assigned to</InputLabel>
                   <Select
                     labelId="task-assignees-label"

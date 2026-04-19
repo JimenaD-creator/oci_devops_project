@@ -129,6 +129,7 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
       className={`kanban-task-card ${kindClass}${isDone ? ' kanban-task-card--done' : ''}`}
       onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
+      title={typeof onOpenTask === 'function' ? 'Click to view details' : undefined}
     >
       <div className="kanban-task-card-top">
         <span className="kanban-task-id">#{item.id}</span>

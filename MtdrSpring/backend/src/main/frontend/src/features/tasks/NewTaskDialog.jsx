@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, FormControl, InputLabel, Select, MenuItem,
-  OutlinedInput, Checkbox, ListItemText,
+  OutlinedInput, Checkbox, ListItemText, Chip,
   Button, IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import { developerAvatarColors } from '../../utils/developerColors';
 import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
 import { API_BASE, ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { newSprintDialogFieldOutline, oracleRgba } from '../sprints/utils/sprintUtils';
@@ -78,6 +79,7 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
     setSaving(true);
     setError('');
     try {
+      const userIds = finiteUserIds(assignedToIds);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,6 +94,7 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
           dueDate: new Date(dueDate).toISOString(),
           finishDate: new Date(dueDate).toISOString(),
           assignedSprint: { id: Number(sprintId) },
+          assigneeUserIds: userIds,
         }),
       });
       if (!res.ok) {
@@ -99,14 +102,6 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
         return;
       }
       const task = await res.json();
-      const userIds = finiteUserIds(assignedToIds);
-      for (const uid of userIds) {
-        await fetch(`${API_BASE}/api/user-tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: uid, taskId: Number(task.id), status }),
-        });
-      }
       onCreated?.(task, userIds, status);
       onClose();
     } catch {
@@ -182,7 +177,26 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
             </FormControl>
             <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} sx={newSprintDialogFieldOutline()} />
           </Stack>
-          <FormControl fullWidth size="small" sx={newSprintDialogFieldOutline()}>
+          <FormControl
+            fullWidth
+            size="small"
+            sx={{
+              ...newSprintDialogFieldOutline(),
+              /* MUI Select multiple defaults to nowrap + ellipsis; chips need wrap + visible overflow */
+              '& .MuiSelect-select': {
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                alignContent: 'center',
+                gap: 0.5,
+                minHeight: 40,
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                textOverflow: 'clip',
+                py: 0.75,
+              },
+            }}
+          >
             <InputLabel id="create-task-assigned-label">Developers</InputLabel>
             <Select
               labelId="create-task-assigned-label"
@@ -190,7 +204,49 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
               value={finiteUserIds(assignedToIds)}
               onChange={(e) => setAssignedToIds(multiselectNumericIds(e.target.value))}
               input={<OutlinedInput label="Developers" />}
-              renderValue={(selected) => finiteUserIds(selected).map((id) => validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`).join(', ')}
+              renderValue={(selected) => {
+                const ids = finiteUserIds(selected);
+                return (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 0.5,
+                      maxHeight: 80,
+                      overflowY: 'auto',
+                      py: 0.25,
+                      width: '100%',
+                    }}
+                  >
+                    {ids.length === 0 ? (
+                      <Typography component="span" variant="body2" sx={{ color: '#9E9E9E' }}>
+                        Select developers
+                      </Typography>
+                    ) : (
+                      ids.map((id) => {
+                        const name = validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
+                        const av = developerAvatarColors(name);
+                        return (
+                          <Chip
+                            key={id}
+                            size="small"
+                            label={name}
+                            variant="outlined"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: 'transparent',
+                              color: av.color,
+                              borderColor: av.color,
+                              borderWidth: 1,
+                            }}
+                          />
+                        );
+                      })
+                    )}
+                  </Box>
+                );
+              }}
+              MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
             >
               {validDevelopers.map((u) => (
                 <MenuItem key={u.uid} value={u.uid}>

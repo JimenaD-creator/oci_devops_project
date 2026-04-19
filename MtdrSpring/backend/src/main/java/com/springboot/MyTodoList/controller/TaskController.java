@@ -1,10 +1,12 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.dto.TaskCreatePayload;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import com.springboot.MyTodoList.service.TaskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,9 @@ public class TaskController {
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Autowired
+    private TaskService taskService;
     
     /**
      * Get all tasks
@@ -51,9 +56,16 @@ public class TaskController {
      * Create new task
      */
     @PostMapping
-    public ResponseEntity<Task> createTask(@RequestBody Task task) {
-        Task savedTask = taskRepository.save(task);
-        return ResponseEntity.ok(savedTask);
+    public ResponseEntity<Task> createTask(@RequestBody TaskCreatePayload payload) {
+        if (payload == null || payload.getTask() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            return ResponseEntity.ok(
+                    taskService.createTask(payload.getTask(), payload.getAssigneeUserIds()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
     
     /**

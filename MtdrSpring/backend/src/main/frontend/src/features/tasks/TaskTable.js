@@ -1,8 +1,12 @@
 import React from "react";
 import {
   Table, TableBody, TableCell, TableContainer, TableRow,
-  Paper, Chip, IconButton, Button, TableHead, Typography
+  Paper, Chip, IconButton, Button, TableHead, Typography, Stack, Box,
 } from '@mui/material';
+import {
+  ASSIGNEE_IDENTITY_PALETTE,
+  assigneeIdentityPaletteIndex,
+} from './utils/assigneeIdentityPalette';
 import { DeleteIcon } from "lucide-react";
 import { UndoIcon } from "lucide-react";
 import { DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
@@ -92,7 +96,78 @@ function DevChip({ developer }) {
   );
 }
 
-function DevelopersCell({ developers, developer }) {
+function DevelopersCell({ developers, developer, assigneeProgress, managerView }) {
+  if (
+    managerView &&
+    Array.isArray(assigneeProgress) &&
+    assigneeProgress.length > 1
+  ) {
+    return (
+      <Stack spacing={0.45} sx={{ py: 0.25 }}>
+        {assigneeProgress.map((row) => {
+          const key = row.userId != null && Number.isFinite(row.userId) ? `u-${row.userId}` : row.name;
+          const pal = ASSIGNEE_IDENTITY_PALETTE[assigneeIdentityPaletteIndex(row)];
+          return (
+            <Box
+              key={key}
+              title={row.completed ? 'This developer marked their part complete' : 'Waiting on this developer'}
+              sx={{
+                display: 'flex',
+                alignItems: 'stretch',
+                maxWidth: '100%',
+                minHeight: 24,
+                borderRadius: '10px',
+                overflow: 'hidden',
+                border: '1px solid rgba(0,0,0,0.1)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+              }}
+            >
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  pl: 0.85,
+                  pr: 0.5,
+                  py: 0.35,
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: pal.light,
+                  borderLeft: `4px solid ${pal.strip}`,
+                  color: pal.name,
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {row.name}
+              </Box>
+              <Box
+                sx={{
+                  flexShrink: 0,
+                  px: 0.7,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.58rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  writingMode: 'horizontal-tb',
+                  color: '#fff',
+                  bgcolor: row.completed ? '#1B5E20' : '#E65100',
+                  borderLeft: row.completed ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(0,0,0,0.08)',
+                }}
+              >
+                {row.completed ? 'Done' : 'Pending'}
+              </Box>
+            </Box>
+          );
+        })}
+      </Stack>
+    );
+  }
   const list = Array.isArray(developers)
     ? developers.map(resolveDeveloperName).filter(Boolean)
     : [resolveDeveloperName(developer)].filter(Boolean);
@@ -164,8 +239,8 @@ const DEFAULT_LAYOUT = {
 
 /** Manager view: same core columns + due date + completed (no On time). */
 const MANAGER_LAYOUT = {
-  colWidths: ['17%', '12%', '10%', '10%', '10%', '10%', '13%', '10%', '8%'],
-  headers: ['Task', 'Developer', 'Status', 'Priority', 'Assigned hrs', 'Worked hrs', 'Due Date', 'On-time', ''],
+  colWidths: ['16%', '15%', '10%', '10%', '10%', '10%', '13%', '10%', '8%'],
+  headers: ['Task', 'Assignees', 'Status', 'Priority', 'Assigned hrs', 'Worked hrs', 'Due Date', 'On-time', ''],
 };
 
 export default function TaskTable({
@@ -258,6 +333,7 @@ export default function TaskTable({
               <TableRow
                 key={item.id}
                 hover
+                title={clickable ? 'Click to view details' : undefined}
                 onClick={clickable ? () => onRowClick(item) : undefined}
                 sx={{
                   '&:last-child td': { border: 0 },
@@ -282,7 +358,12 @@ export default function TaskTable({
                   {item.description}
                 </TableCell>
                 <TableCell sx={{ px: 1.5, ...columnCellSx(1) }}>
-                  <DevelopersCell developers={item.developers} developer={item.developer} />
+                  <DevelopersCell
+                    developers={item.developers}
+                    developer={item.developer}
+                    assigneeProgress={item.assigneeProgress}
+                    managerView={managerView}
+                  />
                 </TableCell>
                 <TableCell sx={{ px: 1.5, ...columnCellSx(2) }}>
                   <Chip
@@ -332,7 +413,9 @@ export default function TaskTable({
                   {item.assignedHours != null ? `${item.assignedHours}h` : '—'}
                 </TableCell>
                 <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(5) }}>
-                  {isCompletedStatus(item) && item.actualHours != null ? `${item.actualHours}h` : '—'}
+                  {item.actualHours != null && Number(item.actualHours) > 0
+                    ? `${item.actualHours}h`
+                    : '—'}
                 </TableCell>
                 {managerView && (
                   <>

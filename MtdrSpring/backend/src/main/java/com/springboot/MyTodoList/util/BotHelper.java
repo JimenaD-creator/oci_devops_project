@@ -36,6 +36,10 @@ public class BotHelper {
 	public static void sendMessageToTelegram(Long chatId, String text,TelegramClient bot, ReplyKeyboardMarkup rk ) {
 
 		try {
+			if (rk == null) {
+				sendMessageToTelegram(chatId, text, bot);
+				return;
+			}
 			// prepare message
 			SendMessage messageToTelegram = 
 					SendMessage

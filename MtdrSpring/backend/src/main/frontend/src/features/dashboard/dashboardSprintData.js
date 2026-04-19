@@ -147,15 +147,16 @@ export function userTaskWorkedHours(ut) {
 }
 
 /**
- * Hours shown in dashboard charts: only when the parent TASK is DONE.
- * If status is TODO / in progress / etc., counts as 0 (reopened tasks don’t keep showing old hours).
+ * Hours for dashboard rollups: uses {@link userTaskWorkedHours} for each USER_TASK row.
+ * Shared tasks can stay IN_REVIEW while assignees log hours; those hours still count per developer and sprint totals.
+ * Rows whose task is not in {@code taskSprintMap} are ignored (no matching TASK in the loaded project).
  */
 function workedHoursForDashboardCharts(ut, taskId, taskSprintMap) {
   const raw = userTaskWorkedHours(ut);
   if (taskId == null || !Number.isFinite(Number(taskId))) return 0;
   const tm = taskSprintMap[taskId];
   if (!tm) return 0;
-  return bucketTaskStatus(tm.status) === 'DONE' ? raw : 0;
+  return raw;
 }
 
 export function taskSprintId(task) {
@@ -325,7 +326,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const utCompleted = userTaskRowEligibleForWorkedHours(ut);
     const loggedHours = workedHoursForDashboardCharts(ut, taskId, taskSprintMap);
 
-    /** Sprint total: worked hours only for TASK in DONE (reopened → 0). */
+    /** Sprint total: sum of USER_TASK.WORKED_HOURS for tasks in this sprint (incl. shared tasks not fully DONE). */
     sp.totalHours += loggedHours;
 
     const devKey = developerAggregateKey(ut);

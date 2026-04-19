@@ -11,9 +11,9 @@ ENV ui_username="admin"
 ENV ui_password="none0001"
 
 # Spring Boot binds these to spring.datasource.* (db_url / db_user are ignored).
-ENV SPRING_DATASOURCE_URL="jdbc:oracle:thin:@managementdatabase_tp?TNS_ADMIN=/mtdrworkshop/creds"
+ENV SPRING_DATASOURCE_URL="jdbc:oracle:thin:@reacttodo2p9ml_tp?TNS_ADMIN=/mtdrworkshop/creds"
 ENV SPRING_DATASOURCE_USERNAME="MANAGER"
-ENV SPRING_DATASOURCE_PASSWORD="Mgr##2024Oracle!"
+ENV SPRING_DATASOURCE_PASSWORD="MxTodo#2026Pass9"
 ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME="oracle.jdbc.OracleDriver"
 
 ENTRYPOINT ["java","-jar","MyTodoList.jar"]

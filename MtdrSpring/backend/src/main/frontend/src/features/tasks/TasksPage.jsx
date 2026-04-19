@@ -8,6 +8,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import KanbanBoard from './KanbanBoard';
+import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId } from '../../utils/userIds';
 import { TasksNewTaskDialog } from './TasksNewTaskDialog';
@@ -37,6 +38,8 @@ export default function TasksPage({ projectId }) {
   const [dueTo, setDueTo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [multiDoneTaskId, setMultiDoneTaskId] = useState(null);
+  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
+  const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -227,6 +230,19 @@ export default function TasksPage({ projectId }) {
       await putTask();
     } catch (e) { console.error('Error updating task status:', e); }
   };
+
+  const handleOpenTaskFromKanban = useCallback((kanbanItem) => {
+    const raw = kanbanItem?._raw;
+    if (raw && raw.id != null) {
+      setTaskForDetailDialog(raw);
+      setTaskDetailOpen(true);
+    }
+  }, []);
+
+  const closeTaskDetailDialog = useCallback(() => {
+    setTaskDetailOpen(false);
+    setTaskForDetailDialog(null);
+  }, []);
 
   const handleDeleteTask = async (taskId) => {
     if (
@@ -485,7 +501,12 @@ export default function TasksPage({ projectId }) {
             <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: '#F5F5F5', fontWeight: 700 }} />
           </Box>
           <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #ECECEC', bgcolor: '#FFFFFF', overflow: 'hidden' }}>
-            <KanbanBoard items={filteredItems} onStatusChange={handleStatusChange} onDeleteTask={handleDeleteTask} />
+            <KanbanBoard
+              items={filteredItems}
+              onStatusChange={handleStatusChange}
+              onDeleteTask={handleDeleteTask}
+              onOpenTask={handleOpenTaskFromKanban}
+            />
           </Paper>
         </Grid>
       </Grid>
@@ -539,6 +560,25 @@ export default function TasksPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         defaultSprintId={selectedSprintId}
         pickerProjectId={effectiveProjectId}
+      />
+
+      <TaskDetailDialog
+        open={taskDetailOpen}
+        initialTask={taskForDetailDialog}
+        sprints={sprintsForActiveProject}
+        projectDevelopers={projectDevelopers}
+        activeProjectId={selectedProjectId}
+        onClose={closeTaskDetailDialog}
+        onSaved={(updated) => {
+          setRawTasks((prev) => prev.map((t) => (Number(t.id) === Number(updated.id) ? updated : t)));
+          closeTaskDetailDialog();
+          loadData();
+        }}
+        onDeleted={(taskId) => {
+          setRawTasks((prev) => prev.filter((t) => Number(t.id) !== Number(taskId)));
+          closeTaskDetailDialog();
+          loadData();
+        }}
       />
     </Box>
   );

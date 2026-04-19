@@ -77,8 +77,7 @@ public class UserTaskController {
         try {
         Number userIdNum = (Number) payload.get("userId");
         Number taskIdNum = (Number) payload.get("taskId");
-        String status    = (String) payload.get("status");
-        Number workedHoursNum = (Number) payload.getOrDefault("workedHours", 0);
+        String status = (String) payload.get("status");
 
         if (userIdNum == null || taskIdNum == null) {
             return ResponseEntity.badRequest().build();
@@ -86,7 +85,6 @@ public class UserTaskController {
 
         Long userId = userIdNum.longValue();
         Long taskId = taskIdNum.longValue();
-        Long workedHours = workedHoursNum != null ? workedHoursNum.longValue() : 0L;
 
         User user = userRepository.findById(userId).orElse(null);
         Task task = taskRepository.findById(taskId).orElse(null);
@@ -95,14 +93,25 @@ public class UserTaskController {
             return ResponseEntity.notFound().build();
         }
 
-        // ✅ Look up existing record by composite key
         UserTaskId id = new UserTaskId(userId, taskId);
         UserTask userTask = userTaskRepository.findById(id)
-                .orElseGet(() -> new UserTask(user, task)); // ✅ use constructor — lets @MapsId work
+                .orElseGet(() -> new UserTask(user, task));
 
-        // ✅ Only update scalar fields, never touch the ID or re-set associations on existing records
+        /*
+         * UI often sends only { userId, taskId, status } when marking an assignee complete.
+         * Do not default workedHours to 0 — that wiped WORKED_HOURS. Only overwrite when the client sends the field.
+         */
+        long hoursToSave;
+        if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
+            hoursToSave = ((Number) payload.get("workedHours")).longValue();
+        } else if (userTask.getWorkedHours() != null) {
+            hoursToSave = userTask.getWorkedHours();
+        } else {
+            hoursToSave = 0L;
+        }
+
         userTask.setStatus(status != null ? status.toUpperCase() : "TODO");
-        userTask.setWorkedHours(workedHours);
+        userTask.setWorkedHours(hoursToSave);
 
         UserTask saved = userTaskRepository.save(userTask);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);

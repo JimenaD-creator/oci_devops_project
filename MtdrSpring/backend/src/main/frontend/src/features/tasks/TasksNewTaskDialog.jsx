@@ -147,6 +147,7 @@ export function TasksNewTaskDialog({
     setSaving(true);
     setError('');
     try {
+      const assigneeUserIds = finiteUserIds(assignedToIds);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -161,33 +162,13 @@ export function TasksNewTaskDialog({
           dueDate: new Date(dueDate).toISOString(),
           finishDate: new Date(dueDate).toISOString(),
           assignedSprint: { id: Number(sprintId) },
+          assigneeUserIds,
         }),
       });
 
       if (res.ok) {
         const createdTask = await res.json();
-
-        const assignmentPromises = assignedToIds.map(async (uid) => {
-          const assignRes = await fetch(`${API_BASE}/api/user-tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: Number(uid),
-              taskId: createdTask.id,
-              status,
-              workedHours: 0,
-            }),
-          });
-          if (!assignRes.ok) {
-            const errorText = await assignRes.text();
-            throw new Error(`Assignment failed for user ${uid}: ${errorText}`);
-          }
-          return assignRes.json();
-        });
-
-        await Promise.all(assignmentPromises);
-
-        onCreated(createdTask, assignedToIds, status, null);
+        onCreated(createdTask, assigneeUserIds, status, null);
         handleClose();
       } else {
         const errorText = await res.text();
@@ -305,7 +286,26 @@ export function TasksNewTaskDialog({
               <Typography component="span" variant="caption" sx={{ fontWeight: 700 }}>{`/api/projects/${pickerProjectId}/developers`}</Typography>.
             </Alert>
           ) : null}
-          <FormControl fullWidth size="small" sx={pageFormFieldOutline()}>
+          <FormControl
+            fullWidth
+            size="small"
+            sx={{
+              ...pageFormFieldOutline(),
+              '& .MuiSelect-select': {
+                color: '#1A1A1A',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                alignContent: 'center',
+                gap: 0.5,
+                minHeight: 40,
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                textOverflow: 'clip',
+                py: 0.75,
+              },
+            }}
+          >
             <InputLabel id="create-task-assigned-label">Developers</InputLabel>
             <Select
               labelId="create-task-assigned-label"

@@ -12,6 +12,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import TaskTable from '../tasks/TaskTable';
+import { isUserTaskAssigneeComplete } from '../tasks/utils/taskUtils';
 import {
   EditSprintDialog,
   NewSprintDialog,
@@ -26,6 +27,7 @@ import {
   pickDefaultSelectedSprint,
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
+  sortTasksForSprintTable,
   sprintProjectIdFromJson,
   sprintsOverviewVariants,
   taskDisplayName,
@@ -108,8 +110,9 @@ export default function SprintsPage({ projectId }) {
     };
   }, [effectiveProjectIdNum]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setLoading(true);
     try {
       const pid = resolveActiveProjectIdNum(projectId);
       const sprintsUrl =
@@ -150,7 +153,7 @@ export default function SprintsPage({ projectId }) {
         return pickDefaultSelectedSprint(sorted) ?? sorted[0];
       });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -179,10 +182,10 @@ export default function SprintsPage({ projectId }) {
       window.alert('Connection error deleting sprint.');
     }
   };
-  const selectedSprintTasks = useMemo(
-    () => (selectedSprint ? tasks.filter((t) => t.assignedSprint?.id === selectedSprint.id) : []),
-    [tasks, selectedSprint],
-  );
+  const selectedSprintTasks = useMemo(() => {
+    if (!selectedSprint) return [];
+    return sortTasksForSprintTable(tasks.filter((t) => t.assignedSprint?.id === selectedSprint.id));
+  }, [tasks, selectedSprint]);
   const assignmentsByTaskId = useMemo(() => {
     return (Array.isArray(userTasks) ? userTasks : []).reduce((acc, ut) => {
       const tidRaw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId;
@@ -198,31 +201,47 @@ export default function SprintsPage({ projectId }) {
       selectedSprintTasks.map((task) => ({
         ...(function deriveTaskRowFields() {
           const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
+          const resolveUtName = (ut) => {
+            const direct = String(
+              ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? ''
+            ).trim();
+            if (direct) return direct;
+            const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
+            if (Number.isFinite(uid)) {
+              const known = (projectDevelopers || []).find((u) => developerNumericId(u) === uid);
+              if (known?.name) return String(known.name).trim();
+              return `User ${uid}`;
+            }
+            return null;
+          };
           const names = [...new Set(
             taskAssignments
-              .map((ut) => {
-                const direct = String(
-                  ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? ''
-                ).trim();
-                if (direct) return direct;
-                const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
-                if (Number.isFinite(uid)) {
-                  const known = (projectDevelopers || []).find((u) => developerNumericId(u) === uid);
-                  if (known?.name) return String(known.name).trim();
-                  return `User ${uid}`;
-                }
-                return null;
-              })
+              .map((ut) => resolveUtName(ut))
               .filter(Boolean),
           )];
           const workedHours = taskAssignments.reduce((sum, ut) => {
             const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
             return sum + (Number.isFinite(n) ? n : 0);
           }, 0);
+          const assigneeProgress =
+            taskAssignments.length > 0
+              ? [...taskAssignments]
+                .map((ut) => {
+                  const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
+                  const name = resolveUtName(ut) || (Number.isFinite(uid) ? `User ${uid}` : 'Unknown');
+                  return {
+                    userId: Number.isFinite(uid) ? uid : null,
+                    name,
+                    completed: isUserTaskAssigneeComplete(ut),
+                  };
+                })
+                .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))
+              : undefined;
           return {
             developers: names,
             developer: names[0] ?? null,
             actualHours: workedHours > 0 ? workedHours : null,
+            assigneeProgress,
           };
         })(),
         id: task.id,
@@ -254,9 +273,19 @@ export default function SprintsPage({ projectId }) {
   }, [developerFilter, developerFilterOptions]);
   useEffect(() => {
     if (statusFilter === 'all') return;
-    const exists = selectedSprintRows.some((r) => String(r.status || '').toUpperCase() === String(statusFilter).toUpperCase());
+    const want = String(statusFilter).toUpperCase();
+    const exists = selectedSprintRows.some((r) => {
+      const rowStatus = String(r.status || '').toUpperCase();
+      if (rowStatus === want) return true;
+      if (want === 'DONE' && developerFilter !== 'all') {
+        const f = String(developerFilter).trim();
+        const mine = (r.assigneeProgress || []).find((p) => String(p.name).trim() === f);
+        return Boolean(mine?.completed);
+      }
+      return false;
+    });
     if (!exists) setStatusFilter('all');
-  }, [statusFilter, selectedSprintRows]);
+  }, [statusFilter, selectedSprintRows, developerFilter]);
   const hasTaskTableFilters = developerFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueDateFilter);
   const clearTaskTableFilters = () => {
     setDeveloperFilter('all');
@@ -278,8 +307,15 @@ export default function SprintsPage({ projectId }) {
         if (!names.includes(f)) return false;
       }
       if (statusFilter !== 'all') {
+        const want = String(statusFilter).toUpperCase();
         const rowStatus = String(row.status || '').toUpperCase();
-        if (rowStatus !== String(statusFilter).toUpperCase()) return false;
+        let statusOk = rowStatus === want;
+        if (!statusOk && want === 'DONE' && developerFilter !== 'all') {
+          const f = String(developerFilter).trim();
+          const mine = (row.assigneeProgress || []).find((p) => String(p.name).trim() === f);
+          statusOk = Boolean(mine?.completed);
+        }
+        if (!statusOk) return false;
       }
       if (priorityFilter !== 'all') {
         const rowPriority = String(row.priority || '').toUpperCase();
@@ -556,6 +592,7 @@ export default function SprintsPage({ projectId }) {
             return next;
           });
           setSelectedTaskForDialog(null);
+          void loadData({ silent: true });
         }}
         onDeleted={(taskId) => {
           setTasks((prev) => {

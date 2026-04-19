@@ -595,7 +595,7 @@ function CompareComboLegend({ sprintDefs }) {
   );
 }
 
-function SingleWorkloadSymbolLegend() {
+function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = STACK_PENDING }) {
   return (
     <Box
       sx={{
@@ -610,14 +610,14 @@ function SingleWorkloadSymbolLegend() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box
           component="span"
-          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: STACK_DONE, flexShrink: 0 }}
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: completedFill, flexShrink: 0 }}
         />
         <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Completed tasks</Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box
           component="span"
-          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: STACK_PENDING, flexShrink: 0 }}
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: pendingFill, flexShrink: 0 }}
         />
         <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Pending tasks</Typography>
       </Box>
@@ -753,6 +753,12 @@ export default function DashboardDeveloperCharts({
 
   const hasCompareData = compareModel && compareModel.workloadRows.length > 0;
   const hasSingleData = developers.length > 0;
+
+  /** Single-sprint charts: match the sprint chip / compare-mode bar color (`assignSprintAccentColors` on fetch). */
+  const singleSelectedSprintAccent = useMemo(() => {
+    const sp = selectedSprints?.[0];
+    return sp?.accentColor ?? '#3949AB';
+  }, [selectedSprints]);
 
   const singleWorkloadTaskAxis = useMemo(
     () => buildTaskAxisDomainTicks(maxSingleWorkloadStack(workloadStack)),
@@ -1154,14 +1160,16 @@ export default function DashboardDeveloperCharts({
     );
   }
 
+  const workloadPendingTint = alpha(singleSelectedSprintAccent, 0.42);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', minWidth: 0 }}>
       <ChartShell
         title="Assigned workload by developer"
         description={CHART_DESC.single.workload}
         height={hWorkload}
-        accent="#2E7D32"
-        tint="rgba(46, 125, 50, 0.08)"
+        accent={singleSelectedSprintAccent}
+        tint={alpha(singleSelectedSprintAccent, 0.08)}
       >
         <BarChart
           layout="vertical"
@@ -1209,13 +1217,18 @@ export default function DashboardDeveloperCharts({
             align="center"
             layout="horizontal"
             wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingBottom: 6, marginBottom: 2 }}
-            content={() => <SingleWorkloadSymbolLegend />}
+            content={() => (
+              <SingleWorkloadSymbolLegend
+                completedFill={singleSelectedSprintAccent}
+                pendingFill={workloadPendingTint}
+              />
+            )}
           />
           <Bar
             stackId="load"
             dataKey="completed"
             name="Completed tasks"
-            fill={STACK_DONE}
+            fill={singleSelectedSprintAccent}
             radius={[0, 6, 6, 0]}
             maxBarSize={38}
             animationDuration={CHART_BAR_ANIM_MS}
@@ -1226,7 +1239,7 @@ export default function DashboardDeveloperCharts({
             stackId="load"
             dataKey="pending"
             name="Pending tasks"
-            fill={STACK_PENDING}
+            fill={workloadPendingTint}
             radius={[6, 0, 0, 6]}
             maxBarSize={38}
             animationDuration={CHART_BAR_ANIM_MS}

@@ -40,6 +40,35 @@ export function toInputDate(iso) {
   return date.toISOString().slice(0, 10);
 }
 
+const PRIORITY_RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+/**
+ * Stable order for the sprint task table: API `findAll()` has no ORDER BY; client must sort.
+ * Due date (soonest first), then priority (critical first), then task id.
+ */
+export function sortTasksForSprintTable(tasks) {
+  if (!Array.isArray(tasks) || tasks.length <= 1) return tasks || [];
+  const dueMs = (t) => {
+    const raw = t?.dueDate;
+    if (raw == null || raw === '') return Number.POSITIVE_INFINITY;
+    const ms = new Date(raw).getTime();
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+  };
+  const pri = (t) => {
+    const u = String(t?.priority || '').toUpperCase();
+    return u in PRIORITY_RANK ? PRIORITY_RANK[u] : 4;
+  };
+  return [...tasks].sort((a, b) => {
+    const da = dueMs(a);
+    const db = dueMs(b);
+    if (da !== db) return da - db;
+    const pa = pri(a);
+    const pb = pri(b);
+    if (pa !== pb) return pa - pb;
+    return Number(a?.id) - Number(b?.id);
+  });
+}
+
 /**
  * Active project id from props + localStorage. Treats empty-string prop as missing so we
  * still use localStorage (otherwise `??` skips localStorage and /api/sprints loads everything).
@@ -89,8 +118,9 @@ export function inferStatusByDate(sprint) {
 
 /**
  * Sprints page chip: combines calendar (like dashboard) with tasks.
- * - If the sprint window ended by date and not every task is DONE → active ("In progress").
+ * - If the sprint window ended by date and there are tasks not all DONE → pending.
  * - If the window ended and all tasks DONE → completed.
+ * - If the window ended and there are no tasks in the sprint → active (same as before).
  * - While the window is future (planned) or current (active by date), status follows tasks:
  *   no tasks / none DONE → planned; some DONE → active; all DONE → completed.
  */
@@ -105,6 +135,7 @@ export function inferSprintStatus(sprint, allTasks) {
 
   if (calendar === 'completed') {
     if (allDone) return 'completed';
+    if (sprintTasks.length > 0) return 'pending';
     return 'active';
   }
 
@@ -157,7 +188,7 @@ export function pickDefaultSelectedSprint(sprints) {
 export function sortSprintsForDisplay(list, allTasks) {
   const rank = (s) => {
     const st = inferSprintStatus(s, allTasks);
-    if (st === 'active') return 0;
+    if (st === 'active' || st === 'pending') return 0;
     if (st === 'planned') return 1;
     return 2;
   };

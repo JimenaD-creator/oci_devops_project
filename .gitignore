@@ -27,6 +27,8 @@ hs_err_pid*
 
 # dependencies
 frontend/node_modules
+# React app under Spring backend (Create React App path)
+MtdrSpring/backend/src/main/frontend/node_modules/
 frontend/.pnp
 .pnp.js
 

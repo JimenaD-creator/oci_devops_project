@@ -20,6 +20,8 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
   const done = sprintTasks.filter((t) => t.status === 'DONE').length;
   const total = sprintTasks.length;
   const progress = total > 0 ? Math.round((done / total) * 100) : Math.round((sprint.completionRate ?? 0) * 100);
+  /** Green bar when every task is done or the sprint is in the “completed” lifecycle state (chip). */
+  const progressBarComplete = progress >= 100 || status === 'completed';
 
   const outlineColor = statusCfg.textColor;
   return (
@@ -40,7 +42,7 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
           <Box><Typography sx={{ fontWeight: 800, fontSize: '1.08rem' }}>Sprint {sprint.id}</Typography><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}><CalendarTodayIcon sx={{ fontSize: 12, color: '#AAA' }} /><Typography variant="caption" sx={{ color: '#999' }}>{formatDate(sprint.startDate)} → {formatDate(sprint.dueDate)}</Typography></Box></Box>
           <Chip label={statusCfg.label} size="small" sx={{ bgcolor: statusCfg.color, color: statusCfg.textColor, fontWeight: 700, fontSize: '0.7rem' }} />
         </Box>
-        {total > 0 && (<><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}><Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>Progress</Typography><Typography variant="caption" sx={{ fontWeight: 800, color: PROGRESS_LABEL }}>{progress}%</Typography></Box><LinearProgress variant="determinate" value={progress} sx={{ height: 6, borderRadius: 3, bgcolor: PROGRESS_TRACK, mb: 2, '& .MuiLinearProgress-bar': { bgcolor: progress === 100 ? PROGRESS_BAR_COMPLETE : PROGRESS_BAR, borderRadius: 3 } }} /></>)}
+        {total > 0 && (<><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}><Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>Progress</Typography><Typography variant="caption" sx={{ fontWeight: 800, color: progressBarComplete ? PROGRESS_BAR_COMPLETE : PROGRESS_LABEL }}>{progress}%</Typography></Box><LinearProgress variant="determinate" value={progress} sx={{ height: 6, borderRadius: 3, bgcolor: PROGRESS_TRACK, mb: 2, '& .MuiLinearProgress-bar': { bgcolor: progressBarComplete ? PROGRESS_BAR_COMPLETE : PROGRESS_BAR, borderRadius: 3 } }} /></>)}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Box sx={{ display: 'flex', gap: 1.5 }}><CheckCircleIcon sx={{ fontSize: 14, color: '#4CAF50' }} /><Typography variant="caption" sx={{ fontWeight: 600, color: '#555' }}>{done}</Typography><RadioButtonUncheckedIcon sx={{ fontSize: 14, color: ORACLE_RED }} /><Typography variant="caption" sx={{ fontWeight: 600, color: '#555' }}>{total - done}</Typography></Box><Typography variant="caption" sx={{ color: '#AAA', fontWeight: 600 }}>{total} tasks</Typography></Box>
       </CardContent>
     </Card>

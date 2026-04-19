@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Box, Typography, CircularProgress, Grid, Paper, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Grid,
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tooltip,
+} from "@mui/material";
 import { Target } from "lucide-react";
 import KpiDonutChart from './KpiDonutChart';
 import IndividualTable from './IndividualTable';
@@ -11,6 +22,31 @@ import { SECTION_BRAND_DARK, SECTION_ACCENT, sectionRgba } from '../dashboard/co
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 const pageEase = [0.22, 1, 0.36, 1];
+
+/** Hover help for the sprint KPI donut cards (KPI Analytics). */
+const KPI_ANALYTICS_CARD_TOOLTIPS = {
+  'Completion Rate':
+    'Share of tasks in this sprint that are marked Done, out of all tasks in the sprint. A higher value means more work is finished.',
+  'On-Time Delivery':
+    'Among tasks already completed, the percentage that were finished on or before their due date. Only Done tasks are counted in the denominator.',
+  'Team Participation':
+    'How logged hours compare to planned (estimated) hours on tasks in this sprint—roughly “how much of the plan has hours against it.”',
+  'Productivity Score':
+    'A sprint-level score that blends completion rate with how much planned work exists in the sprint (capped at 100). Use it as a quick health signal, not a substitute for detailed hours.',
+};
+
+const tooltipSlotProps = {
+  tooltip: {
+    sx: {
+      maxWidth: 300,
+      fontSize: '0.8125rem',
+      lineHeight: 1.5,
+      fontWeight: 500,
+      py: 1,
+      px: 1.25,
+    },
+  },
+};
 
 export default function KPIAnalytics({ projectId }) {
   const [sprints, setSprints] = useState([]);
@@ -208,38 +244,53 @@ export default function KPIAnalytics({ projectId }) {
             { label: 'Productivity Score', pct: kpis.productivityScore, arcColor: '#2E7D32', borderColor: '#66BB6A' },
           ].map(({ label, pct, arcColor, borderColor }) => (
             <Grid item xs={12} sm={6} md={3} key={label}>
-              <Paper
-                sx={{
-                  p: 2,
-                  textAlign: 'center',
-                  borderRadius: 2,
-                  border: `1px solid ${sectionRgba(0.22)}`,
-                  borderLeft: `4px solid ${borderColor}`,
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  minHeight: 232,
-                  boxSizing: 'border-box',
-                }}
+              <Tooltip
+                title={KPI_ANALYTICS_CARD_TOOLTIPS[label] ?? ''}
+                arrow
+                enterDelay={280}
+                describeChild
+                componentsProps={tooltipSlotProps}
               >
-                <Typography variant="caption" sx={{ color: '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}>
-                  {label}
-                </Typography>
-                <KpiDonutChart
-                  pct={pct}
-                  displayValue={`${Math.round(pct)}%`}
-                  displaySuffix=""
-                  arcColor={arcColor}
-                  height={{ xs: 150, sm: 160 }}
-                  innerRadius={50}
-                  outerRadius={68}
-                  width={{ xs: '100%', sm: '100%' }}
-                  maxWidth={260}
-                  valueFontSize={{ xs: '1.5rem', sm: '1.65rem' }}
-                />
-              </Paper>
+                <Paper
+                  component="div"
+                  tabIndex={0}
+                  sx={{
+                    p: 2,
+                    textAlign: 'center',
+                    borderRadius: 2,
+                    border: `1px solid ${sectionRgba(0.22)}`,
+                    borderLeft: `4px solid ${borderColor}`,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    minHeight: 232,
+                    boxSizing: 'border-box',
+                    cursor: 'help',
+                    outline: 'none',
+                    '&:focus-visible': {
+                      boxShadow: `0 0 0 2px #FFFFFF, 0 0 0 4px ${SECTION_ACCENT}`,
+                    },
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}>
+                    {label}
+                  </Typography>
+                  <KpiDonutChart
+                    pct={pct}
+                    displayValue={`${Math.round(pct)}%`}
+                    displaySuffix=""
+                    arcColor={arcColor}
+                    height={{ xs: 150, sm: 160 }}
+                    innerRadius={50}
+                    outerRadius={68}
+                    width={{ xs: '100%', sm: '100%' }}
+                    maxWidth={260}
+                    valueFontSize={{ xs: '1.5rem', sm: '1.65rem' }}
+                  />
+                </Paper>
+              </Tooltip>
             </Grid>
           ))}
         </Grid>
