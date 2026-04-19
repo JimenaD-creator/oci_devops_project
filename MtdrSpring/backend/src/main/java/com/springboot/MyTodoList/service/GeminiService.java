@@ -30,7 +30,7 @@ public class GeminiService {
     private String geminiApiKey;
 
     private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     @Autowired
     private SprintRepository sprintRepository;
@@ -69,6 +69,8 @@ public class GeminiService {
                 .findByAssignedProjectIdOrderByStartDateAsc(projectId);
 
             String prompt = buildPrompt(sprint, historicalSprints);
+            System.out.println("[GeminiService] Prompt length: " + prompt.length());
+            System.out.println("[GeminiService] Prompt preview: " + prompt.substring(0, Math.min(200, prompt.length())));
             String rawJson = callGemini(prompt);
             String insightsJson = extractJsonFromGeminiResponse(rawJson);
 
@@ -254,7 +256,7 @@ public class GeminiService {
 
         String requestBody = "{\"contents\":[{\"parts\":[{\"text\":" +
             mapper.writeValueAsString(prompt) +
-            "}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":1024," +
+            "}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":8192," +
             "\"responseMimeType\":\"application/json\"}}";
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -285,6 +287,7 @@ public class GeminiService {
             throw new RuntimeException(
                 "Gemini API returned HTTP " + statusCode + ": " + response.body());
         }
+        System.out.println("[GeminiService] Raw Gemini response: " + response.body());
 
         return response.body();
     }
