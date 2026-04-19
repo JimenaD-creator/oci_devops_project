@@ -242,7 +242,7 @@ function mapApiSprint(apiSprint) {
   };
 }
 
-function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksList, taskSprintMap, storedKpis) {
+function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasks, taskSprintMap, storedKpis) {
   const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
   const totalCompleted = _statusCounts.DONE ?? 0;
   const completionRatePct = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
@@ -262,26 +262,11 @@ function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasksLis
   });
   const onTimeDeliveryPct = doneForOnTime > 0 ? Math.round((onTimeCount / doneForOnTime) * 100) : 0;
 
-  let sumAssignedHours = 0;
-  tasksInSprint.forEach((t) => {
-    sumAssignedHours += Number(t.assignedHours) || 0;
-  });
-  let sumWorkedHours = 0;
-  (userTasksList || []).forEach((ut) => {
-    const tid = resolveUserTaskTaskId(ut);
-    const sid = resolveSprintIdForUserTaskRow(ut, tid, taskSprintMap);
-    if (sid == null || Number(sid) !== Number(sprintId)) return;
-    sumWorkedHours += workedHoursForDashboardCharts(ut, tid, taskSprintMap);
-  });
-  const teamParticipationPct =
-    sumAssignedHours > 0 ? Math.round((sumWorkedHours / sumAssignedHours) * 100) : 0;
-
   return {
     ...storedKpis,
     completionRate: completionRatePct,
-    productivityScore: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
-    teamParticipation: teamParticipationPct,
+    productivityScore: completionRatePct,
   };
 }
 
