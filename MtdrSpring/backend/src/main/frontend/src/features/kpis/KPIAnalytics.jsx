@@ -19,6 +19,7 @@ import DeveloperTable from './DeveloperTable';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { SECTION_BRAND_DARK, SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
+//import KPIInsightsPanel from './KPIInsightsPanel';
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 const pageEase = [0.22, 1, 0.36, 1];
@@ -358,6 +359,7 @@ const calculateKPIs = () => {
             workloadBalance={kpis.workloadBalance}
           />
         </Box>
+        
 
         <Box
           component={motion.div}
