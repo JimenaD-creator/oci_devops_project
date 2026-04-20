@@ -66,16 +66,25 @@ function DevChip({ developer }) {
   const label = getDeveloperLabel(resolved);
   const pickFromName = (name) => {
     const palettes = [
-      { bg: '#E3F2FD', color: '#0D47A1' },
-      { bg: '#E8F5E9', color: '#1B5E20' },
-      { bg: '#FFF3E0', color: '#E65100' },
-      { bg: '#F3E5F5', color: '#6A1B9A' },
-      { bg: '#E0F2F1', color: '#00695C' },
-      { bg: '#FCE4EC', color: '#AD1457' },
+      { bg: '#E3F2FD', color: '#0D47A1' }, // blue
+      { bg: '#E8F5E9', color: '#1B5E20' }, // green
+      { bg: '#FFF3E0', color: '#E65100' }, // orange
+      { bg: '#F3E5F5', color: '#6A1B9A' }, // purple
+      { bg: '#E0F2F1', color: '#00695C' }, // teal
+      { bg: '#FCE4EC', color: '#AD1457' }, // pink
+      { bg: '#FFF9C4', color: '#F57F17' }, // yellow
+      { bg: '#E8EAF6', color: '#283593' }, // indigo
+      { bg: '#F1F8E9', color: '#33691E' }, // light green
+      { bg: '#FBE9E7', color: '#BF360C' }, // deep orange
+      { bg: '#E0F7FA', color: '#006064' }, // cyan
+      { bg: '#EDE7F6', color: '#4527A0' }, // deep purple
     ];
     const src = String(name || '');
-    let h = 0;
-    for (let i = 0; i < src.length; i += 1) h = (h * 31 + src.charCodeAt(i)) >>> 0;
+    // Polynomial hash with a larger prime to reduce collisions
+    let h = 5381;
+    for (let i = 0; i < src.length; i += 1) {
+      h = (Math.imul(h, 33) ^ src.charCodeAt(i)) >>> 0;
+    }
     return palettes[h % palettes.length];
   };
   const palette = d ?? pickFromName(label);
