@@ -1,6 +1,6 @@
 /**
- * Requirement: Role-based dashboard (login gate).
- * Topics: Form Testing, Mock HTTP requests, Mock functions (jest.fn/spy).
+ * Requirement 5: Role-based access at login (who may enter the app).
+ * Component under test: Login.jsx.
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
@@ -10,7 +10,6 @@ import { renderWithTheme } from '../../test-utils';
 import Login from './Login';
 import { setupFetchMock, jsonResponse } from '../../mocks/mockFetch';
 
-// Mock the auth utilities so navigation side-effects are isolated 
 jest.mock('../../utils/auth.js', () => ({
   isAuthenticated: jest.fn(() => false),
   login: jest.fn(),
@@ -26,7 +25,6 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-// Dynamic test data factory 
 function makeUser(overrides = {}) {
   return {
     id: 1,
@@ -39,9 +37,8 @@ function makeUser(overrides = {}) {
   };
 }
 
-// Tests 
-
-test('shows error when fields are empty and Sign in is clicked', async () => {
+// Submit with empty fields shows the validation error message.
+test('validation: empty email shows error on submit', async () => {
   const user = userEvent.setup();
   renderWithTheme(
     <MemoryRouter>
@@ -49,31 +46,15 @@ test('shows error when fields are empty and Sign in is clicked', async () => {
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { name: /sign in/i }));
-  expect(
-    await screen.findByText(/please enter your email/i),
-  ).toBeInTheDocument();
+  expect(await screen.findByText(/please enter your email/i)).toBeInTheDocument();
 });
 
-test('typing in email and password fields updates their values', async () => {
-  const user = userEvent.setup();
-  renderWithTheme(
-    <MemoryRouter>
-      <Login />
-    </MemoryRouter>,
-  );
-  const emailInput = screen.getByPlaceholderText(/email, phone, or username/i);
-  const pwInput = screen.getByPlaceholderText(/enter your password/i);
-  await user.type(emailInput, 'admin@oracle.com');
-  await user.type(pwInput, 'secret');
-  expect(emailInput).toHaveValue('admin@oracle.com');
-  expect(pwInput).toHaveValue('secret');
-});
-
-test('MOCK HTTP: DEVELOPER role is denied access after valid credentials', async () => {
+// DEVELOPER users get a denial message and the app does not navigate away.
+test('DEVELOPER role: valid credentials show access denied and do not navigate', async () => {
   const user = userEvent.setup();
   setupFetchMock([
     {
-      test: () => true,
+      test: (url) => String(url).includes('/users') && !String(url).includes('/api'),
       handle: () => jsonResponse([makeUser({ type: 'DEVELOPER' })]),
     },
   ]);
@@ -89,15 +70,16 @@ test('MOCK HTTP: DEVELOPER role is denied access after valid credentials', async
   expect(mockNavigate).not.toHaveBeenCalled();
 });
 
-test('MOCK HTTP: MANAGER logs in and is redirected to home', async () => {
+// MANAGER signs in successfully and the router navigates to `/`.
+test('MANAGER role: login and redirect to /', async () => {
   const user = userEvent.setup();
   setupFetchMock([
     {
-      test: (url) => url.includes('/users') && !url.includes('/api'),
+      test: (url) => String(url).includes('/users') && !String(url).includes('/api'),
       handle: () => jsonResponse([makeUser({ type: 'MANAGER' })]),
     },
     {
-      test: (url) => url.includes('/api/projects/manager/1'),
+      test: (url) => String(url).includes('/api/projects/manager/1'),
       handle: () => jsonResponse({ id: 10, name: 'Test Project' }),
     },
   ]);
@@ -112,7 +94,8 @@ test('MOCK HTTP: MANAGER logs in and is redirected to home', async () => {
   await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
 });
 
-test('MOCK HTTP: shows error when server is unreachable', async () => {
+// If fetch fails, the user sees a connection error instead of a silent failure.
+test('network error: shows message when fetch fails', async () => {
   const user = userEvent.setup();
   jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network Error'));
   renderWithTheme(

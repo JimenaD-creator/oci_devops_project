@@ -1,6 +1,6 @@
 /**
- * Requirement: Real-time task assignment filtering by developer.
- * Topics: Dynamic test data, pure function testing, edge cases.
+ * Supporting — pure helpers for task list filters (used by task views).
+ * Module under test: taskFilters.js.
  */
 import {
   matchesDueDateRange,
@@ -9,19 +9,17 @@ import {
   normalizeDeveloperValue,
 } from './taskFilters';
 
-// matchesStatusFilter
-
+// Matrix: each case checks whether a task row matches the selected status filter.
 describe('matchesStatusFilter', () => {
   const cases = [
-    { filter: 'all',         item: { done: false, status: 'todo' },        expected: true },
-    { filter: 'completed',   item: { done: true,  status: 'done' },        expected: true },
-    { filter: 'completed',   item: { done: false, status: 'todo' },        expected: false },
-    { filter: 'pending',     item: { done: false, inProgress: false },     expected: true },
+    { filter: 'all', item: { done: false, status: 'todo' }, expected: true },
+    { filter: 'completed', item: { done: true, status: 'done' }, expected: true },
+    { filter: 'completed', item: { done: false, status: 'todo' }, expected: false },
+    { filter: 'pending', item: { done: false, inProgress: false }, expected: true },
     { filter: 'in_progress', item: { done: false, status: 'in_progress' }, expected: true },
-    { filter: 'in_progress', item: { done: false, status: 'todo' },        expected: false },
+    { filter: 'in_progress', item: { done: false, status: 'todo' }, expected: false },
   ];
 
-  // DYNAMIC test data: generate one it() per case
   test.each(cases)(
     'filter=$filter, item.done=$item.done → $expected',
     ({ filter, item, expected }) => {
@@ -30,9 +28,8 @@ describe('matchesStatusFilter', () => {
   );
 });
 
-// matchesDueDateRange (extended)
-
-describe('matchesDueDateRange (dynamic date boundaries)', () => {
+describe('matchesDueDateRange', () => {
+  // No from/to dates: any task with a due date passes.
   test('no bounds: always matches', () => {
     expect(matchesDueDateRange({ dueDate: '2026-01-15' }, '', '')).toBe(true);
   });
@@ -49,29 +46,26 @@ describe('matchesDueDateRange (dynamic date boundaries)', () => {
     expect(matchesDueDateRange({ dueDate: '2026-04-16' }, '2026-04-01', '2026-04-15')).toBe(false);
   });
 
+  // If the user enters end before start, the helper normalizes bounds.
   test('swapped bounds are auto-corrected', () => {
     expect(matchesDueDateRange({ dueDate: '2026-04-10' }, '2026-04-15', '2026-04-01')).toBe(true);
   });
 
-  test('task with no dueDate is excluded when a bound is set', () => {
+  test('no dueDate with a bound set: no match', () => {
     expect(matchesDueDateRange({ dueDate: null }, '2026-04-01', '')).toBe(false);
   });
 });
 
-// normalizeDeveloperValue 
-
 describe('normalizeDeveloperValue', () => {
-  test('returns null for empty input', () => {
+  test('empty input → null', () => {
     expect(normalizeDeveloperValue('')).toBeNull();
     expect(normalizeDeveloperValue(null)).toBeNull();
   });
 
-  test('passes through unknown strings unchanged', () => {
+  test('unknown strings pass through', () => {
     expect(normalizeDeveloperValue('unknown_dev_99')).toBe('unknown_dev_99');
   });
 });
-
-// itemMatchesDeveloperFilter 
 
 describe('itemMatchesDeveloperFilter', () => {
   test('all filter always returns true', () => {
@@ -80,6 +74,8 @@ describe('itemMatchesDeveloperFilter', () => {
 
   test('unassigned sentinel matches items with no developer', () => {
     expect(itemMatchesDeveloperFilter({ developer: null }, 'unassigned', 'unassigned')).toBe(true);
-    expect(itemMatchesDeveloperFilter({ developer: 'dev1' }, 'unassigned', 'unassigned')).toBe(false);
+    expect(itemMatchesDeveloperFilter({ developer: 'dev1' }, 'unassigned', 'unassigned')).toBe(
+      false,
+    );
   });
 });

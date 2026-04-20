@@ -11,13 +11,13 @@ export function useCache(key, fetchFn, dependencies = [], ttl = 60000) {
     const fetchData = async () => {
       const cached = cache.get(key);
       const now = Date.now();
-      
-      if (cached && (now - cached.timestamp) < ttl) {
+
+      if (cached && now - cached.timestamp < ttl) {
         setData(cached.data);
         setLoading(false);
         return;
       }
-      
+
       setLoading(true);
       try {
         const result = await fetchFn();
@@ -30,13 +30,13 @@ export function useCache(key, fetchFn, dependencies = [], ttl = 60000) {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, dependencies);
-  
+
   const invalidateCache = () => {
     cache.delete(key);
   };
-  
+
   return { data, loading, error, invalidateCache };
 }

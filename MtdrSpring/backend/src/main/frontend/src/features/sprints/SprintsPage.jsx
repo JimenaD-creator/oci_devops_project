@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Box, Typography, Grid, Button,
+  Box,
+  Typography,
+  Grid,
+  Button,
   CircularProgress,
-  TextField, Stack, FormControl, InputLabel, Select, MenuItem,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -47,7 +55,9 @@ export default function SprintsPage({ projectId }) {
   const [newTaskDialogOpen, setNewTaskDialogOpen] = useState(false);
   const [sprintForEdit, setSprintForEdit] = useState(null);
   const [selectedTaskForDialog, setSelectedTaskForDialog] = useState(null);
-  const [projectName, setProjectName] = useState(() => localStorage.getItem('currentProjectName') || '');
+  const [projectName, setProjectName] = useState(
+    () => localStorage.getItem('currentProjectName') || '',
+  );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
 
@@ -157,9 +167,14 @@ export default function SprintsPage({ projectId }) {
     }
   };
 
-  useEffect(() => { loadData(); }, [projectId, effectiveProjectIdNum]);
+  useEffect(() => {
+    loadData();
+  }, [projectId, effectiveProjectIdNum]);
 
-  const handleSprintCreated = (newSprint) => { setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks)); setSelectedSprint(newSprint); };
+  const handleSprintCreated = (newSprint) => {
+    setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
+    setSelectedSprint(newSprint);
+  };
   const handleDeleteSprint = async () => {
     if (!selectedSprint?.id) return;
     if (
@@ -203,7 +218,7 @@ export default function SprintsPage({ projectId }) {
           const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
           const resolveUtName = (ut) => {
             const direct = String(
-              ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? ''
+              ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? '',
             ).trim();
             if (direct) return direct;
             const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
@@ -214,11 +229,9 @@ export default function SprintsPage({ projectId }) {
             }
             return null;
           };
-          const names = [...new Set(
-            taskAssignments
-              .map((ut) => resolveUtName(ut))
-              .filter(Boolean),
-          )];
+          const names = [
+            ...new Set(taskAssignments.map((ut) => resolveUtName(ut)).filter(Boolean)),
+          ];
           const workedHours = taskAssignments.reduce((sum, ut) => {
             const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
             return sum + (Number.isFinite(n) ? n : 0);
@@ -226,16 +239,23 @@ export default function SprintsPage({ projectId }) {
           const assigneeProgress =
             taskAssignments.length > 0
               ? [...taskAssignments]
-                .map((ut) => {
-                  const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
-                  const name = resolveUtName(ut) || (Number.isFinite(uid) ? `User ${uid}` : 'Unknown');
-                  return {
-                    userId: Number.isFinite(uid) ? uid : null,
-                    name,
-                    completed: isUserTaskAssigneeComplete(ut),
-                  };
-                })
-                .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))
+                  .map((ut) => {
+                    const uid = Number(
+                      ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId,
+                    );
+                    const name =
+                      resolveUtName(ut) || (Number.isFinite(uid) ? `User ${uid}` : 'Unknown');
+                    return {
+                      userId: Number.isFinite(uid) ? uid : null,
+                      name,
+                      completed: isUserTaskAssigneeComplete(ut),
+                    };
+                  })
+                  .sort((a, b) =>
+                    String(a.name).localeCompare(String(b.name), undefined, {
+                      sensitivity: 'base',
+                    }),
+                  )
               : undefined;
           return {
             developers: names,
@@ -286,13 +306,17 @@ export default function SprintsPage({ projectId }) {
     });
     if (!exists) setStatusFilter('all');
   }, [statusFilter, selectedSprintRows, developerFilter]);
-  const hasTaskTableFilters = developerFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueDateFilter);
   const clearTaskTableFilters = () => {
     setDeveloperFilter('all');
     setStatusFilter('all');
     setPriorityFilter('all');
     setDueDateFilter('');
   };
+  const hasTaskTableFilters =
+    developerFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    Boolean(dueDateFilter);
   const handleOpenNewTask = () => {
     if (effectiveProjectIdNum == null) return;
     setNewTaskDialogOpen(true);
@@ -330,13 +354,18 @@ export default function SprintsPage({ projectId }) {
     });
   }, [selectedSprintRows, developerFilter, statusFilter, priorityFilter, dueDateFilter]);
 
-  if (loading) return (<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}><CircularProgress sx={{ color: ORACLE_RED }} /></Box>);
+  if (loading)
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <CircularProgress sx={{ color: ORACLE_RED }} />
+      </Box>
+    );
 
   const subtitleProjectName =
-    projectName
-    || (effectiveProjectIdNum === 1 ? 'Software Manager Tool' : null)
-    || sprints[0]?.assignedProject?.name
-    || 'Project';
+    projectName ||
+    (effectiveProjectIdNum === 1 ? 'Software Manager Tool' : null) ||
+    sprints[0]?.assignedProject?.name ||
+    'Project';
   const subtitleProjectId = effectiveProjectIdNum;
   return (
     <Box
@@ -352,17 +381,21 @@ export default function SprintsPage({ projectId }) {
         sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px', fontSize: { xs: '1.65rem', sm: '1.85rem' } }}>Sprints</Typography>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              color: '#1A1A1A',
+              letterSpacing: '-0.5px',
+              fontSize: { xs: '1.65rem', sm: '1.85rem' },
+            }}
+          >
+            Sprints
+          </Typography>
           <Typography variant="body1" sx={{ color: '#757575', mt: 0.75 }}>
             {subtitleProjectName}
-            {subtitleProjectId != null && (
-              <>
-                {' '}
-                · ID {subtitleProjectId}
-              </>
-            )}
-            {' '}
-            · {sprints.length} total sprints
+            {subtitleProjectId != null && <> · ID {subtitleProjectId}</>} · {sprints.length} total
+            sprints
           </Typography>
         </Box>
         <Box>
@@ -372,7 +405,13 @@ export default function SprintsPage({ projectId }) {
             onClick={() => selectedSprint && setSprintForEdit(selectedSprint)}
             disabled={!selectedSprint}
             size="small"
-            sx={{ textTransform: 'none', borderColor: '#DDD', color: '#555', borderRadius: 2, mr: 1 }}
+            sx={{
+              textTransform: 'none',
+              borderColor: '#DDD',
+              color: '#555',
+              borderRadius: 2,
+              mr: 1,
+            }}
           >
             Edit sprint
           </Button>
@@ -382,18 +421,60 @@ export default function SprintsPage({ projectId }) {
             onClick={handleDeleteSprint}
             disabled={!selectedSprint}
             size="small"
-            sx={{ textTransform: 'none', borderColor: '#E0B4AF', color: '#B64536', borderRadius: 2, mr: 1 }}
+            sx={{
+              textTransform: 'none',
+              borderColor: '#E0B4AF',
+              color: '#B64536',
+              borderRadius: 2,
+              mr: 1,
+            }}
           >
             Delete sprint
           </Button>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} size="small" sx={{ textTransform: 'none', borderColor: '#DDD', color: '#555', borderRadius: 2, mr: 1 }}>Sync</Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)} disabled={effectiveProjectIdNum == null} sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: ORACLE_RED_ACTION } }}>Create new sprint</Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadData}
+            size="small"
+            sx={{
+              textTransform: 'none',
+              borderColor: '#DDD',
+              color: '#555',
+              borderRadius: 2,
+              mr: 1,
+            }}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialogOpen(true)}
+            disabled={effectiveProjectIdNum == null}
+            sx={{
+              bgcolor: ORACLE_RED,
+              textTransform: 'none',
+              fontWeight: 700,
+              borderRadius: 2,
+              '&:hover': { bgcolor: ORACLE_RED_ACTION },
+            }}
+          >
+            Create new sprint
+          </Button>
         </Box>
       </Box>
       <Box component={motion.div} variants={sprintsOverviewVariants.block}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
-            <Typography sx={{ fontWeight: 800, color: '#333', mb: 1.5, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                color: '#333',
+                mb: 1.5,
+                fontSize: '1.15rem',
+                letterSpacing: '-0.02em',
+              }}
+            >
               Sprint history
             </Typography>
             <Box
@@ -431,7 +512,12 @@ export default function SprintsPage({ projectId }) {
             </Box>
           </Grid>
           <Grid item xs={12}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 1.5, flexWrap: 'wrap' }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.25}
+              alignItems={{ xs: 'stretch', sm: 'center' }}
+              sx={{ mb: 1.5, flexWrap: 'wrap' }}
+            >
               <Typography sx={{ fontWeight: 800, color: '#333', fontSize: '1.02rem' }}>
                 {selectedSprint ? `Tasks · Sprint ${selectedSprint.id}` : 'Tasks'}
               </Typography>
@@ -445,7 +531,9 @@ export default function SprintsPage({ projectId }) {
                 >
                   <MenuItem value="all">All developers</MenuItem>
                   {developerFilterOptions.map((name) => (
-                    <MenuItem key={name} value={name}>{name}</MenuItem>
+                    <MenuItem key={name} value={name}>
+                      {name}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -509,7 +597,13 @@ export default function SprintsPage({ projectId }) {
                   size="small"
                   variant="outlined"
                   onClick={clearTaskTableFilters}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderColor: ORACLE_RED_ACTION, color: ORACLE_RED_ACTION, minHeight: 40 }}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderColor: ORACLE_RED_ACTION,
+                    color: ORACLE_RED_ACTION,
+                    minHeight: 40,
+                  }}
                 >
                   Clear filters
                 </Button>
@@ -545,7 +639,9 @@ export default function SprintsPage({ projectId }) {
             return next;
           });
           if (createdTask?.id) {
-            const byId = new Map((projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]));
+            const byId = new Map(
+              (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
+            );
             const optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
               const matched = byId.get(Number(uid));
               return {
@@ -573,7 +669,12 @@ export default function SprintsPage({ projectId }) {
         sprint={sprintForEdit}
         onClose={() => setSprintForEdit(null)}
         onSaved={(updated) => {
-          setSprints((prev) => sortSprintsForDisplay(prev.map((s) => (s.id === updated.id ? updated : s)), tasks));
+          setSprints((prev) =>
+            sortSprintsForDisplay(
+              prev.map((s) => (s.id === updated.id ? updated : s)),
+              tasks,
+            ),
+          );
           setSelectedSprint((prev) => (prev?.id === updated.id ? updated : prev));
         }}
       />
@@ -603,7 +704,6 @@ export default function SprintsPage({ projectId }) {
           setSelectedTaskForDialog(null);
         }}
       />
-
     </Box>
   );
 }

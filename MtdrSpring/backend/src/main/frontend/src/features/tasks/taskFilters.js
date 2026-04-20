@@ -49,9 +49,7 @@ export function getDeveloperFilterOptions(items) {
       });
     }
   });
-  return list.sort((a, b) =>
-    a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
-  );
+  return list.sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
 }
 
 export function itemMatchesDeveloperFilter(item, developerFilter, unassignedDevValue) {

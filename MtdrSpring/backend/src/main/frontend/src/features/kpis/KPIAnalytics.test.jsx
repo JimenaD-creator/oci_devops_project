@@ -1,6 +1,6 @@
 /**
- * Requirement 6: Team KPIs (Completion Rate donut).
- * Topics: Mock modules, Mock HTTP, React Testing Library.
+ * Requirement 6: Team KPIs (e.g. completion) per sprint.
+ * Component under test: KPIAnalytics.jsx (team KPI section; some charts stubbed in tests).
  */
 import React from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -9,7 +9,6 @@ import { renderWithTheme } from '../../test-utils';
 import { invalidateDashboardCache } from '../dashboard/dashboardSprintData';
 import KPIAnalytics from './KPIAnalytics';
 
-// Mock heavy chart sub-components 
 jest.mock('./KpiDonutChart', () => ({
   __esModule: true,
   default: function KpiDonutChartStub({ displayValue }) {
@@ -23,7 +22,9 @@ jest.mock('./DeveloperWorkloadCharts', () => ({
 }));
 
 afterEach(() => jest.restoreAllMocks());
-beforeEach(() => { invalidateDashboardCache(); });
+beforeEach(() => {
+  invalidateDashboardCache();
+});
 
 const sprint = {
   id: 3,
@@ -32,9 +33,8 @@ const sprint = {
   dueDate: '2026-04-30T23:59:59.999Z',
 };
 
-// Requirement 6: Completion Rate
-
-test('team completion rate for selected sprint reflects done vs total tasks (50%)', async () => {
+// With one DONE and one TODO task in the sprint, Completion Rate shows 50% on the stubbed donut.
+test('Completion Rate reflects done vs total tasks for selected sprint', async () => {
   setupFetchMock([
     {
       test: (url, init) =>
@@ -44,14 +44,31 @@ test('team completion rate for selected sprint reflects done vs total tasks (50%
     {
       test: (url, init) =>
         pathIncludes(url, '/api/tasks') && String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse([
-        { id: 1, title: 'A', status: 'DONE', assignedHours: 4, dueDate: '2026-04-20T00:00:00.000Z', finishDate: '2026-04-19T00:00:00.000Z', assignedSprint: { id: 3 } },
-        { id: 2, title: 'B', status: 'TODO', assignedHours: 2, dueDate: '2026-04-22T00:00:00.000Z', assignedSprint: { id: 3 } },
-      ]),
+      handle: () =>
+        jsonResponse([
+          {
+            id: 1,
+            title: 'A',
+            status: 'DONE',
+            assignedHours: 4,
+            dueDate: '2026-04-20T00:00:00.000Z',
+            finishDate: '2026-04-19T00:00:00.000Z',
+            assignedSprint: { id: 3 },
+          },
+          {
+            id: 2,
+            title: 'B',
+            status: 'TODO',
+            assignedHours: 2,
+            dueDate: '2026-04-22T00:00:00.000Z',
+            assignedSprint: { id: 3 },
+          },
+        ]),
     },
     {
       test: (url, init) =>
-        pathIncludes(url, '/api/user-tasks') && String(init?.method || 'GET').toUpperCase() === 'GET',
+        pathIncludes(url, '/api/user-tasks') &&
+        String(init?.method || 'GET').toUpperCase() === 'GET',
       handle: () => jsonResponse([]),
     },
   ]);
@@ -63,5 +80,3 @@ test('team completion rate for selected sprint reflects done vs total tasks (50%
   const completionCard = screen.getByText('Completion Rate').closest('.MuiPaper-root');
   expect(within(completionCard).getByTestId('donut-value')).toHaveTextContent('50%');
 });
-
-

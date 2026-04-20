@@ -25,7 +25,11 @@
     "scripts": {
         "start": "react-scripts start",
         "build": "react-scripts build",
-        "test": "react-scripts test --env=jsdom --watchAll=false"
+        "test": "react-scripts test --env=jsdom --watchAll=false --slowTestThreshold=60",
+        "lint": "eslint src --ext .js,.jsx",
+        "lint:fix": "eslint src --ext .js,.jsx --fix",
+        "format": "prettier --write src",
+        "format:check": "prettier --check src"
     },
     "eslintConfig": {
         "extends": "react-app"
@@ -39,7 +43,11 @@
         "@testing-library/react": "^14.3.1",
         "@testing-library/user-event": "^14.6.1",
         "@vitest/ui": "^4.1.4",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-jest": "^27.9.0",
+        "eslint-plugin-prettier": "^5.5.5",
         "jsdom": "^29.0.2",
+        "prettier": "^3.8.3",
         "vitest": "^4.1.4"
     }
 }
