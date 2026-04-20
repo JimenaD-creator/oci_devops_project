@@ -61,7 +61,8 @@ test('developer filter shows only tasks assigned to that developer', async () =>
 
   // MUI Select renders as role="button" with its current value as accessible name.
   // The Developer select starts with "All developers".
-  await user.click(screen.getByRole('button', { name: /all developers/i }));
+  const comboboxes = screen.getAllByRole('combobox');
+  await user.click(comboboxes[1]);
   await user.click(await screen.findByRole('option', { name: 'Alice Dev' }));
 
   await waitFor(() => expect(screen.getByText('1 shown')).toBeInTheDocument());

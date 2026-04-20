@@ -117,10 +117,12 @@ test('save persists assigned hours, work item type (User Story), and priority (H
   await user.clear(within(dialog).getByLabelText('Assigned hours'));
   await user.type(within(dialog).getByLabelText('Assigned hours'), '13');
 
-  await user.click(await screen.getByRole('button', { name: /^task$/i }));
+  const comboboxes = within(dialog).getAllByRole('combobox');
+  await user.click(comboboxes[0]); // Work item type
   await user.click(await screen.findByRole('option', { name: /user story/i }));
-
-  await user.click(screen.getByRole('button', { name: /^medium$/i }));
+ 
+  // Priority
+  await user.click(comboboxes[2]);
   await user.click(await screen.findByRole('option', { name: /^high$/i }));
 
   await user.click(screen.getByRole('button', { name: /save changes/i }));

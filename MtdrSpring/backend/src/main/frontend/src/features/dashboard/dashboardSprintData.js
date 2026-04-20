@@ -193,12 +193,6 @@ function userTaskRowEligibleForWorkedHours(ut) {
   return n === 'COMPLETED' || n === 'DONE';
 }
 
-function isUserTaskAssignmentDone(ut, taskInfo) {
-  const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
-  const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
-  return nonempty.some((s) => bucketTaskStatus(s) === 'DONE');
-}
-
 function sprintTaskStatusRows(counts) {
   const rows = TASK_STATUS_ORDER.map((key) => ({
     key,
