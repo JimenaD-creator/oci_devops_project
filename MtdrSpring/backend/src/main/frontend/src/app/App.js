@@ -31,6 +31,7 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 // Lazy load pages
 const SprintsPage = lazy(() => import('../features/sprints/SprintsPage'));
@@ -38,6 +39,7 @@ const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const KPIAnalytics = lazy(() => import('../features/kpis/KPIAnalytics'));
 const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
+const AIInsightsPage = lazy(() => import('../features/kpis/AIInsightsPage'));
 
 const DRAWER_WIDTH = 240;
 
@@ -137,6 +139,7 @@ function App() {
   const NAV_ITEMS = [
     { text: 'Dashboard', icon: <DashboardIcon />, id: 'dashboard', roles: ['ADMIN', 'MANAGER'] },
     { text: 'KPI Analytics', icon: <AnalyticsIcon />, id: 'analytics', roles: ['ADMIN', 'MANAGER'] },
+    { text: 'AI Insights', icon: <AutoAwesomeIcon />, id: 'ai-insights', roles: ['ADMIN', 'MANAGER'] },
     { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter(item => item.roles.includes(user.role));
   const primaryNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard');
@@ -371,10 +374,15 @@ function App() {
               onNavigateToTasks={() => setActivePage('tasks')}
             />
           )}
-          {activePage === 'analytics' && <KPIAnalytics projectId={selectedProjectId} />}
+          {activePage === 'analytics' && (
+            <KPIAnalytics projectId={selectedProjectId} />
+          )}
+          {activePage === 'ai-insights' && (
+            <AIInsightsPage projectId={selectedProjectId} />
+          )}
         </Suspense>
         
-        {!['dashboard', 'sprints', 'analytics', 'tasks'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Typography variant="h6" color="textSecondary">Section under development</Typography>
           </Box>
