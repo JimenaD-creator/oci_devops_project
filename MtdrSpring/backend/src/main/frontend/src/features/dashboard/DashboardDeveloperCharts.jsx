@@ -289,6 +289,7 @@ function ChartShell({
   tint,
   compact,
   belowDescription,
+  headerAdornment,
 }) {
   const chartRef = useRef(null);
   const chartVisible = useInView(chartRef, {
@@ -309,6 +310,7 @@ function ChartShell({
         };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
+  const titleMb = description ? 0.5 : compact ? 1 : headerAdornment ? 1.25 : 1.5;
   return (
     <MotionPaper
       elevation={0}
@@ -331,9 +333,33 @@ function ChartShell({
         overflow: 'visible',
       }}
     >
-      <Typography sx={{ ...CHART_TITLE_SX, color: a, mb: description ? 0.5 : 1.5 }}>
-        {title}
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 1.5,
+          mb: titleMb,
+        }}
+      >
+        <Typography
+          sx={{
+            ...CHART_TITLE_SX,
+            color: a,
+            flex: 1,
+            minWidth: 0,
+            mb: 0,
+            pr: headerAdornment ? 1 : 0,
+          }}
+        >
+          {title}
+        </Typography>
+        {headerAdornment ? (
+          <Box sx={{ flexShrink: 0, pt: { xs: 0.1, sm: 0.25 }, maxWidth: { xs: '52%', sm: '46%' } }}>
+            {headerAdornment}
+          </Box>
+        ) : null}
+      </Box>
       {description ? (
         <Typography
           sx={{

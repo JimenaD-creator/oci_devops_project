@@ -1,9 +1,9 @@
 /**
- * Supporting — DashboardTopMetrics scorecard (not tied to a single numbered requirement).
- * Component under test: DashboardTopMetrics.jsx.
+ * Requirement 6 — team hours per sprint (`DashboardTopMetrics` scorecards).
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithTheme } from '../../test-utils';
 import DashboardTopMetrics from './DashboardTopMetrics';
 
 jest.mock('recharts', () => ({
@@ -29,9 +29,8 @@ jest.mock('framer-motion', () => {
   };
 });
 
-// Renders aggregate totals and the “Scorecards” section title when enabled.
-test('shows totals and Scorecards header when showSectionHeader is true', () => {
-  render(
+test('shows Total hours worked, value, helper copy, and Scorecards heading', () => {
+  renderWithTheme(
     <DashboardTopMetrics
       totalTasks={10}
       totalHours={40.0}
@@ -39,16 +38,18 @@ test('shows totals and Scorecards header when showSectionHeader is true', () => 
       avgHoursPerDev={8}
       uniqueDevCount={5}
       showSectionHeader
+      multiSprint={false}
     />,
   );
-  expect(screen.getByText('10')).toBeInTheDocument();
-  expect(screen.getByText('40.0')).toBeInTheDocument();
   expect(screen.getByText('Scorecards')).toBeInTheDocument();
+  expect(screen.getByText('Total hours worked')).toBeInTheDocument();
+  expect(screen.getByText('40.0')).toBeInTheDocument();
+  expect(screen.getByText('Hours logged this sprint')).toBeInTheDocument();
 });
 
 // Hides the Scorecards label when the section header is turned off.
 test('hides Scorecards header when showSectionHeader is false', () => {
-  render(
+  renderWithTheme(
     <DashboardTopMetrics
       totalTasks={0}
       totalHours={0}

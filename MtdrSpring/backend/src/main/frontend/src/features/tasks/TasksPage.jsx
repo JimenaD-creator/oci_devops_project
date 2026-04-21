@@ -37,6 +37,7 @@ import {
   isUserTaskAssigneeComplete,
   pageFormFieldOutline,
 } from './utils/taskUtils';
+import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 
 export default function TasksPage({ projectId }) {
   const effectiveProjectId = resolveActiveProjectId(projectId);
@@ -60,48 +61,9 @@ export default function TasksPage({ projectId }) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const pid = effectiveProjectId;
-      const sprintsUrl =
-        pid != null
-          ? `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/sprints`;
-      const tasksUrl =
-        pid != null
-          ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/tasks`;
-      const userTasksUrl =
-        pid != null
-          ? `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/user-tasks`;
-      const [tasksRes, sprintsRes, userTasksRes] = await Promise.all([
-        fetch(tasksUrl),
-        fetch(sprintsUrl),
-        fetch(userTasksUrl),
-      ]);
-
-      let tasksData = await tasksRes.json();
-      let sprintsData = await sprintsRes.json();
-      let userTasksData = await userTasksRes.json();
-
-      if (pid != null) {
-        sprintsData = sprintsData.filter((s) => sprintProjectIdFromJson(s) === Number(pid));
-        const sprintIds = new Set(sprintsData.map((s) => Number(s.id)));
-        tasksData = tasksData.filter((t) => {
-          const sid = t.assignedSprint?.id;
-          return sid != null && sprintIds.has(Number(sid));
-        });
-        const taskIds = new Set(
-          (Array.isArray(tasksData) ? tasksData : []).map((t) => Number(t.id)),
-        );
-        userTasksData = (Array.isArray(userTasksData) ? userTasksData : []).filter((ut) => {
-          const tid = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;
-          const n = Number(tid);
-          return Number.isFinite(n) && taskIds.has(n);
-        });
-      }
-
-      setRawTasks(Array.isArray(tasksData) ? tasksData : []);
-      setSprints(Array.isArray(sprintsData) ? sprintsData : []);
+      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
+      setRawTasks(tasksData);
+      setSprints(sprintsData);
       setUserTasks(userTasksData);
     } catch (error) {
       console.error('Error loading tasks data:', error);
@@ -171,8 +133,7 @@ export default function TasksPage({ projectId }) {
     }
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/developers`);
-        const data = res.ok ? await res.json() : [];
+        const data = await fetchProjectDevelopersList(selectedProjectId);
         if (!cancelled) {
           setProjectDevelopers(Array.isArray(data) ? data : []);
         }

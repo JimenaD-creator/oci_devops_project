@@ -34,7 +34,6 @@ import {
   normalizeUserId,
 } from '../../utils/userIds';
 import {
-  API_BASE,
   ORACLE_RED,
   ORACLE_RED_ACTION,
   CLASSIFICATION_CHIP_SX,
@@ -42,6 +41,15 @@ import {
   STATUS_CHIP_SX,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
+import {
+  deleteTaskById,
+  deleteUserTasksForTask,
+  fetchTaskById,
+  fetchTaskDetailDevelopers,
+  fetchUserTasksForTask,
+  postUserTask,
+  putTask,
+} from './taskDetailApi';
 import {
   formatDate,
   oracleRgba,
@@ -112,10 +120,7 @@ export function TaskDetailDialog({
     setPickerLoading(true);
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/projects/${pid}/developers`, {
-          headers: { Accept: 'application/json' },
-        });
-        const data = res.ok ? await res.json() : [];
+        const data = await fetchTaskDetailDevelopers(pid);
         if (!cancelled) {
           setPickerDevelopers(Array.isArray(data) ? data : []);
         }
@@ -162,13 +167,11 @@ export function TaskDetailDialog({
     setLoading(true);
     (async () => {
       try {
-        const taskRes = await fetch(`${API_BASE}/api/tasks/${initialTask.id}`);
-        const t = taskRes.ok ? await taskRes.json() : null;
+        const t = await fetchTaskById(initialTask.id);
         if (cancelled || !t) return;
         setTask(t);
 
-        const utRes = await fetch(`${API_BASE}/api/user-tasks/task/${t.id}`);
-        const utList = utRes.ok ? await utRes.json() : [];
+        const utList = await fetchUserTasksForTask(t.id);
         if (cancelled) return;
         const list = Array.isArray(utList) ? utList : [];
         setTaskUserTasks(list);
@@ -275,9 +278,7 @@ export function TaskDetailDialog({
         const tid = task.id;
         if (nextIds.length === 0) {
           if (prevIds.length > 0) {
-            const delRes = await fetch(`${API_BASE}/api/user-tasks/task/${tid}`, {
-              method: 'DELETE',
-            });
+            const delRes = await deleteUserTasksForTask(tid);
             if (!delRes.ok) {
               setError('Could not update assignees.');
               return;
@@ -286,27 +287,20 @@ export function TaskDetailDialog({
             setTaskUserTasks([]);
           }
         } else {
-          const delRes = await fetch(`${API_BASE}/api/user-tasks/task/${tid}`, {
-            method: 'DELETE',
-          });
+          const delRes = await deleteUserTasksForTask(tid);
           if (!delRes.ok) {
             setError('Could not update assignees.');
             return;
           }
           for (const uid of nextIds) {
-            const postRes = await fetch(`${API_BASE}/api/user-tasks`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: uid, taskId: tid, status }),
-            });
+            const postRes = await postUserTask({ userId: uid, taskId: tid, status });
             if (!postRes.ok) {
               setError('Could not update assignees.');
               return;
             }
           }
           setLoadedAssigneeUserIds(nextIds);
-          const refreshUt = await fetch(`${API_BASE}/api/user-tasks/task/${tid}`);
-          const refreshed = refreshUt.ok ? await refreshUt.json() : [];
+          const refreshed = await fetchUserTasksForTask(tid);
           setTaskUserTasks(Array.isArray(refreshed) ? refreshed : []);
         }
       }
@@ -324,11 +318,7 @@ export function TaskDetailDialog({
         dueDate: new Date(dueDate).toISOString(),
         assignedSprint: { id: Number(sprintId) },
       };
-      const res = await fetch(`${API_BASE}/api/tasks/${task.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await putTask(task.id, payload);
       if (res.ok) {
         const updated = await res.json();
         setTask(updated);
@@ -364,7 +354,7 @@ export function TaskDetailDialog({
     setSaving(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${task.id}`, { method: 'DELETE' });
+      const res = await deleteTaskById(task.id);
       if (res.ok) {
         onDeleted?.(task.id);
         onClose();

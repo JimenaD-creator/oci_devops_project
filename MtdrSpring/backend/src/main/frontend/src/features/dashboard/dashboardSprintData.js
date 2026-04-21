@@ -269,7 +269,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     sprintMap[id] = {
       ...sp,
       id,
-      totalAssignedHoursTasks: 0,
+      totalHours: Number(sp.totalHours) || 0,
+      totalAssignedHoursTasks: Number(sp.totalAssignedHoursTasks) || 0,
       _devMap: {},
       _statusCounts: { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 },
     };

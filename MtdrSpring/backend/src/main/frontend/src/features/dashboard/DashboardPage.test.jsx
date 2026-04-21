@@ -1,13 +1,23 @@
 /**
- * Requirement 5: Dashboard shows required project/context when opened.
- * Component under test: DashboardPage.jsx (integration; heavy children stubbed).
+ * Requirement 5 — project name in the dashboard title (from API).
+ * Requirement 6 — completed-task header pills when two sprints are selected (hours: `DashboardTopMetrics.test.jsx`; mocked below).
  */
 import React from 'react';
 import { screen } from '@testing-library/react';
-import { setupFetchMock, jsonResponse, pathIncludes } from '../../mocks/mockFetch';
+import userEvent from '@testing-library/user-event';
 import { renderWithTheme } from '../../test-utils';
-import { invalidateDashboardCache } from './dashboardSprintData';
+import { invalidateDashboardCache, fetchDashboardSprints } from './dashboardSprintData';
+import { fetchProjectById } from './projectApi';
 import DashboardPage from './DashboardPage';
+
+jest.mock('./projectApi', () => ({
+  fetchProjectById: jest.fn(),
+}));
+
+jest.mock('./dashboardSprintData', () => ({
+  ...jest.requireActual('./dashboardSprintData'),
+  fetchDashboardSprints: jest.fn(),
+}));
 
 jest.mock('./DashboardDeveloperCharts', () => ({
   __esModule: true,
@@ -47,78 +57,75 @@ jest.mock('framer-motion', () => ({
   useInView: () => true,
 }));
 
-const sprintA = {
-  id: 1,
-  assignedProject: { id: 1, name: 'Proyecto Demo' },
-  startDate: '2026-04-01T00:00:00.000Z',
-  dueDate: '2026-04-30T23:59:59.999Z',
-};
-
-const tasksPayload = [
-  {
-    id: 11,
-    title: 'T1',
-    status: 'DONE',
-    assignedHours: 10,
-    dueDate: '2026-04-25T00:00:00.000Z',
-    finishDate: '2026-04-24T00:00:00.000Z',
-    assignedSprint: { id: 1 },
-  },
-  {
-    id: 12,
-    title: 'T2',
-    status: 'IN_PROGRESS',
-    assignedHours: 5,
-    dueDate: '2026-04-26T00:00:00.000Z',
-    assignedSprint: { id: 1 },
-  },
-];
-
-const userTasksPayload = [
-  { task: { id: 11 }, user: { id: 1, name: 'Ana' }, status: 'COMPLETED', workedHours: 10 },
-  { task: { id: 12 }, user: { id: 2, name: 'Luis' }, status: 'TODO', workedHours: 5 },
-];
-
 afterEach(() => jest.restoreAllMocks());
 beforeEach(() => {
   invalidateDashboardCache();
 });
 
-function setupMocks() {
-  setupFetchMock([
-    {
-      test: (url) => {
-        try {
-          return new URL(url, 'http://localhost').pathname === '/api/projects/1';
-        } catch {
-          return false;
-        }
-      },
-      handle: () => jsonResponse({ id: 1, name: 'Proyecto Demo' }),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/sprints') && String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse([sprintA]),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/tasks') && String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse(tasksPayload),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/user-tasks') &&
-        String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse(userTasksPayload),
-    },
-  ]);
-}
+describe('project name in dashboard header', () => {
+  test('heading includes the project name from fetchProjectById', async () => {
+    fetchProjectById.mockResolvedValue({ id: 1, name: 'Proyecto Demo' });
+    fetchDashboardSprints.mockResolvedValue([]);
+    renderWithTheme(<DashboardPage projectId="1" />);
 
-// After loading dashboard data, the heading includes the project name from the API.
-test('displays project name from API', async () => {
-  setupMocks();
-  renderWithTheme(<DashboardPage projectId="1" />);
+    expect(await screen.findByText(/Dashboard\s*[–-]\s*Proyecto Demo/i)).toBeInTheDocument();
+  });
+});
 
-  expect(await screen.findByText(/Dashboard\s*[–-]\s*Proyecto Demo/i)).toBeInTheDocument();
+describe('header completed-task pills', () => {
+  describe('compare mode (two sprints selected)', () => {
+    test('renders two chips with test id dashboard-header-tasks-completed', async () => {
+      const user = userEvent.setup();
+      fetchProjectById.mockResolvedValue({ id: 1, name: 'Proyecto Demo' });
+      fetchDashboardSprints.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Sprint A',
+          shortLabel: 'S0',
+          accentColor: '#1565C0',
+          startDate: '2026-04-01T00:00:00.000Z',
+          dueDate: '2026-04-14T23:59:59.999Z',
+          totalCompleted: 13,
+          totalTasks: 18,
+          totalHours: 40,
+          taskStatusDistribution: [
+            { key: 'TODO', name: 'To Do', count: 5 },
+            { key: 'IN_PROGRESS', name: 'In Progress', count: 0 },
+            { key: 'IN_REVIEW', name: 'In Review', count: 0 },
+            { key: 'DONE', name: 'Done', count: 13 },
+          ],
+          developers: [],
+        },
+        {
+          id: 2,
+          name: 'Sprint B',
+          shortLabel: 'S1',
+          accentColor: '#C62828',
+          startDate: '2026-05-01T00:00:00.000Z',
+          dueDate: '2026-05-31T23:59:59.999Z',
+          totalCompleted: 7,
+          totalTasks: 11,
+          totalHours: 22,
+          taskStatusDistribution: [
+            { key: 'TODO', name: 'To Do', count: 4 },
+            { key: 'IN_PROGRESS', name: 'In Progress', count: 0 },
+            { key: 'IN_REVIEW', name: 'In Review', count: 0 },
+            { key: 'DONE', name: 'Done', count: 7 },
+          ],
+          developers: [],
+        },
+      ]);
+
+      renderWithTheme(<DashboardPage projectId="1" />);
+      await screen.findByText(/Dashboard\s*[–-]\s*Proyecto Demo/i);
+
+      const checkboxes = screen.getAllByRole('checkbox');
+      expect(checkboxes.length).toBe(2);
+      const toAdd = checkboxes.find((cb) => !cb.checked);
+      expect(toAdd).toBeTruthy();
+      await user.click(toAdd);
+
+      expect(screen.getAllByTestId('dashboard-header-tasks-completed')).toHaveLength(2);
+    });
+  });
 });

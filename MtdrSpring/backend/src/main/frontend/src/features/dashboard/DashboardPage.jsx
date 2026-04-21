@@ -17,6 +17,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
+import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DeveloperTable from '../kpis/DeveloperTable';
 import {
@@ -31,7 +32,7 @@ import {
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
-import { API_BASE } from '../sprints/constants/sprintConstants';
+import { fetchProjectById } from './projectApi';
 
 export default function DashboardPage({ projectId: propProjectId }) {
   const [allSprints, setAllSprints] = useState([]);
@@ -54,11 +55,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
   const loadProjectInfo = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/projects/${projectId}`);
-      if (response.ok) {
-        const project = await response.json();
-        setCurrentProject(project);
-      }
+      const project = await fetchProjectById(projectId);
+      if (project) setCurrentProject(project);
     } catch (err) {
       console.error('Error loading project:', err);
     }
@@ -195,6 +193,33 @@ export default function DashboardPage({ projectId: propProjectId }) {
     [selectedSprints],
   );
 
+  /** Task-table DONE count (totalCompleted), shown at top of the page for visibility. */
+  const headerTasksCompleted = useMemo(() => {
+    if (!selectedSprints?.length) return null;
+    if (compareMode) {
+      return (
+        <DashboardCompletedTasksPills
+          pillTestId="dashboard-header-tasks-completed"
+          accent={selectedSprints[0]?.accentColor ?? DASHBOARD_PRIMARY_ACCENT}
+          compareBySprint={selectedSprints.map((sp) => ({
+            id: Number(sp.id),
+            shortLabel: sp.shortLabel ?? `S${sp.id}`,
+            completed: Number(sp.totalCompleted) || 0,
+            accentColor: sp.accentColor,
+          }))}
+        />
+      );
+    }
+    if (!primarySprint) return null;
+    return (
+      <DashboardCompletedTasksPills
+        pillTestId="dashboard-header-tasks-completed"
+        accent={primarySprint.accentColor ?? DASHBOARD_PRIMARY_ACCENT}
+        count={Number(primarySprint.totalCompleted) || 0}
+      />
+    );
+  }, [selectedSprints, compareMode, primarySprint]);
+
   const toggleSprint = (id, checked) => {
     const nid = Number(id);
     setSelectedSprintIds((prev) => {
@@ -288,6 +313,27 @@ export default function DashboardPage({ projectId: propProjectId }) {
               </Typography>
             </Box>
           </Box>
+
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
+              {compareMode ? 'Multi-sprint comparison' : primarySprint?.name || 'Project Progress'}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
+              <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
+                {teamDeveloperCount} devs
+              </Typography>
+            </Box>
+            {!compareMode && headerTasksCompleted}
+          </Box>
+
+          {compareMode && headerTasksCompleted ? (
+            <Box sx= {{ mt: 1.25, display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))',
+              gap: 0.75 }}>
+              {headerTasksCompleted}
+            </Box>
+          ) : null}
         </Paper>
       </ScrollReveal>
 

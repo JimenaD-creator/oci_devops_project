@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated, login as setSessionAuthenticated } from '../../utils/auth';
+import { fetchAllUsers, fetchManagerPrimaryProject } from './loginApi';
 
 const EyeIcon = ({ open }) => (
   <svg
@@ -75,8 +76,6 @@ const ShieldIcon = () => (
   </svg>
 );
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
-
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -105,9 +104,7 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/users`);
-      if (!response.ok) throw new Error('Server error');
-      const users = await response.json();
+      const users = await fetchAllUsers();
       const idRaw = String(email).trim();
       const idLower = idRaw.toLowerCase();
       const idDigits = idRaw.replace(/\D/g, '');
@@ -145,9 +142,8 @@ export default function Login() {
           navigate('/project-selector');
         } else if (userData.role === 'MANAGER') {
           try {
-            const projRes = await fetch(`${API_BASE}/api/projects/manager/${match.id}`);
-            if (projRes.ok) {
-              const project = await projRes.json();
+            const project = await fetchManagerPrimaryProject(match.id);
+            if (project) {
               // Same keys as App.js — avoids empty dashboard on first paint (selected* was never read).
               localStorage.setItem('currentProjectId', String(project.id));
               localStorage.setItem('currentProjectName', project.name);

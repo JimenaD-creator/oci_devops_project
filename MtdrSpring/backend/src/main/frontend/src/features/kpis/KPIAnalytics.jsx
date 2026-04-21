@@ -18,6 +18,7 @@ import IndividualTable from './IndividualTable';
 import DeveloperTable from './DeveloperTable';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -25,7 +26,6 @@ import {
 } from '../dashboard/constants/dashboardConstants';
 //import KPIInsightsPanel from './KPIInsightsPanel';
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 const pageEase = [0.22, 1, 0.36, 1];
 
 const KPI_ANALYTICS_CARD_TOOLTIPS = {
@@ -189,25 +189,13 @@ export default function KPIAnalytics({ projectId }) {
             : '';
       const projectKey = pid || null;
 
-      const tasksUrl =
-        projectKey != null
-          ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectKey)}`
-          : `${API_BASE}/api/tasks`;
-
-      const [enrichedSprints, tasksRes] = await Promise.all([
+      const [enrichedSprints, tasksDataRaw] = await Promise.all([
         fetchDashboardSprints(projectKey),
-        fetch(tasksUrl),
+        fetchTasksForKpiProject(projectKey),
       ]);
 
       let sprintsData = Array.isArray(enrichedSprints) ? enrichedSprints : [];
-      let tasksData = [];
-      if (tasksRes.ok) {
-        try {
-          tasksData = await tasksRes.json();
-        } catch {
-          tasksData = [];
-        }
-      }
+      let tasksData = Array.isArray(tasksDataRaw) ? tasksDataRaw : [];
 
       if (pid) {
         sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));

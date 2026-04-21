@@ -19,14 +19,21 @@ const sprintSnapshot = {
 };
 
 // Row for a developer shows assigned count, completed count, and total hours as text.
-test('columns show per-person assigned, completed, and hours', () => {
+test('columns show per-person assigned tasks, completed tasks, and hours', () => {
   renderWithTheme(
     <DeveloperTable selectedSprints={[sprintSnapshot]} compareMode={false} suppressCardTitle />,
   );
   const anaRow = screen.getByText('Ana Ruiz').closest('tr');
+
   expect(anaRow).toBeTruthy();
+
+  // Assigned tasks
   expect(within(anaRow).getByText('3')).toBeInTheDocument();
+
+  // Completed tasks
   expect(within(anaRow).getByText('2')).toBeInTheDocument();
+
+  // Worked hours
   expect(within(anaRow).getByText('18h')).toBeInTheDocument();
 });
 

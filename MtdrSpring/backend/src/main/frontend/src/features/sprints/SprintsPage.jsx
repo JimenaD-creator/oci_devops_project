@@ -31,15 +31,18 @@ import {
   EASE_OUT,
   ORACLE_RED,
   ORACLE_RED_ACTION,
-  fetchJsonNoStore,
   pickDefaultSelectedSprint,
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
   sortTasksForSprintTable,
-  sprintProjectIdFromJson,
   sprintsOverviewVariants,
   taskDisplayName,
 } from './index';
+import {
+  fetchSprintsProjectDevelopers,
+  fetchSprintsProjectSummary,
+  fetchSprintsTasksAndAssignments,
+} from './sprintsPageApi';
 
 export default function SprintsPage({ projectId }) {
   const [sprints, setSprints] = useState([]);
@@ -81,9 +84,8 @@ export default function SprintsPage({ projectId }) {
     }
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/projects/${effectiveProjectIdNum}/developers`);
-        const data = res.ok ? await res.json() : [];
-        if (!cancelled) setProjectDevelopers(Array.isArray(data) ? data : []);
+        const data = await fetchSprintsProjectDevelopers(effectiveProjectIdNum);
+        if (!cancelled) setProjectDevelopers(data);
       } catch {
         if (!cancelled) setProjectDevelopers([]);
       }
@@ -100,9 +102,7 @@ export default function SprintsPage({ projectId }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/projects/${effectiveProjectIdNum}`);
-        if (!res.ok) return;
-        const p = await res.json();
+        const p = await fetchSprintsProjectSummary(effectiveProjectIdNum);
         if (!cancelled && p?.name) {
           setProjectName(String(p.name).trim());
           try {
@@ -124,33 +124,8 @@ export default function SprintsPage({ projectId }) {
     const silent = opts.silent === true;
     if (!silent) setLoading(true);
     try {
-      const pid = resolveActiveProjectIdNum(projectId);
-      const sprintsUrl =
-        pid != null
-          ? `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/sprints`;
-      const tasksUrl =
-        pid != null
-          ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/tasks`;
-      const userTasksUrl =
-        pid != null
-          ? `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`
-          : `${API_BASE}/api/user-tasks`;
-      const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
-        fetchJsonNoStore(sprintsUrl),
-        fetchJsonNoStore(tasksUrl),
-        fetchJsonNoStore(userTasksUrl),
-      ]);
-      let sprintsData = await sprintsRes.json();
-      const tasksData = await tasksRes.json();
-      const userTasksData = await userTasksRes.json();
-      const tasksList = Array.isArray(tasksData) ? tasksData : [];
-      const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
-      if (pid != null && Array.isArray(sprintsData)) {
-        sprintsData = sprintsData.filter((s) => sprintProjectIdFromJson(s) === pid);
-      }
-      const sprintsList = Array.isArray(sprintsData) ? sprintsData : [];
+      const { pid, sprintsList, tasksList, userTasksList } =
+        await fetchSprintsTasksAndAssignments(projectId);
       const sorted = sortSprintsForDisplay(sprintsList, tasksList);
       setSprints(sorted);
       setTasks(tasksList);

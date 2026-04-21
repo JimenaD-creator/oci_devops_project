@@ -8,7 +8,12 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { renderWithTheme } from '../../test-utils';
 import Login from './Login';
-import { setupFetchMock, jsonResponse } from '../../mocks/mockFetch';
+import { fetchAllUsers, fetchManagerPrimaryProject } from './loginApi';
+
+jest.mock('./loginApi', () => ({
+  fetchAllUsers: jest.fn(),
+  fetchManagerPrimaryProject: jest.fn(),
+}));
 
 jest.mock('../../utils/auth.js', () => ({
   isAuthenticated: jest.fn(() => false),
@@ -52,12 +57,7 @@ test('validation: empty email shows error on submit', async () => {
 // DEVELOPER users get a denial message and the app does not navigate away.
 test('DEVELOPER role: valid credentials show access denied and do not navigate', async () => {
   const user = userEvent.setup();
-  setupFetchMock([
-    {
-      test: (url) => String(url).includes('/users') && !String(url).includes('/api'),
-      handle: () => jsonResponse([makeUser({ type: 'DEVELOPER' })]),
-    },
-  ]);
+  fetchAllUsers.mockResolvedValue([makeUser({ type: 'DEVELOPER' })]);
   renderWithTheme(
     <MemoryRouter>
       <Login />
@@ -73,16 +73,8 @@ test('DEVELOPER role: valid credentials show access denied and do not navigate',
 // MANAGER signs in successfully and the router navigates to `/`.
 test('MANAGER role: login and redirect to /', async () => {
   const user = userEvent.setup();
-  setupFetchMock([
-    {
-      test: (url) => String(url).includes('/users') && !String(url).includes('/api'),
-      handle: () => jsonResponse([makeUser({ type: 'MANAGER' })]),
-    },
-    {
-      test: (url) => String(url).includes('/api/projects/manager/1'),
-      handle: () => jsonResponse({ id: 10, name: 'Test Project' }),
-    },
-  ]);
+  fetchAllUsers.mockResolvedValue([makeUser({ type: 'MANAGER' })]);
+  fetchManagerPrimaryProject.mockResolvedValue({ id: 10, name: 'Test Project' });
   renderWithTheme(
     <MemoryRouter>
       <Login />
@@ -97,7 +89,7 @@ test('MANAGER role: login and redirect to /', async () => {
 // If fetch fails, the user sees a connection error instead of a silent failure.
 test('network error: shows message when fetch fails', async () => {
   const user = userEvent.setup();
-  jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network Error'));
+  fetchAllUsers.mockRejectedValueOnce(new Error('Network Error'));
   renderWithTheme(
     <MemoryRouter>
       <Login />

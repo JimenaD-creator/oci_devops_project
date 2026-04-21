@@ -5,9 +5,25 @@
 import React from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { setupFetchMock, jsonResponse, pathIncludes } from '../../mocks/mockFetch';
 import { renderWithTheme } from '../../test-utils';
+import {
+  deleteTaskById,
+  fetchTaskById,
+  fetchTaskDetailDevelopers,
+  fetchUserTasksForTask,
+  putTask,
+} from './taskDetailApi';
 import { TaskDetailDialog } from './TaskDetailDialog';
+
+jest.mock('./taskDetailApi', () => ({
+  fetchTaskDetailDevelopers: jest.fn(),
+  fetchTaskById: jest.fn(),
+  fetchUserTasksForTask: jest.fn(),
+  deleteUserTasksForTask: jest.fn(),
+  postUserTask: jest.fn(),
+  putTask: jest.fn(),
+  deleteTaskById: jest.fn(),
+}));
 
 const baseTask = {
   id: 10,
@@ -24,43 +40,21 @@ const baseTask = {
 
 let lastPutBody;
 
-function parseBody(init) {
-  const raw = init?.body;
-  if (raw == null) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
 afterEach(() => jest.restoreAllMocks());
 
 beforeEach(() => {
   lastPutBody = null;
-  setupFetchMock([
-    {
-      test: (url) => pathIncludes(url, '/api/projects/1/developers'),
-      handle: () => jsonResponse([{ id: 101, name: 'Dev Uno' }]),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/tasks/10') && String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse(baseTask),
-    },
-    {
-      test: (url) => pathIncludes(url, '/api/user-tasks/task/10'),
-      handle: () => jsonResponse([]),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/tasks/10') && String(init?.method || '').toUpperCase() === 'PUT',
-      handle: (_url, init) => {
-        lastPutBody = parseBody(init);
-        return jsonResponse({ ...baseTask, ...lastPutBody, id: 10 });
-      },
-    },
-  ]);
+  fetchTaskDetailDevelopers.mockResolvedValue([{ id: 101, name: 'Dev Uno' }]);
+  fetchTaskById.mockResolvedValue(baseTask);
+  fetchUserTasksForTask.mockResolvedValue([]);
+  putTask.mockImplementation((_id, body) => {
+    lastPutBody = body;
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ...baseTask, ...body, id: 10 }),
+    });
+  });
 });
 
 // Edits title, hours, work item type, and priority; asserts PUT body and parent onSaved/onClose.
@@ -116,26 +110,10 @@ test('delete: after confirm, calls onDeleted', async () => {
   const user = userEvent.setup();
   jest.spyOn(window, 'confirm').mockReturnValue(true);
 
-  setupFetchMock([
-    {
-      test: (url) => pathIncludes(url, '/api/projects/1/developers'),
-      handle: () => jsonResponse([]),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/tasks/10') && String(init?.method || 'GET').toUpperCase() === 'GET',
-      handle: () => jsonResponse(baseTask),
-    },
-    {
-      test: (url) => pathIncludes(url, '/api/user-tasks/task/10'),
-      handle: () => jsonResponse([]),
-    },
-    {
-      test: (url, init) =>
-        pathIncludes(url, '/api/tasks/10') && String(init?.method || '').toUpperCase() === 'DELETE',
-      handle: () => new Response(null, { status: 200 }),
-    },
-  ]);
+  fetchTaskDetailDevelopers.mockResolvedValue([]);
+  fetchTaskById.mockResolvedValue(baseTask);
+  fetchUserTasksForTask.mockResolvedValue([]);
+  deleteTaskById.mockResolvedValue({ ok: true, status: 200 });
 
   const onDeleted = jest.fn();
 
