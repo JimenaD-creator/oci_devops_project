@@ -36,6 +36,8 @@ const KPI_ANALYTICS_CARD_TOOLTIPS = {
   'Team Participation': 'How logged hours compare to planned hours on tasks in this sprint.',
   'Workload Balance':
     'How evenly tasks are distributed among team members. 100% = perfectly balanced.',
+  'Productivity Score':
+    'Weighted KPI: completion (40%), on-time delivery (30%), team participation (20%), workload balance (10%).',
 };
 
 const tooltipSlotProps = {
@@ -55,10 +57,10 @@ function ProductivityScoreCard({
   );
 
   const components = [
-    { label: 'Completion rate', value: completionRate, weight: '×0.4', color: '#1565C0' },
-    { label: 'On-time delivery', value: onTimeDelivery, weight: '×0.3', color: '#FB8C00' },
-    { label: 'Team participation', value: teamParticipation, weight: '×0.2', color: '#8E24AA' },
-    { label: 'Workload balance', value: workloadBalance, weight: '×0.1', color: '#1D9E75' },
+    { label: 'Completion rate', value: completionRate, weight: 'x0.4', color: '#1565C0' },
+    { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#FB8C00' },
+    { label: 'Team participation', value: teamParticipation, weight: 'x0.2', color: '#8E24AA' },
+    { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#1D9E75' },
   ];
 
   return (
@@ -160,10 +162,6 @@ function ProductivityScoreCard({
           </Grid>
         ))}
       </Grid>
-
-      <Typography sx={{ fontSize: '0.7rem', color: '#90A4AE', textAlign: 'center', mt: 1.5 }}>
-        Weighted average — completion (40%), on-time (30%), participation (20%), balance (10%)
-      </Typography>
     </Paper>
   );
 }
@@ -249,13 +247,25 @@ export default function KPIAnalytics({ projectId }) {
       completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 0;
 
     const teamParticipation = sprint?.kpis?.teamParticipation ?? 0;
-    const workloadBalance = Math.round((sprint?.kpis?.workloadBalance ?? 0) * 100);
+    const rawWb = Number(sprint?.kpis?.workloadBalance);
+    const workloadBalancePct = Number.isFinite(rawWb)
+      ? Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)
+      : 0;
+    const teamParticipationPct = Math.min(100, Math.max(0, Number(teamParticipation) || 0));
+    const clampedWorkloadBalance = Math.min(100, Math.max(0, workloadBalancePct));
+    const productivityScore = Math.round(
+      completionRate * 0.4 +
+        onTimeDelivery * 0.3 +
+        teamParticipationPct * 0.2 +
+        clampedWorkloadBalance * 0.1,
+    );
 
     return {
       completionRate,
       onTimeDelivery,
-      teamParticipation,
-      workloadBalance,
+      teamParticipation: teamParticipationPct,
+      workloadBalance: clampedWorkloadBalance,
+      productivityScore: Math.min(100, Math.max(0, productivityScore)),
       totalTasks,
       completedTasks,
     };
@@ -329,7 +339,7 @@ export default function KPIAnalytics({ projectId }) {
                 <InputLabel id="kpi-analytics-sprint-filter">Sprint</InputLabel>
                 <Select
                   labelId="kpi-analytics-sprint-filter"
-                  value={selectedSprintId || ''}
+                  value={selectedSprintId ?? ''}
                   label="Sprint"
                   onChange={(e) => setSelectedSprintId(Number(e.target.value))}
                 >
@@ -390,10 +400,10 @@ export default function KPIAnalytics({ projectId }) {
               borderColor: '#BA68C8',
             },
             {
-              label: 'Productivity Score',
-              pct: kpis.productivityScore,
-              arcColor: '#2E7D32',
-              borderColor: '#66BB6A',
+              label: 'Workload Balance',
+              pct: kpis.workloadBalance,
+              arcColor: '#1D9E75',
+              borderColor: '#43A047',
             },
           ].map(({ label, pct, arcColor, borderColor }) => (
             <Grid item xs={12} sm={6} md={3} key={label}>
@@ -434,8 +444,8 @@ export default function KPIAnalytics({ projectId }) {
                     {label}
                   </Typography>
                   <KpiDonutChart
-                    pct={pct}
-                    displayValue={`${Math.round(pct)}%`}
+                    pct={Math.min(100, Math.max(0, Number(pct) || 0))}
+                    displayValue={`${Math.round(Math.min(100, Math.max(0, Number(pct) || 0)))}%`}
                     displaySuffix=""
                     arcColor={arcColor}
                     height={{ xs: 150, sm: 160 }}

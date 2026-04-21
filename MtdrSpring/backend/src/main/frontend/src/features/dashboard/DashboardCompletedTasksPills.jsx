@@ -25,11 +25,7 @@ export default function DashboardCompletedTasksPills({
           display: 'grid',
           width: '100%',
           boxSizing: 'border-box',
-          gridTemplateColumns: {
-            xs: 'minmax(0, 1fr)',
-            sm: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))',
-            md: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))',
-          },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
           gap: { xs: 0.75, sm: 1 },
         }}
       >
@@ -39,31 +35,35 @@ export default function DashboardCompletedTasksPills({
             COMPARE_FALLBACK_ACCENTS[idx % COMPARE_FALLBACK_ACCENTS.length] ||
             defaultAccent;
           return (
-            <Chip
-              key={b.id}
-              data-testid={pillTestId}
-              data-sprint-id={String(b.id)}
-              size="small"
-              label={`${b.shortLabel}: ${b.completed} tasks completed`}
-              sx={{
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: nCompare > 4 ? { xs: '0.6875rem', sm: '0.75rem' } : { xs: '0.75rem', sm: '0.8125rem' },
-                minHeight: nCompare > 4 ? { xs: 26, sm: 28 } : { xs: 28, sm: 30 },
-                height: 'auto',
-                py: 0.5,
-                '& .MuiChip-label': {
-                  whiteSpace: 'normal',
-                  textAlign: 'center',
-                  lineHeight: 1.25,
-                  px: 0.75,
-                },
-                borderColor: chipAccent,
-                color: chipAccent,
-                bgcolor: alpha(chipAccent, 0.08),
-              }}
-              variant="outlined"
-            />
+            <Box key={b.id} sx={{ minWidth: 0 }}>
+              <Chip
+                data-testid={pillTestId}
+                data-sprint-id={String(b.id)}
+                size="small"
+                label={`${b.shortLabel}: ${b.completed} tasks completed`}
+                sx={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: nCompare > 4 ? { xs: '0.6875rem', sm: '0.72rem' } : { xs: '0.75rem', sm: '0.8rem' },
+                  minHeight: nCompare > 4 ? { xs: 30, sm: 32 } : { xs: 32, sm: 34 },
+                  height: 'auto',
+                  py: 0.5,
+                  '& .MuiChip-label': {
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    textAlign: 'center',
+                    lineHeight: 1.25,
+                    px: 1,
+                  },
+                  borderColor: chipAccent,
+                  color: chipAccent,
+                  bgcolor: alpha(chipAccent, 0.08),
+                }}
+                variant="outlined"
+              />
+            </Box>
           );
         })}
       </Box>

@@ -48,7 +48,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
     handleRefresh();
   }, [projectId]);
 
-  /** Avoid infinite spinner when no project is selected (e.g. admin not yet chose). */
   useEffect(() => {
     if (!projectId) setSprintsLoading(false);
   }, [projectId]);
@@ -96,10 +95,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
     const uniqueRaw = [...new Set(raw)];
     const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw
-      .slice()
-      .sort((a, b) => a - b)
-      .join(',');
+    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
     const hasDuplicateEntries = raw.length !== uniqueRaw.length;
     const needsPrune = uniqSorted !== normSorted;
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
@@ -155,7 +151,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
     }
     const current = chronological[chronological.length - 1];
     const previous = chronological[chronological.length - 2];
-
     const tasksDelta = avgTasks(current) - avgTasks(previous);
     const hoursDelta = avgHours(current) - avgHours(previous);
 
@@ -193,7 +188,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
     [selectedSprints],
   );
 
-  /** Task-table DONE count (totalCompleted), shown at top of the page for visibility. */
   const headerTasksCompleted = useMemo(() => {
     if (!selectedSprints?.length) return null;
     if (compareMode) {
@@ -312,25 +306,16 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 {teamDeveloperCount} devs
               </Typography>
             </Box>
-          </Box>
-
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
-              {compareMode ? 'Multi-sprint comparison' : primarySprint?.name || 'Project Progress'}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
-              <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
-                {teamDeveloperCount} devs
-              </Typography>
-            </Box>
             {!compareMode && headerTasksCompleted}
           </Box>
 
           {compareMode && headerTasksCompleted ? (
-            <Box sx= {{ mt: 1.25, display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))',
-              gap: 0.75 }}>
+            <Box
+              sx={{
+                mt: 1.25,
+                width: '100%',
+              }}
+            >
               {headerTasksCompleted}
             </Box>
           ) : null}
@@ -443,13 +428,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
             >
               <Typography
                 component="h2"
-                sx={{
-                  ...SECTION_TITLE_SX,
-                  color: '#1A1A1A',
-                  mb: 0.5,
-                  textAlign: 'left',
-                  width: '100%',
-                }}
+                sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
               >
                 Scorecards
               </Typography>
@@ -485,13 +464,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
               >
                 <Typography
                   component="h2"
-                  sx={{
-                    ...SECTION_TITLE_SX,
-                    color: '#1A1A1A',
-                    mb: 0.5,
-                    textAlign: 'left',
-                    width: '100%',
-                  }}
+                  sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
                 >
                   Project status
                 </Typography>

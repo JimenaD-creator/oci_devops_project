@@ -63,8 +63,8 @@ export default function DashboardTopMetrics({
     : {
         tasks: 'All tasks assigned to this sprint',
         hours: 'Hours logged this sprint',
-        avgTasks: 'Per unique developer in this sprint',
-        avgHours: 'Total worked hours per developer, averaged across developers in this sprint',
+        avgTasks: 'Tasks',
+        avgHours: 'Hours',
       };
 
   const items = [

@@ -66,13 +66,24 @@ public interface KpiRepository extends JpaRepository<Sprint, Long> {
     Map<String, Object> getWorkloadBalance(@Param("sprintId") Long sprintId);
 
     @Query(nativeQuery = true, value =
-        "SELECT s.id AS sprint_id, SUM(ut.worked_hours) AS total_worked_hours," +
-        " SUM(t.assigned_hours) AS total_expected_hours," +
-        " ROUND(CASE WHEN SUM(t.assigned_hours) = 0 THEN 0" +
-        " ELSE SUM(ut.worked_hours) / SUM(t.assigned_hours) END, 4) AS team_participation" +
-        " FROM sprint s LEFT JOIN task t ON t.assigned_sprint = s.id" +
-        " LEFT JOIN user_task ut ON ut.task_id = t.id" +
-        " WHERE s.id = :sprintId GROUP BY s.id"
+        "SELECT s.id AS sprint_id," +
+        " NVL(w.total_worked_hours, 0) AS total_worked_hours," +
+        " NVL(e.total_expected_hours, 0) AS total_expected_hours," +
+        " ROUND(CASE WHEN NVL(e.total_expected_hours, 0) = 0 THEN 0" +
+        " ELSE NVL(w.total_worked_hours, 0) / e.total_expected_hours END, 4) AS team_participation" +
+        " FROM sprint s" +
+        " LEFT JOIN (" +
+        "   SELECT t.assigned_sprint AS sprint_id, SUM(ut.worked_hours) AS total_worked_hours" +
+        "   FROM task t" +
+        "   LEFT JOIN user_task ut ON ut.task_id = t.id" +
+        "   GROUP BY t.assigned_sprint" +
+        " ) w ON w.sprint_id = s.id" +
+        " LEFT JOIN (" +
+        "   SELECT t.assigned_sprint AS sprint_id, SUM(t.assigned_hours) AS total_expected_hours" +
+        "   FROM task t" +
+        "   GROUP BY t.assigned_sprint" +
+        " ) e ON e.sprint_id = s.id" +
+        " WHERE s.id = :sprintId"
     )
     Map<String, Object> getTeamParticipation(@Param("sprintId") Long sprintId);
 }

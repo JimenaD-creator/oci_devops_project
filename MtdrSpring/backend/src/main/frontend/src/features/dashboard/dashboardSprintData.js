@@ -254,10 +254,25 @@ function deriveKpisFromLiveData(
   });
   const onTimeDeliveryPct = doneForOnTime > 0 ? Math.round((onTimeCount / doneForOnTime) * 100) : 0;
 
+  // Live Team Participation = logged USER_TASK hours / planned TASK hours (same sprint).
+  const totalExpectedHours = tasksInSprint.reduce((sum, t) => {
+    const n = Number(t?.assignedHours ?? t?.assigned_hours ?? 0);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+  const totalWorkedHours = (userTasksList || []).reduce((sum, ut) => {
+    const taskId = resolveUserTaskTaskId(ut);
+    if (taskId == null) return sum;
+    if (Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return sum;
+    return sum + userTaskWorkedHours(ut);
+  }, 0);
+  const teamParticipationPct =
+    totalExpectedHours > 0 ? Math.round((totalWorkedHours / totalExpectedHours) * 100) : 0;
+
   return {
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
+    teamParticipation: Math.min(100, Math.max(0, teamParticipationPct)),
     productivityScore: completionRatePct,
   };
 }

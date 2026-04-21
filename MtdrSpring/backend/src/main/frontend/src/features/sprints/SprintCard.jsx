@@ -21,8 +21,12 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
   const total = sprintTasks.length;
   const progress =
     total > 0 ? Math.round((done / total) * 100) : Math.round((sprint.completionRate ?? 0) * 100);
-  /** Green bar when every task is done or the sprint is in the “completed” lifecycle state (chip). */
-  const progressBarComplete = progress >= 100 || status === 'completed';
+  const progressBarColor = (() => {
+    if (status === 'completed') return PROGRESS_BAR_COMPLETE; // green
+    if (status === 'pending') return '#E53935'; // red
+    if (status === 'active') return PROGRESS_BAR; // blue (in progress)
+    return PROGRESS_LABEL;
+  })();
 
   const outlineColor = statusCfg.textColor;
   return (
@@ -79,7 +83,7 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
                 variant="caption"
                 sx={{
                   fontWeight: 800,
-                  color: progressBarComplete ? PROGRESS_BAR_COMPLETE : PROGRESS_LABEL,
+                  color: progressBarColor,
                 }}
               >
                 {progress}%
@@ -94,7 +98,7 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
                 bgcolor: PROGRESS_TRACK,
                 mb: 2,
                 '& .MuiLinearProgress-bar': {
-                  bgcolor: progressBarComplete ? PROGRESS_BAR_COMPLETE : PROGRESS_BAR,
+                  bgcolor: progressBarColor,
                   borderRadius: 3,
                 },
               }}
