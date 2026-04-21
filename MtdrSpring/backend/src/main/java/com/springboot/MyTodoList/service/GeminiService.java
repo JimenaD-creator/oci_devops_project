@@ -40,7 +40,7 @@ public class GeminiService {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
+        .connectTimeout(Duration.ofSeconds(60))
         .build();
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -49,6 +49,9 @@ public class GeminiService {
 
     @Async
     public CompletableFuture<SprintInsight> generateInsightsForSprint(Long sprintId) {
+        System.out.println("[GeminiService] API key present: " + 
+    (geminiApiKey != null && !geminiApiKey.isBlank() ? 
+     "YES (length=" + geminiApiKey.length() + ")" : "NO/EMPTY"));
         try {
             Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
             if (sprint == null) {
@@ -249,49 +252,55 @@ public class GeminiService {
     // ─────────────────────────────────────────────────────────────────────────
 
     private String callGemini(String prompt) throws Exception {
-        if (geminiApiKey == null || geminiApiKey.isBlank()) {
-            throw new IllegalStateException(
-                "Gemini API key not configured. Set GEMINI_API_KEY environment variable.");
-        }
+    if (geminiApiKey == null || geminiApiKey.isBlank()) {
+        throw new IllegalStateException("Gemini API key not configured.");
+    }
 
-        String requestBody = "{\"contents\":[{\"parts\":[{\"text\":" +
-            mapper.writeValueAsString(prompt) +
-            "}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":8192," +
-            "\"responseMimeType\":\"application/json\"}}";
+    String requestBody = "{\"contents\":[{\"parts\":[{\"text\":" +
+        mapper.writeValueAsString(prompt) +
+        "}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":8192," +
+        "\"responseMimeType\":\"application/json\"}}";
+
+    int maxRetries = 4;
+    int delaySeconds = 8;
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        System.out.println("[GeminiService] Attempt " + attempt + "/" + maxRetries);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(GEMINI_URL + "?key=" + geminiApiKey))
             .header("Content-Type", "application/json")
-            .timeout(Duration.ofSeconds(25))
+            .timeout(Duration.ofSeconds(60)) // ← sube a 60s
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build();
 
         HttpResponse<String> response = httpClient.send(
             request, HttpResponse.BodyHandlers.ofString());
 
-        // ── Specific error handling per status code ────────────────────────
-        int statusCode = response.statusCode();
-        if (statusCode == 429) {
-            throw new RuntimeException(
-                "429: Gemini quota exceeded. Please wait a few minutes and try again.");
-        } else if (statusCode == 401 || statusCode == 403) {
-            throw new RuntimeException(
-                "API key is invalid or does not have permission to use this model.");
-        } else if (statusCode == 404) {
-            throw new RuntimeException(
-                "404: Gemini model not found. Check the model name in GeminiService.GEMINI_URL.");
-        } else if (statusCode == 500 || statusCode == 503) {
-            throw new RuntimeException(
-                "Gemini service is temporarily unavailable (HTTP " + statusCode + "). Try again later.");
-        } else if (statusCode != 200) {
-            throw new RuntimeException(
-                "Gemini API returned HTTP " + statusCode + ": " + response.body());
-        }
-        System.out.println("[GeminiService] Raw Gemini response: " + response.body());
+        int status = response.statusCode();
 
-        return response.body();
+        if (status == 200) {
+            System.out.println("[GeminiService] Raw Gemini response: " + response.body());
+            return response.body();
+        }
+
+        if ((status == 503 || status == 500) && attempt < maxRetries) {
+            System.out.println("[GeminiService] 503 on attempt " + attempt +
+                ", retrying in " + delaySeconds + "s...");
+            Thread.sleep(delaySeconds * 1000L);
+            delaySeconds *= 2; // 8s → 16s → 32s → falla
+            continue;
+        }
+
+        // Errores que NO ameritan retry
+        if (status == 429) throw new RuntimeException("429: Gemini quota exceeded.");
+        if (status == 401 || status == 403) throw new RuntimeException("API key invalid.");
+        if (status == 404) throw new RuntimeException("404: Model not found.");
+        throw new RuntimeException("Gemini HTTP " + status + " - body: " + response.body());
     }
 
+    throw new RuntimeException("Gemini unavailable after " + maxRetries + " attempts (503).");
+}
     private String extractJsonFromGeminiResponse(String rawGeminiResponse) throws Exception {
         JsonNode root = mapper.readTree(rawGeminiResponse);
         String text = root
