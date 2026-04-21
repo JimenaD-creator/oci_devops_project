@@ -9,7 +9,7 @@ services:
       - DB_USERNAME=MANAGER
       - DB_PASSWORD=MxTodo#2026Pass9
       - TELEGRAM_BOT_TOKEN=8597252989:AAESmYUpOa2ftnr5OuS0oQNKKKX96JXhKD8
-      - GEMINI_API_KEY=AIzaSyDHOT-wBox7MBjh75luN8taCUuoyhdVC_0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - ./backend/wallet:/app/wallet
     restart: unless-stopped

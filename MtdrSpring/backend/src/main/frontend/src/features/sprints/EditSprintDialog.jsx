@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, IconButton,
+  Box,
+  Typography,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import { newSprintDialogFieldOutline, oracleRgba, sprintKpiNumber, toInputDate } from './utils/sprintUtils';
+import {
+  newSprintDialogFieldOutline,
+  oracleRgba,
+  sprintKpiNumber,
+  toInputDate,
+} from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const [startDate, setStartDate] = useState('');
@@ -145,10 +158,21 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
               <EditIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', lineHeight: 1.25, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  color: '#1A1A1A',
+                  lineHeight: 1.25,
+                  fontSize: '1.3rem',
+                  letterSpacing: '-0.02em',
+                }}
+              >
                 Edit sprint{sprint?.id != null ? ` #${sprint.id}` : ''}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}
+              >
                 Dates & goal
               </Typography>
             </Box>
@@ -173,8 +197,12 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           backgroundColor: '#FFFFFF',
         }}
       >
-        <Typography variant="body2" sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}>
-          Update the sprint window and optional goal. KPI metrics stored in the database are kept as-is.
+        <Typography
+          variant="body2"
+          sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}
+        >
+          Update the sprint window and optional goal. KPI metrics stored in the database are kept
+          as-is.
         </Typography>
         <Stack spacing={2}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -216,7 +244,10 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           />
         </Stack>
         {error ? (
-          <Typography variant="caption" sx={{ color: ORACLE_RED_ACTION, fontWeight: 600, mt: 1.5, display: 'block' }}>
+          <Typography
+            variant="caption"
+            sx={{ color: ORACLE_RED_ACTION, fontWeight: 600, mt: 1.5, display: 'block' }}
+          >
             {error}
           </Typography>
         ) : null}
