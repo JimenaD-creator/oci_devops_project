@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -18,11 +18,37 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  UserCircle,
 } from 'lucide-react';
-import { API_BASE, getErrorMessage } from './aiInsightsConstants';
-import { AlertCard, WorkloadCard, PredictionCard } from './InsightCardParts';
+import { API_BASE, getErrorMessage, AI_INSIGHTS_EMPTY } from './aiInsightsConstants';
+import {
+  AlertCard,
+  SectionHeading,
+  AlertTypesLegend,
+  ActionableRecommendationsList,
+  ExecutiveSummaryBlock,
+  DeveloperInsightsTable,
+  PredictionsBlock,
+} from './InsightCardParts';
 
-export default function InsightCard({ sprintId, sprintLabel }) {
+function computeRecommendationList(ins) {
+  if (!ins) return [];
+  const list = [...(ins.actionableRecommendations ?? [])];
+  for (const r of ins.workloadRecommendations ?? []) {
+    list.push({
+      category: 'workload_redistribution',
+      text: `Move ~${r.tasksToMove} task(s)${r.from ? ` from ${r.from}` : ''}${r.to ? ` to ${r.to}` : ''}. ${r.reason ?? ''}`.trim(),
+    });
+  }
+  return list;
+}
+
+export default function InsightCard({
+  sprintId,
+  sprintLabel,
+  showPredictionsSection = true,
+  showNextSprintForecast = true,
+}) {
   const [status, setStatus] = useState('idle');
   const [insights, setInsights] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -135,13 +161,31 @@ export default function InsightCard({ sprintId, sprintLabel }) {
     ? {
         critical: insights.alerts.filter((a) => a.severity === 'critical').length,
         warning: insights.alerts.filter((a) => a.severity === 'warning').length,
+        info: insights.alerts.filter((a) => a.severity === 'info').length,
       }
     : null;
+
+  const recommendationList = useMemo(
+    () => computeRecommendationList(insights),
+    [insights],
+  );
+
+  const hasExtendedPredictions =
+    insights?.predictions &&
+    (insights.predictions.productivityOutlook ||
+      insights.predictions.risks ||
+      insights.predictions.deliveryEstimate);
+  const hasPredictionsContent =
+    insights &&
+    (Boolean(hasExtendedPredictions) || Boolean(insights.productivityPrediction));
 
   return (
     <Paper
       sx={{
-        p: 2.5,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        p: { xs: 2.5, sm: 3.5, md: 4.5 },
         borderRadius: 2,
         border: '1px solid rgba(103,58,183,0.18)',
         borderLeft: '4px solid #673AB7',
@@ -158,8 +202,8 @@ export default function InsightCard({ sprintId, sprintLabel }) {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Sparkles size={15} color="#673AB7" />
-          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1A1A1A' }}>
+          <Sparkles size={22} color="#673AB7" />
+          <Typography sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: '#1A1A1A' }}>
             {sprintLabel}
           </Typography>
           {alertCounts && (
@@ -167,10 +211,9 @@ export default function InsightCard({ sprintId, sprintLabel }) {
               {alertCounts.critical > 0 && (
                 <Chip
                   label={`${alertCounts.critical} critical`}
-                  size="small"
                   sx={{
-                    height: 18,
-                    fontSize: '0.65rem',
+                    height: 26,
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     bgcolor: '#C62828',
                     color: '#fff',
@@ -180,13 +223,25 @@ export default function InsightCard({ sprintId, sprintLabel }) {
               )}
               {alertCounts.warning > 0 && (
                 <Chip
-                  label={`${alertCounts.warning} warning`}
-                  size="small"
+                  label={`${alertCounts.warning} warning(s)`}
                   sx={{
-                    height: 18,
-                    fontSize: '0.65rem',
+                    height: 26,
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     bgcolor: '#E65100',
+                    color: '#fff',
+                    borderRadius: 1,
+                  }}
+                />
+              )}
+              {alertCounts.info > 0 && (
+                <Chip
+                  label={`${alertCounts.info} info`}
+                  sx={{
+                    height: 26,
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    bgcolor: '#1565C0',
                     color: '#fff',
                     borderRadius: 1,
                   }}
@@ -198,18 +253,14 @@ export default function InsightCard({ sprintId, sprintLabel }) {
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
           {status === 'loaded' && (
             <Tooltip title="Regenerate">
-              <IconButton size="small" onClick={handleGenerate} sx={{ color: '#607D8B' }}>
-                <RefreshCw size={13} />
+              <IconButton onClick={handleGenerate} sx={{ color: '#607D8B', p: 1 }}>
+                <RefreshCw size={20} />
               </IconButton>
             </Tooltip>
           )}
           {status === 'loaded' && (
-            <IconButton
-              size="small"
-              onClick={() => setExpanded((v) => !v)}
-              sx={{ color: '#607D8B' }}
-            >
-              {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            <IconButton onClick={() => setExpanded((v) => !v)} sx={{ color: '#607D8B', p: 1 }}>
+              {expanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
             </IconButton>
           )}
         </Box>
@@ -218,7 +269,7 @@ export default function InsightCard({ sprintId, sprintLabel }) {
       {/* Idle / Error */}
       {(status === 'idle' || status === 'error') && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
-          <Typography sx={{ fontSize: '0.78rem', color: '#607D8B' }}>
+          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#607D8B' }}>
             {status === 'idle'
               ? 'No insights generated yet for this sprint.'
               : 'Could not generate insights for this sprint.'}
@@ -236,15 +287,14 @@ export default function InsightCard({ sprintId, sprintLabel }) {
               }}
             >
               <AlertCircle size={14} color="#C62828" style={{ marginTop: 1, flexShrink: 0 }} />
-              <Typography sx={{ fontSize: '0.75rem', color: '#C62828', lineHeight: 1.45 }}>
+              <Typography sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#C62828', lineHeight: 1.45 }}>
                 {error}
               </Typography>
             </Box>
           )}
           <Button
             variant="contained"
-            size="small"
-            startIcon={<Sparkles size={13} />}
+            startIcon={<Sparkles size={18} />}
             onClick={handleGenerate}
             sx={{
               alignSelf: 'flex-start',
@@ -253,7 +303,9 @@ export default function InsightCard({ sprintId, sprintLabel }) {
               borderRadius: 1.5,
               textTransform: 'none',
               fontWeight: 700,
-              fontSize: '0.78rem',
+              fontSize: { xs: '0.9rem', md: '1rem' },
+              py: 1.25,
+              px: 2.5,
             }}
           >
             {status === 'error' ? 'Try again' : 'Generate'}
@@ -264,8 +316,8 @@ export default function InsightCard({ sprintId, sprintLabel }) {
       {/* Generating / Polling */}
       {(status === 'generating' || status === 'polling') && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.5 }}>
-          <CircularProgress size={16} sx={{ color: '#673AB7' }} />
-          <Typography sx={{ fontSize: '0.78rem', color: '#607D8B' }}>
+          <CircularProgress size={24} sx={{ color: '#C74634' }} />
+          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#607D8B' }}>
             {status === 'generating'
               ? 'Sending to Gemini…'
               : `Waiting for response${pollCount > 0 ? ` (${pollCount * 2}s elapsed)` : ''}…`}
@@ -276,103 +328,228 @@ export default function InsightCard({ sprintId, sprintLabel }) {
       {/* Loaded */}
       {status === 'loaded' && insights && (
         <Collapse in={expanded}>
-          {insights.summary && (
-            <Box
-              sx={{
-                p: 1.25,
-                borderRadius: 1.5,
-                bgcolor: '#EDE7F6',
-                border: '1px solid #CE93D8',
-                mb: 1.5,
-              }}
-            >
-              <Typography
-                sx={{ fontSize: '0.8rem', color: '#37474F', lineHeight: 1.5, fontStyle: 'italic' }}
-              >
-                "{insights.summary}"
-              </Typography>
-            </Box>
-          )}
-          {insights.alerts?.length > 0 && (
-            <Box sx={{ mb: 1.5 }}>
-              <Typography
+          {/* Snapshot counters */}
+          <Box
+            sx={{
+              mb: { xs: 2.5, md: 3.5 },
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+              gap: 1.5,
+            }}
+          >
+            {[
+              {
+                label: 'Critical alerts',
+                value: alertCounts?.critical ?? 0,
+                color: '#B71C1C',
+                bg: '#FFEBEE',
+                border: '#FFCDD2',
+              },
+              {
+                label: 'Warnings',
+                value: alertCounts?.warning ?? 0,
+                color: '#E65100',
+                bg: '#FFF3E0',
+                border: '#FFE0B2',
+              },
+              {
+                label: 'Recommendations',
+                value: recommendationList.length,
+                color: '#2E7D32',
+                bg: '#E8F5E9',
+                border: '#C8E6C9',
+              },
+            ].map((s) => (
+              <Box
+                key={s.label}
                 sx={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  color: '#607D8B',
-                  mb: 0.75,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 2,
+                  border: `1px solid ${s.border}`,
+                  bgcolor: s.bg,
+                  textAlign: 'center',
                 }}
               >
-                Alerts
-              </Typography>
-              {insights.alerts.map((a, i) => (
-                <AlertCard key={i} alert={a} />
-              ))}
-            </Box>
-          )}
-          {insights.alerts?.length === 0 && (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                mb: 1.5,
-                p: 1.25,
-                bgcolor: '#E8F5E9',
-                borderRadius: 1.5,
-                border: '1px solid #A5D6A7',
-              }}
-            >
-              <CheckCircle size={14} color="#2E7D32" />
-              <Typography sx={{ fontSize: '0.78rem', color: '#2E7D32', fontWeight: 600 }}>
-                No alerts — sprint looks healthy!
-              </Typography>
-            </Box>
-          )}
-          {insights.workloadRecommendations?.length > 0 && (
-            <Box sx={{ mb: 1.5 }}>
-              <Divider sx={{ mb: 1 }} />
-              <Typography
+                <Typography sx={{ fontSize: '1.7rem', lineHeight: 1.1, fontWeight: 800, color: s.color }}>
+                  {s.value}
+                </Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600, mt: 0.25 }}>
+                  {s.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Main two-column dashboard-like layout */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', lg: '1.05fr 0.95fr' },
+              gap: { xs: 2, md: 2.5 },
+              mb: { xs: 3, md: 4 },
+            }}
+          >
+            {/* Left column: alerts + executive summary */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box
                 sx={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  color: '#607D8B',
-                  mb: 0.75,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: '#FFFFFF',
                 }}
               >
-                Workload
-              </Typography>
-              {insights.workloadRecommendations.map((r, i) => (
-                <WorkloadCard key={i} rec={r} />
-              ))}
-            </Box>
-          )}
-          {insights.productivityPrediction && (
-            <Box sx={{ mb: acknowledged ? 0 : 1.5 }}>
-              <Divider sx={{ mb: 1 }} />
-              <Typography
+                <Box sx={{ px: 2, py: 1.25, bgcolor: '#F3E5F5', borderBottom: '1px solid rgba(156,39,176,0.18)' }}>
+                  <SectionHeading emoji="📊">Automatic alerts</SectionHeading>
+                </Box>
+                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                  <AlertTypesLegend />
+                  {insights.alerts?.length > 0 ? (
+                    insights.alerts.map((a, i) => <AlertCard key={i} alert={a} />)
+                  ) : (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: { xs: 2, md: 2.5 },
+                        bgcolor: '#E8F5E9',
+                        borderRadius: 1.5,
+                        border: '1px solid #A5D6A7',
+                      }}
+                    >
+                      <CheckCircle size={20} color="#2E7D32" />
+                      <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#2E7D32', fontWeight: 600 }}>
+                        No alerts — this sprint looks healthy.
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+
+              <Box
                 sx={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  color: '#607D8B',
-                  mb: 0.75,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: '#FFFFFF',
                 }}
               >
-                Forecast
-              </Typography>
-              <PredictionCard prediction={insights.productivityPrediction} />
+                <Box sx={{ px: 2, py: 1.25, bgcolor: '#E3F2FD', borderBottom: '1px solid #BBDEFB' }}>
+                  <SectionHeading emoji="📈">Sprint summary</SectionHeading>
+                </Box>
+                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                  {(() => {
+                    const es = insights.executiveSummary;
+                    const hasExecFields =
+                      es && (es.overview || es.trends || es.improvementAreas || es.nextSteps);
+                    const tsb = insights.taskStatusBreakdown;
+                    const hasTaskStatus = tsb != null && tsb.total != null;
+                    const showSummaryBlock =
+                      Boolean(hasExecFields) || hasTaskStatus || Boolean(insights.summary);
+                    if (showSummaryBlock) {
+                      return (
+                        <ExecutiveSummaryBlock
+                          executiveSummary={insights.executiveSummary}
+                          fallbackSummary={hasExecFields ? null : insights.summary}
+                          taskStatusBreakdown={tsb}
+                        />
+                      );
+                    }
+                    return (
+                      <Typography
+                        sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}
+                      >
+                        {AI_INSIGHTS_EMPTY.executive}
+                      </Typography>
+                    );
+                  })()}
+                </Box>
+              </Box>
             </Box>
-          )}
+
+            {/* Right column: recommendations + predictions */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box
+                sx={{
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: '#FFFFFF',
+                }}
+              >
+                <Box sx={{ px: 2, py: 1.25, bgcolor: '#E8F5E9', borderBottom: '1px solid #C8E6C9' }}>
+                  <SectionHeading emoji="💡">Actionable recommendations</SectionHeading>
+                </Box>
+                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                  {recommendationList.length > 0 ? (
+                    <ActionableRecommendationsList items={recommendationList} />
+                  ) : (
+                    <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
+                      {AI_INSIGHTS_EMPTY.recommendations}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              {/* Predictions: only for active sprint (or latest if no active) — see AIInsightsPage */}
+              {showPredictionsSection && (
+                <Box
+                  sx={{
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    bgcolor: '#FFFFFF',
+                  }}
+                >
+                  <Box sx={{ px: 2, py: 1.25, bgcolor: '#FFF8E1', borderBottom: '1px solid #FFECB3' }}>
+                    <SectionHeading emoji="🔮" icon={Sparkles}>
+                      Predictions
+                    </SectionHeading>
+                  </Box>
+                  <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                    {hasPredictionsContent ? (
+                      <PredictionsBlock
+                        predictions={insights.predictions}
+                        productivityPrediction={insights.productivityPrediction}
+                        showNextSprintForecast={showNextSprintForecast}
+                      />
+                    ) : (
+                      <Typography
+                        sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}
+                      >
+                        {AI_INSIGHTS_EMPTY.predictions}
+                      </Typography>
+                    )}
+                    <Typography color="text.secondary" sx={{ display: 'block', mt: 1.5, fontSize: '0.85rem' }}>
+                      Per sprint — outlook, risks, and delivery estimate from the latest AI run.
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Box>
+
+          {/* Per-developer analysis — full width below dashboard cards */}
+          <Box sx={{ mb: { xs: 2, md: 3 } }}>
+            <Divider sx={{ mb: 2 }} />
+            <SectionHeading emoji="📋" icon={UserCircle}>
+              Per-developer analysis
+            </SectionHeading>
+            {insights.developerInsights?.length > 0 ? (
+              <DeveloperInsightsTable rows={insights.developerInsights} />
+            ) : (
+              <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
+                {AI_INSIGHTS_EMPTY.developers}
+              </Typography>
+            )}
+            <Typography color="text.secondary" sx={{ display: 'block', mt: 1.5, fontSize: '0.9rem' }}>
+              Per sprint — one row per developer from the AI analysis.
+            </Typography>
+          </Box>
           {!acknowledged && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.25 }}>
               <Button
-                size="small"
                 variant="outlined"
                 onClick={handleAcknowledge}
                 sx={{
@@ -380,8 +557,10 @@ export default function InsightCard({ sprintId, sprintLabel }) {
                   color: '#673AB7',
                   borderRadius: 1.5,
                   textTransform: 'none',
-                  fontSize: '0.72rem',
+                  fontSize: { xs: '0.9rem', md: '0.95rem' },
                   fontWeight: 600,
+                  py: 1,
+                  px: 2,
                   '&:hover': { bgcolor: 'rgba(103,58,183,0.06)' },
                 }}
               >
@@ -400,7 +579,7 @@ export default function InsightCard({ sprintId, sprintLabel }) {
               }}
             >
               <CheckCircle size={13} color="#2E7D32" />
-              <Typography sx={{ fontSize: '0.72rem', color: '#2E7D32', fontWeight: 600 }}>
+              <Typography sx={{ fontSize: '0.9rem', color: '#2E7D32', fontWeight: 600 }}>
                 Reviewed
               </Typography>
             </Box>

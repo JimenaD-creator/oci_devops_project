@@ -4,6 +4,7 @@ import { Clock, Users, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 import KpiGaugeCard from './KpiGaugeCard';
 import ProductivityGaugeCard from './ProductivityGaugeCard';
+import { KPI_TOOLTIPS } from './KpiTooltipParts';
 
 export const KPI_DEFS = [
   {
@@ -11,34 +12,14 @@ export const KPI_DEFS = [
     title: 'On-Time Delivery',
     format: (v) => `${v}%`,
     icon: Clock,
-    tooltip: {
-      what: 'Share of completed tasks that were delivered on or before the due date.',
-      representation: 'Percentage from 0–100%. In compare mode, each sprint shows its own value.',
-      formula: {
-        type: 'fraction',
-        label: 'On-time (%) =',
-        numerator: 'completed on or before due date',
-        denominator: 'completed tasks',
-        suffix: '× 100',
-      },
-    },
+    tooltip: KPI_TOOLTIPS.onTimeDelivery,
   },
   {
     key: 'teamParticipation',
     title: 'Team Participation',
     format: (v) => `${v}%`,
     icon: Users,
-    tooltip: {
-      what: 'How logged hours compare to the planned hours on tasks this sprint.',
-      representation: 'Percentage from 0 to 100.',
-      formula: {
-        type: 'fraction',
-        label: 'Participation (%) =',
-        numerator: 'hours logged',
-        denominator: 'planned hours on tasks',
-        suffix: '× 100',
-      },
-    },
+    tooltip: KPI_TOOLTIPS.teamParticipation,
   },
   {
     key: 'workloadBalance',
@@ -46,15 +27,7 @@ export const KPI_DEFS = [
     format: (v) => (typeof v === 'number' ? `${Math.round(v * 100)}` : String(v)),
     icon: Scale,
     numeric: (v) => (typeof v === 'number' ? v * 100 : 0),
-    tooltip: {
-      what: 'How evenly tasks are distributed across team members who have assignments (more balanced is better).',
-      representation:
-        'Shown as a whole number from 0 to 100. Higher values mean a more even distribution.',
-      formula: {
-        type: 'plain',
-        text: 'Higher means work is spread more evenly across people with assignments.',
-      },
-    },
+    tooltip: KPI_TOOLTIPS.workloadBalance,
   },
 ];
 

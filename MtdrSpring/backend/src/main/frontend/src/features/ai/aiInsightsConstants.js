@@ -24,3 +24,23 @@ export const KPI_LABELS = {
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
 };
+
+/** Gemini `actionableRecommendations[].category` → UI label */
+export const RECOMMENDATION_CATEGORY_LABELS = {
+  workload_redistribution: 'Workload redistribution',
+  estimates: 'Estimates',
+  planning: 'Planning',
+  training: 'Training',
+  blockers: 'Blockers',
+};
+
+/** Shown when a sprint insight section has no AI content yet */
+export const AI_INSIGHTS_EMPTY = {
+  recommendations: 'No recommendations for this sprint yet. Generate insights to populate this list.',
+  executive:
+    'No executive summary yet. Generate insights to see overview, trends, improvement areas, and next steps.',
+  developers:
+    'No per-developer rows in the AI response yet. Add developers to the sprint roster or task assignments, then regenerate. Zero completed tasks should still produce rows when team workload data exists.',
+  predictions:
+    'No predictions yet. Generate insights to see productivity outlook, risks, and delivery estimates.',
+};

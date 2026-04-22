@@ -101,6 +101,27 @@ public class InsightsController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/developer-variation")
+    public ResponseEntity<Map<String, Object>> getDeveloperVariationInsights(
+            @RequestBody Map<String, Object> body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Object rawSprints = body != null ? body.get("sprints") : null;
+            if (!(rawSprints instanceof List<?>)) {
+                response.put("error", "Body must include a 'sprints' array.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> sprints = (List<Map<String, Object>>) rawSprints;
+            JsonNode insights = geminiService.generateDeveloperVariationInsights(sprints);
+            response.put("insights", insights);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("error", "Failed to generate developer variation insights: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ACKNOWLEDGE
     // ─────────────────────────────────────────────────────────────────────────
@@ -141,9 +162,10 @@ public class InsightsController {
             return payload;
         }
 
-        // Parse stored JSON string back into a node so frontend gets a real object
+        // Parse stored JSON; normalize snake_case / back-fill empty sections from DB workload (same as on save)
         try {
             JsonNode parsed = mapper.readTree(insight.getInsightsJson());
+            parsed = geminiService.enrichInsightsForResponse(parsed, insight.getSprintId());
             payload.put("insights", parsed);
         } catch (Exception e) {
             payload.put("insights", insight.getInsightsJson());
