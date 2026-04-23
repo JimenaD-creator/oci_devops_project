@@ -11,7 +11,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { Sparkles } from 'lucide-react';
-import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
@@ -20,6 +20,25 @@ export default function AIInsightsPage({ projectId }) {
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  useEffect(() => {
+    const onFocus = () => setRefreshToken((v) => v + 1);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') setRefreshToken((v) => v + 1);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setRefreshToken((v) => v + 1), 15000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const pid =
@@ -32,23 +51,26 @@ export default function AIInsightsPage({ projectId }) {
       setLoading(false);
       return;
     }
-    fetchDashboardSprints(pid)
+    invalidateDashboardCache();
+    fetchDashboardSprints(pid, { forceFresh: true })
       .then((data) => {
         const filtered = Array.isArray(data)
           ? data.filter((s) => String(s.assignedProject?.id) === String(pid))
           : [];
         setSprints(filtered);
-        if (filtered.length > 0) {
+        setSelectedSprintId((prev) => {
+          if (filtered.length === 0) return null;
+          if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
           const active = filtered.find((s) => {
             const now = new Date();
             return now >= new Date(s.startDate) && now <= new Date(s.dueDate);
           });
-          setSelectedSprintId(active?.id ?? filtered[filtered.length - 1]?.id ?? null);
-        }
+          return active?.id ?? filtered[filtered.length - 1]?.id ?? null;
+        });
       })
       .catch(() => setSprints([]))
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, refreshToken]);
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
 
@@ -209,6 +231,7 @@ export default function AIInsightsPage({ projectId }) {
           sprintLabel={`Sprint ${selectedSprint.id}`}
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
+          refreshToken={refreshToken}
         />
       )}
     </Box>

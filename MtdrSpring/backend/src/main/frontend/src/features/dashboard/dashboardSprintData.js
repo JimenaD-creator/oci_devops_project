@@ -406,7 +406,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 const fetchJsonNoCache = (url) =>
   fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
 
-export async function fetchDashboardSprints(projectId) {
+export async function fetchDashboardSprints(projectId, options = {}) {
+  const forceFresh = Boolean(options?.forceFresh);
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
   if (!pid) {
@@ -417,6 +418,7 @@ export async function fetchDashboardSprints(projectId) {
 
   // Check cache first
   if (
+    !forceFresh &&
     cachedData.sprints &&
     cachedData.tasks &&
     cachedData.userTasks &&

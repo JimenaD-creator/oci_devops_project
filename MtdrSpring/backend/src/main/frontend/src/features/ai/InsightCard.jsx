@@ -48,6 +48,7 @@ export default function InsightCard({
   sprintLabel,
   showPredictionsSection = true,
   showNextSprintForecast = true,
+  refreshToken = 0,
 }) {
   const [status, setStatus] = useState('idle');
   const [insights, setInsights] = useState(null);
@@ -55,14 +56,24 @@ export default function InsightCard({
   const [expanded, setExpanded] = useState(true);
   const [error, setError] = useState(null);
   const [pollCount, setPollCount] = useState(0);
+  const [lastGeneratedAtMs, setLastGeneratedAtMs] = useState(null);
   const cancelPollRef = useRef(false);
+
+  const parseGeneratedAtMs = (value) => {
+    const ms = new Date(value ?? '').getTime();
+    return Number.isFinite(ms) ? ms : null;
+  };
 
   const loadExisting = useCallback(async () => {
     if (!sprintId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`);
+      const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const data = await res.json();
+        setLastGeneratedAtMs(parseGeneratedAtMs(data.generatedAt));
         if (data.error) {
           setError(getErrorMessage(data.error));
           setStatus('error');
@@ -84,6 +95,7 @@ export default function InsightCard({
     setAcknowledged(false);
     setError(null);
     setPollCount(0);
+    setLastGeneratedAtMs(null);
     cancelPollRef.current = false;
     loadExisting();
     return () => {
@@ -91,16 +103,24 @@ export default function InsightCard({
     };
   }, [sprintId, loadExisting]);
 
+  useEffect(() => {
+    if (!sprintId || refreshToken === 0) return;
+    loadExisting();
+  }, [refreshToken, sprintId, loadExisting]);
+
   // Iterative loop — NOT recursive. Each iteration awaits before the next,
   // so the attempt counter increments correctly and the loop terminates at MAX_ATTEMPTS.
-  const pollForResults = useCallback(async () => {
+  const pollForResults = useCallback(async (minGeneratedAtMs = null) => {
     const MAX_ATTEMPTS = 12;
     const INTERVAL_MS = 2500;
     for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
       await new Promise((r) => setTimeout(r, INTERVAL_MS));
       if (cancelPollRef.current) return;
       try {
-        const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`);
+        const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
         if (cancelPollRef.current) return;
         if (res.ok) {
           const data = await res.json();
@@ -110,8 +130,17 @@ export default function InsightCard({
             setStatus('error');
             return;
           }
+          const generatedAtMs = parseGeneratedAtMs(data.generatedAt);
+          const hasFreshGeneration =
+            minGeneratedAtMs == null ||
+            (generatedAtMs != null && generatedAtMs > Number(minGeneratedAtMs));
+          if (!hasFreshGeneration) {
+            setPollCount(attempt + 1);
+            continue;
+          }
           setInsights(data.insights);
           setAcknowledged(data.acknowledged ?? false);
+          setLastGeneratedAtMs(generatedAtMs);
           setStatus('loaded');
           setPollCount(attempt + 1);
           return;
@@ -137,11 +166,12 @@ export default function InsightCard({
     try {
       const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}/generate`, {
         method: 'POST',
+        cache: 'no-store',
       });
       if (!res.ok) throw new Error('POST failed');
       cancelPollRef.current = false;
       setStatus('polling');
-      pollForResults();
+      pollForResults(lastGeneratedAtMs);
     } catch {
       setError('Could not start AI analysis. Check server connection.');
       setStatus('error');
@@ -150,7 +180,10 @@ export default function InsightCard({
 
   const handleAcknowledge = async () => {
     try {
-      await fetch(`${API_BASE}/api/insights/sprint/${sprintId}/acknowledge`, { method: 'PATCH' });
+      await fetch(`${API_BASE}/api/insights/sprint/${sprintId}/acknowledge`, {
+        method: 'PATCH',
+        cache: 'no-store',
+      });
       setAcknowledged(true);
     } catch {
       /* non-critical */

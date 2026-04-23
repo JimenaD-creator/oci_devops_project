@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.Comparator;
 
 @Service
 public class GeminiService {
@@ -704,6 +705,7 @@ public class GeminiService {
             Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
             enrichActionableRecommendationsIfEmpty(root, sprint);
             normalizeActionableRecommendationCounts(root, sprintId);
+            refineWorkloadRedistributionRecommendations(root, sprintId);
             suppressComparativeTrendsForFirstSprint(root, sprintId);
             enrichExecutiveSummaryIfSparse(root);
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
@@ -919,6 +921,412 @@ public class GeminiService {
                 o.put("text", fixed);
                 o.put("guardrailCorrected", true);
             }
+        }
+    }
+
+    private static class DeveloperStatusLoad {
+        String name;
+        int todo;
+        int inProcess;
+        int inReview;
+        int done;
+        int total;
+    }
+
+    private static class DeveloperUrgencyLoad {
+        String name;
+        int completed;
+        int open;
+        int urgentPending;
+    }
+
+    private static class StatusSpread {
+        String statusKey;
+        String statusLabel;
+        DeveloperStatusLoad from;
+        DeveloperStatusLoad to;
+        int spread;
+    }
+
+    private Map<String, DeveloperStatusLoad> buildDeveloperStatusLoad(Long sprintId) {
+        Map<String, DeveloperStatusLoad> byName = new LinkedHashMap<>();
+        try {
+            List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+            if (raw == null) {
+                return byName;
+            }
+            LinkedHashMap<String, UserTask> deduped = new LinkedHashMap<>();
+            for (UserTask ut : raw) {
+                if (ut == null || ut.getId() == null || ut.getTask() == null) {
+                    continue;
+                }
+                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
+                deduped.putIfAbsent(key, ut);
+            }
+            for (UserTask ut : deduped.values()) {
+                Long uid = ut.getId() != null ? ut.getId().getUserId() : null;
+                if (uid == null) {
+                    continue;
+                }
+                User u = ut.getUser();
+                String name = (u != null && u.getName() != null && !u.getName().isBlank())
+                    ? u.getName().trim()
+                    : ("User " + uid);
+                DeveloperStatusLoad d = byName.computeIfAbsent(name, k -> {
+                    DeveloperStatusLoad x = new DeveloperStatusLoad();
+                    x.name = k;
+                    return x;
+                });
+                String norm = normalizeWorkflowStatus(ut.getTask().getStatus());
+                if ("TODO".equals(norm)) d.todo++;
+                else if ("IN_PROCESS".equals(norm)) d.inProcess++;
+                else if ("IN_REVIEW".equals(norm)) d.inReview++;
+                else if ("DONE".equals(norm)) d.done++;
+                d.total++;
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] buildDeveloperStatusLoad: " + e.getMessage());
+        }
+        return byName;
+    }
+
+    private StatusSpread computeStatusSpread(List<DeveloperStatusLoad> rows, String statusKey) {
+        if (rows == null || rows.size() < 2) {
+            return null;
+        }
+        Comparator<DeveloperStatusLoad> byName = Comparator.comparing(d -> d.name == null ? "" : d.name);
+        DeveloperStatusLoad max = rows.stream()
+            .max((a, b) -> {
+                int va = statusValue(a, statusKey);
+                int vb = statusValue(b, statusKey);
+                if (va != vb) return Integer.compare(va, vb);
+                return -byName.compare(a, b);
+            })
+            .orElse(null);
+        DeveloperStatusLoad min = rows.stream()
+            .min((a, b) -> {
+                int va = statusValue(a, statusKey);
+                int vb = statusValue(b, statusKey);
+                if (va != vb) return Integer.compare(va, vb);
+                return byName.compare(a, b);
+            })
+            .orElse(null);
+        if (max == null || min == null) {
+            return null;
+        }
+        StatusSpread s = new StatusSpread();
+        s.statusKey = statusKey;
+        s.statusLabel = statusLabel(statusKey);
+        s.from = max;
+        s.to = min;
+        s.spread = Math.max(0, statusValue(max, statusKey) - statusValue(min, statusKey));
+        return s;
+    }
+
+    private int statusValue(DeveloperStatusLoad d, String statusKey) {
+        if (d == null) return 0;
+        if ("TODO".equals(statusKey)) return d.todo;
+        if ("IN_PROCESS".equals(statusKey)) return d.inProcess;
+        if ("IN_REVIEW".equals(statusKey)) return d.inReview;
+        return d.total;
+    }
+
+    private String statusLabel(String statusKey) {
+        if ("TODO".equals(statusKey)) return "To do";
+        if ("IN_PROCESS".equals(statusKey)) return "In progress";
+        if ("IN_REVIEW".equals(statusKey)) return "In review";
+        return "tasks";
+    }
+
+    private boolean isTaskDone(Task t) {
+        return t != null && "DONE".equals(normalizeWorkflowStatus(t.getStatus()));
+    }
+
+    private boolean isHighPriorityTask(Task t) {
+        if (t == null) return false;
+        String p = t.getPriority() != null ? t.getPriority().trim().toUpperCase() : "";
+        String c = t.getClassification() != null ? t.getClassification().trim().toUpperCase() : "";
+        String title = t.getTitle() != null ? t.getTitle().trim().toUpperCase() : "";
+        return p.contains("HIGH")
+            || p.contains("CRITICAL")
+            || p.contains("URGENT")
+            || c.contains("HIGH")
+            || c.contains("CRITICAL")
+            || c.contains("URGENT")
+            || title.contains("[HIGH]")
+            || title.contains("[URGENT]")
+            || title.contains("CRITICAL");
+    }
+
+    private boolean isDueSoon(Task t, LocalDateTime now) {
+        if (t == null || t.getDueDate() == null || now == null) return false;
+        LocalDateTime due = t.getDueDate();
+        // within next 72h (or overdue but still open)
+        return !due.isAfter(now.plusDays(3));
+    }
+
+    private Map<String, DeveloperUrgencyLoad> buildDeveloperUrgencyLoad(Long sprintId) {
+        Map<String, DeveloperUrgencyLoad> byName = new LinkedHashMap<>();
+        try {
+            List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+            if (raw == null) return byName;
+            LinkedHashMap<String, UserTask> deduped = new LinkedHashMap<>();
+            for (UserTask ut : raw) {
+                if (ut == null || ut.getId() == null || ut.getTask() == null) continue;
+                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
+                deduped.putIfAbsent(key, ut);
+            }
+            LocalDateTime now = LocalDateTime.now();
+            for (UserTask ut : deduped.values()) {
+                Long uid = ut.getId() != null ? ut.getId().getUserId() : null;
+                if (uid == null) continue;
+                User u = ut.getUser();
+                String name = (u != null && u.getName() != null && !u.getName().isBlank())
+                    ? u.getName().trim()
+                    : ("User " + uid);
+                DeveloperUrgencyLoad d = byName.computeIfAbsent(name, k -> {
+                    DeveloperUrgencyLoad x = new DeveloperUrgencyLoad();
+                    x.name = k;
+                    return x;
+                });
+                Task t = ut.getTask();
+                if (isTaskDone(t)) {
+                    d.completed++;
+                    continue;
+                }
+                d.open++;
+                if (isHighPriorityTask(t) || isDueSoon(t, now)) {
+                    d.urgentPending++;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] buildDeveloperUrgencyLoad: " + e.getMessage());
+        }
+        return byName;
+    }
+
+    private String statusKeyFromRecommendationText(String text) {
+        if (text == null) return null;
+        String t = text.toLowerCase();
+        if (t.contains("to do") || t.contains("todo")) return "TODO";
+        if (t.contains("in progress") || t.contains("in-process") || t.contains("in process")) return "IN_PROCESS";
+        if (t.contains("in review")) return "IN_REVIEW";
+        return null;
+    }
+
+    /**
+     * Guardrail for redistribution precision:
+     * - If status distribution is balanced (spread <= 1), avoid "move tasks from A to B" guidance.
+     * - If unbalanced, rewrite recommendations using the actual most/least-loaded developers for that status.
+     */
+    private void refineWorkloadRedistributionRecommendations(ObjectNode root, Long sprintId) {
+        try {
+            ArrayNode actionable = ensureArrayField(root, "actionableRecommendations");
+            JsonNode wlNode = root.get("workloadRecommendations");
+            ArrayNode workloadRecs = (wlNode != null && wlNode.isArray())
+                ? (ArrayNode) wlNode
+                : mapper.createArrayNode();
+            if (wlNode == null || !wlNode.isArray()) {
+                root.set("workloadRecommendations", workloadRecs);
+            }
+
+            boolean hasWorkloadActionable = false;
+            for (JsonNode n : actionable) {
+                if (n.isObject() && "workload_redistribution".equalsIgnoreCase(n.path("category").asText(""))) {
+                    hasWorkloadActionable = true;
+                    break;
+                }
+            }
+            boolean hasWorkloadArray = workloadRecs.size() > 0;
+            if (!hasWorkloadActionable && !hasWorkloadArray) {
+                return;
+            }
+
+            List<DeveloperStatusLoad> rows = new ArrayList<>(buildDeveloperStatusLoad(sprintId).values());
+            if (rows.size() < 2) {
+                return;
+            }
+
+            List<StatusSpread> candidates = new ArrayList<>();
+            candidates.add(computeStatusSpread(rows, "TODO"));
+            candidates.add(computeStatusSpread(rows, "IN_PROCESS"));
+            candidates.add(computeStatusSpread(rows, "IN_REVIEW"));
+            candidates = candidates.stream().filter(Objects::nonNull).collect(Collectors.toList());
+            if (candidates.isEmpty()) {
+                return;
+            }
+            Map<String, StatusSpread> spreadByStatus = candidates.stream()
+                .collect(Collectors.toMap(c -> c.statusKey, c -> c, (a, b) -> a, LinkedHashMap::new));
+            StatusSpread best = candidates.stream()
+                .max(Comparator.comparingInt(c -> c.spread))
+                .orElse(null);
+            if (best == null) {
+                return;
+            }
+
+            if (best.spread <= 1) {
+                // Balanced distribution by status: avoid misleading move recommendations.
+                for (JsonNode n : actionable) {
+                    if (!n.isObject()) continue;
+                    ObjectNode o = (ObjectNode) n;
+                    if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) continue;
+                    o.put("text",
+                        String.format(
+                            "Current task status distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.",
+                            best.statusLabel));
+                    o.put("guardrailCorrected", true);
+                }
+                workloadRecs.removeAll();
+                return;
+            }
+
+            int fromCount = statusValue(best.from, best.statusKey);
+            int toCount = statusValue(best.to, best.statusKey);
+            int tasksToMove = Math.max(1, best.spread / 2);
+
+            for (JsonNode n : actionable) {
+                if (!n.isObject()) continue;
+                ObjectNode o = (ObjectNode) n;
+                if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) continue;
+                String recommendationText = o.path("text").asText("");
+                String mentionedStatus = statusKeyFromRecommendationText(recommendationText);
+                StatusSpread targetSpread = mentionedStatus != null
+                    ? spreadByStatus.getOrDefault(mentionedStatus, best)
+                    : best;
+                int targetFrom = statusValue(targetSpread.from, targetSpread.statusKey);
+                int targetTo = statusValue(targetSpread.to, targetSpread.statusKey);
+                int targetMove = Math.max(1, targetSpread.spread / 2);
+                if (targetSpread.spread <= 1) {
+                    o.put(
+                        "text",
+                        String.format(
+                            "Current %s distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.",
+                            targetSpread.statusLabel));
+                    o.put("guardrailCorrected", true);
+                    continue;
+                }
+                o.put(
+                    "text",
+                    String.format(
+                        "Move ~%d %s task(s) from %s (%d) to %s (%d) to reduce the current status imbalance.",
+                        targetMove,
+                        targetSpread.statusLabel,
+                        targetSpread.from.name,
+                        targetFrom,
+                        targetSpread.to.name,
+                        targetTo));
+                o.put("guardrailCorrected", true);
+            }
+
+            if (workloadRecs.size() == 0) {
+                ObjectNode o = mapper.createObjectNode();
+                o.put("from", best.from.name);
+                o.put("to", best.to.name);
+                o.put("tasksToMove", tasksToMove);
+                o.put("reason",
+                    String.format(
+                        "Current %s load is uneven (%s: %d vs %s: %d).",
+                        best.statusLabel,
+                        best.from.name,
+                        fromCount,
+                        best.to.name,
+                        toCount));
+                workloadRecs.add(o);
+            } else {
+                for (JsonNode n : workloadRecs) {
+                    if (!n.isObject()) continue;
+                    ObjectNode o = (ObjectNode) n;
+                    o.put("from", best.from.name);
+                    o.put("to", best.to.name);
+                    o.put("tasksToMove", tasksToMove);
+                    o.put(
+                        "reason",
+                        String.format(
+                            "Current %s load is uneven (%s: %d vs %s: %d).",
+                            best.statusLabel,
+                            best.from.name,
+                            fromCount,
+                            best.to.name,
+                            toCount));
+                }
+            }
+
+            // Precision rule: only when it applies, suggest moving urgent work
+            // from developers with zero completed tasks to developers with no open tasks.
+            List<DeveloperUrgencyLoad> urg = new ArrayList<>(buildDeveloperUrgencyLoad(sprintId).values());
+            DeveloperUrgencyLoad sender = urg.stream()
+                .filter(d -> d.completed == 0 && d.urgentPending > 0)
+                .max(Comparator.comparingInt(d -> d.urgentPending))
+                .orElse(null);
+            DeveloperUrgencyLoad receiver = urg.stream()
+                .filter(d -> d.open == 0 && d.completed > 0)
+                .max(Comparator.comparingInt(d -> d.completed))
+                .orElse(null);
+            if (sender != null && receiver != null && !Objects.equals(sender.name, receiver.name)) {
+                int moveUrgent = Math.max(1, Math.min(2, sender.urgentPending));
+                boolean rewritten = false;
+                for (JsonNode n : actionable) {
+                    if (!n.isObject()) continue;
+                    ObjectNode o = (ObjectNode) n;
+                    if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) continue;
+                    o.put(
+                        "text",
+                        String.format(
+                            "%s has %d urgent pending task(s) (high priority or due soon) and no completed tasks yet; %s currently has no open tasks. Reassign ~%d urgent task(s) to balance delivery risk.",
+                            sender.name,
+                            sender.urgentPending,
+                            receiver.name,
+                            moveUrgent));
+                    o.put("guardrailCorrected", true);
+                    rewritten = true;
+                    break;
+                }
+                if (!rewritten) {
+                    ObjectNode add = mapper.createObjectNode();
+                    add.put("category", "workload_redistribution");
+                    add.put(
+                        "text",
+                        String.format(
+                            "%s has %d urgent pending task(s) (high priority or due soon) and no completed tasks yet; %s currently has no open tasks. Reassign ~%d urgent task(s) to balance delivery risk.",
+                            sender.name,
+                            sender.urgentPending,
+                            receiver.name,
+                            moveUrgent));
+                    add.put("guardrailCorrected", true);
+                    actionable.add(add);
+                }
+                if (workloadRecs.size() == 0) {
+                    ObjectNode o = mapper.createObjectNode();
+                    o.put("from", sender.name);
+                    o.put("to", receiver.name);
+                    o.put("tasksToMove", moveUrgent);
+                    o.put(
+                        "reason",
+                        String.format(
+                            "%s carries %d urgent pending task(s) with 0 completed, while %s has no open tasks.",
+                            sender.name,
+                            sender.urgentPending,
+                            receiver.name));
+                    workloadRecs.add(o);
+                } else {
+                    for (JsonNode n : workloadRecs) {
+                        if (!n.isObject()) continue;
+                        ObjectNode o = (ObjectNode) n;
+                        o.put("from", sender.name);
+                        o.put("to", receiver.name);
+                        o.put("tasksToMove", moveUrgent);
+                        o.put(
+                            "reason",
+                            String.format(
+                                "%s carries %d urgent pending task(s) with 0 completed, while %s has no open tasks.",
+                                sender.name,
+                                sender.urgentPending,
+                                receiver.name));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] refineWorkloadRedistributionRecommendations: " + e.getMessage());
         }
     }
 

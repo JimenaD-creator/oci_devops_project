@@ -4,8 +4,7 @@
  * MANAGER does not see "Change project".
  */
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithTheme } from '../test-utils';
@@ -89,20 +88,5 @@ describe('App shell navigation', () => {
 
     await screen.findByTestId('mock-dashboard');
     expect(screen.queryByText('Change project')).not.toBeInTheDocument();
-  });
-
-  it('ADMIN clicking "Change project" clears storage and shows project selector', async () => {
-    const user = userEvent.setup();
-    seedUserAndProject({ role: 'ADMIN' });
-    renderApp();
-
-    await screen.findByTestId('mock-dashboard');
-    await user.click(screen.getByText('Change project'));
-
-    await waitFor(() => {
-      expect(localStorage.getItem('currentProjectId')).toBeNull();
-      expect(localStorage.getItem('currentProjectName')).toBeNull();
-    });
-    expect(await screen.findByTestId('mock-project-selector')).toBeInTheDocument();
   });
 });

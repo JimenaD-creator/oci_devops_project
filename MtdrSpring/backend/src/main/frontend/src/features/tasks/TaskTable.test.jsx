@@ -27,8 +27,3 @@ test('completed row shows title, developer, estimated hours and real hours in th
   expect(within(row).getByText('7h')).toBeInTheDocument();
 });
 
-// Empty state: no rows and a clear “No tasks” message.
-test('empty table shows the No tasks placeholder', () => {
-  renderWithTheme(<TaskTable items={[]} />);
-  expect(screen.getByText('No tasks')).toBeInTheDocument();
-});

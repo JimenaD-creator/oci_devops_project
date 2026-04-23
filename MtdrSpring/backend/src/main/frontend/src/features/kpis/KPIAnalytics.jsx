@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -37,6 +37,29 @@ const KPI_ANALYTICS_CARD_LABEL_TO_TOOLTIP_KEY = {
   'Team Participation': 'teamParticipation',
   'Workload Balance': 'workloadBalance',
 };
+
+function normalizeTaskStatus(rawStatus) {
+  const s = String(rawStatus || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (s === 'DONE' || s === 'COMPLETED' || s === 'COMPLETE') return 'DONE';
+  if (s === 'IN_REVIEW' || s === 'REVIEW') return 'IN_REVIEW';
+  if (s === 'IN_PROGRESS') return 'IN_PROGRESS';
+  return 'TODO';
+}
+
+function taskSprintId(task) {
+  const raw =
+    task?.assignedSprint?.id ??
+    task?.sprint?.id ??
+    task?.sprintId ??
+    task?.sprint_id ??
+    task?.id?.sprintId ??
+    task?.id?.sprint_id;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 function ProductivityScoreCard({
   completionRate,
@@ -196,10 +219,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, [projectId]);
-
-  useEffect(() => {
     if (loading || selectedSprintId == null) return undefined;
     let cancelled = false;
     setManagerGuideLoading(true);
@@ -231,7 +250,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     };
   }, [selectedSprintId, loading]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const pid =
@@ -252,10 +271,11 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
 
       if (pid) {
         sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
-        const sprintIds = new Set(sprintsData.map((s) => s.id));
-        tasksData = tasksData.filter(
-          (t) => t.assignedSprint?.id != null && sprintIds.has(t.assignedSprint.id),
-        );
+        const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
+        tasksData = tasksData.filter((t) => {
+          const sid = taskSprintId(t);
+          return sid != null && sprintIds.has(sid);
+        });
       }
 
       setSprints(sprintsData);
@@ -277,25 +297,29 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const getSelectedSprint = () => sprints.find((s) => s.id === selectedSprintId);
 
   const getSprintTasks = () => {
     const sprint = getSelectedSprint();
     if (!sprint) return [];
-    return tasks.filter((t) => t.assignedSprint?.id === sprint.id);
+    return tasks.filter((t) => Number(taskSprintId(t)) === Number(sprint.id));
   };
 
   const calculateKPIs = () => {
     const sprint = getSelectedSprint();
     const sprintTasks = getSprintTasks();
     const totalTasks = sprintTasks.length;
-    const completedTasks = sprintTasks.filter((t) => t.status === 'DONE').length;
+    const completedTasks = sprintTasks.filter((t) => normalizeTaskStatus(t.status) === 'DONE').length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     const onTimeTasks = sprintTasks.filter((t) => {
-      if (t.status !== 'DONE') return false;
+      if (normalizeTaskStatus(t.status) !== 'DONE') return false;
       return new Date(t.finishDate ?? new Date()) <= new Date(t.dueDate);
     }).length;
     const onTimeDelivery =

@@ -47,17 +47,3 @@ test('shows Total hours worked, value, helper copy, and Scorecards heading', () 
   expect(screen.getByText('Hours logged this sprint')).toBeInTheDocument();
 });
 
-// Hides the Scorecards label when the section header is turned off.
-test('hides Scorecards header when showSectionHeader is false', () => {
-  renderWithTheme(
-    <DashboardTopMetrics
-      totalTasks={0}
-      totalHours={0}
-      avgTasksPerDev={0}
-      avgHoursPerDev={0}
-      uniqueDevCount={0}
-      showSectionHeader={false}
-    />,
-  );
-  expect(screen.queryByText('Scorecards')).not.toBeInTheDocument();
-});

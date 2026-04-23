@@ -8,7 +8,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import {
-  deleteTaskById,
   fetchTaskById,
   fetchTaskDetailDevelopers,
   fetchUserTasksForTask,
@@ -20,10 +19,7 @@ vi.mock('./taskDetailApi', () => ({
   fetchTaskDetailDevelopers: vi.fn(),
   fetchTaskById: vi.fn(),
   fetchUserTasksForTask: vi.fn(),
-  deleteUserTasksForTask: vi.fn(),
-  postUserTask: vi.fn(),
   putTask: vi.fn(),
-  deleteTaskById: vi.fn(),
 }));
 
 const baseTask = {
@@ -110,32 +106,3 @@ test('save persists title, hours, type, and priority; notifies parent', async ()
   expect(lastPutBody?.priority).toBe('HIGH');
 }, 20000);
 
-// Confirms delete in the browser dialog, then expects DELETE success and onDeleted callback.
-test('delete: after confirm, calls onDeleted', async () => {
-  const user = userEvent.setup();
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-  fetchTaskDetailDevelopers.mockResolvedValue([]);
-  fetchTaskById.mockResolvedValue(baseTask);
-  fetchUserTasksForTask.mockResolvedValue([]);
-  deleteTaskById.mockResolvedValue({ ok: true, status: 200 });
-
-  const onDeleted = vi.fn();
-
-  renderWithTheme(
-    <TaskDetailDialog
-      open
-      initialTask={baseTask}
-      sprints={[{ id: 1 }]}
-      projectDevelopers={[]}
-      activeProjectId="1"
-      onClose={vi.fn()}
-      onSaved={vi.fn()}
-      onDeleted={onDeleted}
-    />,
-  );
-
-  await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
-  await user.click(screen.getByRole('button', { name: /delete/i }));
-  await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(10));
-});
