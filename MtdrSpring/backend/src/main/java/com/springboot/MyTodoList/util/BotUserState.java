@@ -11,6 +11,8 @@ public class BotUserState {
     private Long chatId;              // Telegram chat ID
     private Integer taskId;           // Task waiting for hours (if in WAITING_FOR_HOURS state)
     private Long sprintId;            // Sprint ID (if in sprint-related state)
+    /** Assignee filter when viewing sprint tasks (USER_TASK / multi-assignee). */
+    private Long selectedUserId;
     private String state;             // Current state
     private LocalDateTime timestamp;  // When state was created (for timeout)
     
@@ -18,9 +20,14 @@ public class BotUserState {
     public BotUserState() {}
     
     public BotUserState(Long chatId, Integer taskId, Long sprintId, String state) {
+        this(chatId, taskId, sprintId, null, state);
+    }
+
+    public BotUserState(Long chatId, Integer taskId, Long sprintId, Long selectedUserId, String state) {
         this.chatId = chatId;
         this.taskId = taskId;
         this.sprintId = sprintId;
+        this.selectedUserId = selectedUserId;
         this.state = state;
         this.timestamp = LocalDateTime.now();
     }
@@ -48,6 +55,14 @@ public class BotUserState {
     
     public void setSprintId(Long sprintId) {
         this.sprintId = sprintId;
+    }
+
+    public Long getSelectedUserId() {
+        return selectedUserId;
+    }
+
+    public void setSelectedUserId(Long selectedUserId) {
+        this.selectedUserId = selectedUserId;
     }
     
     public String getState() {

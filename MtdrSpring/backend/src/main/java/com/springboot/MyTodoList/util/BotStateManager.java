@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * States:
  * - null/empty: User is not in any special state
  * - "WAITING_FOR_HOURS": User just marked a task as DONE and is waiting to enter hours
+ * - "SELECTING_USER_IN_SPRINT": User picked a sprint; choosing which assignee's tasks to list
+ * - "VIEWING_SPRINT_TASKS": Showing tasks for one assignee in a sprint
  */
 @Component
 public class BotStateManager {
@@ -31,15 +33,16 @@ public class BotStateManager {
     private static final long STATE_TIMEOUT_MINUTES = 30;
     
     /**
-     * Set user state to "waiting for hours"
-     * 
-     * @param chatId The Telegram chat ID
-     * @param taskId The task ID that is waiting for hours
+     * Set user state to "waiting for hours".
+     *
+     * @param actingUserId DB user id who claimed the task (from sprint user-picker when present); stored in
+     *                     {@code selectedUserId} until hours are saved, so it survives the state transition from
+     *                     {@code VIEWING_SPRINT_TASKS}.
      */
-    public void setWaitingForHours(Long chatId, Integer taskId) {
-        BotUserState state = new BotUserState(chatId, taskId, null, "WAITING_FOR_HOURS");
+    public void setWaitingForHours(Long chatId, Integer taskId, Long actingUserId) {
+        BotUserState state = new BotUserState(chatId, taskId, null, actingUserId, "WAITING_FOR_HOURS");
         userStates.put(chatId, state);
-        logger.info("Set chat {} to waiting for hours for task {}", chatId, taskId);
+        logger.info("Set chat {} to waiting for hours for task {}, actingUserId={}", chatId, taskId, actingUserId);
     }
     
     /**
@@ -48,21 +51,44 @@ public class BotStateManager {
      * @param chatId The Telegram chat ID
      */
     public void setSelectingSprint(Long chatId) {
-        BotUserState state = new BotUserState(chatId, null, null, "SELECTING_SPRINT");
+        BotUserState state = new BotUserState(chatId, null, null, null, "SELECTING_SPRINT");
         userStates.put(chatId, state);
         logger.info("Set chat {} to selecting sprint", chatId);
     }
+
+    /**
+     * After choosing a sprint: show assignee list for that sprint.
+     */
+    public void setSelectingUserInSprint(Long chatId, Long sprintId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, null, "SELECTING_USER_IN_SPRINT");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting user in sprint {}", chatId, sprintId);
+    }
+
+    public boolean isSelectingUserInSprint(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_USER_IN_SPRINT".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    /** Sprint id while picking a user or viewing filtered tasks. */
+    public Long getSprintIdInSprintUserFlow(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null || isStateExpired(state)) {
+            return null;
+        }
+        if ("SELECTING_USER_IN_SPRINT".equals(state.getState()) || "VIEWING_SPRINT_TASKS".equals(state.getState())) {
+            return state.getSprintId();
+        }
+        return null;
+    }
     
     /**
-     * Set user state to "viewing sprint tasks"
-     * 
-     * @param chatId The Telegram chat ID
-     * @param sprintId The sprint ID being viewed
+     * Set user state to "viewing sprint tasks" for one assignee.
      */
-    public void setViewingSprintTasks(Long chatId, Long sprintId) {
-        BotUserState state = new BotUserState(chatId, null, sprintId, "VIEWING_SPRINT_TASKS");
+    public void setViewingSprintTasks(Long chatId, Long sprintId, Long selectedUserId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, selectedUserId, "VIEWING_SPRINT_TASKS");
         userStates.put(chatId, state);
-        logger.info("Set chat {} to viewing sprint tasks for sprint {}", chatId, sprintId);
+        logger.info("Set chat {} to viewing sprint {} tasks for user {}", chatId, sprintId, selectedUserId);
     }
     
     /**
@@ -93,6 +119,25 @@ public class BotStateManager {
         }
         
         return state.getTaskId();
+    }
+
+    /**
+     * While waiting for hours: the assignee user id chosen in the sprint flow (or null → use Telegram mapping).
+     */
+    public Long getActingUserIdForHours(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null) {
+            return null;
+        }
+        if (!"WAITING_FOR_HOURS".equals(state.getState())) {
+            return null;
+        }
+        if (isStateExpired(state)) {
+            logger.info("State for chat {} has timed out, clearing", chatId);
+            clearPendingState(chatId);
+            return null;
+        }
+        return state.getSelectedUserId();
     }
     
     /**
@@ -130,6 +175,14 @@ public class BotStateManager {
         }
         return null;
     }
+
+    public Long getViewingSelectedUserId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
+            return state.getSelectedUserId();
+        }
+        return null;
+    }
     
     /**
      * Check if user has any pending state
@@ -152,7 +205,15 @@ public class BotStateManager {
             return false;
         }
         
-        return state.getState() != null && !state.getState().isEmpty();
+        String st = state.getState();
+        if (st == null || st.isEmpty()) {
+            return false;
+        }
+        /* Navigation-only states: not "pending input" for free-text handlers */
+        if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st)) {
+            return false;
+        }
+        return true;
     }
     
     /**
