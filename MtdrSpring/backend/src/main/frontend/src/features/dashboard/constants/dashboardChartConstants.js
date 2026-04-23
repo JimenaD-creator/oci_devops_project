@@ -3,7 +3,8 @@ import { alpha } from '@mui/material/styles';
 /** One line under chart titles — what the reader should take away. */
 export const CHART_DESC = {
   compare: {
-    workload: 'Completed vs pending tasks per developer; bars are stacked by sprint color.',
+    workload:
+      'One column per developer, stacked: solid = completed, lighter = pending, one stack per sprint.',
     hours:
       'Per sprint: solid bar = hours worked; lighter bar = estimated hours from task estimates.',
     combo: 'Bars show completed tasks; lines show hours — both broken down by sprint.',

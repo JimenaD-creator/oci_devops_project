@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
+import { KpiInfoCornerButton, KPI_TOOLTIPS } from './KpiTooltipParts';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import KpiDonutChart from './KpiDonutChart';
@@ -26,6 +27,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
 
   return (
     <Paper
+      component="div"
       sx={{
         p: { xs: 2, sm: 2.25 },
         borderRadius: 3,
@@ -48,7 +50,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
           mb: 0.5,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
           <Box
             sx={{
               width: 36,
@@ -63,12 +65,30 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
           >
             <TrackChangesIcon sx={{ color: GAUGE_HEADER_ACCENT, fontSize: 22 }} />
           </Box>
-          <Typography
-            variant="subtitle1"
-            sx={{ fontWeight: 700, color: '#1A1A1A', lineHeight: 1.25 }}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.35,
+              flexWrap: 'wrap',
+              minWidth: 0,
+            }}
           >
-            Productivity Score
-          </Typography>
+            <Typography
+              component="span"
+              variant="subtitle1"
+              sx={{ fontWeight: 700, color: '#1A1A1A', lineHeight: 1.25 }}
+            >
+              Productivity Score
+            </Typography>
+            <KpiInfoCornerButton
+              id="kpi-info-gauge-productivity"
+              bodyProps={KPI_TOOLTIPS.productivityScore}
+              ariaLabel="Productivity score: how it is calculated"
+              iconSize="1.1rem"
+              placement="inline"
+            />
+          </Box>
         </Box>
       </Box>
 

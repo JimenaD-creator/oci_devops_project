@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { expect, test } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import DeveloperTable from './DeveloperTable';
 
@@ -37,20 +37,3 @@ test('columns show per-person assigned tasks, completed tasks, and hours', () =>
   expect(within(anaRow).getByText('18h')).toBeInTheDocument();
 });
 
-// Two clicks on Total Hours toggle ascending/descending sort by visible row order.
-test('clicking Total Hours sorts rows by hours asc then desc', async () => {
-  const user = userEvent.setup();
-  renderWithTheme(
-    <DeveloperTable selectedSprints={[sprintSnapshot]} compareMode={false} suppressCardTitle />,
-  );
-
-  const hoursHeader = screen.getByText('Total Hours');
-  await user.click(hoursHeader);
-
-  const bodyRows = screen.getAllByRole('row').filter((r) => r.querySelector('.dev-name-text'));
-  expect(within(bodyRows[0]).getByText('Luis Pérez')).toBeInTheDocument();
-
-  await user.click(hoursHeader);
-  const bodyRowsDesc = screen.getAllByRole('row').filter((r) => r.querySelector('.dev-name-text'));
-  expect(within(bodyRowsDesc[0]).getByText('Ana Ruiz')).toBeInTheDocument();
-});

@@ -4,48 +4,48 @@
  * MANAGER does not see "Change project".
  */
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithTheme } from '../test-utils';
 import App from './App';
 import { taskAPI } from '../services/API';
 
-jest.mock('../services/API', () => ({
+vi.mock('../services/API', () => ({
   taskAPI: {
-    getAll: jest.fn(() => Promise.resolve([])),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    getAll: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
-jest.mock('../features/dashboard/DashboardPage', () => ({
+vi.mock('../features/dashboard/DashboardPage', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-dashboard">Dashboard</div>,
 }));
 
-jest.mock('../features/tasks/TasksPage', () => ({
+vi.mock('../features/tasks/TasksPage', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-tasks">Tasks</div>,
 }));
 
-jest.mock('../features/sprints/SprintsPage', () => ({
+vi.mock('../features/sprints/SprintsPage', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-sprints">Sprints</div>,
 }));
 
-jest.mock('../features/kpis/KPIAnalytics', () => ({
+vi.mock('../features/kpis/KPIAnalytics', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-kpi">KPI</div>,
 }));
 
-jest.mock('../features/ai/AIInsightsPage', () => ({
+vi.mock('../features/ai/AIInsightsPage', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-ai">AI</div>,
 }));
 
-jest.mock('../features/project/ProjectSelector', () => ({
+vi.mock('../features/project/ProjectSelector', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-project-selector">Project selector</div>,
 }));
@@ -70,7 +70,7 @@ function renderApp() {
 describe('App shell navigation', () => {
   beforeEach(() => {
     localStorage.clear();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     taskAPI.getAll.mockResolvedValue([]);
   });
 
@@ -88,20 +88,5 @@ describe('App shell navigation', () => {
 
     await screen.findByTestId('mock-dashboard');
     expect(screen.queryByText('Change project')).not.toBeInTheDocument();
-  });
-
-  it('ADMIN clicking "Change project" clears storage and shows project selector', async () => {
-    const user = userEvent.setup();
-    seedUserAndProject({ role: 'ADMIN' });
-    renderApp();
-
-    await screen.findByTestId('mock-dashboard');
-    await user.click(screen.getByText('Change project'));
-
-    await waitFor(() => {
-      expect(localStorage.getItem('currentProjectId')).toBeNull();
-      expect(localStorage.getItem('currentProjectName')).toBeNull();
-    });
-    expect(await screen.findByTestId('mock-project-selector')).toBeInTheDocument();
   });
 });

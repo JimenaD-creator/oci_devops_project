@@ -459,7 +459,12 @@ function App() {
               onNavigateToTasks={() => setActivePage('tasks')}
             />
           )}
-          {activePage === 'analytics' && <KPIAnalytics projectId={selectedProjectId} />}
+          {activePage === 'analytics' && (
+            <KPIAnalytics
+              projectId={selectedProjectId}
+              onOpenAiInsights={() => setActivePage('ai-insights')}
+            />
+          )}
           {activePage === 'ai-insights' && <AIInsightsPage projectId={selectedProjectId} />}
         </Suspense>
 

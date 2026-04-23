@@ -1,7 +1,6 @@
 {
   "extends": [
     "react-app",
-    "react-app/jest",
     "prettier"
   ],
   "plugins": ["prettier"],
@@ -11,9 +10,6 @@
     "react/prop-types": "off",
     "no-unused-vars": "warn",
     "no-console": "off",
-    "jest/no-disabled-tests": "warn",
-    "jest/no-focused-tests": "error",
-    "jest/valid-expect": "error",
     "testing-library/no-node-access": "off",
     "testing-library/no-container": "off",
     "testing-library/no-wait-for-multiple-assertions": "off",

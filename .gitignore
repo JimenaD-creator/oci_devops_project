@@ -34,6 +34,7 @@ frontend/.pnp
 
 # testing
 frontend/coverage
+MtdrSpring/backend/src/main/frontend/coverage/
 
 # production
 frontend/build
@@ -51,11 +52,13 @@ frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 /MtdrSpring/backend/wallet
-<<<<<<< Updated upstream
 MtdrSpring/backend/.env
-=======
+MtdrSpring/.env
 
 # Docker
 docker-compose.yml
 docker-compose.*.yml
->>>>>>> Stashed changes
+
+# Environment (secrets) — all .env files in the repo
+.env
+**/.env

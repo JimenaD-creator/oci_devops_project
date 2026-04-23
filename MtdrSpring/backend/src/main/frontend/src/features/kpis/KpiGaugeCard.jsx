@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Box, Paper, Typography } from '@mui/material';
+import { KpiInfoCornerButton } from './KpiTooltipParts';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import KpiDonutChart from './KpiDonutChart';
 
@@ -178,7 +179,9 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
 
   return (
     <Paper
+      component="div"
       sx={{
+        position: 'relative',
         p: { xs: 2, sm: 2.25 },
         borderRadius: 3,
         border: '1px solid #EFEFEF',
@@ -191,6 +194,12 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
         boxSizing: 'border-box',
       }}
     >
+      <KpiInfoCornerButton
+        id={`kpi-info-gauge-${def.key}`}
+        bodyProps={def.tooltip}
+        ariaLabel={`${def.title}: how it is calculated`}
+        iconSize="1.1rem"
+      />
       <Box
         sx={{
           display: 'flex',
@@ -201,7 +210,7 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
           mb: 1,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, pr: 3.5 }}>
           <Box
             sx={{
               width: 36,

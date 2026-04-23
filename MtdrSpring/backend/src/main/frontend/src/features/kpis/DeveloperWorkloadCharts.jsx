@@ -1,7 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import {
   BarChart,
   Bar,
@@ -10,14 +13,11 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ReferenceLine,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 import { shortDevName } from '../dashboard/dashboardSprintData';
 import { CHART_LEGEND_STYLE, CHART_LEGEND_ITEM_SX } from '../dashboard/dashboardTypography';
+import { API_BASE } from '../sprints/constants/sprintConstants';
 
 const FALLBACK_SPRINT_COLOR = '#546E7A';
 const CHART_ACCENT_ICON_BG = 'rgba(199, 70, 52, 0.09)';
@@ -33,10 +33,6 @@ const TOOLTIP_CONTENT = {
   fontSize: 14,
   padding: '10px 12px',
 };
-
-/** Donut slice colors: neutral slate (not blue/purple or status red/green). */
-const DONUT_ASSIGNED = '#90A4AE';
-const DONUT_COMPLETED = '#546E7A';
 
 /** Recharts 3: use rgba fill for “light” bars — `fillOpacity` on `<Bar>` often renders like solid. */
 function hexToRgba(hex, alpha) {
@@ -115,6 +111,89 @@ function ChartCard({ title, subtitle, iconElement, children }) {
   );
 }
 
+function AIDeveloperVariationCard({ title, rows, emptyText }) {
+  if (!rows?.length) {
+    return (
+      <Paper
+        sx={{
+          mt: 1.5,
+          p: 1.5,
+          borderRadius: 2,
+          border: '1px dashed #D0D7DE',
+          bgcolor: '#FAFBFC',
+        }}
+      >
+        <Typography sx={{ color: '#607D8B', fontSize: '0.9rem' }}>{emptyText}</Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper
+      sx={{
+        mt: 1.5,
+        p: 1.5,
+        borderRadius: 2,
+        border: '1px solid #E6EEF5',
+        bgcolor: '#F8FCFF',
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+        <AutoAwesomeIcon sx={{ color: '#7B1FA2', fontSize: 18 }} />
+        <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#263238' }}>
+          {title}
+        </Typography>
+      </Box>
+
+      <Stack spacing={0.8}>
+        {rows.map((r) => {
+          const up = r.delta > 0;
+          const down = r.delta < 0;
+          return (
+            <Box
+              key={r.key}
+              sx={{
+                p: 1,
+                borderRadius: 1.5,
+                bgcolor: '#FFFFFF',
+                border: '1px solid #E9EEF2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+              }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.88rem' }}>
+                  {r.name}
+                </Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: '#546E7A' }}>{r.message}</Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, flexShrink: 0 }}>
+                {up ? (
+                  <TrendingUpIcon sx={{ color: '#2E7D32', fontSize: 18 }} />
+                ) : down ? (
+                  <TrendingDownIcon sx={{ color: '#C62828', fontSize: 18 }} />
+                ) : null}
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    color: up ? '#2E7D32' : down ? '#C62828' : '#607D8B',
+                  }}
+                >
+                  {r.deltaLabel}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+      </Stack>
+    </Paper>
+  );
+}
+
 function sprintFieldKey(sp, suffix) {
   return `sp${sp.id}_${suffix}`;
 }
@@ -137,6 +216,62 @@ function buildWorkedEstimatedHoursRows(selectedSprints) {
   });
 }
 
+function buildDeveloperVariationTasks(selectedSprints) {
+  if (!selectedSprints || selectedSprints.length < 2) return [];
+
+  const ordered = [...selectedSprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+
+  const devNames = new Set();
+  ordered.forEach((sp) => (sp.developers || []).forEach((d) => d?.name && devNames.add(d.name)));
+
+  return Array.from(devNames).map((name) => {
+    const firstDev = (first.developers || []).find((d) => d.name === name);
+    const lastDev = (last.developers || []).find((d) => d.name === name);
+
+    const firstCompleted = Number(firstDev?.completed || 0);
+    const lastCompleted = Number(lastDev?.completed || 0);
+    const delta = lastCompleted - firstCompleted;
+
+    return {
+      key: `tasks-${name}`,
+      name: shortDevName(name),
+      delta,
+      deltaLabel: `${delta > 0 ? '+' : ''}${delta} tasks`,
+      message: `Completed tasks: ${first.shortLabel} ${firstCompleted} -> ${last.shortLabel} ${lastCompleted}`,
+    };
+  });
+}
+
+function buildDeveloperVariationHours(selectedSprints) {
+  if (!selectedSprints || selectedSprints.length < 2) return [];
+
+  const ordered = [...selectedSprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+
+  const devNames = new Set();
+  ordered.forEach((sp) => (sp.developers || []).forEach((d) => d?.name && devNames.add(d.name)));
+
+  return Array.from(devNames).map((name) => {
+    const firstDev = (first.developers || []).find((d) => d.name === name);
+    const lastDev = (last.developers || []).find((d) => d.name === name);
+
+    const firstHours = Number(firstDev?.hours || 0);
+    const lastHours = Number(lastDev?.hours || 0);
+    const delta = Number((lastHours - firstHours).toFixed(1));
+
+    return {
+      key: `hours-${name}`,
+      name: shortDevName(name),
+      delta,
+      deltaLabel: `${delta > 0 ? '+' : ''}${delta} h`,
+      message: `Worked hours: ${first.shortLabel} ${firstHours.toFixed(1)} -> ${last.shortLabel} ${lastHours.toFixed(1)}`,
+    };
+  });
+}
+
 /**
  * With one sprint selected: one row comparing total tasks assigned vs total completed for that sprint.
  * With several sprints: one row per developer (same metric per sprint).
@@ -149,7 +284,7 @@ function buildAssignedCompletedRows(selectedSprints) {
     const totalC = devs.reduce((a, d) => a + (d.completed ?? 0), 0);
     return [
       {
-        name: sp.shortLabel || 'Sprint',
+        name: 'Total',
         _full: 'team',
         [sprintFieldKey(sp, 'a')]: totalA,
         [sprintFieldKey(sp, 'c')]: totalC,
@@ -168,50 +303,6 @@ function buildAssignedCompletedRows(selectedSprints) {
     });
     return row;
   });
-}
-
-function buildSprintAverageRows(selectedSprints) {
-  return selectedSprints.map((sp) => {
-    const devs = sp.developers || [];
-    const n = devs.length;
-    const sumAssigned = devs.reduce((a, d) => a + (d.assigned || 0), 0);
-    return {
-      shortLabel: sp.shortLabel,
-      /** Mean assigned workload per developer (labeled "tasks" in UI, not "assigned tasks"). */
-      avgTasksPerDev: n ? Number((sumAssigned / n).toFixed(2)) : 0,
-      developerCount: n,
-      accentColor: sp.accentColor ?? FALLBACK_SPRINT_COLOR,
-    };
-  });
-}
-
-function CombinedSprintAvgPills({ sprintAvgRows }) {
-  return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.25 }}>
-      {sprintAvgRows.map((row) => (
-        <Box
-          key={row.shortLabel}
-          sx={{
-            px: 1.25,
-            py: 0.75,
-            borderRadius: 2,
-            border: `1px solid ${row.accentColor}55`,
-            bgcolor: `${row.accentColor}0F`,
-            minWidth: 0,
-          }}
-        >
-          <Typography
-            sx={{ fontSize: '0.9rem', fontWeight: 800, color: row.accentColor, mb: 0.35 }}
-          >
-            {row.shortLabel}
-          </Typography>
-          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#424242', lineHeight: 1.35 }}>
-            Average tasks per developer: {row.avgTasksPerDev}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
 }
 
 function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
@@ -273,198 +364,27 @@ function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
   );
 }
 
-function AssignedCompletedLegendKey({ selectedSprints }) {
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 1.5,
-        alignItems: 'center',
-        mb: 1,
-        ...CHART_LEGEND_ITEM_SX,
-        color: '#555',
-      }}
-    >
-      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-        <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: '#90A4AE', opacity: 0.65 }} />
-        <Box component="span">Assigned (lighter bar)</Box>
-      </Box>
-      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-        <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: '#90A4AE' }} />
-        <Box component="span">Completed (solid bar)</Box>
-      </Box>
-      <Box sx={{ display: 'inline-flex', flexWrap: 'wrap', gap: 0.75 }}>
-        {selectedSprints.map((sp) => (
-          <Box key={sp.id} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-            <Box
-              sx={{
-                width: 12,
-                height: 12,
-                borderRadius: '2px',
-                bgcolor: sp.accentColor ?? FALLBACK_SPRINT_COLOR,
-              }}
-            />
-            <Box component="span" sx={{ fontWeight: 700 }}>
-              {sp.shortLabel}
-            </Box>
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-/**
- * Donut: share of assigned vs completed volume; center = completion rate + avg tasks per developer.
- */
-function TaskVolumeDonut({ totalAssigned, totalCompleted, devCount }) {
-  const sum = totalAssigned + totalCompleted;
-  const completionRate =
-    totalAssigned > 0
-      ? Math.round((100 * totalCompleted) / totalAssigned)
-      : totalCompleted > 0
-        ? 100
-        : 0;
-  const avgTasksPerDev = devCount > 0 ? totalAssigned / devCount : 0;
-
-  const data = useMemo(() => {
-    if (sum <= 0) return [];
-    return [
-      { name: 'Assigned', value: totalAssigned, fill: DONUT_ASSIGNED },
-      { name: 'Completed', value: totalCompleted, fill: DONUT_COMPLETED },
-    ];
-  }, [sum, totalAssigned, totalCompleted]);
-
-  if (sum <= 0) {
-    return (
-      <Box
-        sx={{
-          width: { xs: '100%', md: 240 },
-          minHeight: 200,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: '1px dashed #B39DDB',
-          borderRadius: 2,
-          bgcolor: '#FAFAFA',
-        }}
-      >
-        <Typography
-          sx={{
-            color: '#757575',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            px: 2,
-            textAlign: 'center',
-          }}
-        >
-          No assigned or completed volume for the selection
-        </Typography>
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        position: 'relative',
-        width: { xs: '100%', md: 240 },
-        height: 220,
-        flexShrink: 0,
-        mx: { xs: 'auto', md: 0 },
-      }}
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={62}
-            outerRadius={88}
-            paddingAngle={2}
-            stroke="#fff"
-            strokeWidth={2}
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${entry.name}-${index}`} fill={entry.fill} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v, name) => [`${v} tasks`, name]} contentStyle={TOOLTIP_CONTENT} />
-        </PieChart>
-      </ResponsiveContainer>
-      <Box
-        sx={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center',
-          pointerEvents: 'none',
-          maxWidth: 140,
-        }}
-      >
-        <Typography
-          sx={{ fontSize: '1.75rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.05 }}
-        >
-          {completionRate}%
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: '0.68rem',
-            fontWeight: 700,
-            color: '#616161',
-            textTransform: 'uppercase',
-            letterSpacing: 0.4,
-            mt: 0.35,
-          }}
-        >
-          avg completion
-        </Typography>
-        <Typography
-          sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#757575', mt: 0.4, lineHeight: 1.3 }}
-        >
-          Ø {avgTasksPerDev.toFixed(1)} tasks / developer
-        </Typography>
-      </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 0.5, flexWrap: 'wrap' }}>
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, fontWeight: 700, color: DONUT_ASSIGNED }}>
-          Assigned: {totalAssigned}
-        </Typography>
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, fontWeight: 700, color: DONUT_COMPLETED }}>
-          Completed: {totalCompleted}
-        </Typography>
-      </Box>
-    </Box>
-  );
-}
-
-export default function DeveloperWorkloadCharts({ selectedSprints = [], compareMode = false }) {
-  const {
-    sprintAvgRows,
-    combinedAssignedCompletedRows,
-    workedEstimatedRows,
-    hasData,
-    totalAssigned,
-    totalCompleted,
-    devCount,
-  } = useMemo(() => {
+export default function DeveloperWorkloadCharts({
+  selectedSprints = [],
+  compareMode = false,
+  /** If false, hides the hours bar chart (e.g. when that view is already on the dashboard). */
+  showHoursChart = true,
+  /** Optional custom height for assigned vs completed chart. */
+  assignedCompletedHeight,
+  /** Optional max width for assigned vs completed chart container. */
+  assignedCompletedMaxWidth,
+  /** When true, removes bottom margin on the root so a sibling card can align height in a grid row. */
+  suppressOuterMargin = false,
+}) {
+  const { combinedAssignedCompletedRows, workedEstimatedRows, hasData } = useMemo(() => {
     if (!selectedSprints?.length) {
       return {
-        sprintAvgRows: [],
         combinedAssignedCompletedRows: [],
         workedEstimatedRows: [],
         hasData: false,
-        totalAssigned: 0,
-        totalCompleted: 0,
-        devCount: 0,
       };
     }
 
-    const sprintAvgRowsInner = buildSprintAverageRows(selectedSprints);
     const combinedData = buildAssignedCompletedRows(selectedSprints);
     const workedEstimatedRows = buildWorkedEstimatedHoursRows(selectedSprints);
     const hasCompleted = combinedData.some((r) =>
@@ -484,25 +404,16 @@ export default function DeveloperWorkloadCharts({ selectedSprints = [], compareM
     );
     const n = devNames.size;
 
-    let ta = 0;
-    let tc = 0;
-    selectedSprints.forEach((sp) => {
-      (sp.developers || []).forEach((d) => {
-        ta += d.assigned ?? 0;
-        tc += d.completed ?? 0;
-      });
-    });
+    const hasData = showHoursChart
+      ? n > 0 && (hasCompleted || hasHours || hasAssigned)
+      : n > 0 && (hasCompleted || hasAssigned);
 
     return {
-      sprintAvgRows: sprintAvgRowsInner,
       combinedAssignedCompletedRows: combinedData,
       workedEstimatedRows,
-      hasData: n > 0 && (hasCompleted || hasHours || hasAssigned),
-      totalAssigned: ta,
-      totalCompleted: tc,
-      devCount: n,
+      hasData,
     };
-  }, [selectedSprints]);
+  }, [selectedSprints, showHoursChart]);
 
   const hoursWorkedChartHeight = useMemo(() => {
     if (!workedEstimatedRows?.length || !selectedSprints?.length) return CHART_H;
@@ -518,6 +429,110 @@ export default function DeveloperWorkloadCharts({ selectedSprints = [], compareM
     }
     return Math.min(520, Math.max(300, Math.round(240 + 0.55 * m)));
   }, [workedEstimatedRows, selectedSprints]);
+
+  const aiTaskVariationRows = useMemo(
+    () => (compareMode ? buildDeveloperVariationTasks(selectedSprints) : []),
+    [compareMode, selectedSprints],
+  );
+
+  const aiHourVariationRows = useMemo(
+    () => (compareMode ? buildDeveloperVariationHours(selectedSprints) : []),
+    [compareMode, selectedSprints],
+  );
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiTaskRowsFromGemini, setAiTaskRowsFromGemini] = useState([]);
+  const [aiHourRowsFromGemini, setAiHourRowsFromGemini] = useState([]);
+
+  const aiSprintPayload = useMemo(
+    () =>
+      selectedSprints.map((sp) => ({
+        id: sp.id,
+        shortLabel: sp.shortLabel,
+        developers: (sp.developers || []).map((d) => ({
+          name: d.name,
+          assigned: Number(d.assigned || 0),
+          completed: Number(d.completed || 0),
+          hours: Number(d.hours || 0),
+          assignedHoursEstimate: Number(d.assignedHoursEstimate || 0),
+        })),
+      })),
+    [selectedSprints],
+  );
+
+  useEffect(() => {
+    if (!compareMode || aiSprintPayload.length < 2) {
+      setAiTaskRowsFromGemini([]);
+      setAiHourRowsFromGemini([]);
+      setAiError('');
+      setAiLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+    const run = async () => {
+      setAiLoading(true);
+      setAiError('');
+      try {
+        const res = await fetch(`${API_BASE}/api/insights/developer-variation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sprints: aiSprintPayload }),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const insights = data?.insights ?? {};
+        const tasks = Array.isArray(insights.tasks) ? insights.tasks : [];
+        const hours = Array.isArray(insights.hours) ? insights.hours : [];
+
+        if (!cancelled) {
+          setAiTaskRowsFromGemini(
+            tasks.map((r, idx) => {
+              const delta = Number(r?.delta ?? 0);
+              return {
+                key: r?.key || `ai-task-${idx}`,
+                name: r?.developerName || 'Developer',
+                delta,
+                deltaLabel: `${delta > 0 ? '+' : ''}${delta} tasks`,
+                message: r?.message || 'No additional AI explanation available.',
+              };
+            }),
+          );
+          setAiHourRowsFromGemini(
+            hours.map((r, idx) => {
+              const delta = Number(r?.delta ?? 0);
+              return {
+                key: r?.key || `ai-hour-${idx}`,
+                name: r?.developerName || 'Developer',
+                delta,
+                deltaLabel: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} h`,
+                message: r?.message || 'No additional AI explanation available.',
+              };
+            }),
+          );
+        }
+      } catch (_e) {
+        if (!cancelled) {
+          setAiError('AI insights are temporarily unavailable. Showing computed variation.');
+          setAiTaskRowsFromGemini([]);
+          setAiHourRowsFromGemini([]);
+        }
+      } finally {
+        if (!cancelled) setAiLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [compareMode, aiSprintPayload]);
+
+  const shownTaskRows = aiTaskRowsFromGemini.length ? aiTaskRowsFromGemini : aiTaskVariationRows;
+  const shownHourRows = aiHourRowsFromGemini.length ? aiHourRowsFromGemini : aiHourVariationRows;
 
   if (!hasData) {
     return (
@@ -546,7 +561,7 @@ export default function DeveloperWorkloadCharts({ selectedSprints = [], compareM
   return (
     <Box
       sx={{
-        mb: 3,
+        mb: suppressOuterMargin ? 0 : 3,
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
@@ -555,35 +570,21 @@ export default function DeveloperWorkloadCharts({ selectedSprints = [], compareM
     >
       <Stack spacing={2} sx={{ width: '100%', minWidth: 0 }}>
         {showAssignedCompleted ? (
-          <ChartCard
-            title={
-              compareMode
-                ? 'Tasks assigned vs completed (by developer)'
-                : 'Tasks assigned vs completed'
-            }
-            subtitle={
-              compareMode
-                ? 'Per person and sprint: lighter bars are assigned tasks, solid bars are completed. The dashed line is the team average tasks per developer.'
-                : 'For this sprint: assigned vs completed totals. The dashed line is average tasks per developer. The donut shows the mix and overall completion.'
-            }
-            iconElement={<AssignmentOutlinedIcon sx={{ color: '#C74634', fontSize: 26 }} />}
-          >
-            <CombinedSprintAvgPills sprintAvgRows={sprintAvgRows} />
-            <AssignedCompletedLegendKey selectedSprints={selectedSprints} />
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
-                gap: 2,
-                alignItems: { xs: 'stretch', md: 'flex-start' },
-                width: '100%',
-              }}
+          <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ? assignedCompletedMaxWidth + 120 : '100%', mx: 'auto' }}>
+            <ChartCard
+              title={
+                compareMode
+                  ? 'Tasks assigned vs completed (by developer)'
+                  : 'Tasks assigned vs completed'
+              }
+              iconElement={<AssignmentOutlinedIcon sx={{ color: '#C74634', fontSize: 26 }} />}
             >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <ChartPlot>
+              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ?? '100%' }}>
+                  <ChartPlot height={assignedCompletedHeight ?? CHART_H}>
                   <BarChart
                     data={combinedAssignedCompletedRows}
-                    margin={{ top: 28, right: 16, left: 4, bottom: 8 }}
+                    margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
                     barGap={2}
                     barCategoryGap={compareMode ? '20%' : '22%'}
                   >
@@ -607,103 +608,112 @@ export default function DeveloperWorkloadCharts({ selectedSprints = [], compareM
                             name={`${sp.shortLabel} · Assigned`}
                             fill={hexToRgba(accent, 0.55)}
                             radius={[4, 4, 0, 0]}
-                            maxBarSize={44}
+                        maxBarSize={34}
                           />
                           <Bar
                             dataKey={sprintFieldKey(sp, 'c')}
                             name={`${sp.shortLabel} · Completed`}
                             fill={accent}
                             radius={[4, 4, 0, 0]}
-                            maxBarSize={44}
+                        maxBarSize={34}
                           />
                         </React.Fragment>
                       );
                     })}
-                    {sprintAvgRows.map((row) => (
-                      <ReferenceLine
-                        key={`avg-tasks-${row.shortLabel}`}
-                        y={row.avgTasksPerDev}
-                        stroke={row.accentColor}
-                        strokeDasharray="6 4"
-                        strokeWidth={2}
-                        strokeOpacity={0.9}
-                        ifOverflow="extendDomain"
-                      />
-                    ))}
                   </BarChart>
-                </ChartPlot>
+                  </ChartPlot>
+                </Box>
               </Box>
-              <TaskVolumeDonut
-                totalAssigned={totalAssigned}
-                totalCompleted={totalCompleted}
-                devCount={devCount}
-              />
-            </Box>
-          </ChartCard>
+              {compareMode ? (
+                <AIDeveloperVariationCard
+                  title="AI Summary: variation in completed tasks by developer"
+                  rows={shownTaskRows}
+                  emptyText={
+                    aiLoading
+                      ? 'Generating AI insights for completed-task variation...'
+                      : aiError || 'Select at least 2 sprints to analyze completed-task variation.'
+                  }
+                />
+              ) : null}
+            </ChartCard>
+          </Box>
         ) : null}
 
-        <ChartCard
-          title="Hours worked vs estimated hours"
-          subtitle="Lighter bars show estimated hours from task estimates; solid bars show hours worked."
-          iconElement={<ScheduleIcon sx={{ color: '#C74634', fontSize: 26 }} />}
-        >
-          <HoursWorkedEstimatedLegendKey selectedSprints={selectedSprints} />
-          <ChartPlot height={hoursWorkedChartHeight}>
-            <BarChart
-              data={workedEstimatedRows}
-              margin={{ top: 28, right: 16, left: 4, bottom: 8 }}
-              barGap={2}
-              barCategoryGap="22%"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-              <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
-              <YAxis
-                tick={AXIS_TICK}
-                axisLine={false}
-                width={48}
-                label={{
-                  value: 'Hours',
-                  angle: -90,
-                  position: 'insideLeft',
-                  fontSize: 12,
-                  fill: '#555',
-                }}
+        {showHoursChart ? (
+          <ChartCard
+            title="Hours worked vs estimated hours"
+            subtitle="Lighter bars show estimated hours from task estimates; solid bars show hours worked."
+            iconElement={<ScheduleIcon sx={{ color: '#C74634', fontSize: 26 }} />}
+          >
+            <HoursWorkedEstimatedLegendKey selectedSprints={selectedSprints} />
+            <ChartPlot height={hoursWorkedChartHeight}>
+              <BarChart
+                data={workedEstimatedRows}
+                margin={{ top: 28, right: 16, left: 4, bottom: 8 }}
+                barGap={2}
+                barCategoryGap="22%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
+                <YAxis
+                  tick={AXIS_TICK}
+                  axisLine={false}
+                  width={48}
+                  label={{
+                    value: 'Hours',
+                    angle: -90,
+                    position: 'insideLeft',
+                    fontSize: 12,
+                    fill: '#555',
+                  }}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(v, name) => {
+                    const isPlanned = String(name).includes('Planned');
+                    return [
+                      `${Number(v).toFixed(1)} h`,
+                      isPlanned ? 'Estimated hours' : 'Hours worked',
+                    ];
+                  }}
+                />
+                <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
+                {selectedSprints.map((sp) => {
+                  const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
+                  return (
+                    <React.Fragment key={`hrs-${sp.id}`}>
+                      <Bar
+                        dataKey={sprintFieldKey(sp, 'e')}
+                        name={`${sp.shortLabel} · Estimated hours`}
+                        fill={hexToRgba(accent, 0.48)}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={44}
+                      />
+                      <Bar
+                        dataKey={sprintFieldKey(sp, 'h')}
+                        name={`${sp.shortLabel} · Hours worked`}
+                        fill={accent}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={44}
+                      />
+                    </React.Fragment>
+                  );
+                })}
+              </BarChart>
+            </ChartPlot>
+            {compareMode ? (
+              <AIDeveloperVariationCard
+                title="AI Summary: variation in worked hours by developer"
+                rows={shownHourRows}
+                emptyText={
+                  aiLoading
+                    ? 'Generating AI insights for worked-hours variation...'
+                    : aiError || 'Select at least 2 sprints to analyze worked-hours variation.'
+                }
               />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(v, name) => {
-                  const isPlanned = String(name).includes('Planned');
-                  return [
-                    `${Number(v).toFixed(1)} h`,
-                    isPlanned ? 'Estimated hours' : 'Hours worked',
-                  ];
-                }}
-              />
-              <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
-              {selectedSprints.map((sp) => {
-                const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
-                return (
-                  <React.Fragment key={`hrs-${sp.id}`}>
-                    <Bar
-                      dataKey={sprintFieldKey(sp, 'e')}
-                      name={`${sp.shortLabel} · Estimated hours`}
-                      fill={hexToRgba(accent, 0.48)}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={44}
-                    />
-                    <Bar
-                      dataKey={sprintFieldKey(sp, 'h')}
-                      name={`${sp.shortLabel} · Hours worked`}
-                      fill={accent}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={44}
-                    />
-                  </React.Fragment>
-                );
-              })}
-            </BarChart>
-          </ChartPlot>
-        </ChartCard>
+            ) : null}
+          </ChartCard>
+        ) : null}
       </Stack>
     </Box>
   );

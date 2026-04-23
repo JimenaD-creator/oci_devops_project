@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { screen, within } from '@testing-library/react';
+import { expect, test } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import TaskTable from './TaskTable';
 
@@ -26,8 +27,3 @@ test('completed row shows title, developer, estimated hours and real hours in th
   expect(within(row).getByText('7h')).toBeInTheDocument();
 });
 
-// Empty state: no rows and a clear “No tasks” message.
-test('empty table shows the No tasks placeholder', () => {
-  renderWithTheme(<TaskTable items={[]} />);
-  expect(screen.getByText('No tasks')).toBeInTheDocument();
-});

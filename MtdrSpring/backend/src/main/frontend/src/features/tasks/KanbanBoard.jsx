@@ -216,20 +216,21 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
             {opt.label}
           </MenuItem>
         ))}
-        {typeof onDeleteTask === 'function' ? (
-          <>
-            <Divider />
-            <MenuItem
-              onClick={() => {
-                setAnchorEl(null);
-                onDeleteTask(item.id);
-              }}
-              sx={{ fontSize: '0.875rem', color: '#C62828', fontWeight: 600 }}
-            >
-              Delete task
-            </MenuItem>
-          </>
-        ) : null}
+        {typeof onDeleteTask === 'function'
+          ? [
+              <Divider key="kanban-status-menu-divider" />,
+              <MenuItem
+                key="kanban-status-menu-delete"
+                onClick={() => {
+                  setAnchorEl(null);
+                  onDeleteTask(item.id);
+                }}
+                sx={{ fontSize: '0.875rem', color: '#C62828', fontWeight: 600 }}
+              >
+                Delete task
+              </MenuItem>,
+            ]
+          : null}
       </Menu>
     </div>
   );

@@ -5,7 +5,10 @@ export async function fetchTasksForKpiProject(projectKey) {
     projectKey != null
       ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectKey)}`
       : `${API_BASE}/api/tasks`;
-  const tasksRes = await fetch(tasksUrl);
+  const tasksRes = await fetch(tasksUrl, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
   if (!tasksRes.ok) return [];
   try {
     const tasksData = await tasksRes.json();

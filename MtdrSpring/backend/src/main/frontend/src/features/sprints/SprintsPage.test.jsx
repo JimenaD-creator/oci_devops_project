@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { screen } from '@testing-library/react';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import {
   fetchSprintsProjectDevelopers,
@@ -12,10 +13,10 @@ import {
 } from './sprintsPageApi';
 import SprintsPage from './SprintsPage';
 
-jest.mock('./sprintsPageApi', () => ({
-  fetchSprintsProjectDevelopers: jest.fn(),
-  fetchSprintsProjectSummary: jest.fn(),
-  fetchSprintsTasksAndAssignments: jest.fn(),
+vi.mock('./sprintsPageApi', () => ({
+  fetchSprintsProjectDevelopers: vi.fn(),
+  fetchSprintsProjectSummary: vi.fn(),
+  fetchSprintsTasksAndAssignments: vi.fn(),
 }));
 
 const activeSprint = {
@@ -26,7 +27,9 @@ const activeSprint = {
   dueDate: '2026-04-30T23:59:59.999Z',
 };
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 beforeEach(() => {
   try {

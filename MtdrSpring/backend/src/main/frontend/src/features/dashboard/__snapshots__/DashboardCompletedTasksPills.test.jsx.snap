@@ -1,7 +1,7 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`DashboardCompletedTasksPills compare mode label list matches snapshot 1`] = `
-Array [
+exports[`DashboardCompletedTasksPills > compare mode label list > matches snapshot 1`] = `
+[
   "S1: 2 tasks completed",
   "S2: 5 tasks completed",
 ]

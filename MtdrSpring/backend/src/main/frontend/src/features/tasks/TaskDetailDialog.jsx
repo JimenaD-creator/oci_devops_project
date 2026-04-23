@@ -222,7 +222,8 @@ export function TaskDetailDialog({
     setTitle(typeof t.title === 'string' ? t.title : '');
     setDescription(typeof t.description === 'string' ? t.description : '');
     setClassification(t.classification || 'FEATURE');
-    setStatus(t.status || 'TODO');
+    // PENDING is not offered in the edit Select; map so the control stays valid.
+    setStatus(t.status === 'PENDING' ? 'TODO' : t.status || 'TODO');
     setPriority(t.priority || 'MEDIUM');
     setAssignedHours(t.assignedHours != null ? String(t.assignedHours) : '');
     setStartDate(t.startDate ? t.startDate.slice(0, 10) : '');
@@ -761,10 +762,9 @@ export function TaskDetailDialog({
                       onChange={(e) => setStatus(e.target.value)}
                       label="Status"
                     >
-                      <MenuItem value="TODO">To do</MenuItem>
-                      <MenuItem value="IN_PROGRESS">In progress</MenuItem>
-                      <MenuItem value="IN_REVIEW">In review</MenuItem>
-                      <MenuItem value="PENDING">Pending</MenuItem>
+                      <MenuItem value="TODO">To Do</MenuItem>
+                      <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                      <MenuItem value="IN_REVIEW">In Review</MenuItem>
                       <MenuItem value="DONE">Done</MenuItem>
                     </Select>
                   </FormControl>
