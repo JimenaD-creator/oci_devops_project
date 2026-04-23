@@ -5,8 +5,6 @@ import com.springboot.MyTodoList.dto.UserDetailDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import java.util.List;
-import java.util.Optional;
-import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT new com.springboot.MyTodoList.dto.UserDetailDTO(" +
@@ -22,7 +20,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "LEFT JOIN Team managed_team ON u.id = managed_team.manager.id " +
            "LEFT JOIN Project p2 ON managed_team.id = p2.assignedTeam.id")
     List<UserDetailDTO> findAllUserDetails();
-
-    Optional<User> findByPhonenumber(String phonenumber);
-    Optional<User> findByIdAndUserpassword(Long userId, String userpassword);
 }
