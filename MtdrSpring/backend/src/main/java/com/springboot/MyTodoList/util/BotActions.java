@@ -2,7 +2,6 @@ package com.springboot.MyTodoList.util;
 
 import com.springboot.MyTodoList.model.Sprint;
 import com.springboot.MyTodoList.model.ToDoItem;
-import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
@@ -11,9 +10,6 @@ import com.springboot.MyTodoList.service.UserTaskService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +20,6 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 public class BotActions {
 
     private static final Logger logger = LoggerFactory.getLogger(BotActions.class);
-    private static final int TELEGRAM_BUTTON_MAX = 62;
-    private static final Pattern USER_PICKER_ID = Pattern.compile("^👤 .+ #(\\d+)$");
 
     private String requestText;
     private long chatId;
@@ -61,20 +55,7 @@ public class BotActions {
     public ToDoItemService getTodoService() { return todoService; }
     public DeepSeekService getDeepSeekService() { return deepSeekService; }
 
-    /**
-     * Prefer the DB user chosen in Sprint → name menu; otherwise Telegram chat → user mapping (often default 1).
-     */
-    private Long resolveEffectiveActingUserId() {
-        if (stateManager.isViewingSprintTasks(chatId)) {
-            Long sel = stateManager.getViewingSelectedUserId(chatId);
-            if (sel != null) {
-                return sel;
-            }
-        }
-        return Long.valueOf(telegramUserMappingService.getUserIdByChatId(chatId));
-    }
-
-    // --- Command handlers ---
+    // --- Lógica de Comandos ---
 
     public void fnStart() {
         if (!(requestText.equals(BotCommands.START_COMMAND.getCommand()) 
@@ -99,34 +80,19 @@ public class BotActions {
         Integer id = Integer.valueOf(done);
 
         try {
+
             ToDoItem item = todoService.getToDoItemById(id);
-            if (item == null) {
-                BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
-                exit = true;
-                return;
-            }
-            Long actingUserId = resolveEffectiveActingUserId();
-            if (!userTaskService.isUserAssignedToTask(actingUserId, (long) id)) {
-                BotHelper.sendMessageToTelegram(
-                    chatId,
-                    "You are not assigned to this task. You can only mark your own assignment complete.",
-                    telegramClient,
-                    null
-                );
-                exit = true;
-                return;
-            }
-            /*
-             * Do not set the whole TASK to DONE here — that would mark every assignee complete.
-             * Completion is recorded only after hours are entered: USER_TASK for this user → COMPLETED,
-             * then TaskAssignmentSyncService updates TASK when all assignees are done.
-             */
-            stateManager.setWaitingForHours(chatId, id, actingUserId);
+            item.setDone(true);
+            todoService.updateToDoItem(id, item);
+            
+            // NEW: Set state to waiting for hours
+            stateManager.setWaitingForHours(chatId, id);
+            
+            // NEW: Ask for hours instead of immediately confirming completion
             BotHelper.sendMessageToTelegram(
-                chatId,
-                "How many hours did you work on this task? (Please enter a whole number)",
-                telegramClient,
-                null
+                chatId, 
+                "How many hours did you work on this task? (Please enter a whole number)", 
+                telegramClient
             );
 
         } catch (Exception e) {
@@ -141,20 +107,13 @@ public class BotActions {
             String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
             int id = Integer.parseInt(idStr);
             ToDoItem item = todoService.getToDoItemById(id);
-            if (item == null) {
-                exit = true;
-                return;
-            }
-            Long actingUserId = resolveEffectiveActingUserId();
-            boolean reopened = userTaskService.reopenMyAssignment(actingUserId, (long) id);
-            if (!reopened) {
-                /* Legacy tasks without USER_TASK rows: revert the whole task row */
+            if (item != null) {
                 item.setDone(false);
                 todoService.updateToDoItem(id, item);
+                BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_UNDONE.getMessage(), telegramClient);
             }
-            BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_UNDONE.getMessage(), telegramClient, null);
         } catch (Exception e) {
-            logger.error("fnUndo error: " + e.getMessage());
+            logger.error("Error en fnUndo: " + e.getMessage());
         }
         exit = true;
     }
@@ -167,59 +126,12 @@ public class BotActions {
             todoService.deleteToDoItem(id);
             BotHelper.sendMessageToTelegram(chatId, BotMessages.ITEM_DELETED.getMessage(), telegramClient);
         } catch (Exception e) {
-            logger.error("fnDelete error: " + e.getMessage());
+            logger.error("Error en fnDelete: " + e.getMessage());
         }
         exit = true;
     }
 
-    /** Keyboard label: title, else description, else id fallback. */
-    private static String toUserPickerButton(User u) {
-        String base = (u.getName() != null && !u.getName().isBlank()) ? u.getName().trim() : ("User " + u.getId());
-        String suffix = " #" + u.getId();
-        String prefix = "👤 ";
-        int maxBase = TELEGRAM_BUTTON_MAX - prefix.length() - suffix.length();
-        if (maxBase < 4) {
-            maxBase = 4;
-        }
-        if (base.length() > maxBase) {
-            base = base.substring(0, maxBase - 1) + "…";
-        }
-        return prefix + base + suffix;
-    }
-
-    private static Long parseUserPickerSelection(String text) {
-        if (text == null) {
-            return null;
-        }
-        Matcher m = USER_PICKER_ID.matcher(text.trim());
-        if (!m.matches()) {
-            return null;
-        }
-        return Long.parseLong(m.group(1));
-    }
-
-    /** Sprint list keyboard (shared by / list command and “back to sprints”). */
-    private void sendSelectSprintKeyboard(String optionalNotice) {
-        stateManager.setSelectingSprint(chatId);
-        List<Sprint> allSprints = sprintService.findAll();
-        List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel()));
-        for (Sprint sprint : allSprints) {
-            KeyboardRow currentRow = new KeyboardRow();
-            currentRow.add("Sprint " + sprint.getId());
-            keyboard.add(currentRow);
-        }
-        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
-                .keyboard(keyboard)
-                .resizeKeyboard(true)
-                .selective(true)
-                .build();
-        String msg = (optionalNotice != null && !optionalNotice.isBlank())
-                ? optionalNotice + "\n\n📋 Choose a sprint:"
-                : "📋 *Select a Sprint to view tasks:*";
-        BotHelper.sendMessageToTelegram(chatId, msg, telegramClient, keyboardMarkup);
-    }
-
+    /** Texto del botón en el teclado del bot: título (si hay), si no descripción, si no fallback por id. */
     private static String keyboardLabelForItem(ToDoItem item) {
         if (item.getTitle() != null && !item.getTitle().trim().isEmpty()) {
             return item.getTitle().trim();
@@ -227,7 +139,7 @@ public class BotActions {
         if (item.getDescription() != null && !item.getDescription().isEmpty()) {
             return item.getDescription();
         }
-        return "Task #" + item.getID();
+        return "Tarea #" + item.getID();
     }
 
     public void fnListAll(){
@@ -236,7 +148,29 @@ public class BotActions {
                 || requestText.equals(BotLabels.MY_TODO_LIST.getLabel())) || exit)
             return;
 
-        sendSelectSprintKeyboard(null);
+        // Set state to selecting sprint
+        stateManager.setSelectingSprint(chatId);
+
+        List<Sprint> allSprints = sprintService.findAll();
+        List<KeyboardRow> keyboard = new ArrayList<>();
+
+        // Botón superior de navegación
+        keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel()));
+
+        // Sprints
+        for (Sprint sprint : allSprints) {
+            KeyboardRow currentRow = new KeyboardRow();
+            currentRow.add("Sprint " + sprint.getId());
+            keyboard.add(currentRow);
+        }
+
+        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
+            .keyboard(keyboard)
+            .resizeKeyboard(true)
+            .selective(true)
+            .build();
+
+        BotHelper.sendMessageToTelegram(chatId, "📋 *Select a Sprint to view tasks:*", telegramClient, keyboardMarkup);
         exit = true;
     }
 
@@ -248,8 +182,11 @@ public class BotActions {
                 String sprintIdStr = requestText.substring(7); // Remove "Sprint "
                 Long sprintId = Long.parseLong(sprintIdStr);
 
-                stateManager.setSelectingUserInSprint(chatId, sprintId);
-                showUserPickerForSprint(sprintId);
+                // Set state to viewing sprint tasks
+                stateManager.setViewingSprintTasks(chatId, sprintId);
+
+                // Show tasks for this sprint
+                showSprintTasks(sprintId);
                 exit = true;
             } catch (NumberFormatException e) {
                 BotHelper.sendMessageToTelegram(chatId, "Invalid sprint selection. Please try again.", telegramClient);
@@ -258,75 +195,18 @@ public class BotActions {
         }
     }
 
-    /**
-     * After choosing a sprint: list assignees who have USER_TASK rows on tasks in that sprint.
-     */
-    private void showUserPickerForSprint(Long sprintId) {
-        List<User> users = userTaskService.findDistinctAssigneesBySprintId(sprintId);
-        List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(new KeyboardRow("⬅️ Back to Sprints"));
-        if (users.isEmpty()) {
-            sendSelectSprintKeyboard("ℹ️ This sprint has no tasks with assigned users (USER_TASK). Assign team members from the web app.");
-            return;
-        }
-        for (User u : users) {
-            keyboard.add(new KeyboardRow(toUserPickerButton(u)));
-        }
-        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
-                .keyboard(keyboard)
-                .resizeKeyboard(true)
-                .selective(true)
-                .build();
-        BotHelper.sendMessageToTelegram(
-                chatId,
-                "👥 *Sprint " + sprintId + "* — pick your name to see **only your** assigned tasks:",
-                telegramClient,
-                keyboardMarkup
-        );
-    }
-
-    public void fnSelectUserInSprint() {
-        if (!stateManager.isSelectingUserInSprint(chatId) || exit) {
-            return;
-        }
-        if ("⬅️ Back to Sprints".equals(requestText)) {
-            sendSelectSprintKeyboard(null);
-            exit = true;
-            return;
-        }
-        Long picked = parseUserPickerSelection(requestText);
-        if (picked == null) {
-            exit = true;
-            return;
-        }
-        Long sprintId = stateManager.getSprintIdInSprintUserFlow(chatId);
-        if (sprintId == null) {
-            sendSelectSprintKeyboard(null);
-            exit = true;
-            return;
-        }
-        stateManager.setViewingSprintTasks(chatId, sprintId, picked);
-        showSprintTasksForAssignee(sprintId, picked);
-        exit = true;
-    }
-
-    private void showSprintTasksForAssignee(Long sprintId, Long assigneeUserId) {
+    private void showSprintTasks(Long sprintId) {
         List<ToDoItem> sprintItems = todoService.findByAssignedSprint(Math.toIntExact(sprintId));
-        UserTaskService.UserSprintTaskListIndex sprintIdx =
-                userTaskService.loadUserSprintTaskListIndex(assigneeUserId, sprintId);
-        Set<Long> allowedTaskIds = sprintIdx.assignedTaskIds;
-        Set<Long> myCompletedTaskIds = sprintIdx.myCompletedAssignmentTaskIds;
-        List<ToDoItem> mine = sprintItems.stream()
-                .filter(item -> allowedTaskIds.contains((long) item.getID()))
-                .collect(Collectors.toList());
-
         List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(new KeyboardRow("⬅️ Back to users"));
+
+        // Botón de back
         keyboard.add(new KeyboardRow("⬅️ Back to Sprints"));
 
-        List<ToDoItem> activeItems = mine.stream()
-                .filter(item -> !item.isDone() && !myCompletedTaskIds.contains((long) item.getID()))
+        // Tareas Pendientes
+        List<ToDoItem> activeItems = sprintItems.stream()
+                .filter(item -> !item.isDone())
                 .collect(Collectors.toList());
+
         for (ToDoItem item : activeItems) {
             KeyboardRow currentRow = new KeyboardRow();
             currentRow.add(keyboardLabelForItem(item));
@@ -334,9 +214,11 @@ public class BotActions {
             keyboard.add(currentRow);
         }
 
-        List<ToDoItem> doneItems = mine.stream()
-                .filter(item -> item.isDone() || myCompletedTaskIds.contains((long) item.getID()))
+        // Tareas Completadas
+        List<ToDoItem> doneItems = sprintItems.stream()
+                .filter(ToDoItem::isDone)
                 .collect(Collectors.toList());
+
         for (ToDoItem item : doneItems) {
             KeyboardRow currentRow = new KeyboardRow();
             currentRow.add(keyboardLabelForItem(item));
@@ -346,14 +228,14 @@ public class BotActions {
         }
 
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
-                .keyboard(keyboard)
-                .resizeKeyboard(true)
-                .selective(true)
-                .build();
+            .keyboard(keyboard)
+            .resizeKeyboard(true)
+            .selective(true)
+            .build();
 
-        String message = mine.isEmpty()
-                ? "📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to users or sprints."
-                : "📋 *Your tasks (Sprint " + sprintId + "):*";
+        String message = sprintItems.isEmpty() 
+            ? "📋 *No tasks found for Sprint " + sprintId + "*\n\n⬅️ Use 'Back to Sprints' to return."
+            : "📋 *Tasks for Sprint " + sprintId + ":*";
 
         BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
     }
@@ -361,19 +243,10 @@ public class BotActions {
     public void fnViewSprintTasks() {
         if (!stateManager.isViewingSprintTasks(chatId) || exit) return;
 
-        if ("⬅️ Back to Sprints".equals(requestText)) {
-            sendSelectSprintKeyboard(null);
-            exit = true;
-            return;
-        }
-        if ("⬅️ Back to users".equals(requestText)) {
-            Long sprintId = stateManager.getViewingSprintId(chatId);
-            if (sprintId != null) {
-                stateManager.setSelectingUserInSprint(chatId, sprintId);
-                showUserPickerForSprint(sprintId);
-            } else {
-                sendSelectSprintKeyboard(null);
-            }
+        if (requestText.equals("⬅️ Back to Sprints")) {
+            // Go back to sprint selection
+            stateManager.setSelectingSprint(chatId);
+            fnListAll(); // Reuse the sprint listing logic
             exit = true;
         }
     }
@@ -439,10 +312,6 @@ public class BotActions {
                 return;
             }
         }
-        if (stateManager.isSelectingSprint(chatId) || stateManager.isSelectingUserInSprint(chatId) || stateManager.isViewingSprintTasks(chatId)) {
-            exit = true;
-            return;
-        }
         ToDoItem newItem = new ToDoItem();
         newItem.setDescription(requestText);
         newItem.setCreation_ts(OffsetDateTime.now());
@@ -453,12 +322,12 @@ public class BotActions {
     }
 
     public void fnAddItem() {
-        // Block task creation from the bot
+        // Bloqueo de creación
         if (!(requestText.contains(BotCommands.ADD_ITEM.getCommand()) 
             || requestText.contains(BotLabels.ADD_NEW_ITEM.getLabel())) || exit)
             return;
         
-        BotHelper.sendMessageToTelegram(chatId, "🚫 You can only create tasks from the web app.", telegramClient);
+        BotHelper.sendMessageToTelegram(chatId, "🚫 Solo puedes crear tareas desde la interfaz web.", telegramClient);
         exit = true;
     }
 
@@ -468,30 +337,33 @@ public class BotActions {
             String out = deepSeekService.generateText(requestText.replace(BotCommands.LLM_REQ.getCommand(), ""));
             BotHelper.sendMessageToTelegram(chatId, "🤖 AI: " + out, telegramClient);
         } catch (Exception e) {
-            logger.error("LLM error: " + e.getMessage());
+            logger.error("Error LLM: " + e.getMessage());
         }
         exit = true;
     }
 
     /**
-     * Save worked hours for a task (Telegram): updates only this user's USER_TASK, then syncs TASK status.
+     * NEW: Save worked hours for a task
+     * Coordinates between ToDoItem (task is done) and UserTask (hours worked)
+     * 
+     * @param taskId The task ID
+     * @param hours The hours worked (int)
      */
-    private void saveWorkedHours(Integer taskId, Integer hours) {
-        try {
-            Long uid = stateManager.getActingUserIdForHours(chatId);
-            if (uid == null) {
-                uid = Long.valueOf(telegramUserMappingService.getUserIdByChatId(chatId));
-            }
-            userTaskService.saveWorkedHours(uid, (long) taskId, hours);
-            logger.info("Saved {} hours for task {} by user {}", hours, taskId, uid);
-        } catch (Exception e) {
-            logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
-            BotHelper.sendMessageToTelegram(
-                chatId,
-                "Sorry, there was an error saving your hours. Please try again.",
-                telegramClient,
-                null
-            );
-        }
+private void saveWorkedHours(Integer taskId, Integer hours) {
+    try {
+        Integer userId = telegramUserMappingService.getUserIdByChatId(chatId);
+        
+        // ✅ CORREGIDO: Convertir userId a Long
+        userTaskService.saveWorkedHours(Long.valueOf(userId), (long) taskId, hours);
+        
+        logger.info("Saved {} hours for task {} by user {}", hours, taskId, userId);
+    } catch (Exception e) {
+        logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
+        BotHelper.sendMessageToTelegram(
+            chatId,
+            "Sorry, there was an error saving your hours. Please try again.",
+            telegramClient,
+            null
+        );
     }
-}
+} } 
