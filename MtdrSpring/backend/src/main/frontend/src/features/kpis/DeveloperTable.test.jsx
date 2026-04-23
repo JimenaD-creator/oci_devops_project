@@ -5,6 +5,7 @@
 import React from 'react';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { expect, test } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import DeveloperTable from './DeveloperTable';
 

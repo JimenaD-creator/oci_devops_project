@@ -2,6 +2,7 @@
  * Supporting — pure helpers for task list filters (used by task views).
  * Module under test: taskFilters.js.
  */
+import { describe, expect, test } from 'vitest';
 import {
   matchesDueDateRange,
   matchesStatusFilter,

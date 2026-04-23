@@ -5,31 +5,35 @@
 import React from 'react';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import { invalidateDashboardCache, fetchDashboardSprints } from './dashboardSprintData';
 import { fetchProjectById } from './projectApi';
 import DashboardPage from './DashboardPage';
 
-jest.mock('./projectApi', () => ({
-  fetchProjectById: jest.fn(),
+vi.mock('./projectApi', () => ({
+  fetchProjectById: vi.fn(),
 }));
 
-jest.mock('./dashboardSprintData', () => ({
-  ...jest.requireActual('./dashboardSprintData'),
-  fetchDashboardSprints: jest.fn(),
-}));
+vi.mock('./dashboardSprintData', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    fetchDashboardSprints: vi.fn(),
+  };
+});
 
-jest.mock('./DashboardDeveloperCharts', () => ({
+vi.mock('./DashboardDeveloperCharts', () => ({
   __esModule: true,
   default: () => <div data-testid="dev-charts-stub" />,
 }));
 
-jest.mock('./TaskStatusDistributionChart', () => ({
+vi.mock('./TaskStatusDistributionChart', () => ({
   __esModule: true,
   default: () => <div data-testid="task-status-stub" />,
 }));
 
-jest.mock('./DashboardTopMetrics', () => ({
+vi.mock('./DashboardTopMetrics', () => ({
   __esModule: true,
   default: ({ totalTasks, totalHours }) => (
     <div data-testid="top-metrics-stub">
@@ -41,23 +45,25 @@ jest.mock('./DashboardTopMetrics', () => ({
   ),
 }));
 
-jest.mock('../kpis/DeveloperTable', () => ({
+vi.mock('../kpis/DeveloperTable', () => ({
   __esModule: true,
   default: () => <div data-testid="developer-table-stub" />,
 }));
 
-jest.mock('./ScrollReveal', () => ({
+vi.mock('./ScrollReveal', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
   DASHBOARD_SCROLL_VIEWPORT: {},
 }));
 
-jest.mock('framer-motion', () => ({
+vi.mock('framer-motion', () => ({
   motion: { div: ({ children, ...p }) => <div {...p}>{children}</div> },
   useInView: () => true,
 }));
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 beforeEach(() => {
   invalidateDashboardCache();
 });

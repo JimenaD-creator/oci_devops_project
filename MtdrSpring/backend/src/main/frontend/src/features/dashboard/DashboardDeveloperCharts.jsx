@@ -265,49 +265,56 @@ function CompareSprintLegend({ sprintDefs, dense, manySprints }) {
   );
 }
 
-function CompareWorkloadSymbolLegend({ sprintDefs, compact: legendCompact }) {
-  const tight = Boolean(legendCompact);
+function CompareWorkloadSymbolLegend({ sprintDefs }) {
+  const n = sprintDefs?.length ?? 0;
+  const c = sprintDefs[0]?.accentColor ?? '#3949AB';
+  const pendingTint = alpha(c, 0.42);
+  const donePendingFont = { xs: '0.9rem', sm: '0.97rem' };
   return (
     <Box
       sx={{
         width: '100%',
         display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        gap: tight ? { xs: 1, sm: 1.25 } : { xs: 1.25, sm: 1.75 },
-        rowGap: tight ? 0.75 : 1.25,
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 0,
         pt: 0,
-        pb: tight ? 1.25 : 2.5,
+        pb: 0.25,
         px: { xs: 0.5, sm: 1 },
       }}
     >
-      {sprintDefs.map((sp) => (
-        <Box
-          key={sp.id}
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            gap: 0.5,
-            minWidth: { xs: '100%', sm: 200, md: 210 },
-            maxWidth: { xs: '100%', md: 280 },
-            flex: { xs: '1 1 100%', sm: '0 1 auto' },
-          }}
-        >
-          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, fontWeight: 800, color: '#37474F' }}>{sp.shortLabel}</Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: { xs: 1, sm: 1.25 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box component="span" sx={{ width: 14, height: 14, borderRadius: '2px', bgcolor: sp.accentColor, flexShrink: 0 }} />
-              <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontSize: { xs: '0.9rem', sm: '1rem' } }}>Completed</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box component="span" sx={{ width: 14, height: 14, borderRadius: '2px', bgcolor: alpha(sp.accentColor, 0.42), flexShrink: 0 }} />
-              <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontSize: { xs: '0.9rem', sm: '1rem' } }}>Pending</Typography>
-            </Box>
-          </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 0.75,
+          rowGap: 0.25,
+          mt: { xs: 0.35, sm: 0.5 },
+          width: '100%',
+          maxWidth: 520,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box
+            component="span"
+            sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: c, flexShrink: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}
+          />
+          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontWeight: 700, fontSize: donePendingFont }}>Completed (solid)</Typography>
         </Box>
-      ))}
+        <Typography sx={{ color: '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}>·</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box
+            component="span"
+            sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: pendingTint, flexShrink: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}
+          />
+          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontWeight: 700, fontSize: donePendingFont }}>Pending (lighter)</Typography>
+        </Box>
+      </Box>
+      <Box sx={{ mt: { xs: 1.3, sm: 1.55 }, '& .MuiTypography-root': { lineHeight: 1.2 } }}>
+        <CompareSprintLegend sprintDefs={sprintDefs} dense manySprints={n >= 6} />
+      </Box>
     </Box>
   );
 }
@@ -856,6 +863,14 @@ export default function DashboardDeveloperCharts({
     const bottomAxisCompare = Math.min(92, 58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nDevRows - 6) * 2));
     const xAxisTickHeight = Math.min(72, 50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nDevRows - 5) * 2));
     const barCategoryGapCompare = nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : nSprints >= 3 ? '8%' : '5%';
+    /** Workload: wide bars, minimal gap between developers and sprint stacks. */
+    const workloadBarCategoryGap = nSprints >= 6 ? '1%' : nSprints >= 4 ? '1%' : nSprints >= 3 ? '0%' : '0%';
+    const workloadBarGap = 0;
+    const maxBarWorkloadCompare = Math.max(
+      10,
+      Math.min(nSprints <= 2 ? 54 : nSprints <= 3 ? 46 : nSprints <= 5 ? 38 : 32, Math.floor(124 / Math.max(1, nSprints))),
+    );
+    const marginTopWorkloadTight = Math.max(68, marginTopWorkload - 26);
     const lineStrokeW = nSprints > 5 ? 1.5 : 2;
     const lineDotR = nSprints > 5 ? 2 : nSprints > 3 ? 3 : 4;
 
@@ -883,8 +898,9 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={workloadRows}
-            margin={{ top: marginTopWorkload, right: 24, left: 8, bottom: bottomAxisCompare }}
-            barCategoryGap={barCategoryGapCompare}
+            margin={{ top: marginTopWorkloadTight, right: 24, left: 8, bottom: bottomAxisCompare }}
+            barCategoryGap={workloadBarCategoryGap}
+            barGap={workloadBarGap}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
@@ -918,13 +934,39 @@ export default function DashboardDeveloperCharts({
               verticalAlign="top"
               align="center"
               layout="horizontal"
-              wrapperStyle={{ width: '100%', paddingBottom: nSprints <= 3 ? 4 : 12, top: nSprints <= 3 ? 0 : 4 }}
-              content={() => <CompareWorkloadSymbolLegend sprintDefs={sprintDefs} compact={nSprints <= 3} />}
+              wrapperStyle={{
+                width: '100%',
+                paddingTop: 0,
+                paddingBottom: 0,
+                marginBottom: -10,
+                top: 0,
+              }}
+              content={() => <CompareWorkloadSymbolLegend sprintDefs={sprintDefs} />}
             />
             {sprintDefs.map((sp) => (
               <React.Fragment key={`w-${sp.id}`}>
-                <Bar stackId={`sp-${sp.id}`} dataKey={`wc_${sp.id}`} name={`${sp.shortLabel} · completed`} fill={sp.accentColor} radius={[0, 0, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
-                <Bar stackId={`sp-${sp.id}`} dataKey={`wo_${sp.id}`} name={`${sp.shortLabel} · pending`} fill={alpha(sp.accentColor, 0.42)} radius={[6, 6, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+                <Bar
+                  stackId={`sp-${sp.id}`}
+                  dataKey={`wc_${sp.id}`}
+                  name={`${sp.shortLabel} · completed`}
+                  fill={sp.accentColor}
+                  radius={[0, 0, 0, 0]}
+                  maxBarSize={maxBarWorkloadCompare}
+                  animationDuration={CHART_BAR_ANIM_MS}
+                  animationEasing={CHART_BAR_EASING}
+                  activeBar={false}
+                />
+                <Bar
+                  stackId={`sp-${sp.id}`}
+                  dataKey={`wo_${sp.id}`}
+                  name={`${sp.shortLabel} · pending`}
+                  fill={alpha(sp.accentColor, 0.42)}
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={maxBarWorkloadCompare}
+                  animationDuration={CHART_BAR_ANIM_MS}
+                  animationEasing={CHART_BAR_EASING}
+                  activeBar={false}
+                />
               </React.Fragment>
             ))}
           </BarChart>

@@ -2,6 +2,7 @@
  * Supporting — sprint helpers (status, ordering, default sprint selection).
  * Module under test: sprintUtils.js (pure functions; used by SprintsPage / dashboard).
  */
+import { describe, expect, test } from 'vitest';
 import {
   inferSprintStatus,
   inferStatusByDate,

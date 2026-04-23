@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { screen, within } from '@testing-library/react';
+import { expect, test } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import TaskTable from './TaskTable';
 

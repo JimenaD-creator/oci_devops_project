@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { screen } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 
@@ -40,6 +41,7 @@ describe('DashboardCompletedTasksPills', () => {
   });
 
   describe('compare mode label list', () => {
+    // Snapshot testing: stable list of visible pill labels in compare-by-sprint mode.
     test('matches snapshot', () => {
       renderWithTheme(
         <DashboardCompletedTasksPills

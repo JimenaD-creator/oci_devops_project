@@ -6,28 +6,30 @@ import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { afterEach, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import Login from './Login';
 import { fetchAllUsers, fetchManagerPrimaryProject } from './loginApi';
 
-jest.mock('./loginApi', () => ({
-  fetchAllUsers: jest.fn(),
-  fetchManagerPrimaryProject: jest.fn(),
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+
+vi.mock('./loginApi', () => ({
+  fetchAllUsers: vi.fn(),
+  fetchManagerPrimaryProject: vi.fn(),
 }));
 
-jest.mock('../../utils/auth.js', () => ({
-  isAuthenticated: jest.fn(() => false),
-  login: jest.fn(),
+vi.mock('../../utils/auth.js', () => ({
+  isAuthenticated: vi.fn(() => false),
+  login: vi.fn(),
 }));
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-}));
+vi.mock('react-router-dom', async (importOriginal) => {
+  const mod = await importOriginal();
+  return { ...mod, useNavigate: () => mockNavigate };
+});
 
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 function makeUser(overrides = {}) {

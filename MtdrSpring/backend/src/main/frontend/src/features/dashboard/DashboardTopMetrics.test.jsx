@@ -3,10 +3,11 @@
  */
 import React from 'react';
 import { screen } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import DashboardTopMetrics from './DashboardTopMetrics';
 
-jest.mock('recharts', () => ({
+vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }) => <div data-testid="chart">{children}</div>,
   LineChart: () => null,
   Line: () => null,
@@ -16,8 +17,7 @@ jest.mock('recharts', () => ({
   CartesianGrid: () => null,
 }));
 
-jest.mock('framer-motion', () => {
-  const React = require('react');
+vi.mock('framer-motion', () => {
   const strip = (p = {}) => {
     const { whileInView, initial, animate, viewport, transition, variants, ...rest } = p;
     return rest;

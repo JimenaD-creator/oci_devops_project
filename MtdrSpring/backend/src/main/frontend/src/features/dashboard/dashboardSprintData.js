@@ -485,7 +485,9 @@ export function invalidateDashboardCache() {
     timestamp: 0,
     projectId: null,
   };
-  console.log('Dashboard cache invalidated');
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('Dashboard cache invalidated');
+  }
 }
 
 export function shortDevName(fullName) {

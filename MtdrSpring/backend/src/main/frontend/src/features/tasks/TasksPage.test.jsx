@@ -5,13 +5,14 @@
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import TasksPage from './TasksPage';
 
-jest.mock('./tasksPageApi', () => ({
-  fetchTasksPageBundle: jest.fn(),
-  fetchProjectDevelopersList: jest.fn(),
+vi.mock('./tasksPageApi', () => ({
+  fetchTasksPageBundle: vi.fn(),
+  fetchProjectDevelopersList: vi.fn(),
 }));
 
 const sprint1 = {
@@ -27,7 +28,9 @@ const developers = [
   { id: 2, name: 'Bob Dev' },
 ];
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 beforeEach(() => {
   try {
@@ -75,7 +78,7 @@ test('developer filter shows only tasks assigned to that developer', async () =>
   expect(screen.getByText('Task A')).toBeInTheDocument();
   expect(screen.getByText('Task B')).toBeInTheDocument();
 
-  await user.click(screen.getByRole('combobox', { name: 'Developer' }));
+  await user.click(screen.getByRole('button', { name: 'Developer' }));
   await user.click(await screen.findByRole('option', { name: 'Alice Dev' }));
 
   await screen.findByText('1 shown');

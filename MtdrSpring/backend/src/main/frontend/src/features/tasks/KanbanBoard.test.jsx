@@ -5,6 +5,7 @@
 import React from 'react';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
 import KanbanBoard from './KanbanBoard';
 
@@ -22,7 +23,7 @@ function makeItem(overrides = {}) {
 // Opens status menu on a card, chooses Done, then expects onStatusChange(id, 'DONE').
 test('changing status to Done calls onStatusChange with DONE', async () => {
   const user = userEvent.setup();
-  const onStatusChange = jest.fn();
+  const onStatusChange = vi.fn();
 
   renderWithTheme(
     <KanbanBoard

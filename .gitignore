@@ -34,6 +34,7 @@ frontend/.pnp
 
 # testing
 frontend/coverage
+MtdrSpring/backend/src/main/frontend/coverage/
 
 # production
 frontend/build
