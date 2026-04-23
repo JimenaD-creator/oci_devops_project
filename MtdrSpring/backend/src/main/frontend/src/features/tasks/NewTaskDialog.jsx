@@ -1,9 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Box, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, FormControl, InputLabel, Select, MenuItem,
-  OutlinedInput, Checkbox, ListItemText, Chip,
-  Button, IconButton,
+  Box,
+  Typography,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  OutlinedInput,
+  Checkbox,
+  ListItemText,
+  Chip,
+  Button,
+  IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -12,7 +26,14 @@ import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../
 import { API_BASE, ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { newSprintDialogFieldOutline, oracleRgba } from '../sprints/utils/sprintUtils';
 
-export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelopers, defaultSprintId }) {
+export function NewTaskDialog({
+  open,
+  onClose,
+  onCreated,
+  sprints,
+  projectDevelopers,
+  defaultSprintId,
+}) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classification, setClassification] = useState('FEATURE');
@@ -55,12 +76,12 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
   );
 
   const canSave = Boolean(
-    title.trim()
-    && description.trim()
-    && startDate
-    && dueDate
-    && sprintId
-    && assignedToIds.length > 0,
+    title.trim() &&
+    description.trim() &&
+    startDate &&
+    dueDate &&
+    sprintId &&
+    assignedToIds.length > 0,
   );
 
   const handleClose = () => {
@@ -112,19 +133,68 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ elevation: 0, sx: { borderRadius: 3, border: '1px solid #ECECEC', borderLeft: `4px solid ${ORACLE_RED_ACTION}`, bgcolor: '#FFFFFF', boxShadow: `0 16px 40px ${oracleRgba(0.1)}`, overflow: 'hidden', maxWidth: { xs: 'calc(100% - 24px)', sm: 760 } } }}>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          borderRadius: 3,
+          border: '1px solid #ECECEC',
+          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
+          bgcolor: '#FFFFFF',
+          boxShadow: `0 16px 40px ${oracleRgba(0.1)}`,
+          overflow: 'hidden',
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 760 },
+        },
+      }}
+    >
       <DialogTitle sx={{ p: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, px: 2.5, pt: 2.5, pb: 2, borderBottom: `1px solid ${oracleRgba(0.12)}`, backgroundColor: '#FFFFFF' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+            borderBottom: `1px solid ${oracleRgba(0.12)}`,
+            backgroundColor: '#FFFFFF',
+          }}
+        >
           <Box sx={{ display: 'flex', gap: 1.75 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: oracleRgba(0.12), border: `1px solid ${oracleRgba(0.2)}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: oracleRgba(0.12),
+                border: `1px solid ${oracleRgba(0.2)}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <TaskAltIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.3rem' }}>Create task</Typography>
-              <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600, display: 'block' }}>Details, planning & assignees</Typography>
+              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.3rem' }}>
+                Create task
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ color: '#616161', fontWeight: 600, display: 'block' }}
+              >
+                Details, planning & assignees
+              </Typography>
             </Box>
           </Box>
-          <IconButton onClick={handleClose} disabled={saving} size="small"><CloseIcon /></IconButton>
+          <IconButton onClick={handleClose} disabled={saving} size="small">
+            <CloseIcon />
+          </IconButton>
         </Box>
       </DialogTitle>
       <DialogContent sx={{ pt: 3.5, px: { xs: 3.5, sm: 4.5 }, pb: 3, overflowY: 'auto' }}>
@@ -138,11 +208,23 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
             minRows={2}
             sx={{ ...newSprintDialogFieldOutline(), mt: 0.5 }}
           />
-          <TextField label="Task description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={4} sx={newSprintDialogFieldOutline()} />
+          <TextField
+            label="Task description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            multiline
+            minRows={4}
+            sx={newSprintDialogFieldOutline()}
+          />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
               <InputLabel>Work item type</InputLabel>
-              <Select value={classification} onChange={(e) => setClassification(e.target.value)} label="Work item type">
+              <Select
+                value={classification}
+                onChange={(e) => setClassification(e.target.value)}
+                label="Work item type"
+              >
                 <MenuItem value="FEATURE">Feature</MenuItem>
                 <MenuItem value="BUG">Bug</MenuItem>
                 <MenuItem value="TASK">Task</MenuItem>
@@ -160,7 +242,11 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
             </FormControl>
             <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
               <InputLabel>Priority</InputLabel>
-              <Select value={priority} onChange={(e) => setPriority(e.target.value)} label="Priority">
+              <Select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                label="Priority"
+              >
                 <MenuItem value="LOW">Low</MenuItem>
                 <MenuItem value="MEDIUM">Medium</MenuItem>
                 <MenuItem value="HIGH">High</MenuItem>
@@ -172,10 +258,21 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
             <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
               <InputLabel>Sprint</InputLabel>
               <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
-                {(sprints || []).map((s) => (<MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>))}
+                {(sprints || []).map((s) => (
+                  <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
+                ))}
               </Select>
             </FormControl>
-            <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} sx={newSprintDialogFieldOutline()} />
+            <TextField
+              label="Assigned hours"
+              type="number"
+              value={assignedHours}
+              onChange={(e) => setAssignedHours(e.target.value)}
+              fullWidth
+              size="small"
+              inputProps={{ min: 0 }}
+              sx={newSprintDialogFieldOutline()}
+            />
           </Stack>
           <FormControl
             fullWidth
@@ -224,7 +321,8 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
                       </Typography>
                     ) : (
                       ids.map((id) => {
-                        const name = validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
+                        const name =
+                          validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
                         const av = developerAvatarColors(name);
                         return (
                           <Chip
@@ -257,15 +355,57 @@ export function NewTaskDialog({ open, onClose, onCreated, sprints, projectDevelo
             </Select>
           </FormControl>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={newSprintDialogFieldOutline()} />
-            <TextField label="Due Date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={newSprintDialogFieldOutline()} />
+            <TextField
+              label="Start Date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
+            <TextField
+              label="Due Date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              sx={newSprintDialogFieldOutline()}
+            />
           </Stack>
-          {error && <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600 }}>{error}</Typography>}
+          {error && (
+            <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600 }}>
+              {error}
+            </Typography>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 2, gap: 1, borderTop: `1px solid ${oracleRgba(0.12)}` }}>
-        <Button onClick={handleClose} disabled={saving} sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }}>Cancel</Button>
-        <Button onClick={handleSave} disabled={saving || !canSave} variant="contained" disableElevation sx={{ bgcolor: ORACLE_RED_ACTION, textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#A83B2D' } }}>{saving ? 'Creating…' : 'Create task'}</Button>
+        <Button
+          onClick={handleClose}
+          disabled={saving}
+          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          variant="contained"
+          disableElevation
+          sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            textTransform: 'none',
+            fontWeight: 700,
+            borderRadius: 2,
+            '&:hover': { bgcolor: '#A83B2D' },
+          }}
+        >
+          {saving ? 'Creating…' : 'Create task'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

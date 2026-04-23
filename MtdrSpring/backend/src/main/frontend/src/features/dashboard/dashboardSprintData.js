@@ -25,7 +25,7 @@ let cachedData = {
   tasks: null,
   userTasks: null,
   timestamp: 0,
-  projectId: null
+  projectId: null,
 };
 const CACHE_TTL = 30000; // 30 segundos
 
@@ -83,12 +83,7 @@ const STATUS_DIST_META = {
 export function resolveUserTaskTaskId(ut) {
   if (ut == null) return null;
   const raw =
-    ut.task?.id
-    ?? ut.task?.ID
-    ?? ut.id?.taskId
-    ?? ut.id?.task_id
-    ?? ut.taskId
-    ?? ut.task_id;
+    ut.task?.id ?? ut.task?.ID ?? ut.id?.taskId ?? ut.id?.task_id ?? ut.taskId ?? ut.task_id;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
@@ -96,11 +91,7 @@ export function resolveUserTaskTaskId(ut) {
 /** DB user id for this assignment (stable key for aggregating hours per developer). */
 export function resolveUserTaskUserId(ut) {
   if (ut == null) return null;
-  const raw =
-    ut.user?.id
-    ?? ut.user?.ID
-    ?? ut.id?.userId
-    ?? ut.id?.user_id;
+  const raw = ut.user?.id ?? ut.user?.ID ?? ut.id?.userId ?? ut.id?.user_id;
   if (raw == null || raw === '') return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
@@ -193,12 +184,6 @@ function userTaskRowEligibleForWorkedHours(ut) {
   return n === 'COMPLETED' || n === 'DONE';
 }
 
-function isUserTaskAssignmentDone(ut, taskInfo) {
-  const candidates = [ut?.status, ut?.task?.status, taskInfo?.status];
-  const nonempty = candidates.filter((s) => s != null && String(s).trim() !== '');
-  return nonempty.some((s) => bucketTaskStatus(s) === 'DONE');
-}
-
 function sprintTaskStatusRows(counts) {
   const rows = TASK_STATUS_ORDER.map((key) => ({
     key,
@@ -232,17 +217,24 @@ function mapApiSprint(apiSprint) {
     taskStatusDistribution: [],
     taskStatusTotal: 0,
     kpis: {
-      completionRate:    Math.round((apiSprint.completionRate    ?? 0) * 100),
-      onTimeDelivery:    Math.round((apiSprint.onTimeDelivery    ?? 0) * 100),
+      completionRate: Math.round((apiSprint.completionRate ?? 0) * 100),
+      onTimeDelivery: Math.round((apiSprint.onTimeDelivery ?? 0) * 100),
       teamParticipation: Math.round((apiSprint.teamParticipation ?? 0) * 100),
-      workloadBalance:   apiSprint.workloadBalance ?? 0,
-      productivityScore: Math.round((apiSprint.completionRate    ?? 0) * 100),
+      workloadBalance: apiSprint.workloadBalance ?? 0,
+      productivityScore: Math.round((apiSprint.completionRate ?? 0) * 100),
     },
     developers: [],
   };
 }
 
-function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasks, taskSprintMap, storedKpis) {
+function deriveKpisFromLiveData(
+  sprintId,
+  _statusCounts,
+  tasksList,
+  userTasksList,
+  taskSprintMap,
+  storedKpis,
+) {
   const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
   const totalCompleted = _statusCounts.DONE ?? 0;
   const completionRatePct = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
@@ -262,10 +254,25 @@ function deriveKpisFromLiveData(sprintId, _statusCounts, tasksList, userTasks, t
   });
   const onTimeDeliveryPct = doneForOnTime > 0 ? Math.round((onTimeCount / doneForOnTime) * 100) : 0;
 
+  // Live Team Participation = logged USER_TASK hours / planned TASK hours (same sprint).
+  const totalExpectedHours = tasksInSprint.reduce((sum, t) => {
+    const n = Number(t?.assignedHours ?? t?.assigned_hours ?? 0);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+  const totalWorkedHours = (userTasksList || []).reduce((sum, ut) => {
+    const taskId = resolveUserTaskTaskId(ut);
+    if (taskId == null) return sum;
+    if (Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return sum;
+    return sum + userTaskWorkedHours(ut);
+  }, 0);
+  const teamParticipationPct =
+    totalExpectedHours > 0 ? Math.round((totalWorkedHours / totalExpectedHours) * 100) : 0;
+
   return {
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
+    teamParticipation: Math.min(100, Math.max(0, teamParticipationPct)),
     productivityScore: completionRatePct,
   };
 }
@@ -277,7 +284,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     sprintMap[id] = {
       ...sp,
       id,
-      totalAssignedHoursTasks: 0,
+      totalHours: Number(sp.totalHours) || 0,
+      totalAssignedHoursTasks: Number(sp.totalAssignedHoursTasks) || 0,
       _devMap: {},
       _statusCounts: { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 },
     };
@@ -376,7 +384,14 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const statusPart = sprintTaskStatusRows(_statusCounts);
     const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
     const totalCompleted = _statusCounts.DONE ?? 0;
-    const kpis = deriveKpisFromLiveData(id, _statusCounts, tasks, userTasks, taskSprintMap, rest.kpis);
+    const kpis = deriveKpisFromLiveData(
+      id,
+      _statusCounts,
+      tasks,
+      userTasks,
+      taskSprintMap,
+      rest.kpis,
+    );
     return {
       ...rest,
       kpis,
@@ -401,18 +416,20 @@ export async function fetchDashboardSprints(projectId) {
   const now = Date.now();
 
   // Check cache first
-  if (cachedData.sprints && 
-      cachedData.tasks && 
-      cachedData.userTasks && 
-      cachedData.projectId === pid &&
-      (now - cachedData.timestamp) < CACHE_TTL) {
+  if (
+    cachedData.sprints &&
+    cachedData.tasks &&
+    cachedData.userTasks &&
+    cachedData.projectId === pid &&
+    now - cachedData.timestamp < CACHE_TTL
+  ) {
     console.log('Using cached dashboard data');
     const mapped = cachedData.sprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
     const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
     assignSprintAccentColors(enriched);
     return enriched;
   }
-  
+
   try {
     console.log('Fetching fresh dashboard data');
     const sprintsUrl = `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`;
@@ -430,14 +447,14 @@ export async function fetchDashboardSprints(projectId) {
     const apiSprints = await sprintsRes.json();
     const apiTasks = await tasksRes.json();
     const apiUserTasks = await userTasksRes.json();
-    
+
     // Update cache
     cachedData = {
       sprints: apiSprints,
       tasks: apiTasks,
       userTasks: apiUserTasks,
       timestamp: now,
-      projectId: pid
+      projectId: pid,
     };
 
     const mapped = apiSprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
@@ -445,7 +462,10 @@ export async function fetchDashboardSprints(projectId) {
     try {
       enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
     } catch (e) {
-      console.error('enrichSprintsWithUserTasks failed, using sprints without user-task rollups:', e);
+      console.error(
+        'enrichSprintsWithUserTasks failed, using sprints without user-task rollups:',
+        e,
+      );
       enriched = mapped;
     }
     assignSprintAccentColors(enriched);
@@ -463,7 +483,7 @@ export function invalidateDashboardCache() {
     tasks: null,
     userTasks: null,
     timestamp: 0,
-    projectId: null
+    projectId: null,
   };
   console.log('Dashboard cache invalidated');
 }
@@ -669,10 +689,18 @@ export function buildCompareDeveloperChartsModel(selectedSprints) {
 export function buildSprintInsights(selectedSprints) {
   if (selectedSprints.length < 2) return [];
   const insights = [];
-  const byProd = [...selectedSprints].sort((a, b) => b.kpis.productivityScore - a.kpis.productivityScore);
-  insights.push(`${byProd[0].name} registered the highest productivity score (${byProd[0].kpis.productivityScore}).`);
-  const byCompletion = [...selectedSprints].sort((a, b) => b.kpis.completionRate - a.kpis.completionRate);
-  insights.push(`Best task completion rate: ${byCompletion[0].shortLabel} at ${byCompletion[0].kpis.completionRate}%.`);
+  const byProd = [...selectedSprints].sort(
+    (a, b) => b.kpis.productivityScore - a.kpis.productivityScore,
+  );
+  insights.push(
+    `${byProd[0].name} registered the highest productivity score (${byProd[0].kpis.productivityScore}).`,
+  );
+  const byCompletion = [...selectedSprints].sort(
+    (a, b) => b.kpis.completionRate - a.kpis.completionRate,
+  );
+  insights.push(
+    `Best task completion rate: ${byCompletion[0].shortLabel} at ${byCompletion[0].kpis.completionRate}%.`,
+  );
   return [...new Set(insights)].slice(0, 5);
 }
 

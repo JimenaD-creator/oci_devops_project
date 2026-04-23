@@ -1,0 +1,8 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DashboardCompletedTasksPills compare mode label list matches snapshot 1`] = `
+Array [
+  "S1: 2 tasks completed",
+  "S2: 5 tasks completed",
+]
+`;

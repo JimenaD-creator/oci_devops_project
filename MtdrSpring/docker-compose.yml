@@ -4,12 +4,13 @@ services:
     container_name: agileContainer
     ports:
       - "8080:8080"
+    env_file:
+      - ./backend/.env                          
     environment:
       - DB_URL=jdbc:oracle:thin:@reacttodo2p9ml_medium?TNS_ADMIN=/app/wallet
       - DB_USERNAME=MANAGER
       - DB_PASSWORD=MxTodo#2026Pass9
       - TELEGRAM_BOT_TOKEN=8597252989:AAESmYUpOa2ftnr5OuS0oQNKKKX96JXhKD8
-      - GEMINI_API_KEY=AIzaSyDHOT-wBox7MBjh75luN8taCUuoyhdVC_0
     volumes:
       - ./backend/wallet:/app/wallet
     restart: unless-stopped

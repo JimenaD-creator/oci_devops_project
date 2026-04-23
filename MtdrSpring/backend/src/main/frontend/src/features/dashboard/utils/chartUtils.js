@@ -1,4 +1,4 @@
-/** Pure helpers for dashboard developer charts (easy to unit test). */
+/** Pure helpers for dashboard developer charts. */
 
 export function maxCompareWorkloadStack(rows, sprintDefs) {
   let m = 0;

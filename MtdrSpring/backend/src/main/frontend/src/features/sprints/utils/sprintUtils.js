@@ -18,9 +18,16 @@ export function newSprintDialogFieldOutline() {
   const accent = ORACLE_RED_ACTION;
   return {
     '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.35)' },
-    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(199, 70, 52, 0.55)' },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: accent },
+    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(199, 70, 52, 0.35)',
+    },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(199, 70, 52, 0.55)',
+    },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderWidth: 2,
+      borderColor: accent,
+    },
     '& .MuiInputLabel-root': { color: '#616161' },
     '& .MuiInputLabel-root.Mui-focused': { color: accent },
     '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
@@ -30,7 +37,11 @@ export function newSprintDialogFieldOutline() {
 
 export function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export function toInputDate(iso) {

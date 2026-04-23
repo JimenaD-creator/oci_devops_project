@@ -26,12 +26,7 @@ function toPositiveFiniteNumber(v) {
 export function normalizeUserId(raw) {
   if (raw == null || raw === '') return null;
   if (typeof raw === 'object') {
-    const nested =
-      raw.id ??
-      raw.ID ??
-      raw.userId ??
-      raw.USER_ID ??
-      raw.user_id;
+    const nested = raw.id ?? raw.ID ?? raw.userId ?? raw.USER_ID ?? raw.user_id;
     return toPositiveFiniteNumber(nested);
   }
   return toPositiveFiniteNumber(raw);
@@ -43,12 +38,7 @@ export function normalizeUserId(raw) {
 export function developerNumericId(u) {
   if (u == null || u === '') return null;
   if (typeof u === 'object') {
-    const nested =
-      u.id ??
-      u.ID ??
-      u.userId ??
-      u.USER_ID ??
-      u.user_id;
+    const nested = u.id ?? u.ID ?? u.userId ?? u.USER_ID ?? u.user_id;
     const fromFields = normalizeUserId({ id: nested });
     return fromFields ?? normalizeUserId(u);
   }
