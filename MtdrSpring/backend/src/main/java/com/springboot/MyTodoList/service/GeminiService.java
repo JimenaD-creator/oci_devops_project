@@ -747,7 +747,7 @@ public class GeminiService {
             return node;
         }
         ObjectNode out = mapper.createObjectNode();
-        node.fields().forEachRemaining(e -> {
+        ((ObjectNode) node).properties().forEach(e -> {
             String k = e.getKey();
             String nk = k.contains("_") ? snakeToLowerCamel(k) : k;
             out.set(nk, camelCaseKeysDeep(e.getValue()));

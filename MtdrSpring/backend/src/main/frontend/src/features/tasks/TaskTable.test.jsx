@@ -21,7 +21,9 @@ const completedRowItem = {
 // Asserts the row exposes title, developer chip, assigned hours (8h), and worked hours (7h).
 test('completed row shows title, developer, estimated hours and real hours in the row', () => {
   renderWithTheme(<TaskTable items={[completedRowItem]} />);
+  expect(screen.getByRole('columnheader', { name: /^ID$/i })).toBeInTheDocument();
   const row = screen.getByRole('row', { name: /Closed task sprint 3/i });
+  expect(within(row).getByRole('cell', { name: '1' })).toBeInTheDocument();
   expect(within(row).getByText('Carlos Ruiz')).toBeInTheDocument();
   expect(within(row).getByText('8h')).toBeInTheDocument();
   expect(within(row).getByText('7h')).toBeInTheDocument();
