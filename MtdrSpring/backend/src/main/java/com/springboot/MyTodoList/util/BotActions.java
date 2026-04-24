@@ -7,6 +7,7 @@ import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
+import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.service.UserTaskService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ public class BotActions {
     BotStateManager stateManager;
     TelegramUserMappingService telegramUserMappingService;
     UserTaskService userTaskService;
+    UserService userService;
 
     public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds, 
                       BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts, SprintService ss){
@@ -48,6 +50,19 @@ public class BotActions {
         telegramUserMappingService = tums;
         userTaskService = uts;
         sprintService = ss;
+        exit  = false;
+    }
+
+    public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds, 
+                      BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts, SprintService ss, UserService us){
+        telegramClient = tc;
+        todoService = ts;
+        deepSeekService = ds;
+        stateManager = sm;
+        telegramUserMappingService = tums;
+        userTaskService = uts;
+        sprintService = ss;
+        userService = us;
         exit  = false;
     }
 
@@ -305,8 +320,15 @@ public class BotActions {
             exit = true;
             return;
         }
-        stateManager.setViewingSprintTasks(chatId, sprintId, picked);
-        showSprintTasksForAssignee(sprintId, picked);
+        
+        // Instead of directly showing sprint tasks, ask for credential verification
+        stateManager.setVerifyingCredentialsPhoneEmail(chatId, picked, sprintId);
+        BotHelper.sendMessageToTelegram(
+                chatId,
+                "🔐 Before accessing tasks, please verify your identity.\n\nPlease enter your phone number or email:",
+                telegramClient,
+                null
+        );
         exit = true;
     }
 
@@ -376,6 +398,105 @@ public class BotActions {
             }
             exit = true;
         }
+    }
+
+    /**
+     * Handle credential verification step 1: phone/email input
+     */
+    public void fnVerifyCredentialsPhoneEmail() {
+        if (!stateManager.isVerifyingCredentialsPhoneEmail(chatId) || exit) {
+            return;
+        }
+        
+        String phoneEmail = requestText.trim();
+        if (phoneEmail.isEmpty()) {
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "Please enter a valid phone number or email.",
+                    telegramClient,
+                    null
+            );
+            exit = true;
+            return;
+        }
+        
+        Long userId = stateManager.getCredentialVerificationUserId(chatId);
+        Long sprintId = stateManager.getSprintIdInSprintUserFlow(chatId);
+        
+        if (userId == null || sprintId == null) {
+            sendSelectSprintKeyboard(null);
+            exit = true;
+            return;
+        }
+        
+        // Move to password verification state
+        stateManager.setVerifyingCredentialsPassword(chatId, userId, sprintId, phoneEmail);
+        BotHelper.sendMessageToTelegram(
+                chatId,
+                "Now please enter your password:",
+                telegramClient,
+                null
+        );
+        exit = true;
+    }
+
+    /**
+     * Handle credential verification step 2: password input and verification
+     */
+    public void fnVerifyCredentialsPassword() {
+        if (!stateManager.isVerifyingCredentialsPassword(chatId) || exit) {
+            return;
+        }
+        
+        String password = requestText.trim();
+        if (password.isEmpty()) {
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "Password cannot be empty. Please try again.",
+                    telegramClient,
+                    null
+            );
+            exit = true;
+            return;
+        }
+        
+        Long userId = stateManager.getCredentialVerificationUserId(chatId);
+        String phoneEmail = stateManager.getStoredPhoneEmailForVerification(chatId);
+        Long sprintId = stateManager.getSprintIdInSprintUserFlow(chatId);
+        
+        if (userId == null || phoneEmail == null || sprintId == null) {
+            sendSelectSprintKeyboard(null);
+            exit = true;
+            return;
+        }
+        
+        // Verify credentials against database
+        boolean credentialsValid = false;
+        if (userService != null) {
+            credentialsValid = userService.verifyUserCredentials(userId, phoneEmail, password);
+        }
+        
+        if (credentialsValid) {
+            // Credentials verified! Now show the sprint tasks
+            stateManager.setViewingSprintTasks(chatId, sprintId, userId);
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "✅ Identity verified! Loading your tasks...",
+                    telegramClient,
+                    null
+            );
+            showSprintTasksForAssignee(sprintId, userId);
+        } else {
+            // Credentials invalid - ask them to try again
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "❌ Invalid credentials. Please try again.\n\nEnter your phone number or email:",
+                    telegramClient,
+                    null
+            );
+            stateManager.setVerifyingCredentialsPhoneEmail(chatId, userId, sprintId);
+        }
+        exit = true;
     }
 
     public void fnHide() {

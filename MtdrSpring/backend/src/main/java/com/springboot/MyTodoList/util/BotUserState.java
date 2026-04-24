@@ -16,6 +16,10 @@ public class BotUserState {
     private String state;             // Current state
     private LocalDateTime timestamp;  // When state was created (for timeout)
     
+    // Credential verification fields
+    private String tempPhoneEmail;    // Temporary storage for phone/email during credential verification
+    private Long credentialUserBeingVerified; // User ID whose credentials are being verified
+    
     // Constructors
     public BotUserState() {}
     
@@ -80,6 +84,22 @@ public class BotUserState {
     
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getTempPhoneEmail() {
+        return tempPhoneEmail;
+    }
+
+    public void setTempPhoneEmail(String tempPhoneEmail) {
+        this.tempPhoneEmail = tempPhoneEmail;
+    }
+
+    public Long getCredentialUserBeingVerified() {
+        return credentialUserBeingVerified;
+    }
+
+    public void setCredentialUserBeingVerified(Long credentialUserBeingVerified) {
+        this.credentialUserBeingVerified = credentialUserBeingVerified;
     }
     
     @Override
