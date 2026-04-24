@@ -113,6 +113,7 @@ public class GeminiService {
             + "- tasks[].delta = last.completed - first.completed (integer).\n"
             + "- hours[].delta = last.hours - first.hours (number, 1 decimal).\n"
             + "- productivity[].delta = (last.completed/max(last.hours,0.1)) - (first.completed/max(first.hours,0.1)) rounded to 2 decimals.\n"
+            + "- In tasks and hours interpretation, explicitly use delivery completion status (all assigned completed vs pending work), not sprint task-volume swings.\n"
             + "- tasks message must judge variation mainly by completion outcomes (finished vs not finished), even when assigned/created volume changes.\n"
             + "- hours message must relate worked-hour changes to completion outcomes and efficiency; avoid conclusions based only on workload size changes.\n"
             + "- productivity message must explain whether efficiency (tasks per hour) improved, worsened, or remained stable.\n"
@@ -269,6 +270,9 @@ public class GeminiService {
                 String name;
                 int taskRows;
                 int completedTasks;
+                int onTimeCompletedTasks;
+                int lateCompletedTasks;
+                int completedWithZeroHours;
                 long workedHours;
                 long assignedHours;
                 boolean fromSprintRosterOnly;
@@ -304,6 +308,14 @@ public class GeminiService {
                 String st = t.getStatus();
                 if (st != null && "DONE".equalsIgnoreCase(st.trim())) {
                     a.completedTasks++;
+                    if (isTaskFinishedOnTime(t)) {
+                        a.onTimeCompletedTasks++;
+                    } else if (isTaskFinishedLate(t)) {
+                        a.lateCompletedTasks++;
+                    }
+                    if (ut.getWorkedHours() == null || ut.getWorkedHours() <= 0) {
+                        a.completedWithZeroHours++;
+                    }
                 }
                 if (ut.getWorkedHours() != null) {
                     a.workedHours += ut.getWorkedHours();
@@ -319,6 +331,13 @@ public class GeminiService {
                     if (t.getClassification() != null && !t.getClassification().isBlank()) {
                         sm.put("classification", t.getClassification());
                     }
+                    if (t.getDueDate() != null) {
+                        sm.put("dueDate", t.getDueDate().toString());
+                    }
+                    if (t.getFinishDate() != null) {
+                        sm.put("finishDate", t.getFinishDate().toString());
+                    }
+                    sm.put("workedHours", ut.getWorkedHours() != null ? ut.getWorkedHours() : 0);
                     a.taskSamples.add(sm);
                 }
             }
@@ -354,6 +373,9 @@ public class GeminiService {
                 row.put("developerName", a.name);
                 row.put("assignedTaskRows", a.taskRows);
                 row.put("completedTasks", a.completedTasks);
+                row.put("onTimeCompletedTasks", a.onTimeCompletedTasks);
+                row.put("lateCompletedTasks", a.lateCompletedTasks);
+                row.put("completedWithZeroHours", a.completedWithZeroHours);
                 row.put("workedHoursSum", a.workedHours);
                 row.put("assignedHoursSum", a.assignedHours);
                 row.put("taskSamples", a.taskSamples);
@@ -576,6 +598,8 @@ public class GeminiService {
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- developerInsights: one object per developer in Team workload JSON (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint but have no USER_TASK assignment rows in DB. If Team workload is [], set developerInsights to [].\n" +
+            "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
+            "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
             "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that DB shows no Done tasks yet). Do not omit developers solely because completions are zero.\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
             "- workloadRecommendations: only if workloadBalance < 70; else [].\n" +
@@ -1046,6 +1070,16 @@ public class GeminiService {
 
     private boolean isTaskDone(Task t) {
         return t != null && "DONE".equals(normalizeWorkflowStatus(t.getStatus()));
+    }
+
+    private boolean isTaskFinishedOnTime(Task t) {
+        if (t == null || t.getFinishDate() == null || t.getDueDate() == null) return false;
+        return !t.getFinishDate().isAfter(t.getDueDate());
+    }
+
+    private boolean isTaskFinishedLate(Task t) {
+        if (t == null || t.getFinishDate() == null || t.getDueDate() == null) return false;
+        return t.getFinishDate().isAfter(t.getDueDate());
     }
 
     private boolean isHighPriorityTask(Task t) {
@@ -1570,6 +1604,8 @@ public class GeminiService {
         for (String name : names) {
             Map<String, Object> firstDev = firstByName.get(name);
             Map<String, Object> lastDev = lastByName.get(name);
+            int firstAssigned = asInt(firstDev != null ? firstDev.get("assigned") : null);
+            int lastAssigned = asInt(lastDev != null ? lastDev.get("assigned") : null);
             int firstCompleted = asInt(firstDev != null ? firstDev.get("completed") : null);
             int lastCompleted = asInt(lastDev != null ? lastDev.get("completed") : null);
             double firstHours = asDouble(firstDev != null ? firstDev.get("hours") : null);
@@ -1606,10 +1642,11 @@ public class GeminiService {
             t.put("developerName", name);
             t.put("delta", deltaTasks);
             t.put("message", String.format(
-                "%s: completion outcome moved from %d done task(s) in %s to %d in %s "
+                "%s: completion outcome moved from %d/%d done in %s to %d/%d in %s "
                     + "(range across selected sprints: %d-%d done). Variation is interpreted by delivery results, "
                     + "not by how many tasks were created or assigned per sprint.",
-                name, firstCompleted, firstLabel, lastCompleted, lastLabel, minCompleted, maxCompleted));
+                name, firstCompleted, Math.max(firstAssigned, 0), firstLabel,
+                lastCompleted, Math.max(lastAssigned, 0), lastLabel, minCompleted, maxCompleted));
             taskRows.add(t);
 
             ObjectNode h = mapper.createObjectNode();
@@ -1629,6 +1666,10 @@ public class GeminiService {
                     + "Task creation/assignment volume changes are not treated as performance by themselves.",
                 name, firstHours, firstLabel, lastHours, lastLabel, minHours, maxHours,
                 hoursPerformanceContext, firstCompleted, lastCompleted));
+            if (lastCompleted > 0 && lastHours <= 0) {
+                h.put("message", h.path("message").asText()
+                    + " Data warning: completed tasks with zero logged hours indicate missing hour tracking.");
+            }
             hourRows.add(h);
 
             ObjectNode p = mapper.createObjectNode();
@@ -1644,6 +1685,10 @@ public class GeminiService {
                     + "(range across selected sprints: %.2f-%.2f). Assessment is based on completion efficiency, "
                     + "not on task creation/assignment volume changes.",
                 name, trendText, firstRate, firstLabel, lastRate, lastLabel, minRate, maxRate));
+            if (lastCompleted > 0 && lastHours <= 0) {
+                p.put("message", p.path("message").asText()
+                    + " Data warning: zero logged hours can inflate efficiency and must be validated.");
+            }
             productivityRows.add(p);
         }
         return root;

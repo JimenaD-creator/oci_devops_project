@@ -24,6 +24,30 @@ const METRIC_STYLES = {
   productivityScore: { title: '#37474F', bg: '#ECEFF1', border: '#CFD8DC' },
 };
 
+function clampOver100ForDisplay(rawText, options = {}) {
+  const text = typeof rawText === 'string' ? rawText : '';
+  if (!text) return '';
+  const aggressive = Boolean(options.aggressive);
+
+  // Always cap explicit percentages (e.g., 228% -> 100%).
+  let out = text.replace(/(\d+(?:\.\d+)?)\s*%/g, (m, n) => {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v <= 100) return m;
+    return '100%';
+  });
+
+  // For score-heavy narratives, also cap bare numeric values above 100.
+  if (aggressive) {
+    out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, (m, n) => {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v <= 100) return m;
+      return '100';
+    });
+  }
+
+  return out;
+}
+
 /**
  * Manager-facing KPI interpretation from persisted AI insights (`kpiManagerGuide`).
  */
@@ -37,7 +61,9 @@ export default function KpiManagerGuidePanel({
 }) {
   const byMetric =
     guide && guide.byMetric && typeof guide.byMetric === 'object' ? guide.byMetric : null;
-  const introText = typeof guide?.intro === 'string' ? guide.intro.trim() : '';
+  const introText = clampOver100ForDisplay(
+    typeof guide?.intro === 'string' ? guide.intro.trim() : '',
+  );
   const hasMetricLines =
     byMetric &&
     METRIC_KEYS.some((k) => {
@@ -202,6 +228,9 @@ export default function KpiManagerGuidePanel({
             {METRIC_KEYS.map((key) => {
               const text = byMetric ? byMetric[key] : null;
               if (typeof text !== 'string' || !text.trim()) return null;
+              const sanitizedText = clampOver100ForDisplay(text.trim(), {
+                aggressive: key === 'teamParticipation' || key === 'productivityScore',
+              });
               const title = KPI_LABELS[key] ?? key;
               const style = METRIC_STYLES[key] ?? {
                 title: SECTION_ACCENT,
@@ -231,7 +260,7 @@ export default function KpiManagerGuidePanel({
                     {title}
                   </Typography>
                   <Typography sx={{ fontSize: '0.95rem', color: '#455A64', lineHeight: 1.55 }}>
-                    {text.trim()}
+                    {sanitizedText}
                   </Typography>
                 </Box>
               );
