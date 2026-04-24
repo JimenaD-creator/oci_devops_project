@@ -95,7 +95,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
     const uniqueRaw = [...new Set(raw)];
     const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw
+      .slice()
+      .sort((a, b) => a - b)
+      .join(',');
     const hasDuplicateEntries = raw.length !== uniqueRaw.length;
     const needsPrune = uniqSorted !== normSorted;
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
@@ -428,7 +431,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
             >
               <Typography
                 component="h2"
-                sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                sx={{
+                  ...SECTION_TITLE_SX,
+                  color: '#1A1A1A',
+                  mb: 0.5,
+                  textAlign: 'left',
+                  width: '100%',
+                }}
               >
                 Scorecards
               </Typography>
@@ -464,7 +473,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
               >
                 <Typography
                   component="h2"
-                  sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                  sx={{
+                    ...SECTION_TITLE_SX,
+                    color: '#1A1A1A',
+                    mb: 0.5,
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
                 >
                   Project status
                 </Typography>

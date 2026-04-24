@@ -78,13 +78,17 @@ export function AlertCard({ alert }) {
             }}
           />
           {alert.kpi && (
-            <Typography sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: '#607D8B', fontWeight: 600 }}>
+            <Typography
+              sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: '#607D8B', fontWeight: 600 }}
+            >
               {KPI_LABELS[alert.kpi] ?? alert.kpi}
               {alert.value != null ? ` — ${alert.value}%` : ''}
             </Typography>
           )}
         </Box>
-        <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.5 }}>
+        <Typography
+          sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.5 }}
+        >
           {alert.message}
         </Typography>
       </Box>
@@ -124,7 +128,10 @@ export function SectionHeading({ icon: Icon, emoji, children }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
       {emoji && (
-        <Typography component="span" sx={{ fontSize: { xs: '1.35rem', md: '1.5rem' }, lineHeight: 1 }}>
+        <Typography
+          component="span"
+          sx={{ fontSize: { xs: '1.35rem', md: '1.5rem' }, lineHeight: 1 }}
+        >
           {emoji}
         </Typography>
       )}
@@ -156,7 +163,9 @@ export function AlertTypesLegend() {
       variant="outlined"
       sx={{ mb: 2, borderRadius: 2, borderColor: 'rgba(0,0,0,0.08)', width: '100%' }}
     >
-      <Table sx={{ '& td, & th': { fontSize: { xs: '0.88rem', md: '0.95rem' }, py: 1.25, px: 1.5 } }}>
+      <Table
+        sx={{ '& td, & th': { fontSize: { xs: '0.88rem', md: '0.95rem' }, py: 1.25, px: 1.5 } }}
+      >
         <TableHead sx={{ bgcolor: 'rgba(103,58,183,0.06)' }}>
           <TableRow>
             <TableCell sx={{ fontWeight: 700, width: { xs: 120, md: 140 } }}>Type</TableCell>
@@ -224,7 +233,11 @@ export function ActionableRecommendationsList({ items }) {
               )}
               <Typography
                 component="span"
-                sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}
+                sx={{
+                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                  color: '#37474F',
+                  lineHeight: 1.55,
+                }}
               >
                 {rec.text}
               </Typography>
@@ -238,43 +251,44 @@ export function ActionableRecommendationsList({ items }) {
 
 export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskStatusBreakdown }) {
   const es = executiveSummary;
-  const hasEsContent = Boolean(es && (es.overview || es.trends || es.improvementAreas || es.nextSteps));
+  const hasEsContent = Boolean(
+    es && (es.overview || es.trends || es.improvementAreas || es.nextSteps),
+  );
   const hasBreakdown = taskStatusBreakdown != null && taskStatusBreakdown.total != null;
 
-  const statusChips =
-    hasBreakdown ? (
-      <Box sx={{ mb: hasEsContent || fallbackSummary ? 2 : 0 }}>
-        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 1 }}>
-          Task status
-        </Typography>
-        <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
-          {[
-            { label: 'To do', value: Number(taskStatusBreakdown.toDo) || 0 },
-            { label: 'In progress', value: Number(taskStatusBreakdown.inProgress) || 0 },
-            { label: 'In review', value: Number(taskStatusBreakdown.inReview) || 0 },
-            { label: 'Done', value: Number(taskStatusBreakdown.done) || 0 },
-            ...(Number(taskStatusBreakdown.unknown) > 0
-              ? [{ label: 'Other / unknown', value: Number(taskStatusBreakdown.unknown) || 0 }]
-              : []),
-          ].map(({ label, value }) => (
-            <Chip
-              key={label}
-              size="small"
-              label={`${label}: ${value}`}
-              sx={{
-                fontWeight: 700,
-                bgcolor: 'rgba(57, 73, 171, 0.1)',
-                color: '#283593',
-                border: '1px solid rgba(57, 73, 171, 0.25)',
-              }}
-            />
-          ))}
-        </Stack>
-        <Typography sx={{ fontSize: '0.75rem', color: '#90A4AE', mt: 0.75 }}>
-          Total tasks in sprint: {Number(taskStatusBreakdown.total) || 0}
-        </Typography>
-      </Box>
-    ) : null;
+  const statusChips = hasBreakdown ? (
+    <Box sx={{ mb: hasEsContent || fallbackSummary ? 2 : 0 }}>
+      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 1 }}>
+        Task status
+      </Typography>
+      <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+        {[
+          { label: 'To do', value: Number(taskStatusBreakdown.toDo) || 0 },
+          { label: 'In progress', value: Number(taskStatusBreakdown.inProgress) || 0 },
+          { label: 'In review', value: Number(taskStatusBreakdown.inReview) || 0 },
+          { label: 'Done', value: Number(taskStatusBreakdown.done) || 0 },
+          ...(Number(taskStatusBreakdown.unknown) > 0
+            ? [{ label: 'Other / unknown', value: Number(taskStatusBreakdown.unknown) || 0 }]
+            : []),
+        ].map(({ label, value }) => (
+          <Chip
+            key={label}
+            size="small"
+            label={`${label}: ${value}`}
+            sx={{
+              fontWeight: 700,
+              bgcolor: 'rgba(57, 73, 171, 0.1)',
+              color: '#283593',
+              border: '1px solid rgba(57, 73, 171, 0.25)',
+            }}
+          />
+        ))}
+      </Stack>
+      <Typography sx={{ fontSize: '0.75rem', color: '#90A4AE', mt: 0.75 }}>
+        Total tasks in sprint: {Number(taskStatusBreakdown.total) || 0}
+      </Typography>
+    </Box>
+  ) : null;
 
   if (hasEsContent) {
     return (
@@ -292,7 +306,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Overview
             </Typography>
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                color: '#37474F',
+                lineHeight: 1.55,
+              }}
+            >
               {es.overview}
             </Typography>
           </Box>
@@ -302,7 +322,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Trends
             </Typography>
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                color: '#37474F',
+                lineHeight: 1.55,
+              }}
+            >
               {es.trends}
             </Typography>
           </Box>
@@ -312,7 +338,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Improvement areas
             </Typography>
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                color: '#37474F',
+                lineHeight: 1.55,
+              }}
+            >
               {es.improvementAreas}
             </Typography>
           </Box>
@@ -322,7 +354,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Next steps
             </Typography>
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                color: '#37474F',
+                lineHeight: 1.55,
+              }}
+            >
               {es.nextSteps}
             </Typography>
           </Box>
@@ -388,10 +426,17 @@ export function DeveloperInsightsTable({ rows }) {
       variant="outlined"
       sx={{ borderRadius: 2, borderColor: 'rgba(0,0,0,0.08)', overflow: 'auto', width: '100%' }}
     >
-      <Table sx={{ width: '100%', '& td': { fontSize: { xs: '0.9rem', md: '1rem' }, verticalAlign: 'top', py: 1.5 } }}>
+      <Table
+        sx={{
+          width: '100%',
+          '& td': { fontSize: { xs: '0.9rem', md: '1rem' }, verticalAlign: 'top', py: 1.5 },
+        }}
+      >
         <TableHead sx={{ bgcolor: 'rgba(92,107,192,0.08)' }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 700, width: { xs: '28%', md: '22%' } }}>Developer</TableCell>
+            <TableCell sx={{ fontWeight: 700, width: { xs: '28%', md: '22%' } }}>
+              Developer
+            </TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Insight</TableCell>
           </TableRow>
         </TableHead>
@@ -420,8 +465,10 @@ export function PredictionsBlock({
   if (!hasExtended && !productivityPrediction) return null;
   if (!hasExtended && productivityPrediction && !showNextSprintForecast) {
     return (
-      <Typography sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#78909C', fontStyle: 'italic' }}>
-        The next sprint score forecast is only shown for the latest sprint in this project (by end date).
+      <Typography
+        sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#78909C', fontStyle: 'italic' }}
+      >
+        The next sprint score forecast is hidden for this sprint.
       </Typography>
     );
   }
@@ -438,7 +485,9 @@ export function PredictionsBlock({
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.75 }}>
             <LineChart size={24} color="#00838F" aria-hidden />
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, fontWeight: 700, color: '#006064' }}>
+            <Typography
+              sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, fontWeight: 700, color: '#006064' }}
+            >
               Forecast insights
             </Typography>
           </Box>
@@ -447,7 +496,13 @@ export function PredictionsBlock({
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#00838F', mb: 0.5 }}>
                 Future productivity
               </Typography>
-              <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                  color: '#37474F',
+                  lineHeight: 1.55,
+                }}
+              >
                 {predictions.productivityOutlook}
               </Typography>
             </Box>
@@ -457,7 +512,13 @@ export function PredictionsBlock({
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#00838F', mb: 0.5 }}>
                 Risks
               </Typography>
-              <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                  color: '#37474F',
+                  lineHeight: 1.55,
+                }}
+              >
                 {predictions.risks}
               </Typography>
             </Box>
@@ -467,7 +528,13 @@ export function PredictionsBlock({
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#00838F', mb: 0.5 }}>
                 Delivery estimate
               </Typography>
-              <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                  color: '#37474F',
+                  lineHeight: 1.55,
+                }}
+              >
                 {predictions.deliveryEstimate}
               </Typography>
             </Box>
@@ -497,7 +564,14 @@ export function PredictionCard({ prediction }) {
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
-        <Typography sx={{ fontSize: { xs: '2.25rem', md: '2.5rem' }, fontWeight: 800, color: trendColor, lineHeight: 1 }}>
+        <Typography
+          sx={{
+            fontSize: { xs: '2.25rem', md: '2.5rem' },
+            fontWeight: 800,
+            color: trendColor,
+            lineHeight: 1,
+          }}
+        >
           {prediction.predictedScore}
         </Typography>
         <Typography sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600 }}>
@@ -506,7 +580,14 @@ export function PredictionCard({ prediction }) {
         <TrendIcon size={24} color={trendColor} style={{ marginTop: 6 }} />
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, fontWeight: 700, color: '#1B5E20', mb: 0.5 }}>
+        <Typography
+          sx={{
+            fontSize: { xs: '0.95rem', md: '1.05rem' },
+            fontWeight: 700,
+            color: '#1B5E20',
+            mb: 0.5,
+          }}
+        >
           Next sprint forecast
           {prediction.confidence && (
             <span style={{ fontWeight: 400, color: '#607D8B', marginLeft: 8 }}>
@@ -514,7 +595,9 @@ export function PredictionCard({ prediction }) {
             </span>
           )}
         </Typography>
-        <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: '#37474F', lineHeight: 1.55 }}>
+        <Typography
+          sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: '#37474F', lineHeight: 1.55 }}
+        >
           {prediction.reasoning}
         </Typography>
       </Box>

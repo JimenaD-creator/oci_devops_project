@@ -158,7 +158,11 @@ function ProductivityScoreCard({
         />
       </Box>
 
-      <Grid container spacing={1.5} sx={fillColumnHeight ? { flex: 1, alignContent: 'flex-start' } : undefined}>
+      <Grid
+        container
+        spacing={1.5}
+        sx={fillColumnHeight ? { flex: 1, alignContent: 'flex-start' } : undefined}
+      >
         {components.map(({ label, value, weight, color }) => (
           <Grid item xs={6} key={label}>
             <Box sx={{ bgcolor: '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
@@ -315,7 +319,9 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const sprint = getSelectedSprint();
     const sprintTasks = getSprintTasks();
     const totalTasks = sprintTasks.length;
-    const completedTasks = sprintTasks.filter((t) => normalizeTaskStatus(t.status) === 'DONE').length;
+    const completedTasks = sprintTasks.filter(
+      (t) => normalizeTaskStatus(t.status) === 'DONE',
+    ).length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     const onTimeTasks = sprintTasks.filter((t) => {
@@ -353,12 +359,30 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
-  const currentSprintDevelopers = Array.isArray(currentSprint?.developers) ? currentSprint.developers : [];
-  const assignedTotalInSprint = currentSprintDevelopers.reduce((acc, d) => acc + (Number(d?.assigned) || 0), 0);
-  const completedTotalInSprint = currentSprintDevelopers.reduce((acc, d) => acc + (Number(d?.completed) || 0), 0);
-  const chartDataDensity = Math.max(assignedTotalInSprint, completedTotalInSprint, currentSprintDevelopers.length);
-  const adaptiveAssignedChartHeight = Math.min(360, Math.max(220, 200 + Math.round(chartDataDensity * 2)));
-  const adaptiveAssignedChartWidth = Math.min(640, Math.max(430, 430 + Math.round(chartDataDensity * 1.5)));
+  const currentSprintDevelopers = Array.isArray(currentSprint?.developers)
+    ? currentSprint.developers
+    : [];
+  const assignedTotalInSprint = currentSprintDevelopers.reduce(
+    (acc, d) => acc + (Number(d?.assigned) || 0),
+    0,
+  );
+  const completedTotalInSprint = currentSprintDevelopers.reduce(
+    (acc, d) => acc + (Number(d?.completed) || 0),
+    0,
+  );
+  const chartDataDensity = Math.max(
+    assignedTotalInSprint,
+    completedTotalInSprint,
+    currentSprintDevelopers.length,
+  );
+  const adaptiveAssignedChartHeight = Math.min(
+    360,
+    Math.max(220, 200 + Math.round(chartDataDensity * 2)),
+  );
+  const adaptiveAssignedChartWidth = Math.min(
+    640,
+    Math.max(430, 430 + Math.round(chartDataDensity * 1.5)),
+  );
 
   const normalizeProductivityValue = (v) => {
     const n = Number(v);

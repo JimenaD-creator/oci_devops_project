@@ -61,7 +61,8 @@ export default function TasksPage({ projectId }) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
+      const { tasksData, sprintsData, userTasksData } =
+        await fetchTasksPageBundle(effectiveProjectId);
       setRawTasks(tasksData);
       setSprints(sprintsData);
       setUserTasks(userTasksData);

@@ -25,4 +25,3 @@ test('completed row shows title, developer, estimated hours and real hours in th
   expect(within(row).getByText('8h')).toBeInTheDocument();
   expect(within(row).getByText('7h')).toBeInTheDocument();
 });
-

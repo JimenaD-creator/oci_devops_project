@@ -160,8 +160,12 @@ function App() {
     },
     { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter((item) => item.roles.includes(user.role));
-  const primaryNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard');
-  const secondaryNavItems = NAV_ITEMS.filter((item) => item.id !== 'dashboard');
+  const topNavItems = NAV_ITEMS.filter(
+    (item) => item.id === 'dashboard' || item.id === 'ai-insights',
+  );
+  const secondaryNavItems = NAV_ITEMS.filter(
+    (item) => item.id !== 'dashboard' && item.id !== 'ai-insights',
+  );
 
   const SPRINTS_SUBITEMS = [
     { text: 'Tasks', id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },

@@ -166,7 +166,14 @@ export default function AIInsightsPage({ projectId }) {
           </Typography>
         </Box>
         {sprints.length > 0 && (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', minWidth: { xs: '100%', sm: 220 } }}>
+          <Box
+            sx={{
+              ml: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              minWidth: { xs: '100%', sm: 220 },
+            }}
+          >
             <FormControl
               size="small"
               sx={{

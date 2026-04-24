@@ -36,7 +36,8 @@ export const RECOMMENDATION_CATEGORY_LABELS = {
 
 /** Shown when a sprint insight section has no AI content yet */
 export const AI_INSIGHTS_EMPTY = {
-  recommendations: 'No recommendations for this sprint yet. Generate insights to populate this list.',
+  recommendations:
+    'No recommendations for this sprint yet. Generate insights to populate this list.',
   executive:
     'No executive summary yet. Generate insights to see overview, trends, improvement areas, and next steps.',
   developers:

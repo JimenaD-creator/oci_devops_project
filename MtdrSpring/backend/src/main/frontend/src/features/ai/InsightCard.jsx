@@ -110,52 +110,55 @@ export default function InsightCard({
 
   // Iterative loop — NOT recursive. Each iteration awaits before the next,
   // so the attempt counter increments correctly and the loop terminates at MAX_ATTEMPTS.
-  const pollForResults = useCallback(async (minGeneratedAtMs = null) => {
-    const MAX_ATTEMPTS = 12;
-    const INTERVAL_MS = 2500;
-    for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
-      await new Promise((r) => setTimeout(r, INTERVAL_MS));
-      if (cancelPollRef.current) return;
-      try {
-        const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
-          cache: 'no-store',
-          headers: { Accept: 'application/json' },
-        });
+  const pollForResults = useCallback(
+    async (minGeneratedAtMs = null) => {
+      const MAX_ATTEMPTS = 12;
+      const INTERVAL_MS = 2500;
+      for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
+        await new Promise((r) => setTimeout(r, INTERVAL_MS));
         if (cancelPollRef.current) return;
-        if (res.ok) {
-          const data = await res.json();
-          // Backend persisted an error → stop polling immediately
-          if (data.error) {
-            setError(getErrorMessage(data.error));
-            setStatus('error');
+        try {
+          const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          });
+          if (cancelPollRef.current) return;
+          if (res.ok) {
+            const data = await res.json();
+            // Backend persisted an error → stop polling immediately
+            if (data.error) {
+              setError(getErrorMessage(data.error));
+              setStatus('error');
+              return;
+            }
+            const generatedAtMs = parseGeneratedAtMs(data.generatedAt);
+            const hasFreshGeneration =
+              minGeneratedAtMs == null ||
+              (generatedAtMs != null && generatedAtMs > Number(minGeneratedAtMs));
+            if (!hasFreshGeneration) {
+              setPollCount(attempt + 1);
+              continue;
+            }
+            setInsights(data.insights);
+            setAcknowledged(data.acknowledged ?? false);
+            setLastGeneratedAtMs(generatedAtMs);
+            setStatus('loaded');
+            setPollCount(attempt + 1);
             return;
           }
-          const generatedAtMs = parseGeneratedAtMs(data.generatedAt);
-          const hasFreshGeneration =
-            minGeneratedAtMs == null ||
-            (generatedAtMs != null && generatedAtMs > Number(minGeneratedAtMs));
-          if (!hasFreshGeneration) {
-            setPollCount(attempt + 1);
-            continue;
-          }
-          setInsights(data.insights);
-          setAcknowledged(data.acknowledged ?? false);
-          setLastGeneratedAtMs(generatedAtMs);
-          setStatus('loaded');
+          setPollCount(attempt + 1); // still 404 — keep waiting
+        } catch {
+          if (cancelPollRef.current) return;
           setPollCount(attempt + 1);
-          return;
         }
-        setPollCount(attempt + 1); // still 404 — keep waiting
-      } catch {
-        if (cancelPollRef.current) return;
-        setPollCount(attempt + 1);
       }
-    }
-    if (!cancelPollRef.current) {
-      setError('Took too long to generate. Please try again.');
-      setStatus('error');
-    }
-  }, [sprintId]);
+      if (!cancelPollRef.current) {
+        setError('Took too long to generate. Please try again.');
+        setStatus('error');
+      }
+    },
+    [sprintId],
+  );
 
   const handleGenerate = async () => {
     cancelPollRef.current = true;
@@ -198,10 +201,7 @@ export default function InsightCard({
       }
     : null;
 
-  const recommendationList = useMemo(
-    () => computeRecommendationList(insights),
-    [insights],
-  );
+  const recommendationList = useMemo(() => computeRecommendationList(insights), [insights]);
 
   const hasExtendedPredictions =
     insights?.predictions &&
@@ -209,8 +209,7 @@ export default function InsightCard({
       insights.predictions.risks ||
       insights.predictions.deliveryEstimate);
   const hasPredictionsContent =
-    insights &&
-    (Boolean(hasExtendedPredictions) || Boolean(insights.productivityPrediction));
+    insights && (Boolean(hasExtendedPredictions) || Boolean(insights.productivityPrediction));
 
   return (
     <Paper
@@ -236,7 +235,9 @@ export default function InsightCard({
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Sparkles size={22} color="#673AB7" />
-          <Typography sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: '#1A1A1A' }}>
+          <Typography
+            sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: '#1A1A1A' }}
+          >
             {sprintLabel}
           </Typography>
           {alertCounts && (
@@ -320,7 +321,13 @@ export default function InsightCard({
               }}
             >
               <AlertCircle size={14} color="#C62828" style={{ marginTop: 1, flexShrink: 0 }} />
-              <Typography sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#C62828', lineHeight: 1.45 }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: '0.9rem', md: '0.95rem' },
+                  color: '#C62828',
+                  lineHeight: 1.45,
+                }}
+              >
                 {error}
               </Typography>
             </Box>
@@ -404,10 +411,14 @@ export default function InsightCard({
                   textAlign: 'center',
                 }}
               >
-                <Typography sx={{ fontSize: '1.7rem', lineHeight: 1.1, fontWeight: 800, color: s.color }}>
+                <Typography
+                  sx={{ fontSize: '1.7rem', lineHeight: 1.1, fontWeight: 800, color: s.color }}
+                >
                   {s.value}
                 </Typography>
-                <Typography sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600, mt: 0.25 }}>
+                <Typography
+                  sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600, mt: 0.25 }}
+                >
                   {s.label}
                 </Typography>
               </Box>
@@ -433,7 +444,14 @@ export default function InsightCard({
                   bgcolor: '#FFFFFF',
                 }}
               >
-                <Box sx={{ px: 2, py: 1.25, bgcolor: '#F3E5F5', borderBottom: '1px solid rgba(156,39,176,0.18)' }}>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1.25,
+                    bgcolor: '#F3E5F5',
+                    borderBottom: '1px solid rgba(156,39,176,0.18)',
+                  }}
+                >
                   <SectionHeading emoji="📊">Automatic alerts</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
@@ -453,7 +471,13 @@ export default function InsightCard({
                       }}
                     >
                       <CheckCircle size={20} color="#2E7D32" />
-                      <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#2E7D32', fontWeight: 600 }}>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: '0.95rem', md: '1.05rem' },
+                          color: '#2E7D32',
+                          fontWeight: 600,
+                        }}
+                      >
                         No alerts — this sprint looks healthy.
                       </Typography>
                     </Box>
@@ -469,7 +493,9 @@ export default function InsightCard({
                   bgcolor: '#FFFFFF',
                 }}
               >
-                <Box sx={{ px: 2, py: 1.25, bgcolor: '#E3F2FD', borderBottom: '1px solid #BBDEFB' }}>
+                <Box
+                  sx={{ px: 2, py: 1.25, bgcolor: '#E3F2FD', borderBottom: '1px solid #BBDEFB' }}
+                >
                   <SectionHeading emoji="📈">Sprint summary</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
@@ -492,7 +518,11 @@ export default function InsightCard({
                     }
                     return (
                       <Typography
-                        sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}
+                        sx={{
+                          fontSize: { xs: '0.95rem', md: '1rem' },
+                          color: '#78909C',
+                          fontStyle: 'italic',
+                        }}
                       >
                         {AI_INSIGHTS_EMPTY.executive}
                       </Typography>
@@ -512,14 +542,22 @@ export default function InsightCard({
                   bgcolor: '#FFFFFF',
                 }}
               >
-                <Box sx={{ px: 2, py: 1.25, bgcolor: '#E8F5E9', borderBottom: '1px solid #C8E6C9' }}>
+                <Box
+                  sx={{ px: 2, py: 1.25, bgcolor: '#E8F5E9', borderBottom: '1px solid #C8E6C9' }}
+                >
                   <SectionHeading emoji="💡">Actionable recommendations</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                   {recommendationList.length > 0 ? (
                     <ActionableRecommendationsList items={recommendationList} />
                   ) : (
-                    <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
+                    <Typography
+                      sx={{
+                        fontSize: { xs: '0.95rem', md: '1rem' },
+                        color: '#78909C',
+                        fontStyle: 'italic',
+                      }}
+                    >
                       {AI_INSIGHTS_EMPTY.recommendations}
                     </Typography>
                   )}
@@ -535,7 +573,9 @@ export default function InsightCard({
                     bgcolor: '#FFFFFF',
                   }}
                 >
-                  <Box sx={{ px: 2, py: 1.25, bgcolor: '#FFF8E1', borderBottom: '1px solid #FFECB3' }}>
+                  <Box
+                    sx={{ px: 2, py: 1.25, bgcolor: '#FFF8E1', borderBottom: '1px solid #FFECB3' }}
+                  >
                     <SectionHeading emoji="🔮" icon={Sparkles}>
                       Predictions
                     </SectionHeading>
@@ -549,12 +589,19 @@ export default function InsightCard({
                       />
                     ) : (
                       <Typography
-                        sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}
+                        sx={{
+                          fontSize: { xs: '0.95rem', md: '1rem' },
+                          color: '#78909C',
+                          fontStyle: 'italic',
+                        }}
                       >
                         {AI_INSIGHTS_EMPTY.predictions}
                       </Typography>
                     )}
-                    <Typography color="text.secondary" sx={{ display: 'block', mt: 1.5, fontSize: '0.85rem' }}>
+                    <Typography
+                      color="text.secondary"
+                      sx={{ display: 'block', mt: 1.5, fontSize: '0.85rem' }}
+                    >
                       Per sprint — outlook, risks, and delivery estimate from the latest AI run.
                     </Typography>
                   </Box>
@@ -572,11 +619,20 @@ export default function InsightCard({
             {insights.developerInsights?.length > 0 ? (
               <DeveloperInsightsTable rows={insights.developerInsights} />
             ) : (
-              <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: '0.95rem', md: '1rem' },
+                  color: '#78909C',
+                  fontStyle: 'italic',
+                }}
+              >
                 {AI_INSIGHTS_EMPTY.developers}
               </Typography>
             )}
-            <Typography color="text.secondary" sx={{ display: 'block', mt: 1.5, fontSize: '0.9rem' }}>
+            <Typography
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1.5, fontSize: '0.9rem' }}
+            >
               Per sprint — one row per developer from the AI analysis.
             </Typography>
           </Box>

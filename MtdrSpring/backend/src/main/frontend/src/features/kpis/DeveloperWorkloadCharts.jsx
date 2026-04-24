@@ -570,7 +570,13 @@ export default function DeveloperWorkloadCharts({
     >
       <Stack spacing={2} sx={{ width: '100%', minWidth: 0 }}>
         {showAssignedCompleted ? (
-          <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ? assignedCompletedMaxWidth + 120 : '100%', mx: 'auto' }}>
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: assignedCompletedMaxWidth ? assignedCompletedMaxWidth + 120 : '100%',
+              mx: 'auto',
+            }}
+          >
             <ChartCard
               title={
                 compareMode
@@ -582,45 +588,45 @@ export default function DeveloperWorkloadCharts({
               <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                 <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ?? '100%' }}>
                   <ChartPlot height={assignedCompletedHeight ?? CHART_H}>
-                  <BarChart
-                    data={combinedAssignedCompletedRows}
-                    margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
-                    barGap={2}
-                    barCategoryGap={compareMode ? '20%' : '22%'}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                    <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
-                    <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} width={40} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(v, name) => {
-                        const isA = String(name).includes('Assigned');
-                        return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
-                      }}
-                    />
-                    <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
-                    {selectedSprints.map((sp) => {
-                      const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
-                      return (
-                        <React.Fragment key={sp.id}>
-                          <Bar
-                            dataKey={sprintFieldKey(sp, 'a')}
-                            name={`${sp.shortLabel} · Assigned`}
-                            fill={hexToRgba(accent, 0.55)}
-                            radius={[4, 4, 0, 0]}
-                        maxBarSize={34}
-                          />
-                          <Bar
-                            dataKey={sprintFieldKey(sp, 'c')}
-                            name={`${sp.shortLabel} · Completed`}
-                            fill={accent}
-                            radius={[4, 4, 0, 0]}
-                        maxBarSize={34}
-                          />
-                        </React.Fragment>
-                      );
-                    })}
-                  </BarChart>
+                    <BarChart
+                      data={combinedAssignedCompletedRows}
+                      margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
+                      barGap={2}
+                      barCategoryGap={compareMode ? '20%' : '22%'}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                      <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
+                      <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} width={40} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(v, name) => {
+                          const isA = String(name).includes('Assigned');
+                          return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
+                        }}
+                      />
+                      <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
+                      {selectedSprints.map((sp) => {
+                        const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
+                        return (
+                          <React.Fragment key={sp.id}>
+                            <Bar
+                              dataKey={sprintFieldKey(sp, 'a')}
+                              name={`${sp.shortLabel} · Assigned`}
+                              fill={hexToRgba(accent, 0.55)}
+                              radius={[4, 4, 0, 0]}
+                              maxBarSize={34}
+                            />
+                            <Bar
+                              dataKey={sprintFieldKey(sp, 'c')}
+                              name={`${sp.shortLabel} · Completed`}
+                              fill={accent}
+                              radius={[4, 4, 0, 0]}
+                              maxBarSize={34}
+                            />
+                          </React.Fragment>
+                        );
+                      })}
+                    </BarChart>
                   </ChartPlot>
                 </Box>
               </Box>

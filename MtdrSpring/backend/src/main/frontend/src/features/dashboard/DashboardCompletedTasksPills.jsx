@@ -45,7 +45,10 @@ export default function DashboardCompletedTasksPills({
                   width: '100%',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: nCompare > 4 ? { xs: '0.6875rem', sm: '0.72rem' } : { xs: '0.75rem', sm: '0.8rem' },
+                  fontSize:
+                    nCompare > 4
+                      ? { xs: '0.6875rem', sm: '0.72rem' }
+                      : { xs: '0.75rem', sm: '0.8rem' },
                   minHeight: nCompare > 4 ? { xs: 30, sm: 32 } : { xs: 32, sm: 34 },
                   height: 'auto',
                   py: 0.5,
