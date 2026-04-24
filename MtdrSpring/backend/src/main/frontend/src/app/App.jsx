@@ -147,21 +147,23 @@ function App() {
   const NAV_ITEMS = [
     { text: 'Dashboard', icon: <DashboardIcon />, id: 'dashboard', roles: ['ADMIN', 'MANAGER'] },
     {
-      text: 'KPI Analytics',
-      icon: <AnalyticsIcon />,
-      id: 'analytics',
-      roles: ['ADMIN', 'MANAGER'],
-    },
-    {
       text: 'AI Insights',
       icon: <AutoAwesomeIcon />,
       id: 'ai-insights',
       roles: ['ADMIN', 'MANAGER'],
     },
+    {
+      text: 'KPI Analytics',
+      icon: <AnalyticsIcon />,
+      id: 'analytics',
+      roles: ['ADMIN', 'MANAGER'],
+    },
     { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter((item) => item.roles.includes(user.role));
-  const primaryNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard');
-  const secondaryNavItems = NAV_ITEMS.filter((item) => item.id !== 'dashboard');
+  const topNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard' || item.id === 'ai-insights');
+  const secondaryNavItems = NAV_ITEMS.filter(
+    (item) => item.id !== 'dashboard' && item.id !== 'ai-insights',
+  );
 
   const SPRINTS_SUBITEMS = [
     { text: 'Tasks', id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },
@@ -249,7 +251,7 @@ function App() {
         </Box>
 
         <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }} component="nav">
-          {primaryNavItems.map((item) => (
+          {topNavItems.map((item) => (
             <ListItemButton
               key={item.id}
               onClick={() => {

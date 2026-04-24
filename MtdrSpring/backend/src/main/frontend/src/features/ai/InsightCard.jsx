@@ -48,6 +48,8 @@ export default function InsightCard({
   sprintLabel,
   showPredictionsSection = true,
   showNextSprintForecast = true,
+  nextSprintLabel = null,
+  nextSprintActualScore = null,
   refreshToken = 0,
 }) {
   const [status, setStatus] = useState('idle');
@@ -546,6 +548,8 @@ export default function InsightCard({
                         predictions={insights.predictions}
                         productivityPrediction={insights.productivityPrediction}
                         showNextSprintForecast={showNextSprintForecast}
+                        nextSprintLabel={nextSprintLabel}
+                        nextSprintActualScore={nextSprintActualScore}
                       />
                     ) : (
                       <Typography

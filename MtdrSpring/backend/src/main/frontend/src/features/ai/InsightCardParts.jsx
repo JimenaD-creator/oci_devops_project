@@ -421,7 +421,7 @@ export function PredictionsBlock({
   if (!hasExtended && productivityPrediction && !showNextSprintForecast) {
     return (
       <Typography sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#78909C', fontStyle: 'italic' }}>
-        The next sprint score forecast is only shown for the latest sprint in this project (by end date).
+        The next sprint score forecast is hidden for this sprint.
       </Typography>
     );
   }
@@ -474,7 +474,11 @@ export function PredictionsBlock({
           )}
         </Box>
       )}
-      {showScoreCard && <PredictionCard prediction={productivityPrediction} />}
+      {showScoreCard && (
+        <PredictionCard
+          prediction={productivityPrediction}
+        />
+      )}
     </Box>
   );
 }

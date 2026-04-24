@@ -108,10 +108,15 @@ public class GeminiService {
             + "Rules:\n"
             + "- Use all selected sprints in input order. Compare first vs last, and also consider variation across intermediate sprints.\n"
             + "- Include one row per developer seen in any sprint (missing values treated as 0).\n"
+            + "- For interpretation, prioritize delivery performance (completed tasks and completed-per-hour efficiency), not total created or assigned scope.\n"
+            + "- Do not treat changes in assigned or created task volume as positive/negative performance by themselves; scope can vary by sprint goal.\n"
             + "- tasks[].delta = last.completed - first.completed (integer).\n"
             + "- hours[].delta = last.hours - first.hours (number, 1 decimal).\n"
             + "- productivity[].delta = (last.completed/max(last.hours,0.1)) - (first.completed/max(first.hours,0.1)) rounded to 2 decimals.\n"
+            + "- tasks message must judge variation mainly by completion outcomes (finished vs not finished), even when assigned/created volume changes.\n"
+            + "- hours message must relate worked-hour changes to completion outcomes and efficiency; avoid conclusions based only on workload size changes.\n"
             + "- productivity message must explain whether efficiency (tasks per hour) improved, worsened, or remained stable.\n"
+            + "- productivity message must use completed-per-hour as the performance basis and must not treat assigned/created task volume changes as productivity by themselves.\n"
             + "- message must be concise English, grounded in the data, mention first/last sprint labels, and mention if intermediate sprints had notable fluctuations.\n"
             + "- Sort tasks, hours, and productivity by absolute delta descending.\n"
             + "- Do not include any extra keys.";
@@ -982,7 +987,8 @@ public class GeminiService {
                 else if ("IN_PROCESS".equals(norm)) d.inProcess++;
                 else if ("IN_REVIEW".equals(norm)) d.inReview++;
                 else if ("DONE".equals(norm)) d.done++;
-                d.total++;
+                // Keep total derived from status buckets so each bucket (including done) is used.
+                d.total = d.todo + d.inProcess + d.inReview + d.done;
             }
         } catch (Exception e) {
             System.err.println("[GeminiService] buildDeveloperStatusLoad: " + e.getMessage());
@@ -1600,16 +1606,29 @@ public class GeminiService {
             t.put("developerName", name);
             t.put("delta", deltaTasks);
             t.put("message", String.format(
-                "%s: completed tasks moved from %d in %s to %d in %s (range across selected sprints: %d-%d).",
+                "%s: completion outcome moved from %d done task(s) in %s to %d in %s "
+                    + "(range across selected sprints: %d-%d done). Variation is interpreted by delivery results, "
+                    + "not by how many tasks were created or assigned per sprint.",
                 name, firstCompleted, firstLabel, lastCompleted, lastLabel, minCompleted, maxCompleted));
             taskRows.add(t);
 
             ObjectNode h = mapper.createObjectNode();
             h.put("developerName", name);
             h.put("delta", deltaHours);
+            String hoursPerformanceContext;
+            if (lastCompleted > firstCompleted && lastHours <= firstHours) {
+                hoursPerformanceContext = "better delivery efficiency";
+            } else if (lastCompleted < firstCompleted && lastHours >= firstHours) {
+                hoursPerformanceContext = "weaker delivery efficiency";
+            } else {
+                hoursPerformanceContext = "mixed delivery signal";
+            }
             h.put("message", String.format(
-                "%s: worked hours moved from %.1f in %s to %.1f in %s (range across selected sprints: %.1f-%.1f).",
-                name, firstHours, firstLabel, lastHours, lastLabel, minHours, maxHours));
+                "%s: worked hours moved from %.1f in %s to %.1f in %s (range across selected sprints: %.1f-%.1f), "
+                    + "with %s based on completed outcomes (%d -> %d done tasks). "
+                    + "Task creation/assignment volume changes are not treated as performance by themselves.",
+                name, firstHours, firstLabel, lastHours, lastLabel, minHours, maxHours,
+                hoursPerformanceContext, firstCompleted, lastCompleted));
             hourRows.add(h);
 
             ObjectNode p = mapper.createObjectNode();
@@ -1621,8 +1640,10 @@ public class GeminiService {
                     ? "decreased"
                     : "stayed stable";
             p.put("message", String.format(
-                "%s: productivity (%s tasks/hour) %s from %.2f in %s to %.2f in %s (range across selected sprints: %.2f-%.2f).",
-                name, "completed", trendText, firstRate, firstLabel, lastRate, lastLabel, minRate, maxRate));
+                "%s: productivity (completed tasks/hour) %s from %.2f in %s to %.2f in %s "
+                    + "(range across selected sprints: %.2f-%.2f). Assessment is based on completion efficiency, "
+                    + "not on task creation/assignment volume changes.",
+                name, trendText, firstRate, firstLabel, lastRate, lastLabel, minRate, maxRate));
             productivityRows.add(p);
         }
         return root;

@@ -74,45 +74,31 @@ export default function AIInsightsPage({ projectId }) {
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
 
-  /** Latest sprint in the project by due date (then start date, then id). */
-  const mostRecentSprintId = useMemo(() => {
-    if (!Array.isArray(sprints) || sprints.length === 0) return null;
-    const sorted = [...sprints].sort((a, b) => {
+  /** Sprints sorted chronologically for "next sprint" comparisons. */
+  const sortedSprints = useMemo(() => {
+    if (!Array.isArray(sprints) || sprints.length === 0) return [];
+    return [...sprints].sort((a, b) => {
       const endA = new Date(a.dueDate ?? 0).getTime();
       const endB = new Date(b.dueDate ?? 0).getTime();
-      if (endB !== endA) return endB - endA;
+      if (endA !== endB) return endA - endB;
       const startA = new Date(a.startDate ?? 0).getTime();
       const startB = new Date(b.startDate ?? 0).getTime();
-      if (startB !== startA) return startB - startA;
-      return Number(b.id) - Number(a.id);
+      if (startA !== startB) return startA - startB;
+      return Number(a.id) - Number(b.id);
     });
-    return sorted[0]?.id ?? null;
   }, [sprints]);
 
-  /** Sprint that contains "today" (same rule as default selection). */
-  const activeSprintId = useMemo(() => {
-    if (!Array.isArray(sprints) || sprints.length === 0) return null;
-    const now = new Date();
-    const active = sprints.find((s) => now >= new Date(s.startDate) && now <= new Date(s.dueDate));
-    return active?.id ?? null;
-  }, [sprints]);
+  // Show predictions for any selected sprint, including past sprints.
+  const showPredictionsSection = useMemo(() => selectedSprintId != null, [selectedSprintId]);
 
-  /**
-   * Predictions (outlook + next-sprint card) only for the active sprint, or — if none —
-   * the chronologically latest sprint by end date (not older closed sprints).
-   */
-  const showPredictionsSection = useMemo(() => {
-    if (selectedSprintId == null) return false;
-    if (activeSprintId != null) {
-      return Number(selectedSprintId) === Number(activeSprintId);
-    }
-    return mostRecentSprintId != null && Number(selectedSprintId) === Number(mostRecentSprintId);
-  }, [selectedSprintId, activeSprintId, mostRecentSprintId]);
+  const nextSprintForSelected = useMemo(() => {
+    if (selectedSprintId == null || sortedSprints.length === 0) return null;
+    const idx = sortedSprints.findIndex((s) => Number(s.id) === Number(selectedSprintId));
+    if (idx < 0 || idx >= sortedSprints.length - 1) return null;
+    return sortedSprints[idx + 1];
+  }, [selectedSprintId, sortedSprints]);
 
-  const showNextSprintForecast =
-    mostRecentSprintId != null &&
-    selectedSprintId != null &&
-    Number(selectedSprintId) === Number(mostRecentSprintId);
+  const showNextSprintForecast = selectedSprintId != null;
 
   if (loading)
     return (
@@ -231,6 +217,8 @@ export default function AIInsightsPage({ projectId }) {
           sprintLabel={`Sprint ${selectedSprint.id}`}
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
+          nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
+          nextSprintActualScore={nextSprintForSelected?.kpis?.productivityScore ?? null}
           refreshToken={refreshToken}
         />
       )}
