@@ -1,6 +1,5 @@
 /**
  * Requirement 3: Completed tasks list — task name, developer, estimated hrs, actual hrs.
- * Component under test: TaskTable.jsx (not the full Tasks page).
  */
 import React from 'react';
 import { screen, within } from '@testing-library/react';

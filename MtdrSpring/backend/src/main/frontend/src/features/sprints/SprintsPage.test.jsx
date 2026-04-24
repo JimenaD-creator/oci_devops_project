@@ -1,6 +1,5 @@
 /**
  * Requirement 1: Real-time display of tasks assigned to each user.
- * Component under test: SprintsPage.jsx (integration: sprint view + per-user task columns).
  */
 import React from 'react';
 import { screen } from '@testing-library/react';
@@ -77,7 +76,7 @@ test('after load, lists tasks assigned to developers', async () => {
 
   renderWithTheme(<SprintsPage projectId="1" />);
 
-  // Task names (already present)
+  // Task names
   expect(await screen.findByText('Tarea de Ana')).toBeInTheDocument();
   expect(await screen.findByText('Tarea de Bruno')).toBeInTheDocument();
 

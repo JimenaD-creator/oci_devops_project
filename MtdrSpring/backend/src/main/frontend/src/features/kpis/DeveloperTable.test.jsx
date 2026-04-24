@@ -1,6 +1,5 @@
 /**
  * Requirement 7: Per-person KPIs (assigned, completed, hours) per sprint.
- * Component under test: DeveloperTable.jsx (not KPIAnalytics page shell).
  */
 import React from 'react';
 import { screen, within } from '@testing-library/react';
