@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import { taskAPI } from '../services/API';
 import { API_BASE } from '../features/sprints/constants/sprintConstants';
+import ManagerChatbot from '../features/ai/ManagerChatbot';
 
 import {
   Box,
@@ -480,6 +481,7 @@ function App() {
           </Box>
         )}
       </Box>
+      <ManagerChatbot projectId={selectedProjectId} />
     </Box>
   );
 }
