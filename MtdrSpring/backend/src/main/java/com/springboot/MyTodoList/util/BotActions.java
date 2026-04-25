@@ -1,14 +1,5 @@
 package com.springboot.MyTodoList.util;
 
-import com.springboot.MyTodoList.model.Sprint;
-import com.springboot.MyTodoList.model.ToDoItem;
-import com.springboot.MyTodoList.model.User;
-import com.springboot.MyTodoList.service.DeepSeekService;
-import com.springboot.MyTodoList.service.SprintService;
-import com.springboot.MyTodoList.service.ToDoItemService;
-import com.springboot.MyTodoList.service.TelegramUserMappingService;
-import com.springboot.MyTodoList.service.UserService;
-import com.springboot.MyTodoList.service.UserTaskService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,11 +7,22 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+
+import com.springboot.MyTodoList.model.Sprint;
+import com.springboot.MyTodoList.model.ToDoItem;
+import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.SprintService;
+import com.springboot.MyTodoList.service.TelegramUserMappingService;
+import com.springboot.MyTodoList.service.ToDoItemService;
+import com.springboot.MyTodoList.service.UserService;
+import com.springboot.MyTodoList.service.UserTaskService;
 
 public class BotActions {
 
@@ -107,6 +109,9 @@ public class BotActions {
     }
 
     public void fnDone() {
+        // Skip if in new task interaction states
+        if (stateManager.isViewingSprintTasks(chatId) || stateManager.isSelectingTaskStatus(chatId) || exit) 
+            return;
         if (!(requestText.indexOf(BotLabels.DONE.getLabel()) != -1) || exit) 
             return;
             
@@ -151,6 +156,8 @@ public class BotActions {
     }
 
     public void fnUndo() {
+        // Skip if in new task interaction states
+        if (stateManager.isViewingSprintTasks(chatId) || stateManager.isSelectingTaskStatus(chatId) || exit) return;
         if (requestText.indexOf(BotLabels.UNDO.getLabel()) == -1 || exit) return;
         try {
             String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
@@ -175,6 +182,8 @@ public class BotActions {
     }
 
     public void fnDelete() {
+        // Skip if in new task interaction states
+        if (stateManager.isViewingSprintTasks(chatId) || stateManager.isSelectingTaskStatus(chatId) || exit) return;
         if (requestText.indexOf(BotLabels.DELETE.getLabel()) == -1 || exit) return;
         try {
             String idStr = requestText.substring(0, requestText.indexOf(BotLabels.DASH.getLabel()));
@@ -351,8 +360,13 @@ public class BotActions {
                 .collect(Collectors.toList());
         for (ToDoItem item : activeItems) {
             KeyboardRow currentRow = new KeyboardRow();
-            currentRow.add(keyboardLabelForItem(item));
-            currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.DONE.getLabel());
+            String taskLabel = keyboardLabelForItem(item);
+            if (item.getStatus() != null) {
+                taskLabel += " [" + item.getStatus() + "]";
+            }
+            // Include task ID at the beginning for parsing
+            String buttonText = item.getID() + " - " + taskLabel;
+            currentRow.add(buttonText);
             keyboard.add(currentRow);
         }
 
@@ -361,9 +375,13 @@ public class BotActions {
                 .collect(Collectors.toList());
         for (ToDoItem item : doneItems) {
             KeyboardRow currentRow = new KeyboardRow();
-            currentRow.add(keyboardLabelForItem(item));
-            currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.UNDO.getLabel());
-            currentRow.add(item.getID() + BotLabels.DASH.getLabel() + BotLabels.DELETE.getLabel());
+            String taskLabel = keyboardLabelForItem(item);
+            if (item.getStatus() != null) {
+                taskLabel += " [" + item.getStatus() + "]";
+            }
+            // Include task ID at the beginning for parsing
+            String buttonText = item.getID() + " - " + taskLabel;
+            currentRow.add(buttonText);
             keyboard.add(currentRow);
         }
 
@@ -375,13 +393,15 @@ public class BotActions {
 
         String message = mine.isEmpty()
                 ? "📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to users or sprints."
-                : "📋 *Your tasks (Sprint " + sprintId + "):*";
+                : "📋 *Your tasks (Sprint " + sprintId + "):*\n\nClick on a task to view details and change status.";
 
         BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
     }
 
     public void fnViewSprintTasks() {
         if (!stateManager.isViewingSprintTasks(chatId) || exit) return;
+
+        logger.debug("fnViewSprintTasks called with text: {}", requestText);
 
         if ("⬅️ Back to Sprints".equals(requestText)) {
             sendSelectSprintKeyboard(null);
@@ -397,7 +417,125 @@ public class BotActions {
                 sendSelectSprintKeyboard(null);
             }
             exit = true;
+            return;
         }
+        
+        // User clicked on a task - show task details and status options
+        Long sprintId = stateManager.getViewingSprintId(chatId);
+        Long assigneeUserId = stateManager.getViewingSelectedUserId(chatId);
+        
+        if (sprintId == null || assigneeUserId == null) {
+            logger.debug("Missing sprintId or assigneeUserId, returning to sprint selection");
+            sendSelectSprintKeyboard(null);
+            exit = true;
+            return;
+        }
+        
+        // Try to find the task - extract ID from the label
+        Integer taskId = extractTaskIdFromLabel(requestText);
+        logger.debug("Extracted taskId: {} from text: {}", taskId, requestText);
+        
+        if (taskId == null) {
+            logger.debug("Could not extract task ID from: {}", requestText);
+            exit = true;
+            return;
+        }
+        
+        // Show task details with status options
+        ToDoItem task = todoService.getToDoItemById(taskId);
+        if (task == null) {
+            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
+            exit = true;
+            return;
+        }
+        
+        showTaskDetailsWithStatusOptions(task, sprintId, assigneeUserId);
+        exit = true;
+    }
+    
+    /**
+     * Extract task ID from task label (format: "ID - Title [Status]")
+     */
+    private Integer extractTaskIdFromLabel(String label) {
+        if (label == null || label.isEmpty()) {
+            return null;
+        }
+        try {
+            // Parse ID from the beginning: "123 - Task Title [Status]"
+            int dashIndex = label.indexOf(" - ");
+            if (dashIndex > 0) {
+                String idStr = label.substring(0, dashIndex).trim();
+                int id = Integer.parseInt(idStr);
+                logger.debug("Successfully extracted task ID {} from label: {}", id, label);
+                return id;
+            }
+            // Fallback: try to parse the whole string as an ID
+            int id = Integer.parseInt(label.trim());
+            logger.debug("Parsed whole string as task ID {} from label: {}", id, label);
+            return id;
+        } catch (Exception e) {
+            logger.debug("Could not extract task ID from label: {}", label, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Show task details with status selection buttons
+     */
+    private void showTaskDetailsWithStatusOptions(ToDoItem task, Long sprintId, Long assigneeUserId) {
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        
+        // Status buttons
+        KeyboardRow statusRow1 = new KeyboardRow();
+        statusRow1.add("📝 To-do");
+        statusRow1.add("🔄 In Process");
+        keyboard.add(statusRow1);
+        
+        KeyboardRow statusRow2 = new KeyboardRow();
+        statusRow2.add("👀 In Review");
+        statusRow2.add("✅ Done");
+        keyboard.add(statusRow2);
+        
+        // Navigation buttons
+        keyboard.add(new KeyboardRow("⬅️ Back to tasks"));
+        
+        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
+                .keyboard(keyboard)
+                .resizeKeyboard(true)
+                .selective(true)
+                .build();
+        
+        String taskStatus = task.getStatus() != null ? task.getStatus() : "No status set";
+        String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty() 
+                ? task.getDescription() 
+                : "No description provided";
+        
+        String message = String.format(
+                "📋 *Task Details*\n\n" +
+                "*Title:* %s\n\n" +
+                "*Description:* %s\n\n" +
+                "*Current Status:* %s\n\n" +
+                "Select a new status:",
+                escapeMarkdown(task.getTitle()),
+                escapeMarkdown(taskDescription),
+                taskStatus
+        );
+        
+        // Store task selection state
+        stateManager.setSelectingTaskStatus(chatId, task.getID(), sprintId, assigneeUserId);
+        
+        BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
+    }
+    
+    /**
+     * Escape special characters for Telegram Markdown
+     */
+    private String escapeMarkdown(String text) {
+        if (text == null) return "";
+        return text.replace("_", "\\_")
+                   .replace("*", "\\*")
+                   .replace("[", "\\[")
+                   .replace("]", "\\]");
     }
 
     /**
@@ -495,6 +633,108 @@ public class BotActions {
                     null
             );
             stateManager.setVerifyingCredentialsPhoneEmail(chatId, userId, sprintId);
+        }
+        exit = true;
+    }
+
+    /**
+     * Handle task status selection
+     */
+    public void fnSelectTaskStatus() {
+        logger.debug("fnSelectTaskStatus: Called for chatId={}, requestText='{}'", chatId, requestText);
+        if (!stateManager.isSelectingTaskStatus(chatId) || exit) {
+            logger.debug("fnSelectTaskStatus: Not in selecting task status state or exit=true, returning");
+            return;
+        }
+        
+        logger.debug("fnSelectTaskStatus: Processing requestText: '{}'", requestText);
+        
+        if ("⬅️ Back to tasks".equals(requestText)) {
+            logger.debug("fnSelectTaskStatus: Back to tasks clicked");
+            Long sprintId = stateManager.getViewingSprintId(chatId);
+            Long assigneeUserId = stateManager.getViewingSelectedUserId(chatId);
+            if (sprintId != null && assigneeUserId != null) {
+                stateManager.setViewingSprintTasks(chatId, sprintId, assigneeUserId);
+                showSprintTasksForAssignee(sprintId, assigneeUserId);
+            } else {
+                sendSelectSprintKeyboard(null);
+            }
+            exit = true;
+            return;
+        }
+        
+        // Map emoji buttons to status values
+        String newStatus = null;
+        if ("📝 To-do".equals(requestText)) {
+            newStatus = "TO-DO";
+        } else if ("🔄 In Process".equals(requestText)) {
+            newStatus = "IN_PROCESS";
+        } else if ("👀 In Review".equals(requestText)) {
+            newStatus = "IN_REVIEW";
+        } else if ("✅ Done".equals(requestText)) {
+            newStatus = "DONE";
+        } else {
+            logger.debug("fnSelectTaskStatus: Unrecognized status button: '{}'", requestText);
+            exit = true;
+            return;
+        }
+        
+        logger.debug("fnSelectTaskStatus: Mapped '{}' to status '{}'", requestText, newStatus);
+        
+        Integer taskId = stateManager.getSelectedTaskId(chatId);
+        if (taskId == null) {
+            logger.debug("fnSelectTaskStatus: No taskId found in state");
+            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
+            exit = true;
+            return;
+        }
+        
+        logger.debug("fnSelectTaskStatus: Updating task {} to status {}", taskId, newStatus);
+        
+        ToDoItem task = todoService.getToDoItemById(taskId);
+        if (task == null) {
+            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
+            exit = true;
+            return;
+        }
+        
+        // If status is "Done", ask for hours worked
+        if ("DONE".equals(newStatus)) {
+            logger.debug("fnSelectTaskStatus: Status is DONE, asking for hours");
+            Long actingUserId = stateManager.getViewingSelectedUserId(chatId);
+            stateManager.setWaitingForHours(chatId, taskId, actingUserId);
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "How many hours did you work on this task? (Please enter a whole number)",
+                    telegramClient,
+                    null
+            );
+        } else {
+            // For other statuses, just update and return to task list
+            logger.debug("fnSelectTaskStatus: Updating status for non-DONE task");
+            boolean updated = todoService.updateTaskStatusOnly(taskId, newStatus);
+
+            if (!updated) {
+                BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
+                exit = true;
+                return;
+            }
+            
+            logger.debug("fnSelectTaskStatus: Sending confirmation message");
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "✓ Task status updated to: " + newStatus,
+                    telegramClient,
+                    null
+            );
+            
+            logger.debug("fnSelectTaskStatus: Returning to task list");
+            Long sprintId = stateManager.getViewingSprintId(chatId);
+            Long assigneeUserId = stateManager.getViewingSelectedUserId(chatId);
+            if (sprintId != null && assigneeUserId != null) {
+                stateManager.setViewingSprintTasks(chatId, sprintId, assigneeUserId);
+                showSprintTasksForAssignee(sprintId, assigneeUserId);
+            }
         }
         exit = true;
     }

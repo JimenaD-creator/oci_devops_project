@@ -70,7 +70,7 @@ public class BotStateManager {
         return state != null && "SELECTING_USER_IN_SPRINT".equals(state.getState()) && !isStateExpired(state);
     }
 
-    /** Sprint id while picking a user, verifying credentials, or viewing filtered tasks. */
+    /** Sprint id while picking a user, verifying credentials, viewing tasks, or selecting task status. */
     public Long getSprintIdInSprintUserFlow(Long chatId) {
         BotUserState state = userStates.get(chatId);
         if (state == null || isStateExpired(state)) {
@@ -79,7 +79,8 @@ public class BotStateManager {
         if ("SELECTING_USER_IN_SPRINT".equals(state.getState())
                 || "VIEWING_SPRINT_TASKS".equals(state.getState())
                 || "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(state.getState())
-                || "VERIFYING_CREDENTIALS_PASSWORD".equals(state.getState())) {
+                || "VERIFYING_CREDENTIALS_PASSWORD".equals(state.getState())
+                || "SELECTING_TASK_STATUS".equals(state.getState())) {
             return state.getSprintId();
         }
         return null;
@@ -173,16 +174,20 @@ public class BotStateManager {
      */
     public Long getViewingSprintId(Long chatId) {
         BotUserState state = userStates.get(chatId);
-        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
-            return state.getSprintId();
+        if (state != null && !isStateExpired(state)) {
+            if ("VIEWING_SPRINT_TASKS".equals(state.getState()) || "SELECTING_TASK_STATUS".equals(state.getState())) {
+                return state.getSprintId();
+            }
         }
         return null;
     }
 
     public Long getViewingSelectedUserId(Long chatId) {
         BotUserState state = userStates.get(chatId);
-        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
-            return state.getSelectedUserId();
+        if (state != null && !isStateExpired(state)) {
+            if ("VIEWING_SPRINT_TASKS".equals(state.getState()) || "SELECTING_TASK_STATUS".equals(state.getState())) {
+                return state.getSelectedUserId();
+            }
         }
         return null;
     }
@@ -214,7 +219,8 @@ public class BotStateManager {
         }
         /* Navigation-only states: not "pending input" for free-text handlers */
         if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st) ||
-            "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(st) || "VERIFYING_CREDENTIALS_PASSWORD".equals(st)) {
+            "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(st) || "VERIFYING_CREDENTIALS_PASSWORD".equals(st) ||
+            "SELECTING_TASK_STATUS".equals(st)) {
             return false;
         }
         return true;
@@ -342,6 +348,47 @@ public class BotStateManager {
         BotUserState state = userStates.get(chatId);
         if (state != null && !isStateExpired(state)) {
             return state.getTempPhoneEmail();
+        }
+        return null;
+    }
+
+    /**
+     * Set user state to "selecting task status" after clicking on a task.
+     * Prepares to show task details and status options.
+     *
+     * @param chatId The Telegram chat ID
+     * @param taskId The task ID being viewed
+     * @param sprintId The sprint ID context
+     * @param assigneeUserId The assignee user ID
+     */
+    public void setSelectingTaskStatus(Long chatId, Integer taskId, Long sprintId, Long assigneeUserId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, assigneeUserId, "SELECTING_TASK_STATUS");
+        state.setSelectedTaskId(taskId);
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting status for task {} in sprint {}", chatId, taskId, sprintId);
+    }
+
+    /**
+     * Check if user is selecting task status.
+     *
+     * @param chatId The Telegram chat ID
+     * @return true if selecting task status
+     */
+    public boolean isSelectingTaskStatus(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_TASK_STATUS".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    /**
+     * Get the task ID being viewed/modified.
+     *
+     * @param chatId The Telegram chat ID
+     * @return Task ID or null
+     */
+    public Integer getSelectedTaskId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && !isStateExpired(state) && "SELECTING_TASK_STATUS".equals(state.getState())) {
+            return state.getSelectedTaskId();
         }
         return null;
     }

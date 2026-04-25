@@ -20,6 +20,9 @@ public class BotUserState {
     private String tempPhoneEmail;    // Temporary storage for phone/email during credential verification
     private Long credentialUserBeingVerified; // User ID whose credentials are being verified
     
+    // Task selection and status change fields
+    private Integer selectedTaskId;   // Task ID selected for viewing details/changing status
+    
     // Constructors
     public BotUserState() {}
     
@@ -100,6 +103,14 @@ public class BotUserState {
 
     public void setCredentialUserBeingVerified(Long credentialUserBeingVerified) {
         this.credentialUserBeingVerified = credentialUserBeingVerified;
+    }
+
+    public Integer getSelectedTaskId() {
+        return selectedTaskId;
+    }
+
+    public void setSelectedTaskId(Integer selectedTaskId) {
+        this.selectedTaskId = selectedTaskId;
     }
     
     @Override
