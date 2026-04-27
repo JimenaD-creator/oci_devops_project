@@ -15,6 +15,8 @@ import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class ManagerChatService {
@@ -36,6 +38,7 @@ public class ManagerChatService {
         .build();
     private static final int GEMINI_MAX_RETRIES = 3;
     private static final long GEMINI_RETRY_BASE_MS = 1000L;
+    private static final Pattern PERCENT_TOKEN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*%");
 
     // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC ENTRY POINT
@@ -62,6 +65,7 @@ public class ManagerChatService {
 
             String systemPrompt = buildSystemPrompt(contextJson, scope);
             String reply = callGemini(systemPrompt, req.getMessage(), req.getHistory());
+            reply = clampPercentagesToRange(reply);
             return ManagerChatResponse.of(reply, scope);
 
         } catch (Exception e) {
@@ -241,9 +245,34 @@ public class ManagerChatService {
             + "- Never make up data. If a value is null or missing, say it's not recorded.\n"
             + "- Keep responses under 300 words unless more detail is specifically requested.\n"
             + "- Respond in the same language the manager uses (Spanish or English).\n\n"
+            + "- Any percentage you mention must stay between 0% and 100%.\n\n"
             + "## Current data scope: " + scopeDesc + "\n\n"
             + "## Project data (JSON)\n"
             + contextJson;
+    }
+
+    private String clampPercentagesToRange(String text) {
+        if (text == null || text.isBlank()) return text;
+        Matcher matcher = PERCENT_TOKEN.matcher(text);
+        StringBuffer out = new StringBuffer();
+        while (matcher.find()) {
+            String raw = matcher.group(1);
+            double n;
+            try {
+                n = Double.parseDouble(raw);
+            } catch (NumberFormatException ex) {
+                matcher.appendReplacement(out, Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+            double clamped = Math.max(0d, Math.min(100d, n));
+            String replacement =
+                Math.abs(clamped - Math.rint(clamped)) < 1e-9
+                    ? String.format(Locale.ROOT, "%.0f%%", clamped)
+                    : String.format(Locale.ROOT, "%.1f%%", clamped);
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(out);
+        return out.toString();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

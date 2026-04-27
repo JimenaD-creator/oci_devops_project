@@ -61,7 +61,7 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
           }}
         >
           <Typography sx={{ color: '#607D8B', fontWeight: 600 }}>
-            No blocked tasks flagged yet. Once tasks include `block/blocked`, this section highlights impacted developers.
+            No blocked tasks flagged yet. Once developers report `is_blocked`, this section highlights impacted developers.
           </Typography>
         </Paper>
       ) : (
@@ -99,11 +99,21 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                       Oldest blocked: {blockedAgeLabel(oldest)}
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
-                      {dev.blockedTasks.slice(0, 3).map((t) => (
-                        <Typography key={t.id} sx={{ fontSize: '0.84rem', color: '#37474F' }}>
-                          - {t.title}
-                        </Typography>
-                      ))}
+                      {dev.blockedTasks.slice(0, 3).map((t) => {
+                        const reason = String(t?.blockedReason || '').trim();
+                        return (
+                          <Box key={t.id}>
+                            <Typography sx={{ fontSize: '0.84rem', color: '#37474F' }}>
+                              - {t.title}
+                            </Typography>
+                            {reason ? (
+                              <Typography sx={{ fontSize: '0.78rem', color: '#607D8B', pl: 1.25 }}>
+                                Reason: {reason}
+                              </Typography>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
                     </Box>
                   </Box>
                   <Button

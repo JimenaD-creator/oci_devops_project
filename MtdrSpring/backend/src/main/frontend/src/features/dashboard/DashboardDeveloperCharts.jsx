@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Line,
+  LabelList,
 } from 'recharts';
 import {
   CHART_TICK,
@@ -54,6 +55,47 @@ import {
 import { API_BASE } from '../sprints/constants/sprintConstants';
 
 const MotionPaper = motion(Paper);
+
+function HorizontalBarEndLabel({
+  x,
+  y,
+  width,
+  height,
+  value,
+  fill = '#455A64',
+  formatter = (v) => String(v ?? ''),
+}) {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return (
+    <text
+      x={Number(x) + Number(width) + 6}
+      y={Number(y) + Number(height) / 2}
+      fill={fill}
+      fontSize={11}
+      fontWeight={700}
+      dominantBaseline="middle"
+      textAnchor="start"
+    >
+      {formatter(n)}
+    </text>
+  );
+}
+
+function HoursValueLabel(props) {
+  const { x, y, width, height, value, fill, withHoursSuffix = true } = props || {};
+  return (
+    <HorizontalBarEndLabel
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      value={value}
+      fill={fill || '#455A64'}
+      formatter={(v) => (withHoursSuffix ? `${Number(v).toFixed(1)}h` : `${Number(v).toFixed(1)}`)}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tooltips de comparación
@@ -853,6 +895,14 @@ export default function DashboardDeveloperCharts({
 
   if (hasCompareData) {
     const { sprintDefs, workloadRows, hoursRows, comboRows } = compareModel;
+    const workloadRowsWithTotals = workloadRows.map((row) => {
+      const enriched = { ...row };
+      sprintDefs.forEach((sp) => {
+        enriched[`wt_${sp.id}`] =
+          (Number(row[`wc_${sp.id}`]) || 0) + (Number(row[`wo_${sp.id}`]) || 0);
+      });
+      return enriched;
+    });
     const firstAccent = sprintDefs[0]?.accentColor ?? '#3949AB';
     const comboAccent = sprintDefs[sprintDefs.length - 1]?.accentColor ?? sprintDefs[0]?.accentColor ?? '#7E57C2';
 
@@ -897,7 +947,7 @@ export default function DashboardDeveloperCharts({
           }
         >
           <BarChart
-            data={workloadRows}
+            data={workloadRowsWithTotals}
             margin={{ top: marginTopWorkloadTight, right: 24, left: 8, bottom: bottomAxisCompare }}
             barCategoryGap={workloadBarCategoryGap}
             barGap={workloadBarGap}
@@ -966,7 +1016,16 @@ export default function DashboardDeveloperCharts({
                   animationDuration={CHART_BAR_ANIM_MS}
                   animationEasing={CHART_BAR_EASING}
                   activeBar={false}
-                />
+                >
+                  <LabelList
+                    dataKey={`wt_${sp.id}`}
+                    position="top"
+                    fill={sp.accentColor}
+                    fontSize={11}
+                    fontWeight={700}
+                    formatter={(v) => `${Math.round(Number(v) || 0)}`}
+                  />
+                </Bar>
               </React.Fragment>
             ))}
           </BarChart>
@@ -1029,8 +1088,12 @@ export default function DashboardDeveloperCharts({
             />
             {sprintDefs.map((sp) => (
               <React.Fragment key={`hr-bullet-${sp.id}`}>
-                <Bar dataKey={`hw_${sp.id}`} name={`${sp.shortLabel} · hours worked`} fill={sp.accentColor} radius={[0, 0, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
-                <Bar dataKey={`ha_${sp.id}`} name={`${sp.shortLabel} · estimated hours`} fill={alpha(sp.accentColor, 0.42)} radius={[6, 6, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+                <Bar dataKey={`hw_${sp.id}`} name={`${sp.shortLabel} · hours worked`} fill={sp.accentColor} radius={[0, 0, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+                  <LabelList dataKey={`hw_${sp.id}`} position="top" fill={sp.accentColor} fontSize={11} fontWeight={700} formatter={(v) => `${Number(v || 0).toFixed(1)}h`} />
+                </Bar>
+                <Bar dataKey={`ha_${sp.id}`} name={`${sp.shortLabel} · estimated hours`} fill={alpha(sp.accentColor, 0.42)} radius={[6, 6, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+                  <LabelList dataKey={`ha_${sp.id}`} position="top" fill={sp.accentColor} fontSize={11} fontWeight={700} formatter={(v) => `${Number(v || 0).toFixed(1)}h`} />
+                </Bar>
               </React.Fragment>
             ))}
           </BarChart>
@@ -1069,7 +1132,9 @@ export default function DashboardDeveloperCharts({
               content={(props) => <CompareComboTooltip {...props} sprintDefs={sprintDefs} />}
             />
             {sprintDefs.map((sp) => (
-              <Bar key={`cb-${sp.id}`} yAxisId="tasks" dataKey={`cb_${sp.id}`} name={`${sp.shortLabel} · tasks`} fill={sp.accentColor} radius={[6, 6, 0, 0]} maxBarSize={Math.max(8, maxBarCompare)} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+              <Bar key={`cb-${sp.id}`} yAxisId="tasks" dataKey={`cb_${sp.id}`} name={`${sp.shortLabel} · tasks`} fill={sp.accentColor} radius={[6, 6, 0, 0]} maxBarSize={Math.max(8, maxBarCompare)} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+                <LabelList dataKey={`cb_${sp.id}`} position="top" fill={sp.accentColor} fontSize={11} fontWeight={700} formatter={(v) => `${Number(v || 0)}`} />
+              </Bar>
             ))}
             {sprintDefs.map((sp) => (
               <Line key={`ln-${sp.id}`} yAxisId="hrs" type="monotone" dataKey={`ln_${sp.id}`} name={`${sp.shortLabel} · hours`} stroke={sp.accentColor} strokeWidth={lineStrokeW} animationDuration={CHART_BAR_ANIM_MS} dot={{ r: lineDotR, fill: sp.accentColor, strokeWidth: 0 }} />
@@ -1124,7 +1189,9 @@ export default function DashboardDeveloperCharts({
             content={() => <SingleWorkloadSymbolLegend completedFill={singleSelectedSprintAccent} pendingFill={workloadPendingTint} />}
           />
           <Bar stackId="load" dataKey="completed" name="Completed tasks" fill={singleSelectedSprintAccent} radius={[0, 6, 6, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
-          <Bar stackId="load" dataKey="pending" name="Pending tasks" fill={workloadPendingTint} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+          <Bar stackId="load" dataKey="pending" name="Pending tasks" fill={workloadPendingTint} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+            <LabelList dataKey="assigned" position="right" fill={singleSelectedSprintAccent} fontSize={11} fontWeight={700} formatter={(v) => `${Math.round(Number(v) || 0)}`} />
+          </Bar>
         </BarChart>
       </ChartShell>
 
@@ -1163,8 +1230,12 @@ export default function DashboardDeveloperCharts({
             wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingBottom: 6, marginBottom: 2 }}
             content={() => <SingleHoursSymbolLegend />}
           />
-          <Bar dataKey="hWorked" name="Hours worked" fill={HOURS_FILL} radius={[0, 6, 6, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
-          <Bar dataKey="hAssigned" name="Estimated hours" fill={HOURS_ASSIGNED} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+          <Bar dataKey="hWorked" name="Hours worked" fill={HOURS_FILL} radius={[0, 6, 6, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+            <LabelList dataKey="hWorked" position="right" fill={HOURS_FILL} fontSize={11} fontWeight={700} formatter={(v) => `${Number(v || 0).toFixed(1)}h`} />
+          </Bar>
+          <Bar dataKey="hAssigned" name="Estimated hours" fill={HOURS_ASSIGNED} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+            <LabelList dataKey="hAssigned" content={(p) => <HoursValueLabel {...p} fill="#607D8B" />} />
+          </Bar>
         </BarChart>
       </ChartShell>
 
@@ -1190,7 +1261,9 @@ export default function DashboardDeveloperCharts({
             }}
           />
           <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingTop: 8 }} />
-          <Bar yAxisId="tasks" dataKey="completed" name="Tasks completed" fill={COMPLETED_FILL} radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false} />
+          <Bar yAxisId="tasks" dataKey="completed" name="Tasks completed" fill={COMPLETED_FILL} radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+            <LabelList dataKey="completed" position="top" fill={COMPLETED_FILL} fontSize={11} fontWeight={700} formatter={(v) => `${Number(v || 0)}`} />
+          </Bar>
           <Line yAxisId="hrs" type="monotone" dataKey="hours" name={Y_AXIS_HOURS} stroke={HOURS_LINE} strokeWidth={3} animationDuration={CHART_BAR_ANIM_MS} dot={{ r: 5, fill: HOURS_LINE, strokeWidth: 0 }} />
         </ComposedChart>
       </ChartShell>

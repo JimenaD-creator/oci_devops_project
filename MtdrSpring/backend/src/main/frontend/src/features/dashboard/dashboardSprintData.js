@@ -160,6 +160,22 @@ function isTaskBlocked(task) {
   return s === '1' || s === 'true' || s === 'yes' || s === 'y';
 }
 
+function isUserTaskBlocked(ut) {
+  if (!ut || typeof ut !== 'object') return false;
+  const raw = ut.isBlocked ?? ut.is_blocked ?? ut.blocked ?? ut.block;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'y';
+}
+
+function userTaskBlockedReason(ut) {
+  if (!ut || typeof ut !== 'object') return '';
+  const raw = ut.blockedReason ?? ut.blocked_reason ?? ut.blockReason ?? ut.block_reason;
+  return String(raw ?? '').trim();
+}
+
 export function taskSprintId(task) {
   if (task == null) return null;
   const as = task.assignedSprint;
@@ -366,7 +382,9 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     /** Per-developer chart: all logged worked hours on USER_TASK (incl. in progress). */
     dm.hours += loggedHours;
 
-    if (taskId != null && taskSprintMap[taskId]?.blocked) {
+    const blockedFromUserTask = isUserTaskBlocked(ut);
+    const blockedFromTask = taskId != null && taskSprintMap[taskId]?.blocked;
+    if (taskId != null && (blockedFromUserTask || blockedFromTask)) {
       const taskMeta = taskSprintMap[taskId];
       if (!sp._blockedTaskMapByDeveloper[devKey]) sp._blockedTaskMapByDeveloper[devKey] = new Set();
       if (!sp._blockedTaskMapByDeveloper[devKey].has(taskId)) {
@@ -375,7 +393,13 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         dm.blockedTasks.push({
           id: taskId,
           title: taskMeta.title,
-          blockedSince: taskMeta.blockedSince,
+          blockedSince:
+            ut?.updatedAt ??
+            ut?.updated_at ??
+            ut?.createdAt ??
+            ut?.created_at ??
+            taskMeta.blockedSince,
+          blockedReason: userTaskBlockedReason(ut),
         });
       }
     }
