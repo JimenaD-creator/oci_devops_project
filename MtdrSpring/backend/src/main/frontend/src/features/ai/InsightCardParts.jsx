@@ -484,6 +484,8 @@ export function PredictionsBlock({
 }
 
 export function PredictionCard({ prediction }) {
+  const rawScore = Number(prediction?.predictedScore);
+  const clampedScore = Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : 0;
   const TrendIcon =
     prediction.trend === 'up' ? TrendingUp : prediction.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
@@ -502,7 +504,7 @@ export function PredictionCard({ prediction }) {
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
         <Typography sx={{ fontSize: { xs: '2.25rem', md: '2.5rem' }, fontWeight: 800, color: trendColor, lineHeight: 1 }}>
-          {prediction.predictedScore}
+          {clampedScore}
         </Typography>
         <Typography sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600 }}>
           % predicted

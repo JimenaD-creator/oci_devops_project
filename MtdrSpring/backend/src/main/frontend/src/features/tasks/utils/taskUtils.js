@@ -43,6 +43,19 @@ export function createTaskSelectFillSx() {
   };
 }
 
+export function normalizeTaskStatus(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (normalized === 'DONE' || normalized === 'COMPLETED' || normalized === 'COMPLETE') return 'DONE';
+  if (normalized === 'IN_PROGRESS' || normalized === 'IN_PROCESS') return 'IN_PROGRESS';
+  if (normalized === 'IN_REVIEW' || normalized === 'REVIEW') return 'IN_REVIEW';
+  if (normalized === 'PENDING' || normalized === 'TODO' || normalized === 'TO_DO' || normalized === '')
+    return 'TODO';
+  return 'TODO';
+}
+
 export function mapTaskToKanban(task, developerNames = []) {
   const statusMap = {
     DONE: 'done',
@@ -50,6 +63,7 @@ export function mapTaskToKanban(task, developerNames = []) {
     IN_REVIEW: 'in_review',
     TODO: 'todo',
   };
+  const normalizedStatus = normalizeTaskStatus(task?.status);
   const list = Array.isArray(developerNames)
     ? [...new Set(developerNames.filter(Boolean))]
     : developerNames
@@ -61,9 +75,10 @@ export function mapTaskToKanban(task, developerNames = []) {
     details: task.description || task.classification || '',
     classification: task.classification ?? '',
     priority: task.priority ?? 'MEDIUM',
-    done: task.status === 'DONE',
-    status: statusMap[task.status] ?? 'todo',
-    rawStatus: task.status,
+    done: normalizedStatus === 'DONE',
+    status: statusMap[normalizedStatus] ?? 'todo',
+    rawStatus: normalizedStatus,
+    rawStatusOriginal: task.status,
     actualHours: task.assignedHours ?? null,
     developers: list,
     developer: list[0] ?? null,

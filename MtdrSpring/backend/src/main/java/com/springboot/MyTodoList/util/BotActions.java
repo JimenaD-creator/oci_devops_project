@@ -666,9 +666,9 @@ public class BotActions {
         // Map emoji buttons to status values
         String newStatus = null;
         if ("📝 To-do".equals(requestText)) {
-            newStatus = "TO-DO";
+            newStatus = "TODO";
         } else if ("🔄 In Process".equals(requestText)) {
-            newStatus = "IN_PROCESS";
+            newStatus = "IN_PROGRESS";
         } else if ("👀 In Review".equals(requestText)) {
             newStatus = "IN_REVIEW";
         } else if ("✅ Done".equals(requestText)) {

@@ -241,10 +241,13 @@ function toTimeMs(raw) {
 }
 
 function normalizeStatus(value) {
-  return String(value || '')
+  const normalized = String(value || '')
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
+  if (normalized === 'IN_PROCESS') return 'IN_PROGRESS';
+  if (normalized === 'TO_DO') return 'TODO';
+  return normalized;
 }
 
 function isCompletedStatus(item) {
@@ -260,17 +263,13 @@ function completionOnTimeDisplay(item) {
 }
 
 function statusText(item) {
+  const normalized = normalizeStatus(item.statusRaw ?? item.status);
+  if (normalized === 'DONE' || normalized === 'COMPLETED') return 'Done';
+  if (normalized === 'IN_PROGRESS') return 'In Progress';
+  if (normalized === 'IN_REVIEW') return 'In Review';
+  if (normalized === 'TODO' || normalized === 'PENDING') return 'To Do';
   const raw = String(item.statusRaw ?? item.status ?? '').trim();
-  if (!raw) return 'UNKNOWN';
-  return raw;
-}
-
-/** Backend row id (task id); supports alternate payload keys. */
-function displayTaskId(item) {
-  if (item == null) return '—';
-  const raw = item.id ?? item.taskId ?? item.task_id;
-  if (raw == null || raw === '') return '—';
-  return String(raw);
+  return raw ? raw.replace(/_/g, ' ') : 'Unknown';
 }
 
 function taskStatusChipProps(item) {
@@ -291,9 +290,8 @@ function taskStatusChipProps(item) {
 }
 
 const DEFAULT_LAYOUT = {
-  colWidths: ['5%', '15%', '10%', '10%', '9%', '9%', '9%', '10%', '8%', '8%', '11%'],
+  colWidths: ['20%', '12%', '12%', '10%', '10%', '10%', '11%', '8%', '8%', '9%'],
   headers: [
-    'ID',
     'Task',
     'Developer',
     'Status',
@@ -309,9 +307,8 @@ const DEFAULT_LAYOUT = {
 
 /** Manager view: same core columns + due date + completed (no On time). */
 const MANAGER_LAYOUT = {
-  colWidths: ['5%', '13%', '14%', '10%', '10%', '10%', '10%', '12%', '9%', '7%'],
+  colWidths: ['17%', '16%', '12%', '11%', '11%', '11%', '14%', '8%', '8%'],
   headers: [
-    'ID',
     'Task',
     'Assignees',
     'Status',
@@ -419,19 +416,7 @@ export default function TaskTable({
               >
                 <TableCell
                   sx={{
-                    px: 1.25,
                     ...columnCellSx(0),
-                    fontSize: '0.8rem',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                    color: '#546E7A',
-                    fontWeight: 600,
-                  }}
-                >
-                  {displayTaskId(item)}
-                </TableCell>
-                <TableCell
-                  sx={{
-                    ...columnCellSx(1),
                     fontWeight: 500,
                     fontSize: '0.88rem',
                     px: 1.5,
@@ -444,7 +429,7 @@ export default function TaskTable({
                 >
                   {item.description}
                 </TableCell>
-                <TableCell sx={{ px: 1.5, ...columnCellSx(2) }}>
+                <TableCell sx={{ px: 1.5, ...columnCellSx(1) }}>
                   <DevelopersCell
                     developers={item.developers}
                     developer={item.developer}
@@ -452,7 +437,7 @@ export default function TaskTable({
                     managerView={managerView}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, ...columnCellSx(3) }}>
+                <TableCell sx={{ px: 1.5, ...columnCellSx(2) }}>
                   <Chip
                     label={statusChip.label}
                     size="small"
@@ -465,7 +450,7 @@ export default function TaskTable({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, ...columnCellSx(4) }}>
+                <TableCell sx={{ px: 1.5, ...columnCellSx(3) }}>
                   <Chip
                     label={String(item.priority || '—').replace(/_/g, ' ')}
                     size="small"
@@ -496,10 +481,10 @@ export default function TaskTable({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(5) }}>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(4) }}>
                   {item.assignedHours != null ? `${item.assignedHours}h` : '—'}
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(5) }}>
                   {item.actualHours != null && Number(item.actualHours) > 0
                     ? `${item.actualHours}h`
                     : '—'}
@@ -507,11 +492,11 @@ export default function TaskTable({
                 {managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(7) }}
+                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(8) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(7) }}>
                       <Chip
                         label={completionOnTimeDisplay(item)}
                         size="small"
@@ -539,14 +524,14 @@ export default function TaskTable({
                 {!managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(7) }}
+                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(8) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(7) }}>
                       <OnTimeChip item={item} />
                     </TableCell>
-                    <TableCell sx={{ px: 1.5, ...columnCellSx(9) }}>
+                    <TableCell sx={{ px: 1.5, ...columnCellSx(8) }}>
                       <Chip
                         label={completionOnTimeDisplay(item)}
                         size="small"
@@ -573,7 +558,7 @@ export default function TaskTable({
                 )}
                 {hasActions ? (
                   <TableCell
-                    sx={{ px: 1, whiteSpace: 'nowrap', ...columnCellSx(managerView ? 9 : 10) }}
+                    sx={{ px: 1, whiteSpace: 'nowrap', ...columnCellSx(managerView ? 8 : 9) }}
                     align="right"
                   >
                     {onComplete && !item.done && (

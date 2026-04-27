@@ -30,6 +30,15 @@ public class TaskController {
 
     @Autowired
     private TaskService taskService;
+
+    private static String canonicalTaskStatus(String raw) {
+        String n = Optional.ofNullable(raw).orElse("").trim().toUpperCase().replaceAll("[\\s-]+", "_");
+        if ("IN_PROCESS".equals(n)) return "IN_PROGRESS";
+        if ("TO_DO".equals(n) || "PENDING".equals(n)) return "TODO";
+        if ("REVIEW".equals(n)) return "IN_REVIEW";
+        if ("COMPLETE".equals(n) || "COMPLETED".equals(n)) return "DONE";
+        return n;
+    }
     
     /**
      * Get all tasks
@@ -79,7 +88,7 @@ public class TaskController {
         }
         Task existingTask = task.get();
         LocalDateTime previousFinish = existingTask.getFinishDate();
-        String previousStatus = existingTask.getStatus();
+        String previousStatus = canonicalTaskStatus(existingTask.getStatus());
 
         existingTask.setAssignedSprint(taskDetails.getAssignedSprint());
         existingTask.setClassification(taskDetails.getClassification());
@@ -92,7 +101,7 @@ public class TaskController {
         existingTask.setUpdatedAt(LocalDateTime.now());
 
         List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
-        String newStatus = taskDetails.getStatus();
+        String newStatus = canonicalTaskStatus(taskDetails.getStatus());
 
         if (assignments.isEmpty()) {
             existingTask.setStatus(newStatus);
@@ -111,11 +120,11 @@ public class TaskController {
 
         /* Multiple assignees: TASK.STATUS is derived from USER_TASK rows; task is DONE only if everyone is DONE. */
         if (newStatus != null) {
-            if ("DONE".equalsIgnoreCase(newStatus.trim())) {
+            if ("DONE".equals(newStatus)) {
                 boolean allAssigneesDone = assignments.stream()
                     .allMatch(ut -> {
-                        String st = Optional.ofNullable(ut.getStatus()).orElse("").trim();
-                        return "DONE".equalsIgnoreCase(st) || "COMPLETED".equalsIgnoreCase(st);
+                        String st = canonicalTaskStatus(ut.getStatus());
+                        return "DONE".equals(st);
                     });
                 if (!allAssigneesDone) {
                     return ResponseEntity.status(HttpStatus.CONFLICT).build();

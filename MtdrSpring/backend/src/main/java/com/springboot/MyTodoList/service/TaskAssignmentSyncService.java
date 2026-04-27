@@ -27,7 +27,12 @@ public class TaskAssignmentSyncService {
 
     private static String norm(String s) {
         if (s == null) return "";
-        return s.trim().toUpperCase();
+        String n = s.trim().toUpperCase().replaceAll("[\\s-]+", "_");
+        if ("IN_PROCESS".equals(n)) return "IN_PROGRESS";
+        if ("TO_DO".equals(n) || "PENDING".equals(n)) return "TODO";
+        if ("REVIEW".equals(n)) return "IN_REVIEW";
+        if ("COMPLETE".equals(n) || "COMPLETED".equals(n)) return "DONE";
+        return n;
     }
 
     private static boolean isAssigneeDone(String status) {

@@ -66,7 +66,7 @@ export function bucketTaskStatus(raw) {
     .replace(/[\s-]+/g, '_');
   if (s === 'DONE' || s === 'COMPLETED' || s === 'COMPLETE') return 'DONE';
   if (s === 'IN_REVIEW' || s === 'REVIEW') return 'IN_REVIEW';
-  if (s === 'IN_PROGRESS') return 'IN_PROGRESS';
+  if (s === 'IN_PROGRESS' || s === 'IN_PROCESS') return 'IN_PROGRESS';
   if (s === 'PENDING' || s === 'TODO' || s === 'TO_DO' || s === '') return 'TODO';
   return 'TODO';
 }
