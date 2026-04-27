@@ -1,22 +1,12 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Box, Paper, Typography, Chip, Button, Stack } from '@mui/material';
+import { formatBlockedSinceAge, sortBlockedTasksNewestFirst } from './dashboardSprintData';
 
 function severityColors(count) {
   if (count >= 4) return { bg: '#FFEBEE', border: '#EF9A9A', fg: '#B71C1C', chipBg: '#C62828' };
   if (count >= 2) return { bg: '#FFF3E0', border: '#FFCC80', fg: '#E65100', chipBg: '#EF6C00' };
   return { bg: '#FFF8E1', border: '#FFE082', fg: '#F57F17', chipBg: '#FB8C00' };
-}
-
-function blockedAgeLabel(rawDate) {
-  if (!rawDate) return 'Unknown';
-  const ms = new Date(rawDate).getTime();
-  if (!Number.isFinite(ms)) return 'Unknown';
-  const diff = Math.max(0, Date.now() - ms);
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
 }
 
 export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
@@ -61,13 +51,14 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
           }}
         >
           <Typography sx={{ color: '#607D8B', fontWeight: 600 }}>
-            No blocked tasks flagged yet. Once developers report `is_blocked`, this section highlights impacted developers.
+            No blocked tasks flagged yet. When developers mark an assignment as blocked, this section highlights who is affected.
           </Typography>
         </Paper>
       ) : (
         <Stack spacing={1.25}>
           {cards.map((dev) => {
             const palette = severityColors(dev.blockedCount);
+            const blockedTasksOrdered = sortBlockedTasksNewestFirst(dev.blockedTasks);
             const oldest = dev.blockedTasks.reduce((acc, t) => {
               const ms = new Date(t?.blockedSince || '').getTime();
               if (!Number.isFinite(ms)) return acc;
@@ -96,18 +87,18 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                       />
                     </Box>
                     <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', mb: 0.75 }}>
-                      Oldest blocked: {blockedAgeLabel(oldest)}
+                      Oldest blocked: {formatBlockedSinceAge(oldest)}
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
-                      {dev.blockedTasks.slice(0, 3).map((t) => {
+                      {blockedTasksOrdered.slice(0, 3).map((t) => {
                         const reason = String(t?.blockedReason || '').trim();
                         return (
                           <Box key={t.id}>
                             <Typography sx={{ fontSize: '0.84rem', color: '#37474F' }}>
-                              - {t.title}
+                              {t.title}
                             </Typography>
                             {reason ? (
-                              <Typography sx={{ fontSize: '0.78rem', color: '#607D8B', pl: 1.25 }}>
+                              <Typography sx={{ fontSize: '0.78rem', color: '#607D8B', pl: 0 }}>
                                 Reason: {reason}
                               </Typography>
                             ) : null}

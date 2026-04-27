@@ -42,12 +42,6 @@ const SEVERITY = {
   info: { color: '#01579B', bg: '#E3F2FD', border: '#90CAF9', label: 'Info', Icon: Info },
 };
 
-function severityEmoji(sev) {
-  if (sev === 'critical') return '🔴';
-  if (sev === 'warning') return '🟡';
-  return '🔵';
-}
-
 export function AlertCard({ alert }) {
   const cfg = SEVERITY[alert.severity] ?? SEVERITY.info;
   const { Icon } = cfg;
@@ -67,7 +61,7 @@ export function AlertCard({ alert }) {
       <Box sx={{ flex: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
           <Chip
-            label={`${severityEmoji(alert.severity)} ${cfg.label}`}
+            label={cfg.label}
             sx={{
               height: 30,
               fontSize: '0.85rem',
@@ -120,15 +114,10 @@ export function WorkloadCard({ rec }) {
   );
 }
 
-export function SectionHeading({ icon: Icon, emoji, children }) {
+export function SectionHeading({ icon: Icon, children }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-      {emoji && (
-        <Typography component="span" sx={{ fontSize: { xs: '1.35rem', md: '1.5rem' }, lineHeight: 1 }}>
-          {emoji}
-        </Typography>
-      )}
-      {Icon && <Icon size={22} color="#607D8B" />}
+      {Icon && <Icon size={22} color="#607D8B" aria-hidden />}
       <Typography
         sx={{
           fontSize: { xs: '1.1rem', md: '1.25rem' },
@@ -143,12 +132,89 @@ export function SectionHeading({ icon: Icon, emoji, children }) {
   );
 }
 
+/**
+ * Live blocked assignments merged into enriched sprint insights (GET). Assignee = developer who reported the block.
+ */
+export function BlockedAssignmentsSnapshot({ rows }) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) return null;
+  return (
+    <Box
+      sx={{
+        mb: { xs: 2.5, md: 3.5 },
+        border: '1px solid rgba(198, 40, 40, 0.35)',
+        borderRadius: 2,
+        overflow: 'hidden',
+        bgcolor: '#FFFFFF',
+      }}
+    >
+      <Box sx={{ px: 2, py: 1.25, bgcolor: '#FFEBEE', borderBottom: '1px solid rgba(198,40,40,0.2)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+          <AlertTriangle size={22} color="#C62828" aria-hidden style={{ flexShrink: 0 }} />
+          <Typography sx={{ fontSize: { xs: '1.05rem', md: '1.2rem' }, fontWeight: 800, color: '#1A1A1A' }}>
+            Blocked assignments
+          </Typography>
+        </Box>
+        <Typography sx={{ fontSize: '0.8rem', color: '#546E7A', fontWeight: 600, lineHeight: 1.45 }}>
+          Assignments currently flagged as blocked (each assignee reported the block on their own work). Updates when
+          you refresh or regenerate insights.
+        </Typography>
+      </Box>
+      <Stack spacing={1.25} sx={{ p: { xs: 1.5, md: 2 } }}>
+        {list.map((row, i) => {
+          const name = row.reportedByDeveloperName ?? row.reported_by_developer_name ?? 'Developer';
+          const title = row.taskTitle ?? row.task_title ?? '';
+          const tid = row.taskId ?? row.task_id;
+          const reason = row.blockedReason ?? row.blocked_reason ?? '';
+          return (
+            <Paper
+              key={`${name}-${tid}-${i}`}
+              elevation={0}
+              sx={{
+                p: 1.5,
+                borderRadius: 1.5,
+                border: '1px solid #FFCDD2',
+                bgcolor: '#FFF8F8',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <AlertTriangle size={18} color="#C62828" style={{ marginTop: 2, flexShrink: 0 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: '0.92rem', color: '#B71C1C' }}>{name}</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.88rem', color: '#1A1A1A', mt: 0.35 }}>
+                    {title || (tid != null ? `Task #${tid}` : 'Task')}
+                  </Typography>
+                  {reason ? (
+                    <Typography sx={{ fontSize: '0.84rem', color: '#B71C1C', fontWeight: 600, mt: 0.5 }}>
+                      {reason}
+                    </Typography>
+                  ) : null}
+                </Box>
+              </Box>
+            </Paper>
+          );
+        })}
+      </Stack>
+    </Box>
+  );
+}
+
 /** Reference for what Critical / Warning / Info mean in the AI panel (no sample quotes). */
 export function AlertTypesLegend() {
   const rows = [
-    { emoji: '🔴', label: 'Critical', desc: 'Severe issues that require immediate action.' },
-    { emoji: '🟡', label: 'Warning', desc: 'Situations that need attention.' },
-    { emoji: '🔵', label: 'Info', desc: 'Useful context without urgency.' },
+    {
+      Icon: AlertCircle,
+      color: SEVERITY.critical.color,
+      label: 'Critical',
+      desc: 'Severe issues that require immediate action.',
+    },
+    {
+      Icon: AlertTriangle,
+      color: SEVERITY.warning.color,
+      label: 'Warning',
+      desc: 'Situations that need attention.',
+    },
+    { Icon: Info, color: SEVERITY.info.color, label: 'Info', desc: 'Useful context without urgency.' },
   ];
   return (
     <TableContainer
@@ -164,14 +230,20 @@ export function AlertTypesLegend() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.label}>
-              <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                {r.emoji} {r.label}
-              </TableCell>
-              <TableCell sx={{ color: '#455A64' }}>{r.desc}</TableCell>
-            </TableRow>
-          ))}
+          {rows.map((r) => {
+            const RowIcon = r.Icon;
+            return (
+              <TableRow key={r.label}>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <RowIcon size={18} color={r.color} aria-hidden />
+                    {r.label}
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ color: '#455A64' }}>{r.desc}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>
@@ -208,20 +280,6 @@ export function ActionableRecommendationsList({ items }) {
                   verticalAlign: 'middle',
                 }}
               />
-              {rec.guardrailCorrected && (
-                <Chip
-                  label="AI-corrected"
-                  sx={{
-                    height: 24,
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    bgcolor: '#455A64',
-                    color: '#fff',
-                    borderRadius: 1,
-                    verticalAlign: 'middle',
-                  }}
-                />
-              )}
               <Typography
                 component="span"
                 sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}

@@ -147,8 +147,9 @@ export default function AIInsightsPage({ projectId }) {
             </Typography>
           </Box>
           <Typography variant="body1" sx={{ color: '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
-            Gemini-powered sprint analysis: automatic alerts, actionable recommendations, summary,
-            per-developer insights, and predictions
+            Gemini-powered sprint analysis: alerts, recommendations, summary, per-developer insights, and predictions.
+            Blocked assignments (assignee, task, reason) appear when present and are included when you generate
+            insights.
           </Typography>
         </Box>
         {sprints.length > 0 && (

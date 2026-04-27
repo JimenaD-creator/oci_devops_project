@@ -7,12 +7,14 @@ import {
   Card,
   CardContent,
   IconButton,
-  Badge,
   FormGroup,
   FormControlLabel,
   Checkbox,
   CircularProgress,
+  Popover,
+  Stack,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
@@ -25,6 +27,9 @@ import {
   fetchDashboardSprints,
   mergeTaskStatusAcrossSprints,
   aggregateSelectionMetrics,
+  sprintDbIdSortKey,
+  buildBlockedTaskNotificationItems,
+  formatBlockedSinceAge,
 } from './dashboardSprintData';
 import {
   DASHBOARD_CONTENT_MAX_WIDTH,
@@ -40,6 +45,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
+  const [blockedNotifAnchor, setBlockedNotifAnchor] = useState(null);
+  /** Keys of block rows already “read” (popover closed); union grows on each close. New keys → pulse again. */
+  const [seenBlockedKeysCsv, setSeenBlockedKeysCsv] = useState('');
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
@@ -47,6 +55,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     if (!projectId) return;
     loadProjectInfo();
     handleRefresh();
+  }, [projectId]);
+
+  useEffect(() => {
+    setSeenBlockedKeysCsv('');
   }, [projectId]);
 
   useEffect(() => {
@@ -81,9 +93,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const normalizedSelectedIds = useMemo(() => {
     if (!allSprints.length) return [];
     const valid = new Set(allSprints.map((s) => Number(s.id)));
-    return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))].filter((id) =>
-      valid.has(id),
-    );
+    return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))]
+      .filter((id) => valid.has(id))
+      .sort((a, b) => a - b);
   }, [selectedSprintIds, allSprints]);
 
   useEffect(() => {
@@ -107,11 +119,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
     return normalizedSelectedIds
       .map((id) => byId.get(id))
       .filter(Boolean)
-      .sort((a, b) => {
-        const ia = normalizedSelectedIds.indexOf(Number(a.id));
-        const ib = normalizedSelectedIds.indexOf(Number(b.id));
-        return ia - ib;
-      });
+      .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
   }, [normalizedSelectedIds, allSprints]);
 
   const compareMode = normalizedSelectedIds.length > 1;
@@ -188,6 +196,36 @@ export default function DashboardPage({ projectId: propProjectId }) {
     () => new Set(selectedSprints.flatMap((s) => (s.developers || []).map((d) => d.name))).size,
     [selectedSprints],
   );
+
+  const blockedNotificationItems = useMemo(
+    () => buildBlockedTaskNotificationItems(selectedSprints),
+    [selectedSprints],
+  );
+  const hasBlockedNotifications = blockedNotificationItems.length > 0;
+  const blockedNotifOpen = Boolean(blockedNotifAnchor);
+
+  const seenBlockedKeySet = useMemo(() => {
+    if (!seenBlockedKeysCsv) return new Set();
+    return new Set(seenBlockedKeysCsv.split('|').filter(Boolean));
+  }, [seenBlockedKeysCsv]);
+
+  const hasUnreadBlockedNotifications = useMemo(
+    () => blockedNotificationItems.some((n) => !seenBlockedKeySet.has(n.key)),
+    [blockedNotificationItems, seenBlockedKeySet],
+  );
+
+  /** Pulse / orange hover only when there are rows not yet acknowledged (popover closed). */
+  const showBlockedNotifPulse = hasUnreadBlockedNotifications && !blockedNotifOpen;
+
+  const handleBlockedNotifClose = useCallback(() => {
+    setBlockedNotifAnchor(null);
+    setSeenBlockedKeysCsv((prev) => {
+      if (blockedNotificationItems.length === 0) return '';
+      const next = new Set(prev ? prev.split('|').filter(Boolean) : []);
+      blockedNotificationItems.forEach((n) => next.add(n.key));
+      return [...next].sort().join('|');
+    });
+  }, [blockedNotificationItems]);
 
   const headerTasksCompleted = useMemo(() => {
     if (!selectedSprints?.length) return null;
@@ -290,11 +328,114 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 </Typography>
               )}
             </Box>
-            <IconButton sx={{ bgcolor: '#F5F5F5', flexShrink: 0 }} aria-label="Notifications">
-              <Badge badgeContent={1} color="error">
-                <NotificationsIcon />
-              </Badge>
+            <IconButton
+              size="large"
+              onClick={(e) => setBlockedNotifAnchor(e.currentTarget)}
+              aria-label={
+                hasUnreadBlockedNotifications
+                  ? 'Task block notifications (unread)'
+                  : hasBlockedNotifications
+                    ? 'Task block notifications'
+                    : 'Task block notifications (none)'
+              }
+              aria-haspopup="true"
+              aria-expanded={blockedNotifOpen}
+              sx={{
+                flexShrink: 0,
+                ...(showBlockedNotifPulse
+                  ? {
+                      bgcolor: alpha('#FF9800', 0.22),
+                      color: '#E65100',
+                      boxShadow: '0 0 0 2px rgba(255, 152, 0, 0.55)',
+                      '@keyframes dashboardBlockedNotifPulse': {
+                        '0%, 100%': { boxShadow: '0 0 0 2px rgba(255, 152, 0, 0.45)' },
+                        '50%': { boxShadow: '0 0 0 8px rgba(255, 152, 0, 0.12)' },
+                      },
+                      animation: 'dashboardBlockedNotifPulse 2.4s ease-in-out infinite',
+                      '&:hover': {
+                        bgcolor: alpha('#FF9800', 0.32),
+                      },
+                    }
+                  : {
+                      bgcolor: '#F5F5F5',
+                      '&:hover': { bgcolor: '#EEEEEE' },
+                    }),
+              }}
+            >
+              <NotificationsIcon
+                sx={hasBlockedNotifications ? { color: '#C62828' } : { color: '#616161' }}
+              />
             </IconButton>
+            <Popover
+              open={Boolean(blockedNotifAnchor)}
+              anchorEl={blockedNotifAnchor}
+              onClose={handleBlockedNotifClose}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              PaperProps={{
+                elevation: 4,
+                sx: {
+                  mt: 1,
+                  width: 340,
+                  maxWidth: 'calc(100vw - 24px)',
+                  borderRadius: 2,
+                  border: '1px solid #E0E0E0',
+                },
+              }}
+            >
+              <Box sx={{ p: 2, maxHeight: 400, overflowY: 'auto' }}>
+                <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', mb: 1.25 }}>
+                  Task block reports
+                </Typography>
+                {!hasBlockedNotifications ? (
+                  <Typography sx={{ fontSize: '0.85rem', color: '#78909C', fontWeight: 600 }}>
+                    No blocked assignments in this selection. When a developer flags a task as
+                    blocked, it will appear here.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.25}>
+                    {blockedNotificationItems.map((n) => (
+                      <Box
+                        key={n.key}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          bgcolor: '#FFEBEE',
+                          border: '1px solid #E57373',
+                        }}
+                      >
+                        <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#B71C1C' }}>
+                          {n.developerName}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.84rem', color: '#1A1A1A', fontWeight: 700, mt: 0.35 }}>
+                          {n.taskTitle}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: 600, mt: 0.25 }}>
+                          Blocked for: {formatBlockedSinceAge(n.blockedSince)}
+                        </Typography>
+                        {compareMode ? (
+                          <Typography sx={{ fontSize: '0.75rem', color: '#616161', mt: 0.25, fontWeight: 600 }}>
+                            {n.sprintLabel}
+                          </Typography>
+                        ) : null}
+                        {n.blockedReason ? (
+                          <Typography
+                            sx={{
+                              fontSize: '0.8rem',
+                              color: '#B71C1C',
+                              mt: 0.5,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {n.blockedReason}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            </Popover>
           </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>

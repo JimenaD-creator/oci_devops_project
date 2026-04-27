@@ -19,6 +19,9 @@ import {
   ChevronDown,
   ChevronUp,
   UserCircle,
+  BarChart2,
+  FileText,
+  Lightbulb,
 } from 'lucide-react';
 import { API_BASE, getErrorMessage, AI_INSIGHTS_EMPTY } from './aiInsightsConstants';
 import {
@@ -29,6 +32,7 @@ import {
   ExecutiveSummaryBlock,
   DeveloperInsightsTable,
   PredictionsBlock,
+  BlockedAssignmentsSnapshot,
 } from './InsightCardParts';
 
 function computeRecommendationList(ins) {
@@ -416,6 +420,8 @@ export default function InsightCard({
             ))}
           </Box>
 
+          <BlockedAssignmentsSnapshot rows={insights.blockedAssignments} />
+
           {/* Main two-column dashboard-like layout */}
           <Box
             sx={{
@@ -436,7 +442,7 @@ export default function InsightCard({
                 }}
               >
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#F3E5F5', borderBottom: '1px solid rgba(156,39,176,0.18)' }}>
-                  <SectionHeading emoji="📊">Automatic alerts</SectionHeading>
+                  <SectionHeading icon={BarChart2}>Automatic alerts</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                   <AlertTypesLegend />
@@ -472,7 +478,7 @@ export default function InsightCard({
                 }}
               >
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#E3F2FD', borderBottom: '1px solid #BBDEFB' }}>
-                  <SectionHeading emoji="📈">Sprint summary</SectionHeading>
+                  <SectionHeading icon={FileText}>Sprint summary</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                   {(() => {
@@ -515,7 +521,7 @@ export default function InsightCard({
                 }}
               >
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#E8F5E9', borderBottom: '1px solid #C8E6C9' }}>
-                  <SectionHeading emoji="💡">Actionable recommendations</SectionHeading>
+                  <SectionHeading icon={Lightbulb}>Actionable recommendations</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                   {recommendationList.length > 0 ? (
@@ -538,7 +544,7 @@ export default function InsightCard({
                   }}
                 >
                   <Box sx={{ px: 2, py: 1.25, bgcolor: '#FFF8E1', borderBottom: '1px solid #FFECB3' }}>
-                    <SectionHeading emoji="🔮" icon={Sparkles}>
+                    <SectionHeading icon={Sparkles}>
                       Predictions
                     </SectionHeading>
                   </Box>
@@ -570,7 +576,7 @@ export default function InsightCard({
           {/* Per-developer analysis — full width below dashboard cards */}
           <Box sx={{ mb: { xs: 2, md: 3 } }}>
             <Divider sx={{ mb: 2 }} />
-            <SectionHeading emoji="📋" icon={UserCircle}>
+            <SectionHeading icon={UserCircle}>
               Per-developer analysis
             </SectionHeading>
             {insights.developerInsights?.length > 0 ? (

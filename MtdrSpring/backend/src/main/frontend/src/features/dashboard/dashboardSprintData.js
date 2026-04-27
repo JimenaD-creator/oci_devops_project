@@ -59,6 +59,36 @@ function initialsFromName(name) {
   return (name || '').slice(0, 2).toUpperCase();
 }
 
+/** Hours/days since a blocked report timestamp (same convention as Blocked tasks cards). */
+export function formatBlockedSinceAge(rawDate) {
+  if (!rawDate) return 'Unknown';
+  const ms = new Date(rawDate).getTime();
+  if (!Number.isFinite(ms)) return 'Unknown';
+  const diff = Math.max(0, Date.now() - ms);
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+function parseBlockedSinceEpochMs(iso) {
+  if (iso == null || iso === '') return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Newest block first; undated last; tie-break by title. */
+export function sortBlockedTasksNewestFirst(tasks) {
+  return [...(tasks || [])].sort((a, b) => {
+    const ma = parseBlockedSinceEpochMs(a?.blockedSince);
+    const mb = parseBlockedSinceEpochMs(b?.blockedSince);
+    if (ma != null && mb != null && ma !== mb) return mb - ma;
+    if (ma != null && mb == null) return -1;
+    if (ma == null && mb != null) return 1;
+    return String(a?.title || '').localeCompare(String(b?.title || ''));
+  });
+}
+
 export function bucketTaskStatus(raw) {
   const s = String(raw || '')
     .trim()
@@ -162,6 +192,7 @@ function isTaskBlocked(task) {
 
 function isUserTaskBlocked(ut) {
   if (!ut || typeof ut !== 'object') return false;
+  if (userTaskRowEligibleForWorkedHours(ut)) return false;
   const raw = ut.isBlocked ?? ut.is_blocked ?? ut.blocked ?? ut.block;
   if (typeof raw === 'boolean') return raw;
   const s = String(raw ?? '')
@@ -207,7 +238,7 @@ function userTaskRowEligibleForWorkedHours(ut) {
   const st = ut?.status;
   if (st == null || String(st).trim() === '') return false;
   const n = normalizeUserTaskStatusColumn(st);
-  return n === 'COMPLETED' || n === 'DONE';
+  return n === 'COMPLETED' || n === 'DONE' || n === 'COMPLETE';
 }
 
 function sprintTaskStatusRows(counts) {
@@ -384,7 +415,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 
     const blockedFromUserTask = isUserTaskBlocked(ut);
     const blockedFromTask = taskId != null && taskSprintMap[taskId]?.blocked;
-    if (taskId != null && (blockedFromUserTask || blockedFromTask)) {
+    /** Completed assignment never counts as blocked (even if TASK stays flagged blocked). */
+    if (taskId != null && !utCompleted && (blockedFromUserTask || blockedFromTask)) {
       const taskMeta = taskSprintMap[taskId];
       if (!sp._blockedTaskMapByDeveloper[devKey]) sp._blockedTaskMapByDeveloper[devKey] = new Set();
       if (!sp._blockedTaskMapByDeveloper[devKey].has(taskId)) {
@@ -588,6 +620,76 @@ export function mergeTaskStatusAcrossSprints(selectedSprints) {
   return { taskStatusDistribution: distribution, taskStatusTotal };
 }
 
+/**
+ * Flat list of blocked assignments for header notifications (from enriched sprint.blockedDevelopers).
+ */
+export function buildBlockedTaskNotificationItems(selectedSprints) {
+  const seen = new Set();
+  const items = [];
+  (selectedSprints || []).forEach((sp) => {
+    const sprintLabel = sp.shortLabel ?? sp.name ?? `Sprint ${sp.id}`;
+    const sid = Number(sp.id);
+    (sp.blockedDevelopers || []).forEach((dev) => {
+      const developerName = String(dev?.name || '').trim();
+      if (!developerName) return;
+      (dev.blockedTasks || []).forEach((t) => {
+        const taskId = Number(t?.id);
+        const taskTitle = String(
+          t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : 'Task'),
+        ).trim();
+        const key = `${Number.isFinite(sid) ? sid : 'sp'}::${developerName}::${Number.isFinite(taskId) ? taskId : taskTitle}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const blockedReason = String(t?.blockedReason || '').trim();
+        items.push({
+          key,
+          sprintId: Number.isFinite(sid) ? sid : null,
+          sprintLabel,
+          developerName,
+          taskId: Number.isFinite(taskId) ? taskId : null,
+          taskTitle,
+          blockedSince: t?.blockedSince ?? null,
+          blockedReason: blockedReason || null,
+        });
+      });
+    });
+  });
+  items.sort((a, b) => {
+    const ma = parseBlockedSinceEpochMs(a.blockedSince);
+    const mb = parseBlockedSinceEpochMs(b.blockedSince);
+    if (ma != null && mb != null && ma !== mb) return mb - ma;
+    if (ma != null && mb == null) return -1;
+    if (ma == null && mb != null) return 1;
+    const c = String(a.developerName).localeCompare(String(b.developerName));
+    if (c !== 0) return c;
+    return String(a.taskTitle).localeCompare(String(b.taskTitle));
+  });
+  return items;
+}
+
+/**
+ * Per-sprint rows for AI (developer-variation): assignee who reported the block on USER_TASK + task + reason.
+ */
+export function buildBlockedReportsForAiSprint(sp) {
+  const out = [];
+  (sp?.blockedDevelopers || []).forEach((dev) => {
+    const reportedByDeveloperName = String(dev?.name || '').trim();
+    if (!reportedByDeveloperName) return;
+    (dev.blockedTasks || []).forEach((t) => {
+      const taskId = Number(t?.id);
+      out.push({
+        reportedByDeveloperName,
+        taskId: Number.isFinite(taskId) ? taskId : null,
+        taskTitle: String(
+          t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : ''),
+        ).trim(),
+        blockedReason: String(t?.blockedReason || '').trim(),
+      });
+    });
+  });
+  return out;
+}
+
 export function aggregateSelectionMetrics(selectedSprints) {
   let totalTasks = 0;
   let totalHours = 0;
@@ -696,8 +798,21 @@ export function buildGroupedWorkloadData(selectedSprints) {
   });
 }
 
+/**
+ * Ascending sprint primary key from the DB (`id`). Does not parse "Sprint N" labels — those can
+ * disagree with PK order and produce 0,2,1 style column order.
+ */
+export function sprintDbIdSortKey(sp) {
+  const n = Number(sp?.id);
+  if (Number.isFinite(n)) return n;
+  const parsed = Number(String(sp?.id ?? '').match(/-?\d+/)?.[0]);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
 export function buildCompareDeveloperChartsModel(selectedSprints) {
-  const sprints = [...(selectedSprints || [])].filter(Boolean);
+  const sprints = [...(selectedSprints || [])]
+    .filter(Boolean)
+    .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
   if (sprints.length < 2) return null;
 
   const sprintDefs = sprints.map((sp, idx) => ({

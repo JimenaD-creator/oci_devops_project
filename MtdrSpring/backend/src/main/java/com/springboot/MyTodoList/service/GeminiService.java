@@ -100,13 +100,16 @@ public class GeminiService {
             + "Analyze developer variation across sprints from this input JSON:\n"
             + inputJson + "\n\n"
             + "Input schema:\n"
-            + "- each sprint has: id, shortLabel, developers[]\n"
-            + "- each developer has: name, assigned, completed, hours, assignedHoursEstimate\n\n"
+            + "- each sprint has: id, shortLabel, developers[], and optionally blockedReports[]\n"
+            + "- each developer has: name, assigned, completed, hours, assignedHoursEstimate\n"
+            + "- each blockedReports item (when present): assignee who flagged a blocked assignment, task id/title, and reason text\n\n"
             + "Required output schema:\n"
             + "{\"tasks\":[{\"developerName\":\"...\",\"delta\":2,\"message\":\"...\"}],"
             + "\"hours\":[{\"developerName\":\"...\",\"delta\":1.5,\"message\":\"...\"}],"
             + "\"productivity\":[{\"developerName\":\"...\",\"delta\":0.42,\"message\":\"...\"}]}\n\n"
             + "Rules:\n"
+            + "- In every tasks[].message, hours[].message, and productivity[].message: use plain product language only. "
+            + "Never mention database tables, columns, SQL, or internal input field names.\n"
             + "- Use all selected sprints in input order. Compare first vs last, and also consider variation across intermediate sprints.\n"
             + "- Include one row per developer seen in any sprint (missing values treated as 0).\n"
             + "- For interpretation, prioritize delivery performance (completed tasks and completed-per-hour efficiency), not total created or assigned scope.\n"
@@ -119,6 +122,7 @@ public class GeminiService {
             + "- hours message must relate worked-hour changes to completion outcomes and efficiency; avoid conclusions based only on workload size changes.\n"
             + "- productivity message must explain whether efficiency (tasks per hour) improved, worsened, or remained stable.\n"
             + "- productivity message must use completed-per-hour as the performance basis and must not treat assigned/created task volume changes as productivity by themselves.\n"
+            + "- When blockedReports is non-empty in any sprint, explicitly mention which developer reported which task as blocked and summarize the reason text; tie blockers to completion/hours/productivity interpretation where relevant (especially in the last sprint).\n"
             + "- message must be concise English, grounded in the data, mention first/last sprint labels, and mention if intermediate sprints had notable fluctuations.\n"
             + "- Sort tasks, hours, and productivity by absolute delta descending.\n"
             + "- Do not include any extra keys.";
@@ -255,8 +259,8 @@ public class GeminiService {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Per-developer aggregates: USER_TASK + TASK for the sprint, plus USER_SPRINT roster members
-     * who have no assignment rows (common when the UI shows sprint members but USER_TASK was not synced).
+     * Per-developer aggregates: assignment rows and tasks for the sprint, plus sprint-roster members
+     * who have no assignment rows yet (common when the UI shows members but assignments are not synced).
      */
     private String buildTeamWorkloadJson(Long sprintId) {
         try {
@@ -346,6 +350,12 @@ public class GeminiService {
                         sm.put("finishDate", t.getFinishDate().toString());
                     }
                     sm.put("workedHours", ut.getWorkedHours() != null ? ut.getWorkedHours() : 0);
+                    if (Boolean.TRUE.equals(ut.getIsBlocked())) {
+                        sm.put("userTaskBlocked", true);
+                        if (ut.getBlockedReason() != null && !ut.getBlockedReason().isBlank()) {
+                            sm.put("blockedReason", ut.getBlockedReason().trim());
+                        }
+                    }
                     a.taskSamples.add(sm);
                 }
             }
@@ -393,6 +403,55 @@ public class GeminiService {
             return mapper.writeValueAsString(out);
         } catch (Exception e) {
             System.err.println("[GeminiService] buildTeamWorkloadJson: " + e.getMessage());
+            return "[]";
+        }
+    }
+
+    /**
+     * Assignments currently flagged blocked for the sprint (assignee is who reported the block on that assignment).
+     */
+    private String buildBlockedUserTaskReportsJson(Long sprintId) {
+        try {
+            List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+            if (raw == null) {
+                raw = new ArrayList<>();
+            }
+            LinkedHashMap<String, UserTask> deduped = new LinkedHashMap<>();
+            for (UserTask ut : raw) {
+                if (ut == null || ut.getId() == null) {
+                    continue;
+                }
+                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
+                deduped.putIfAbsent(key, ut);
+            }
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (UserTask ut : deduped.values()) {
+                if (!Boolean.TRUE.equals(ut.getIsBlocked())) {
+                    continue;
+                }
+                if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
+                    continue;
+                }
+                Task t = ut.getTask();
+                if (t == null) {
+                    continue;
+                }
+                User u = ut.getUser();
+                Long uid = ut.getId().getUserId();
+                String devName = u != null && u.getName() != null && !u.getName().isBlank()
+                    ? u.getName().trim()
+                    : ("User " + (uid != null ? uid : "?"));
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("reportedByDeveloperName", devName);
+                row.put("taskId", t.getId());
+                row.put("taskTitle", t.getTitle() != null ? t.getTitle() : "");
+                String br = ut.getBlockedReason();
+                row.put("blockedReason", br != null ? br.trim() : "");
+                out.add(row);
+            }
+            return mapper.writeValueAsString(out);
+        } catch (Exception e) {
+            System.err.println("[GeminiService] buildBlockedUserTaskReportsJson: " + e.getMessage());
             return "[]";
         }
     }
@@ -504,6 +563,7 @@ public class GeminiService {
         double ps  = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
 
         String teamWorkloadJson = buildTeamWorkloadJson(sprintId);
+        String blockedUserTaskReportsJson = buildBlockedUserTaskReportsJson(sprintId);
 
         List<Sprint> previousSprints = allSprints.stream()
             .filter(s -> !s.getId().equals(currentSprint.getId()))
@@ -544,7 +604,9 @@ public class GeminiService {
         return "You are an expert Agile coach analyzing sprint KPI data for a software development team.\n\n" +
             "Analyze the following sprint data and return ONLY a valid JSON object with no markdown, no backticks, no explanation outside the JSON.\n\n" +
             "## Language\n" +
-            "- All human-readable strings (messages, summaries, insights, predictions) MUST be in English.\n\n" +
+            "- All human-readable strings (messages, summaries, insights, predictions) MUST be in English.\n" +
+            "- Prose rule: Write only for managers and engineers. Never name database tables, columns, SQL, storage layers, "
+            + "or internal JSON/input field names in any user-facing string (use everyday product language instead).\n\n" +
             "## Current Sprint (ID: " + currentSprint.getId() + ")\n" +
             String.format(
                 "{\"sprintId\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f," +
@@ -554,20 +616,22 @@ public class GeminiService {
             timelineJson + "\n\n" +
             "## Task counts by status (this sprint only)\n" +
             taskStatusJson + "\n\n" +
-            "## Canonical status totals (use these exact counts in recommendations)\n" +
+            "## Canonical status totals (match these integers to narrative; do not echo these bucket codes in user-facing text)\n" +
             String.format(
                 "TODO=%d, IN_PROCESS=%d, IN_REVIEW=%d, DONE=%d, UNKNOWN=%d\n\n",
                 todoCount, inProcessCount, inReviewCount, doneCount, unknownCount
             ) +
             "## Historical Data (previous sprints, most recent first)\n" +
             historyJson + "\n\n" +
-            "## Team workload (USER_TASK + TASK; developerName from data; fromSprintRosterOnly=true means on USER_SPRINT roster but no USER_TASK rows — still include them in developerInsights)\n" +
+            "## Team workload (per developer: assignments, hours, sample tasks; fromSprintRosterOnly=true means on sprint roster but no assignment rows yet — still include them in developerInsights)\n" +
             teamWorkloadJson + "\n\n" +
+            "## Blocked assignments (assignee flagged their own assignment as blocked, with reason when provided)\n" +
+            blockedUserTaskReportsJson + "\n\n" +
             "## Context\n" +
             "- KPI scale: 0-100 (100 = perfect)\n" +
             "- productivityScore = (completionRate x 0.4) + (onTimeDelivery x 0.3) + (teamParticipation x 0.2) + (workloadBalance x 0.1)\n" +
             "- workloadBalance < 70 means task distribution is uneven across developers\n" +
-            "- Task status workflow is strictly: To do → In progress → In review → Done (same order as DB buckets TODO, IN_PROCESS, IN_REVIEW, DONE).\n" +
+            "- Task status workflow is strictly: To do → In progress → In review → Done (same order as the canonical tally keys above — never print those codes in narrative text).\n" +
             "- Treat status movement as forward only when it follows that order; regressions are moves to an earlier stage.\n" +
             "- " + trendHint + "\n\n" +
             "## Required JSON Response Structure\n" +
@@ -601,14 +665,16 @@ public class GeminiService {
             + "Never write TODO, IN_REVIEW, IN_PROCESS, DONE, or snake_case status tokens in user-facing text. "
             + "Counts must still match the integers in \"Canonical status totals\".\n" +
             "- alerts: severity exactly 'critical' (KPI < 40 or dropped 20+ pts in 2+ sprints), 'warning' (KPI < 60), or 'info' (useful positives or context without urgency). Use [] if none.\n" +
-            "- actionableRecommendations: 3-8 items when useful; if phase is in_progress or not_started and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in Task counts by status, taskSamples, or KPIs. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data.\n" +
-            "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → cite taskId from taskSamples when a task is stalled or blocked.\n" +
+            "- actionableRecommendations: 3-8 items when useful; if phase is in_progress or not_started and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload, blocked-assignment list above, or KPIs. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data.\n" +
+            "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
-            "- developerInsights: one object per developer in Team workload JSON (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint but have no USER_TASK assignment rows in DB. If Team workload is [], set developerInsights to [].\n" +
+            "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts (severity warning or info as appropriate), actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
+            "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
+            "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
-            "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that DB shows no Done tasks yet). Do not omit developers solely because completions are zero.\n" +
+            "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero.\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
             "- workloadRecommendations: only if workloadBalance < 70; else [].\n" +
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
@@ -746,6 +812,7 @@ public class GeminiService {
             suppressComparativeTrendsForFirstSprint(root, sprintId);
             enrichExecutiveSummaryIfSparse(root);
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
+            injectBlockedAssignmentsSnapshot(root, sprintId);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
@@ -862,8 +929,8 @@ public class GeminiService {
             boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
             String insight;
             if (rosterOnly) {
-                insight = "On the sprint roster in the database, but no USER_TASK rows for this sprint — "
-                    + "if this person should have assignments, sync task assignees.";
+                insight = "On the sprint roster, but no assignment rows appear for this sprint in the snapshot — "
+                    + "if this person should have work assigned, check assignees and refresh the data.";
             } else if (completed == 0 && assignedRows > 0) {
                 insight = String.format(
                     "%d assignment row(s) in this sprint; %d completed (Done) in the current snapshot — "
@@ -1473,6 +1540,19 @@ public class GeminiService {
     }
 
     /**
+     * Live blocked assignments for this sprint (refreshed on every GET enrich). AI Insights UI shows this list;
+     * assignee is the developer who reported the block on that assignment.
+     */
+    private void injectBlockedAssignmentsSnapshot(ObjectNode root, Long sprintId) throws Exception {
+        JsonNode blocked = mapper.readTree(buildBlockedUserTaskReportsJson(sprintId));
+        if (blocked != null && blocked.isArray()) {
+            root.set("blockedAssignments", blocked);
+        } else {
+            root.set("blockedAssignments", mapper.createArrayNode());
+        }
+    }
+
+    /**
      * Adds {@code taskStatusBreakdown} from DB counts and forces the executive overview to open with
      * the same canonical sentence (idempotent on repeated GET enrich).
      */
@@ -1603,6 +1683,7 @@ public class GeminiService {
         String lastLabel = String.valueOf(last.getOrDefault("shortLabel", "last sprint"));
         Map<String, Map<String, Object>> firstByName = mapDevelopersByName(first.get("developers"));
         Map<String, Map<String, Object>> lastByName = mapDevelopersByName(last.get("developers"));
+        List<Map<String, Object>> lastBlockedReports = readBlockedReportsFromSnapshot(last);
 
         Set<String> names = new LinkedHashSet<>();
         for (Map<String, Object> snap : snapshots) {
@@ -1649,11 +1730,13 @@ public class GeminiService {
             ObjectNode t = mapper.createObjectNode();
             t.put("developerName", name);
             t.put("delta", deltaTasks);
+            String blockSuffix = blockerSuffixForDeveloper(name, lastBlockedReports);
             t.put("message", String.format(
                 "%s: completion outcome moved from %d/%d done in %s to %d/%d in %s "
                     + "(range across selected sprints: %d-%d done). Variation is interpreted primarily from delivery outcomes.",
                 name, firstCompleted, Math.max(firstAssigned, 0), firstLabel,
-                lastCompleted, Math.max(lastAssigned, 0), lastLabel, minCompleted, maxCompleted));
+                lastCompleted, Math.max(lastAssigned, 0), lastLabel, minCompleted, maxCompleted)
+                + blockSuffix);
             taskRows.add(t);
 
             ObjectNode h = mapper.createObjectNode();
@@ -1671,7 +1754,8 @@ public class GeminiService {
                 "%s: worked hours moved from %.1f in %s to %.1f in %s (range across selected sprints: %.1f-%.1f), "
                     + "with %s based on completed outcomes (%d -> %d done tasks).",
                 name, firstHours, firstLabel, lastHours, lastLabel, minHours, maxHours,
-                hoursPerformanceContext, firstCompleted, lastCompleted));
+                hoursPerformanceContext, firstCompleted, lastCompleted)
+                + blockSuffix);
             if (lastCompleted > 0 && lastHours <= 0) {
                 h.put("message", h.path("message").asText()
                     + " Data warning: completed tasks with zero logged hours indicate missing hour tracking.");
@@ -1690,7 +1774,8 @@ public class GeminiService {
                 "%s: productivity (completed tasks/hour) %s from %.2f in %s to %.2f in %s "
                     + "(range across selected sprints: %.2f-%.2f). Assessment is based on completion efficiency, "
                     + "not on task creation/assignment volume changes.",
-                name, trendText, firstRate, firstLabel, lastRate, lastLabel, minRate, maxRate));
+                name, trendText, firstRate, firstLabel, lastRate, lastLabel, minRate, maxRate)
+                + blockSuffix);
             if (lastCompleted > 0 && lastHours <= 0) {
                 p.put("message", p.path("message").asText()
                     + " Data warning: zero logged hours can inflate efficiency and must be validated.");
@@ -1698,6 +1783,52 @@ public class GeminiService {
             productivityRows.add(p);
         }
         return root;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readBlockedReportsFromSnapshot(Map<String, Object> snap) {
+        if (snap == null) {
+            return List.of();
+        }
+        Object raw = snap.get("blockedReports");
+        if (!(raw instanceof List<?>)) {
+            return List.of();
+        }
+        List<?> list = (List<?>) raw;
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?>)) {
+                continue;
+            }
+            out.add((Map<String, Object>) o);
+        }
+        return out;
+    }
+
+    private String blockerSuffixForDeveloper(String name, List<Map<String, Object>> blocks) {
+        if (name == null || blocks == null || blocks.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, Object> b : blocks) {
+            Object repObj = b.get("reportedByDeveloperName");
+            String rep = repObj != null ? String.valueOf(repObj).trim() : "";
+            if (!name.equals(rep)) {
+                continue;
+            }
+            Object tid = b.get("taskId");
+            Object titleObj = b.get("taskTitle");
+            String title = titleObj != null ? String.valueOf(titleObj).trim() : "";
+            Object reasonObj = b.get("blockedReason");
+            String reason = reasonObj != null ? String.valueOf(reasonObj).trim() : "";
+            sb.append(" Blocked (reported by assignee): ");
+            sb.append(title.isEmpty() ? ("task " + tid) : title);
+            if (!reason.isEmpty()) {
+                sb.append(" — ").append(reason);
+            }
+            sb.append(".");
+        }
+        return sb.toString();
     }
 
     @SuppressWarnings("unchecked")

@@ -116,11 +116,7 @@ public class UserTaskService {
     }
 
     private static boolean assignmentStatusIsCompleted(String status) {
-        if (status == null || status.isBlank()) {
-            return false;
-        }
-        String n = status.trim().toUpperCase();
-        return "COMPLETED".equals(n) || "DONE".equals(n);
+        return UserTask.isCompletedAssignmentStatus(status);
     }
 
     private Long resolveAssigneeUserIdForWorkedHours(Long telegramHintUserId, Long taskId) {
@@ -196,6 +192,7 @@ public class UserTaskService {
         UserTask ut = mine.get();
         ut.setStatus("TODO");
         ut.setIsBlocked(false);
+        ut.setBlockedReason(null);
         userTaskRepository.save(ut);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
         return true;
@@ -239,7 +236,8 @@ public class UserTaskService {
             userTask.setWorkedHours(previous + delta);
             userTask.setStatus("COMPLETED");
             userTask.setIsBlocked(false);
-            
+            userTask.setBlockedReason(null);
+
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
             logger.info("Worked hours total for userId {} taskId {} is now {}", effectiveUserId, taskId, userTask.getWorkedHours());

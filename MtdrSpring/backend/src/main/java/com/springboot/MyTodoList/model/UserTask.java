@@ -79,6 +79,26 @@ public class UserTask {
 
     public void setStatus(String status) {
         this.status = status;
+        if (isCompletedAssignmentStatus(status)) {
+            this.isBlocked = false;
+            this.blockedReason = null;
+        }
+    }
+
+    /** COMPLETED / DONE (and common aliases): assignment finished — block flags must not remain set. */
+    public static boolean isCompletedAssignmentStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
+        }
+        String n = status.trim().toUpperCase().replace('-', '_').replaceAll("\\s+", "_");
+        if ("TO_DO".equals(n)) {
+            n = "TODO";
+        }
+        return "COMPLETED".equals(n) || "DONE".equals(n) || "COMPLETE".equals(n);
+    }
+
+    public boolean isCompletedAssignment() {
+        return isCompletedAssignmentStatus(this.status);
     }
 
     public Boolean getIsBlocked() {

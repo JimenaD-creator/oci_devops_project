@@ -15,7 +15,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { shortDevName } from '../dashboard/dashboardSprintData';
+import { shortDevName, buildBlockedReportsForAiSprint } from '../dashboard/dashboardSprintData';
 import { CHART_LEGEND_STYLE, CHART_LEGEND_ITEM_SX } from '../dashboard/dashboardTypography';
 import { API_BASE } from '../sprints/constants/sprintConstants';
 
@@ -456,6 +456,7 @@ export default function DeveloperWorkloadCharts({
           hours: Number(d.hours || 0),
           assignedHoursEstimate: Number(d.assignedHoursEstimate || 0),
         })),
+        blockedReports: buildBlockedReportsForAiSprint(sp),
       })),
     [selectedSprints],
   );

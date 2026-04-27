@@ -110,6 +110,8 @@ public class ManagerChatService {
             List<Map<String, Object>> devSummary = buildDevSummaryForSprint(s.getId());
             sd.put("developers", devSummary);
 
+            sd.put("blockedAssignments", buildBlockedAssignmentsForSprint(s.getId()));
+
             sprintData.add(sd);
         }
 
@@ -120,6 +122,50 @@ public class ManagerChatService {
         context.put("sprints", sprintData);
 
         return mapper.writeValueAsString(context);
+    }
+
+    /**
+     * Assignments flagged blocked for the sprint; assignee is who reported the block on that assignment.
+     */
+    private List<Map<String, Object>> buildBlockedAssignmentsForSprint(Long sprintId) {
+        try {
+            List<UserTask> userTasks = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+            if (userTasks == null) {
+                return List.of();
+            }
+            List<Map<String, Object>> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            for (UserTask ut : userTasks) {
+                if (ut == null || ut.getId() == null || !Boolean.TRUE.equals(ut.getIsBlocked())) {
+                    continue;
+                }
+                if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
+                    continue;
+                }
+                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
+                if (!seen.add(key)) {
+                    continue;
+                }
+                Task t = ut.getTask();
+                if (t == null) {
+                    continue;
+                }
+                User u = ut.getUser();
+                String name = (u != null && u.getName() != null && !u.getName().isBlank())
+                    ? u.getName().trim()
+                    : ("User " + ut.getId().getUserId());
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("reportedByDeveloperName", name);
+                row.put("taskId", t.getId());
+                row.put("taskTitle", t.getTitle());
+                row.put("blockedReason", ut.getBlockedReason() != null ? ut.getBlockedReason().trim() : "");
+                out.add(row);
+            }
+            return out;
+        } catch (Exception e) {
+            System.err.println("[ManagerChatService] buildBlockedAssignmentsForSprint: " + e.getMessage());
+            return List.of();
+        }
     }
 
     private List<Map<String, Object>> buildTasksForSprint(Long sprintId) {
@@ -243,6 +289,8 @@ public class ManagerChatService {
             + "- For developer-specific questions, refer to them by name.\n"
             + "- Use bullet points or short tables when listing multiple items.\n"
             + "- Never make up data. If a value is null or missing, say it's not recorded.\n"
+            + "- Each sprint may include \"blockedAssignments\": who flagged an assignment as blocked, task id/title, and reason. "
+            + "Use it when asked about blockers, who is stuck, or delivery risk. In your replies, never name database tables or columns.\n"
             + "- Keep responses under 300 words unless more detail is specifically requested.\n"
             + "- Respond in the same language the manager uses (Spanish or English).\n\n"
             + "- Any percentage you mention must stay between 0% and 100%.\n\n"
