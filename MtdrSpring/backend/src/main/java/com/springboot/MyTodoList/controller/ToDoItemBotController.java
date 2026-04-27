@@ -5,6 +5,7 @@ import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
+import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.service.UserTaskService;
 import com.springboot.MyTodoList.util.BotActions;
 import com.springboot.MyTodoList.util.BotStateManager;
@@ -32,6 +33,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 	private BotStateManager stateManager;
 	private TelegramUserMappingService telegramUserMappingService;
 	private UserTaskService userTaskService;
+	private UserService userService;
 
 	@Override
     public String getBotToken() {
@@ -45,7 +47,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		SprintService ss,
 		BotStateManager stateManager,
 		TelegramUserMappingService telegramUserMappingService,
-		UserTaskService userTaskService
+		UserTaskService userTaskService,
+		UserService userService
 	) {
 		this.botProps = bp;
 		this.toDoItemService = tsvc;
@@ -54,6 +57,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		this.stateManager = stateManager;
 		this.telegramUserMappingService = telegramUserMappingService;
 		this.userTaskService = userTaskService;
+		this.userService = userService;
 		this.telegramClient = new OkHttpTelegramClient(getBotToken());
 	}
 
@@ -68,6 +72,10 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 
 		String messageTextFromTelegram = update.getMessage().getText();
 		long chatId = update.getMessage().getChatId();
+		
+		logger.info("=== BOT MESSAGE RECEIVED ===");
+		logger.info("ChatId: {}, Message: '{}'", chatId, messageTextFromTelegram);
+		logger.info("Current State: {}", stateManager.getState(chatId));
 
 		BotActions actions = new BotActions(
 			telegramClient, 
@@ -76,7 +84,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 			stateManager,
 			telegramUserMappingService,
 			userTaskService,
-			sprintService
+			sprintService,
+			userService
 		);
 		actions.setRequestText(messageTextFromTelegram);
 		actions.setChatId(chatId);
@@ -94,10 +103,15 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
 		actions.fnListAll();
 		actions.fnSelectSprint();
 		actions.fnSelectUserInSprint();
+		actions.fnVerifyCredentialsPhoneEmail();
+		actions.fnVerifyCredentialsPassword();
 		actions.fnViewSprintTasks();
+		actions.fnSelectTaskStatus();
 		actions.fnAddItem();
 		actions.fnLLM();
 		actions.fnElse();
+		
+		logger.info("=== BOT HANDLERS COMPLETE ===");
 	}
 
 	@AfterBotRegistration

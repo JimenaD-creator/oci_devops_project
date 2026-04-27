@@ -70,13 +70,17 @@ public class BotStateManager {
         return state != null && "SELECTING_USER_IN_SPRINT".equals(state.getState()) && !isStateExpired(state);
     }
 
-    /** Sprint id while picking a user or viewing filtered tasks. */
+    /** Sprint id while picking a user, verifying credentials, viewing tasks, or selecting task status. */
     public Long getSprintIdInSprintUserFlow(Long chatId) {
         BotUserState state = userStates.get(chatId);
         if (state == null || isStateExpired(state)) {
             return null;
         }
-        if ("SELECTING_USER_IN_SPRINT".equals(state.getState()) || "VIEWING_SPRINT_TASKS".equals(state.getState())) {
+        if ("SELECTING_USER_IN_SPRINT".equals(state.getState())
+                || "VIEWING_SPRINT_TASKS".equals(state.getState())
+                || "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(state.getState())
+                || "VERIFYING_CREDENTIALS_PASSWORD".equals(state.getState())
+                || "SELECTING_TASK_STATUS".equals(state.getState())) {
             return state.getSprintId();
         }
         return null;
@@ -170,16 +174,20 @@ public class BotStateManager {
      */
     public Long getViewingSprintId(Long chatId) {
         BotUserState state = userStates.get(chatId);
-        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
-            return state.getSprintId();
+        if (state != null && !isStateExpired(state)) {
+            if ("VIEWING_SPRINT_TASKS".equals(state.getState()) || "SELECTING_TASK_STATUS".equals(state.getState())) {
+                return state.getSprintId();
+            }
         }
         return null;
     }
 
     public Long getViewingSelectedUserId(Long chatId) {
         BotUserState state = userStates.get(chatId);
-        if (state != null && "VIEWING_SPRINT_TASKS".equals(state.getState()) && !isStateExpired(state)) {
-            return state.getSelectedUserId();
+        if (state != null && !isStateExpired(state)) {
+            if ("VIEWING_SPRINT_TASKS".equals(state.getState()) || "SELECTING_TASK_STATUS".equals(state.getState())) {
+                return state.getSelectedUserId();
+            }
         }
         return null;
     }
@@ -210,7 +218,9 @@ public class BotStateManager {
             return false;
         }
         /* Navigation-only states: not "pending input" for free-text handlers */
-        if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st)) {
+        if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st) ||
+            "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(st) || "VERIFYING_CREDENTIALS_PASSWORD".equals(st) ||
+            "SELECTING_TASK_STATUS".equals(st)) {
             return false;
         }
         return true;
@@ -260,4 +270,127 @@ public class BotStateManager {
     public Map<Long, BotUserState> getAllStates() {
         return new ConcurrentHashMap<>(userStates);
     }
+
+    /**
+     * Set user state to "verifying credentials - waiting for phone/email".
+     * After user selection in sprint, ask for credentials first.
+     *
+     * @param chatId The Telegram chat ID
+     * @param userId The user ID whose credentials need verification
+     * @param sprintId The sprint ID context
+     */
+    public void setVerifyingCredentialsPhoneEmail(Long chatId, Long userId, Long sprintId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, userId, "VERIFYING_CREDENTIALS_PHONE_EMAIL");
+        state.setCredentialUserBeingVerified(userId);
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to verifying credentials (phone/email) for user {}", chatId, userId);
+    }
+
+    /**
+     * Set user state to "verifying credentials - waiting for password".
+     *
+     * @param chatId The Telegram chat ID
+     * @param userId The user ID whose credentials need verification
+     * @param sprintId The sprint ID context
+     * @param phoneEmail The phone/email provided by user
+     */
+    public void setVerifyingCredentialsPassword(Long chatId, Long userId, Long sprintId, String phoneEmail) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, userId, "VERIFYING_CREDENTIALS_PASSWORD");
+        state.setCredentialUserBeingVerified(userId);
+        state.setTempPhoneEmail(phoneEmail);
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to verifying credentials (password) for user {}", chatId, userId);
+    }
+
+    /**
+     * Check if user is verifying credentials (phone/email step).
+     *
+     * @param chatId The Telegram chat ID
+     * @return true if verifying credentials (phone/email step)
+     */
+    public boolean isVerifyingCredentialsPhoneEmail(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    /**
+     * Check if user is verifying credentials (password step).
+     *
+     * @param chatId The Telegram chat ID
+     * @return true if verifying credentials (password step)
+     */
+    public boolean isVerifyingCredentialsPassword(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "VERIFYING_CREDENTIALS_PASSWORD".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    /**
+     * Get the user ID whose credentials are being verified.
+     *
+     * @param chatId The Telegram chat ID
+     * @return User ID or null
+     */
+    public Long getCredentialVerificationUserId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && !isStateExpired(state)) {
+            return state.getCredentialUserBeingVerified();
+        }
+        return null;
+    }
+
+    /**
+     * Get the temporarily stored phone/email during credential verification.
+     *
+     * @param chatId The Telegram chat ID
+     * @return Phone/email string or null
+     */
+    public String getStoredPhoneEmailForVerification(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && !isStateExpired(state)) {
+            return state.getTempPhoneEmail();
+        }
+        return null;
+    }
+
+    /**
+     * Set user state to "selecting task status" after clicking on a task.
+     * Prepares to show task details and status options.
+     *
+     * @param chatId The Telegram chat ID
+     * @param taskId The task ID being viewed
+     * @param sprintId The sprint ID context
+     * @param assigneeUserId The assignee user ID
+     */
+    public void setSelectingTaskStatus(Long chatId, Integer taskId, Long sprintId, Long assigneeUserId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, assigneeUserId, "SELECTING_TASK_STATUS");
+        state.setSelectedTaskId(taskId);
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting status for task {} in sprint {}", chatId, taskId, sprintId);
+    }
+
+    /**
+     * Check if user is selecting task status.
+     *
+     * @param chatId The Telegram chat ID
+     * @return true if selecting task status
+     */
+    public boolean isSelectingTaskStatus(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_TASK_STATUS".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    /**
+     * Get the task ID being viewed/modified.
+     *
+     * @param chatId The Telegram chat ID
+     * @return Task ID or null
+     */
+    public Integer getSelectedTaskId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state != null && !isStateExpired(state) && "SELECTING_TASK_STATUS".equals(state.getState())) {
+            return state.getSelectedTaskId();
+        }
+        return null;
+    }
 }
+

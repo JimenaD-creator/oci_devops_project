@@ -56,4 +56,37 @@ public class UserService {
             return userRepository.save(user);
         }).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
+
+    /**
+     * Verify user credentials against database.
+     * Checks if the provided phone/email and password match a user with the given ID.
+     *
+     * @param userId The user ID to verify
+     * @param phoneOrEmail The phone number or email provided by user
+     * @param password The password provided by user
+     * @return true if credentials are valid, false otherwise
+     */
+    public boolean verifyUserCredentials(Long userId, String phoneOrEmail, String password) {
+        Optional<User> user = userRepository.findById(userId);
+        if (!user.isPresent()) {
+            return false;
+        }
+
+        User foundUser = user.get();
+        
+        // Check if provided phone/email matches
+        boolean phoneMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getPhoneNumber());
+        boolean emailMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getEmail());
+        
+        if (!phoneMatches && !emailMatches) {
+            return false;
+        }
+
+        // Check if password matches
+        if (password == null || !password.equals(foundUser.getUserPassword())) {
+            return false;
+        }
+
+        return true;
+    }
 }

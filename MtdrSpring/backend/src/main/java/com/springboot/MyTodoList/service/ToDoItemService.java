@@ -133,6 +133,10 @@ public class ToDoItemService {
         return null;
     }
 
+    public boolean updateTaskStatusOnly(int id, String status) {
+        return toDoItemRepository.updateStatusOnly(id, status) > 0;
+    }
+
     /**
      * Telegram updates only the TASK row (ToDoItem). Keep USER_TASK assignment status aligned: when the task is
      * completed or reopened from the bot, update assignee rows accordingly. WORKED_HOURS is never set here (that
