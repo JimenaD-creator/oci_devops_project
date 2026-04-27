@@ -31,6 +31,8 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
     .sort((a, b) => b.blockedCount - a.blockedCount)
     .slice(0, 8);
 
+  if (cards.length === 0) return null;
+
   return (
     <Box sx={{ mb: 3 }}>
       <Typography component="h2" sx={{ fontWeight: 800, fontSize: '1.15rem', color: '#1A1A1A', mb: 0.5 }}>
@@ -40,86 +42,70 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
         Developers with task blockers in the selected sprint(s).
       </Typography>
 
-      {cards.length === 0 ? (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            borderRadius: 3,
-            border: '1px dashed #CFD8DC',
-            bgcolor: '#FAFAFA',
-          }}
-        >
-          <Typography sx={{ color: '#607D8B', fontWeight: 600 }}>
-            No blocked tasks flagged yet. When developers mark an assignment as blocked, this section highlights who is affected.
-          </Typography>
-        </Paper>
-      ) : (
-        <Stack spacing={1.25}>
-          {cards.map((dev) => {
-            const palette = severityColors(dev.blockedCount);
-            const blockedTasksOrdered = sortBlockedTasksNewestFirst(dev.blockedTasks);
-            const oldest = dev.blockedTasks.reduce((acc, t) => {
-              const ms = new Date(t?.blockedSince || '').getTime();
-              if (!Number.isFinite(ms)) return acc;
-              return acc == null ? ms : Math.min(acc, ms);
-            }, null);
-            return (
-              <Paper
-                key={dev.name}
-                elevation={0}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  border: `1px solid ${palette.border}`,
-                  bgcolor: palette.bg,
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start' }}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <AlertTriangle size={16} color={palette.fg} />
-                      <Typography sx={{ fontWeight: 800, color: '#1A1A1A' }}>{dev.name}</Typography>
-                      <Chip
-                        size="small"
-                        label={`${dev.blockedCount} blocked`}
-                        sx={{ bgcolor: palette.chipBg, color: '#fff', fontWeight: 700, height: 22 }}
-                      />
-                    </Box>
-                    <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', mb: 0.75 }}>
-                      Oldest blocked: {formatBlockedSinceAge(oldest)}
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
-                      {blockedTasksOrdered.slice(0, 3).map((t) => {
-                        const reason = String(t?.blockedReason || '').trim();
-                        return (
-                          <Box key={t.id}>
-                            <Typography sx={{ fontSize: '0.84rem', color: '#37474F' }}>
-                              {t.title}
-                            </Typography>
-                            {reason ? (
-                              <Typography sx={{ fontSize: '0.78rem', color: '#607D8B', pl: 0 }}>
-                                Reason: {reason}
-                              </Typography>
-                            ) : null}
-                          </Box>
-                        );
-                      })}
-                    </Box>
+      <Stack spacing={1.25}>
+        {cards.map((dev) => {
+          const palette = severityColors(dev.blockedCount);
+          const blockedTasksOrdered = sortBlockedTasksNewestFirst(dev.blockedTasks);
+          const oldest = dev.blockedTasks.reduce((acc, t) => {
+            const ms = new Date(t?.blockedSince || '').getTime();
+            if (!Number.isFinite(ms)) return acc;
+            return acc == null ? ms : Math.min(acc, ms);
+          }, null);
+          return (
+            <Paper
+              key={dev.name}
+              elevation={0}
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: `1px solid ${palette.border}`,
+                bgcolor: palette.bg,
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start' }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <AlertTriangle size={16} color={palette.fg} />
+                    <Typography sx={{ fontWeight: 800, color: '#1A1A1A' }}>{dev.name}</Typography>
+                    <Chip
+                      size="small"
+                      label={`${dev.blockedCount} blocked`}
+                      sx={{ bgcolor: palette.chipBg, color: '#fff', fontWeight: 700, height: 22 }}
+                    />
                   </Box>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ textTransform: 'none', fontWeight: 700, borderColor: palette.fg, color: palette.fg }}
-                  >
-                    View tasks
-                  </Button>
+                  <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', mb: 0.75 }}>
+                    Oldest blocked: {formatBlockedSinceAge(oldest)}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
+                    {blockedTasksOrdered.slice(0, 3).map((t) => {
+                      const reason = String(t?.blockedReason || '').trim();
+                      return (
+                        <Box key={t.id}>
+                          <Typography sx={{ fontSize: '0.84rem', color: '#37474F' }}>
+                            {t.title}
+                          </Typography>
+                          {reason ? (
+                            <Typography sx={{ fontSize: '0.78rem', color: '#607D8B', pl: 0 }}>
+                              Reason: {reason}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 </Box>
-              </Paper>
-            );
-          })}
-        </Stack>
-      )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ textTransform: 'none', fontWeight: 700, borderColor: palette.fg, color: palette.fg }}
+                >
+                  View tasks
+                </Button>
+              </Box>
+            </Paper>
+          );
+        })}
+      </Stack>
     </Box>
   );
 }
