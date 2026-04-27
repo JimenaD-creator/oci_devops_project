@@ -195,6 +195,7 @@ public class UserTaskService {
         }
         UserTask ut = mine.get();
         ut.setStatus("TODO");
+        ut.setIsBlocked(false);
         userTaskRepository.save(ut);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
         return true;
@@ -237,6 +238,7 @@ public class UserTaskService {
             
             userTask.setWorkedHours(previous + delta);
             userTask.setStatus("COMPLETED");
+            userTask.setIsBlocked(false);
             
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
@@ -262,6 +264,51 @@ public class UserTaskService {
         } catch (Exception e) {
             logger.error("Error retrieving worked hours for userId {} taskId {}", userId, taskId, e);
             return 0;
+        }
+    }
+
+    /**
+     * Saves the blocked reason/message for a task (Telegram).
+     * Updates the USER_TASK record with the blocked reason and sets status to BLOCKED.
+     *
+     * @param userId The user ID
+     * @param taskId The task ID
+     * @param blockedReason The reason/message why the task is blocked
+     * @return The updated UserTask
+     */
+    @Transactional
+    public UserTask saveBlockedReason(Long userId, Long taskId, String blockedReason) {
+        try {
+            Long effectiveUserId = resolveAssigneeUserIdForWorkedHours(userId, taskId);
+            UserTaskId id = new UserTaskId(effectiveUserId, taskId);
+
+            Optional<UserTask> existingUserTask = userTaskRepository.findById(id);
+
+            UserTask userTask;
+            if (existingUserTask.isPresent()) {
+                userTask = existingUserTask.get();
+                logger.info("Updating blocked reason for userId {} taskId {}", effectiveUserId, taskId);
+            } else {
+                User user = userRepository.findById(effectiveUserId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
+                Task task = taskRepository.findById(taskId)
+                    .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+                userTask = new UserTask(user, task);
+                logger.info("Creating USER_TASK for userId {} taskId {} with blocked reason (first log)", effectiveUserId, taskId);
+            }
+
+            userTask.setBlockedReason(blockedReason);
+            userTask.setStatus("BLOCKED");
+            userTask.setIsBlocked(true);
+
+            UserTask saved = userTaskRepository.save(userTask);
+            taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+            logger.info("Blocked reason saved for userId {} taskId {}: {}", effectiveUserId, taskId, blockedReason);
+            return saved;
+
+        } catch (Exception e) {
+            logger.error("Error saving blocked reason for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
+            throw new RuntimeException("Failed to save blocked reason", e);
         }
     }
 }

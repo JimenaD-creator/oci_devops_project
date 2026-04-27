@@ -27,6 +27,12 @@ public class UserTask {
     @Column(name = "STATUS", length = 50)
     private String status;
 
+    @Column(name = "IS_BLOCKED")
+    private Boolean isBlocked;
+
+    @Column(name = "BLOCKED_REASON", length = 500)
+    private String blockedReason;
+
     public UserTask() {}
 
     public UserTask(User user, Task task) {
@@ -73,5 +79,21 @@ public class UserTask {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getIsBlocked() {
+        return isBlocked;
+    }
+
+    public void setIsBlocked(Boolean isBlocked) {
+        this.isBlocked = isBlocked;
+    }
+
+    public String getBlockedReason() {
+        return blockedReason;
+    }
+
+    public void setBlockedReason(String blockedReason) {
+        this.blockedReason = blockedReason;
     }
 }

@@ -392,5 +392,71 @@ public class BotStateManager {
         }
         return null;
     }
+
+    /**
+     * Set user state to "waiting for blocked reason".
+     * User just marked a task as BLOCKED and needs to provide a reason/message.
+     *
+     * @param chatId The Telegram chat ID
+     * @param taskId The task ID being marked as blocked
+     * @param actingUserId The user ID who is marking the task as blocked
+     */
+    public void setWaitingForBlockedReason(Long chatId, Integer taskId, Long actingUserId) {
+        BotUserState state = new BotUserState(chatId, taskId, null, actingUserId, "WAITING_FOR_BLOCKED_REASON");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to waiting for blocked reason for task {}, actingUserId={}", chatId, taskId, actingUserId);
+    }
+
+    /**
+     * Get the task ID that is waiting for blocked reason for this user.
+     * Returns null if no valid pending state.
+     *
+     * @param chatId The Telegram chat ID
+     * @return Task ID or null
+     */
+    public Integer getTaskIdWaitingForBlockedReason(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+
+        // State must exist
+        if (state == null) {
+            return null;
+        }
+
+        // State must be "WAITING_FOR_BLOCKED_REASON"
+        if (!"WAITING_FOR_BLOCKED_REASON".equals(state.getState())) {
+            return null;
+        }
+
+        // Check if state has timed out
+        if (isStateExpired(state)) {
+            logger.info("State for chat {} has timed out, clearing", chatId);
+            clearPendingState(chatId);
+            return null;
+        }
+
+        return state.getTaskId();
+    }
+
+    /**
+     * While waiting for blocked reason: the acting user id (from sprint flow or null → use Telegram mapping).
+     *
+     * @param chatId The Telegram chat ID
+     * @return Acting user ID or null
+     */
+    public Long getActingUserIdForBlockedReason(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null) {
+            return null;
+        }
+        if (!"WAITING_FOR_BLOCKED_REASON".equals(state.getState())) {
+            return null;
+        }
+        if (isStateExpired(state)) {
+            logger.info("State for chat {} has timed out, clearing", chatId);
+            clearPendingState(chatId);
+            return null;
+        }
+        return state.getSelectedUserId();
+    }
 }
 
