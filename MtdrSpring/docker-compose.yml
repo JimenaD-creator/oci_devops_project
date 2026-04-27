@@ -5,12 +5,12 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - .env                         
+      - ./backend/.env                          
     environment:
       - DB_URL=jdbc:oracle:thin:@reacttodo2p9ml_medium?TNS_ADMIN=/app/wallet
       - DB_USERNAME=MANAGER
       - DB_PASSWORD=MxTodo#2026Pass9
-      - TELEGRAM_BOT_TOKEN=8336070482:AAE5hiBc8D2m1UA38YGjFX-wgua235RIRzM
+      - TELEGRAM_BOT_TOKEN=8597252989:AAESmYUpOa2ftnr5OuS0oQNKKKX96JXhKD8
     volumes:
       - ./backend/wallet:/app/wallet
     restart: unless-stopped
