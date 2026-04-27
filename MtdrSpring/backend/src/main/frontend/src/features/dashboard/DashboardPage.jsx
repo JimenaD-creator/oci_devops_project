@@ -19,6 +19,7 @@ import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
 import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
+import DashboardBlockedTasksPanel from './DashboardBlockedTasksPanel';
 import DeveloperTable from '../kpis/DeveloperTable';
 import {
   fetchDashboardSprints,
@@ -498,6 +499,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
               </Box>
             ) : null}
           </Box>
+        </ScrollReveal>
+
+        <ScrollReveal delay={0.06}>
+          <DashboardBlockedTasksPanel selectedSprints={selectedSprints} />
         </ScrollReveal>
 
         <ScrollReveal delay={0.06}>

@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -224,20 +225,27 @@ public class GeminiService {
      */
     private String sanitizeError(String raw) {
         if (raw == null) return "Unknown error.";
-        if (raw.contains("429") || raw.contains("RESOURCE_EXHAUSTED") || raw.contains("quota")) {
+        String msg = raw.toUpperCase(Locale.ROOT);
+        if (msg.contains("429") || msg.contains("RESOURCE_EXHAUSTED") || msg.contains("QUOTA")) {
             return "QUOTA_EXCEEDED";
         }
-        if (raw.contains("API key") || raw.contains("not configured")) {
+        if (msg.contains("API KEY") || msg.contains("NOT CONFIGURED") || msg.contains("401") || msg.contains("403")) {
             return "API_KEY_MISSING";
         }
-        if (raw.contains("404") && raw.contains("not found")) {
+        if (msg.contains("404") && msg.contains("NOT FOUND")) {
             return "MODEL_NOT_FOUND";
         }
-        if (raw.contains("Sprint not found")) {
+        if (msg.contains("SPRINT NOT FOUND")) {
             return "SPRINT_NOT_FOUND";
         }
-        if (raw.contains("no project")) {
+        if (msg.contains("NO PROJECT")) {
             return "NO_PROJECT_ASSIGNED";
+        }
+        if (msg.contains("TIMEOUT")) {
+            return "UPSTREAM_TIMEOUT";
+        }
+        if (msg.contains("UNAVAILABLE AFTER") || msg.contains("HTTP 503") || msg.contains("HTTP 502") || msg.contains("HTTP 504") || msg.contains("HTTP 500")) {
+            return "UPSTREAM_UNAVAILABLE";
         }
         return "GENERATION_FAILED";
     }
@@ -1643,8 +1651,7 @@ public class GeminiService {
             t.put("delta", deltaTasks);
             t.put("message", String.format(
                 "%s: completion outcome moved from %d/%d done in %s to %d/%d in %s "
-                    + "(range across selected sprints: %d-%d done). Variation is interpreted by delivery results, "
-                    + "not by how many tasks were created or assigned per sprint.",
+                    + "(range across selected sprints: %d-%d done). Variation is interpreted primarily from delivery outcomes.",
                 name, firstCompleted, Math.max(firstAssigned, 0), firstLabel,
                 lastCompleted, Math.max(lastAssigned, 0), lastLabel, minCompleted, maxCompleted));
             taskRows.add(t);
@@ -1662,8 +1669,7 @@ public class GeminiService {
             }
             h.put("message", String.format(
                 "%s: worked hours moved from %.1f in %s to %.1f in %s (range across selected sprints: %.1f-%.1f), "
-                    + "with %s based on completed outcomes (%d -> %d done tasks). "
-                    + "Task creation/assignment volume changes are not treated as performance by themselves.",
+                    + "with %s based on completed outcomes (%d -> %d done tasks).",
                 name, firstHours, firstLabel, lastHours, lastLabel, minHours, maxHours,
                 hoursPerformanceContext, firstCompleted, lastCompleted));
             if (lastCompleted > 0 && lastHours <= 0) {

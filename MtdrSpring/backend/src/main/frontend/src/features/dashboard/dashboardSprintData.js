@@ -150,6 +150,16 @@ function workedHoursForDashboardCharts(ut, taskId, taskSprintMap) {
   return raw;
 }
 
+function isTaskBlocked(task) {
+  if (!task || typeof task !== 'object') return false;
+  const raw = task.blocked ?? task.block ?? task.isBlocked ?? task.is_blocked;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'y';
+}
+
 export function taskSprintId(task) {
   if (task == null) return null;
   const as = task.assignedSprint;
@@ -286,8 +296,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       id,
       totalHours: Number(sp.totalHours) || 0,
       totalAssignedHoursTasks: Number(sp.totalAssignedHoursTasks) || 0,
+      blockedTasksTotal: Number(sp.blockedTasksTotal) || 0,
       _devMap: {},
       _statusCounts: { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 },
+      _blockedTaskMapByDeveloper: {},
     };
   });
 
@@ -302,8 +314,12 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       sprintId: sid,
       status: task.status,
       assignedHours: ah,
+      blocked: isTaskBlocked(task),
+      title: String(task?.title || `Task #${tid}`),
+      blockedSince: task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
     };
     sprintMap[sid].totalAssignedHoursTasks += ah;
+    if (taskSprintMap[tid].blocked) sprintMap[sid].blockedTasksTotal += 1;
     const b = bucketTaskStatus(task.status);
     sprintMap[sid]._statusCounts[b] += 1;
   });
@@ -333,6 +349,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         _assignedHoursEstimate: 0,
         hours: 0,
         workload: 0,
+        blockedCount: 0,
+        blockedTasks: [],
       };
     }
     const dm = sp._devMap[devKey];
@@ -347,6 +365,20 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     }
     /** Per-developer chart: all logged worked hours on USER_TASK (incl. in progress). */
     dm.hours += loggedHours;
+
+    if (taskId != null && taskSprintMap[taskId]?.blocked) {
+      const taskMeta = taskSprintMap[taskId];
+      if (!sp._blockedTaskMapByDeveloper[devKey]) sp._blockedTaskMapByDeveloper[devKey] = new Set();
+      if (!sp._blockedTaskMapByDeveloper[devKey].has(taskId)) {
+        sp._blockedTaskMapByDeveloper[devKey].add(taskId);
+        dm.blockedCount += 1;
+        dm.blockedTasks.push({
+          id: taskId,
+          title: taskMeta.title,
+          blockedSince: taskMeta.blockedSince,
+        });
+      }
+    }
   });
 
   return sprints.map((sp) => {
@@ -366,7 +398,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         kpis: sp.kpis ?? {},
       };
     }
-    const { _devMap, _statusCounts, ...rest } = entry;
+    const { _devMap, _statusCounts, _blockedTaskMapByDeveloper, ...rest } = entry;
     const devs = Object.values(_devMap);
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
     devs.forEach((d) => {
@@ -381,6 +413,9 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       d.workload = Math.round((d.hours / maxHours) * 100);
       d.pending = Math.max(0, (d.assigned ?? 0) - (d.completed ?? 0));
     });
+    const blockedDevelopers = devs
+      .filter((d) => Number(d.blockedCount) > 0)
+      .sort((a, b) => Number(b.blockedCount) - Number(a.blockedCount));
     const statusPart = sprintTaskStatusRows(_statusCounts);
     const totalTasks = TASK_STATUS_ORDER.reduce((acc, k) => acc + (_statusCounts[k] ?? 0), 0);
     const totalCompleted = _statusCounts.DONE ?? 0;
@@ -398,6 +433,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       totalTasks,
       totalCompleted,
       developers: devs,
+      blockedDevelopers,
       ...statusPart,
     };
   });

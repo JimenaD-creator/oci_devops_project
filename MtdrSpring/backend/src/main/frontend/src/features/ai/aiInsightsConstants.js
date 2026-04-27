@@ -10,6 +10,8 @@ const ERROR_MESSAGES = {
   SPRINT_NOT_FOUND: 'This sprint was not found in the database.',
   NO_PROJECT_ASSIGNED:
     'This sprint has no project assigned. Assign a project before generating insights.',
+  UPSTREAM_TIMEOUT: 'The AI service took too long to respond. Please try again.',
+  UPSTREAM_UNAVAILABLE: 'The AI service is temporarily unavailable. Please try again shortly.',
   GENERATION_FAILED: 'AI generation failed unexpectedly. Please try again.',
 };
 

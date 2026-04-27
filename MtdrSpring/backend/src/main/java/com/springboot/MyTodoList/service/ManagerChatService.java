@@ -11,10 +11,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class ManagerChatService {
@@ -34,6 +34,8 @@ public class ManagerChatService {
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(30))
         .build();
+    private static final int GEMINI_MAX_RETRIES = 3;
+    private static final long GEMINI_RETRY_BASE_MS = 1000L;
 
     // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC ENTRY POINT
@@ -287,14 +289,53 @@ public class ManagerChatService {
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        RuntimeException lastRetryable = null;
+        for (int attempt = 1; attempt <= GEMINI_MAX_RETRIES; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                int status = response.statusCode();
 
-        int status = response.statusCode();
-        if (status == 429) throw new RuntimeException("429 quota exceeded");
-        if (status == 401 || status == 403) throw new RuntimeException("API key invalid");
-        if (status != 200) throw new RuntimeException("Gemini HTTP " + status);
+                if (status == 200) {
+                    return extractTextFromGeminiResponse(response.body());
+                }
+                if (status == 429) throw new RuntimeException("HTTP_429_QUOTA_EXCEEDED");
+                if (status == 401 || status == 403) throw new RuntimeException("HTTP_401_403_API_KEY_INVALID");
 
-        return extractTextFromGeminiResponse(response.body());
+                boolean retryableHttp = status == 502 || status == 503 || status == 504;
+                if (retryableHttp) {
+                    lastRetryable = new RuntimeException("HTTP_" + status + "_UPSTREAM_ERROR");
+                    if (attempt < GEMINI_MAX_RETRIES) {
+                        sleepBeforeRetry(attempt);
+                        continue;
+                    }
+                    throw lastRetryable;
+                }
+
+                if (status >= 500) throw new RuntimeException("HTTP_" + status + "_UPSTREAM_ERROR");
+                throw new RuntimeException("HTTP_" + status + "_UNEXPECTED");
+            } catch (HttpTimeoutException e) {
+                lastRetryable = new RuntimeException("GEMINI_TIMEOUT", e);
+                if (attempt < GEMINI_MAX_RETRIES) {
+                    sleepBeforeRetry(attempt);
+                    continue;
+                }
+                throw lastRetryable;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("REQUEST_INTERRUPTED", e);
+            }
+        }
+        throw lastRetryable != null ? lastRetryable : new RuntimeException("GENERATION_FAILED");
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        long waitMs = GEMINI_RETRY_BASE_MS * (1L << Math.max(0, attempt - 1));
+        try {
+            Thread.sleep(waitMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("REQUEST_INTERRUPTED", ie);
+        }
     }
 
     private Map<String, Object> buildGeminiTurn(String role, String text) {
@@ -306,9 +347,17 @@ public class ManagerChatService {
 
     private String extractTextFromGeminiResponse(String raw) throws Exception {
         var root = mapper.readTree(raw);
-        return root.path("candidates").get(0)
-            .path("content").path("parts").get(0)
-            .path("text").asText();
+        var candidates = root.path("candidates");
+        if (!candidates.isArray() || candidates.isEmpty()) {
+            throw new RuntimeException("EMPTY_CANDIDATES");
+        }
+        var first = candidates.get(0);
+        var textNode = first.path("content").path("parts").get(0).path("text");
+        String text = textNode.isMissingNode() ? "" : textNode.asText("");
+        if (text == null || text.trim().isEmpty()) {
+            throw new RuntimeException("EMPTY_GEMINI_TEXT");
+        }
+        return text;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -340,8 +389,13 @@ public class ManagerChatService {
 
     private String sanitizeErrorCode(String msg) {
         if (msg == null) return "UNKNOWN_ERROR";
-        if (msg.contains("429") || msg.contains("quota")) return "QUOTA_EXCEEDED";
-        if (msg.contains("API key") || msg.contains("invalid")) return "API_KEY_INVALID";
+        String m = msg.toUpperCase(Locale.ROOT);
+        if (m.contains("429") || m.contains("QUOTA")) return "QUOTA_EXCEEDED";
+        if (m.contains("401") || m.contains("403") || m.contains("API_KEY")) return "API_KEY_INVALID";
+        if (m.contains("TIMEOUT")) return "UPSTREAM_TIMEOUT";
+        if (m.contains("INTERRUPTED")) return "REQUEST_INTERRUPTED";
+        if (m.contains("EMPTY_CANDIDATES") || m.contains("EMPTY_GEMINI_TEXT")) return "EMPTY_AI_RESPONSE";
+        if (m.contains("HTTP_5")) return "UPSTREAM_UNAVAILABLE";
         return "GENERATION_FAILED";
     }
 
@@ -350,6 +404,14 @@ public class ManagerChatService {
         return "The AI service is temporarily rate-limited. Please try again in a moment.";
     } else if ("API_KEY_INVALID".equals(code)) {
         return "The Gemini API key is invalid or expired.";
+    } else if ("UPSTREAM_TIMEOUT".equals(code)) {
+        return "The AI service took too long to respond. Please try again in a few seconds.";
+    } else if ("REQUEST_INTERRUPTED".equals(code)) {
+        return "The request was interrupted before completion. Please send your message again.";
+    } else if ("EMPTY_AI_RESPONSE".equals(code)) {
+        return "The AI service returned an empty response. Please try rephrasing your message.";
+    } else if ("UPSTREAM_UNAVAILABLE".equals(code)) {
+        return "The AI service is temporarily unavailable. Please try again shortly.";
     } else {
         return "An error occurred while processing your request. Please try again.";
     }
