@@ -494,6 +494,7 @@ public class BotActions {
         KeyboardRow statusRow2 = new KeyboardRow();
         statusRow2.add("👀 In Review");
         statusRow2.add("✅ Done");
+        statusRow2.add("🚧 Blocked");
         keyboard.add(statusRow2);
         
         // Navigation buttons
@@ -665,14 +666,17 @@ public class BotActions {
         
         // Map emoji buttons to status values
         String newStatus = null;
-        if ("📝 To-do".equals(requestText)) {
+        String normalizedRequest = requestText != null ? requestText.trim() : "";
+        if ("📝 To-do".equals(normalizedRequest)) {
             newStatus = "TODO";
-        } else if ("🔄 In Process".equals(requestText)) {
+        } else if ("🔄 In Process".equals(normalizedRequest)) {
             newStatus = "IN_PROGRESS";
-        } else if ("👀 In Review".equals(requestText)) {
+        } else if ("👀 In Review".equals(normalizedRequest)) {
             newStatus = "IN_REVIEW";
-        } else if ("✅ Done".equals(requestText)) {
+        } else if ("✅ Done".equals(normalizedRequest)) {
             newStatus = "DONE";
+        } else if ("🚧 Blocked".equals(normalizedRequest) || "Blocked".equalsIgnoreCase(normalizedRequest)) {
+            newStatus = "BLOCKED";
         } else {
             logger.debug("fnSelectTaskStatus: Unrecognized status button: '{}'", requestText);
             exit = true;
@@ -706,6 +710,17 @@ public class BotActions {
             BotHelper.sendMessageToTelegram(
                     chatId,
                     "How many hours did you work on this task? (Please enter a whole number)",
+                    telegramClient,
+                    null
+            );
+        } else if ("BLOCKED".equals(newStatus)) {
+            // If status is "Blocked", ask for blocked reason
+            logger.debug("fnSelectTaskStatus: Status is BLOCKED, asking for reason");
+            Long actingUserId = stateManager.getViewingSelectedUserId(chatId);
+            stateManager.setWaitingForBlockedReason(chatId, taskId, actingUserId);
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "Please provide the reason why this task is blocked:",
                     telegramClient,
                     null
             );
@@ -799,6 +814,42 @@ public class BotActions {
                 exit = true;
                 return;
             }
+
+            // Check if waiting for blocked reason
+            Integer blockedTaskId = stateManager.getTaskIdWaitingForBlockedReason(chatId);
+            if (blockedTaskId != null) {
+                String blockedReason = requestText.trim();
+                if (blockedReason.isEmpty()) {
+                    BotHelper.sendMessageToTelegram(
+                        chatId,
+                        "Please provide a reason for blocking the task.",
+                        telegramClient,
+                        null
+                    );
+                    exit = true;
+                    return;
+                }
+                if (blockedReason.length() > 500) {
+                    BotHelper.sendMessageToTelegram(
+                        chatId,
+                        "Reason is too long (max 500 characters). Please try again.",
+                        telegramClient,
+                        null
+                    );
+                    exit = true;
+                    return;
+                }
+                saveBlockedReason(blockedTaskId, blockedReason);
+                BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "✓ Task marked as blocked with reason: " + blockedReason,
+                    telegramClient,
+                    null
+                );
+                stateManager.clearPendingState(chatId);
+                exit = true;
+                return;
+            }
         }
         if (stateManager.isSelectingSprint(chatId) || stateManager.isSelectingUserInSprint(chatId) || stateManager.isViewingSprintTasks(chatId)) {
             exit = true;
@@ -850,6 +901,28 @@ public class BotActions {
             BotHelper.sendMessageToTelegram(
                 chatId,
                 "Sorry, there was an error saving your hours. Please try again.",
+                telegramClient,
+                null
+            );
+        }
+    }
+
+    /**
+     * Save blocked reason for a task (Telegram): updates this user's USER_TASK with blocked reason, then syncs TASK status.
+     */
+    private void saveBlockedReason(Integer taskId, String blockedReason) {
+        try {
+            Long uid = stateManager.getActingUserIdForBlockedReason(chatId);
+            if (uid == null) {
+                uid = Long.valueOf(telegramUserMappingService.getUserIdByChatId(chatId));
+            }
+            userTaskService.saveBlockedReason(uid, (long) taskId, blockedReason);
+            logger.info("Saved blocked reason for task {} by user {}: {}", taskId, uid, blockedReason);
+        } catch (Exception e) {
+            logger.error("Error saving blocked reason for task {}: {}", taskId, e.getMessage(), e);
+            BotHelper.sendMessageToTelegram(
+                chatId,
+                "Sorry, there was an error saving the blocked reason. Please try again.",
                 telegramClient,
                 null
             );
