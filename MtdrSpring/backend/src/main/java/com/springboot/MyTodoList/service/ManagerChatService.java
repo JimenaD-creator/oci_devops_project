@@ -108,7 +108,6 @@ public class ManagerChatService {
             sd.put("startDate", s.getStartDate() != null ? s.getStartDate().toString() : null);
             sd.put("dueDate", s.getDueDate() != null ? s.getDueDate().toString() : null);
             sd.put("goal", s.getGoal());
-            sd.put("phase", resolvePhase(s));
             sd.put("completionRate", toPercent(s.getCompletionRate()));
             sd.put("onTimeDelivery", toPercent(s.getOnTimeDelivery()));
             sd.put("teamParticipation", toPercent(s.getTeamParticipation()));
@@ -117,6 +116,7 @@ public class ManagerChatService {
             // Tasks for this sprint
             List<Map<String, Object>> tasks = buildTasksForSprint(s.getId());
             sd.put("tasks", tasks);
+            sd.put("phase", resolvePhase(s, tasks));
             sd.put("productivityScore", computeProductivityScoreFromTasks(tasks, s));
 
             // Developers summary
@@ -469,7 +469,23 @@ public class ManagerChatService {
     // HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String resolvePhase(Sprint s) {
+    private String resolvePhase(Sprint s, List<Map<String, Object>> tasks) {
+        // If task data shows full completion, expose completed state even before dueDate.
+        if (tasks != null && !tasks.isEmpty()) {
+            boolean allDone = true;
+            for (Map<String, Object> t : tasks) {
+                String st = t != null ? String.valueOf(t.get("status")) : "";
+                if (!"Done".equalsIgnoreCase(st)) {
+                    allDone = false;
+                    break;
+                }
+            }
+            if (allDone) return "completed";
+        }
+        // Fallback: if sprint KPI completionRate is already 100%, mark completed.
+        if (toPercent(s != null ? s.getCompletionRate() : null) >= 100.0) {
+            return "completed";
+        }
         LocalDateTime now = LocalDateTime.now();
         if (s.getStartDate() != null && now.isBefore(s.getStartDate())) return "not_started";
         if (s.getDueDate() != null && now.isAfter(s.getDueDate())) return "ended";
