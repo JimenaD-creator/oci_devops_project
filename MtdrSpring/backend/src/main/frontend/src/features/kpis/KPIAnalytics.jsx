@@ -657,6 +657,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             loading={managerGuideLoading}
             fetchFailed={managerGuideFetchFailed}
             productivityDelta={productivityDelta}
+            currentProductivityScore={kpis.productivityScore}
             onOpenAiInsights={onOpenAiInsights}
           />
         </Box>

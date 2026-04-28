@@ -54,6 +54,7 @@ export default function InsightCard({
   showNextSprintForecast = true,
   nextSprintLabel = null,
   nextSprintActualScore = null,
+  currentSprintActualScore = null,
   refreshToken = 0,
 }) {
   const [status, setStatus] = useState('idle');
@@ -495,6 +496,7 @@ export default function InsightCard({
                           executiveSummary={insights.executiveSummary}
                           fallbackSummary={hasExecFields ? null : insights.summary}
                           taskStatusBreakdown={tsb}
+                          currentSprintActualScore={currentSprintActualScore}
                         />
                       );
                     }

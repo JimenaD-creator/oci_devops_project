@@ -74,6 +74,26 @@ export default function AIInsightsPage({ projectId }) {
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
 
+  const normalizeProductivityValue = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    const normalized = n <= 1 ? Math.round(n * 100) : Math.round(n);
+    return Math.min(100, Math.max(0, normalized));
+  };
+
+  // Keep AI Trends aligned with KPI Analytics: score from sprint task completion (done / assigned).
+  const productivityFromSprintWork = (sprint) => {
+    if (!sprint) return null;
+    const devs = Array.isArray(sprint.developers) ? sprint.developers : [];
+    const assigned = devs.reduce((acc, d) => acc + (Number(d?.assigned) || 0), 0);
+    const completed = devs.reduce((acc, d) => acc + (Number(d?.completed) || 0), 0);
+    if (assigned > 0) {
+      const pct = Math.round((100 * completed) / assigned);
+      return Math.min(100, Math.max(0, pct));
+    }
+    return normalizeProductivityValue(sprint?.kpis?.productivityScore);
+  };
+
   /** Sprints sorted chronologically for "next sprint" comparisons. */
   const sortedSprints = useMemo(() => {
     if (!Array.isArray(sprints) || sprints.length === 0) return [];
@@ -219,7 +239,8 @@ export default function AIInsightsPage({ projectId }) {
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
           nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
-          nextSprintActualScore={nextSprintForSelected?.kpis?.productivityScore ?? null}
+          nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
+          currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
           refreshToken={refreshToken}
         />
       )}

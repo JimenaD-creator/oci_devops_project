@@ -28,6 +28,8 @@ import {
   KPI_ALERT_PERCENT_KEYS,
   alignAlertMessagePercent,
   clampKpiPercentForDisplay,
+  clampTrendsPercentLikeValues,
+  alignTrendsProductivityScore,
 } from './aiInsightsConstants';
 
 const SEVERITY = {
@@ -307,9 +309,13 @@ export function ActionableRecommendationsList({ items }) {
   );
 }
 
-export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskStatusBreakdown }) {
+export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskStatusBreakdown, currentSprintActualScore = null }) {
   const es = executiveSummary;
-  const hasEsContent = Boolean(es && (es.overview || es.trends || es.improvementAreas || es.nextSteps));
+  const trendsText = alignTrendsProductivityScore(
+    clampTrendsPercentLikeValues(es?.trends),
+    currentSprintActualScore,
+  );
+  const hasEsContent = Boolean(es && (es.overview || trendsText || es.improvementAreas || es.nextSteps));
   const hasBreakdown = taskStatusBreakdown != null && taskStatusBreakdown.total != null;
 
   const statusChips =
@@ -368,13 +374,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             </Typography>
           </Box>
         )}
-        {es.trends && (
+        {trendsText && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Trends
             </Typography>
             <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
-              {es.trends}
+              {trendsText}
             </Typography>
           </Box>
         )}

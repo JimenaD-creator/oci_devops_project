@@ -39,6 +39,8 @@ public class ManagerChatService {
     private static final int GEMINI_MAX_RETRIES = 3;
     private static final long GEMINI_RETRY_BASE_MS = 1000L;
     private static final Pattern PERCENT_TOKEN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*%");
+    private static final Pattern PRODUCTIVITY_SCORE_TOKEN =
+        Pattern.compile("(productivity\\s+score\\s*(?:of|is|:)?\\s*)(-?\\d+(?:\\.\\d+)?)", Pattern.CASE_INSENSITIVE);
 
     // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC ENTRY POINT
@@ -62,10 +64,14 @@ public class ManagerChatService {
             String scope = req.getSprintId() != null
                 ? "sprint_" + req.getSprintId()
                 : "all_sprints";
+            Integer sprintProductivityScore = req.getSprintId() != null
+                ? getRoundedProductivityScoreForSprint(req.getSprintId())
+                : null;
 
             String systemPrompt = buildSystemPrompt(contextJson, scope);
             String reply = callGemini(systemPrompt, req.getMessage(), req.getHistory());
             reply = clampPercentagesToRange(reply);
+            reply = alignProductivityScoreMentions(reply, sprintProductivityScore);
             return ManagerChatResponse.of(reply, scope);
 
         } catch (Exception e) {
@@ -105,6 +111,7 @@ public class ManagerChatService {
             // Tasks for this sprint
             List<Map<String, Object>> tasks = buildTasksForSprint(s.getId());
             sd.put("tasks", tasks);
+            sd.put("productivityScore", computeProductivityScoreFromTasks(tasks, s));
 
             // Developers summary
             List<Map<String, Object>> devSummary = buildDevSummaryForSprint(s.getId());
@@ -285,10 +292,12 @@ public class ManagerChatService {
             + "## Your behavior\n"
             + "- Answer concisely and directly. Use plain English.\n"
             + "- When the manager asks for counts, lists, or comparisons, use the exact numbers from the data.\n"
+            + "- If asked for productivity score, report the exact `productivityScore` value from sprint data (do not infer a different number).\n"
             + "- If a question cannot be answered from the data provided, say so clearly.\n"
             + "- For developer-specific questions, refer to them by name.\n"
             + "- Use bullet points or short tables when listing multiple items.\n"
             + "- Never make up data. If a value is null or missing, say it's not recorded.\n"
+            + "- `productivityScore` is available in each sprint object (0-100), alongside completionRate/onTimeDelivery/teamParticipation/workloadBalance.\n"
             + "- Each sprint may include \"blockedAssignments\": who flagged an assignment as blocked, task id/title, and reason. "
             + "Use it when asked about blockers, who is stuck, or delivery risk. In your replies, never name database tables or columns.\n"
             + "- Keep responses under 300 words unless more detail is specifically requested.\n"
@@ -317,6 +326,19 @@ public class ManagerChatService {
                 Math.abs(clamped - Math.rint(clamped)) < 1e-9
                     ? String.format(Locale.ROOT, "%.0f%%", clamped)
                     : String.format(Locale.ROOT, "%.1f%%", clamped);
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    private String alignProductivityScoreMentions(String text, Integer expectedScore) {
+        if (text == null || text.isBlank() || expectedScore == null) return text;
+        Matcher matcher = PRODUCTIVITY_SCORE_TOKEN.matcher(text);
+        StringBuffer out = new StringBuffer();
+        while (matcher.find()) {
+            String prefix = matcher.group(1);
+            String replacement = prefix + expectedScore;
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);
@@ -462,6 +484,51 @@ public class ManagerChatService {
         if (value == null) return 0.0;
         return value.multiply(java.math.BigDecimal.valueOf(100))
             .setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
+    }
+
+    private double computeProductivityScorePercent(Sprint s) {
+        if (s == null) return 0.0;
+        double cr = toPercent(s.getCompletionRate());
+        double otd = toPercent(s.getOnTimeDelivery());
+        double tp = toPercent(s.getTeamParticipation());
+        double wb = toPercent(s.getWorkloadBalance());
+        double score = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
+        double clamped = Math.max(0.0, Math.min(100.0, score));
+        return java.math.BigDecimal.valueOf(clamped)
+            .setScale(1, java.math.RoundingMode.HALF_UP)
+            .doubleValue();
+    }
+
+    /**
+     * Align chat "productivityScore" with KPI Analytics behavior:
+     * productivity score = completion percentage from sprint tasks (Done / Total * 100).
+     * Falls back to legacy weighted score only when task list is unavailable/empty.
+     */
+    private int computeProductivityScoreFromTasks(List<Map<String, Object>> tasks, Sprint sprintFallback) {
+        if (tasks != null && !tasks.isEmpty()) {
+            int total = tasks.size();
+            int done = 0;
+            for (Map<String, Object> t : tasks) {
+                if (t == null) continue;
+                String st = String.valueOf(t.get("status"));
+                if ("Done".equalsIgnoreCase(st)) done++;
+            }
+            double pct = total > 0 ? (100.0 * done) / total : 0.0;
+            return (int) Math.round(Math.max(0.0, Math.min(100.0, pct)));
+        }
+        return (int) Math.round(computeProductivityScorePercent(sprintFallback));
+    }
+
+    private Integer getRoundedProductivityScoreForSprint(Long sprintId) {
+        if (sprintId == null) return null;
+        List<Map<String, Object>> tasks = buildTasksForSprint(sprintId);
+        if (tasks != null && !tasks.isEmpty()) {
+            return computeProductivityScoreFromTasks(tasks, null);
+        }
+        return sprintRepository.findById(sprintId)
+            .map(this::computeProductivityScorePercent)
+            .map(v -> (int) Math.round(v))
+            .orElse(null);
     }
 
     private String sanitizeErrorCode(String msg) {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper, Button, CircularProgress } from '@mui/material';
 import { Sparkles } from 'lucide-react';
-import { KPI_LABELS } from '../ai/aiInsightsConstants';
+import { KPI_LABELS, alignTrendsProductivityScore } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -57,13 +57,36 @@ export default function KpiManagerGuidePanel({
   loading,
   fetchFailed,
   productivityDelta,
+  currentProductivityScore = null,
   onOpenAiInsights,
 }) {
+  const resolvedCurrentProductivityScore = Number.isFinite(Number(currentProductivityScore))
+    ? Number(currentProductivityScore)
+    : Number(productivityDelta?.currentScore);
+  const hasCurrentProductivityScore = Number.isFinite(resolvedCurrentProductivityScore);
   const byMetric =
     guide && guide.byMetric && typeof guide.byMetric === 'object' ? guide.byMetric : null;
-  const introText = clampOver100ForDisplay(
+  const introTextRaw = clampOver100ForDisplay(
     typeof guide?.intro === 'string' ? guide.intro.trim() : '',
   );
+  const introText = hasCurrentProductivityScore
+    ? alignTrendsProductivityScore(introTextRaw, resolvedCurrentProductivityScore)
+    : introTextRaw;
+  const alignGenericScorePhrase = (text) => {
+    if (text == null || !hasCurrentProductivityScore) return text;
+    const n = Math.max(0, Math.min(100, Number(resolvedCurrentProductivityScore)));
+    const display = Number.isInteger(n) ? `${n}` : `${n.toFixed(1)}`;
+    return String(text).replace(/(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)/gi, `$1${display}`);
+  };
+  const productivityDeltaTextRaw = clampOver100ForDisplay(
+    typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',
+    { aggressive: true },
+  );
+  const productivityDeltaText = hasCurrentProductivityScore
+    ? alignGenericScorePhrase(
+        alignTrendsProductivityScore(productivityDeltaTextRaw, resolvedCurrentProductivityScore),
+      )
+    : productivityDeltaTextRaw;
   const hasMetricLines =
     byMetric &&
     METRIC_KEYS.some((k) => {
@@ -165,7 +188,7 @@ export default function KpiManagerGuidePanel({
                   lineHeight: 1.5,
                 }}
               >
-                {productivityDelta.text}
+                {productivityDeltaText}
               </Typography>
             </Box>
           )}
@@ -231,6 +254,12 @@ export default function KpiManagerGuidePanel({
               const sanitizedText = clampOver100ForDisplay(text.trim(), {
                 aggressive: key === 'teamParticipation' || key === 'productivityScore',
               });
+              const displayText =
+                key === 'productivityScore' && hasCurrentProductivityScore
+                  ? alignGenericScorePhrase(
+                      alignTrendsProductivityScore(sanitizedText, resolvedCurrentProductivityScore),
+                    )
+                  : sanitizedText;
               const title = KPI_LABELS[key] ?? key;
               const style = METRIC_STYLES[key] ?? {
                 title: SECTION_ACCENT,
@@ -260,7 +289,7 @@ export default function KpiManagerGuidePanel({
                     {title}
                   </Typography>
                   <Typography sx={{ fontSize: '0.95rem', color: '#455A64', lineHeight: 1.55 }}>
-                    {sanitizedText}
+                    {displayText}
                   </Typography>
                 </Box>
               );
