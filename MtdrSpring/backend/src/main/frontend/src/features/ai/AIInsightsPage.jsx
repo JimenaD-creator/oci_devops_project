@@ -81,17 +81,20 @@ export default function AIInsightsPage({ projectId }) {
     return Math.min(100, Math.max(0, normalized));
   };
 
-  // Keep AI Trends aligned with KPI Analytics: score from sprint task completion (done / assigned).
+  // Keep AI Trends aligned with KPI Analytics formula.
   const productivityFromSprintWork = (sprint) => {
     if (!sprint) return null;
-    const devs = Array.isArray(sprint.developers) ? sprint.developers : [];
-    const assigned = devs.reduce((acc, d) => acc + (Number(d?.assigned) || 0), 0);
-    const completed = devs.reduce((acc, d) => acc + (Number(d?.completed) || 0), 0);
-    if (assigned > 0) {
-      const pct = Math.round((100 * completed) / assigned);
-      return Math.min(100, Math.max(0, pct));
-    }
-    return normalizeProductivityValue(sprint?.kpis?.productivityScore);
+    const completionRate = Math.min(100, Math.max(0, Number(sprint?.kpis?.completionRate) || 0));
+    const onTimeDelivery = Math.min(100, Math.max(0, Number(sprint?.kpis?.onTimeDelivery) || 0));
+    const teamParticipation = Math.min(100, Math.max(0, Number(sprint?.kpis?.teamParticipation) || 0));
+    const rawWb = Number(sprint?.kpis?.workloadBalance);
+    const workloadBalance = Number.isFinite(rawWb)
+      ? Math.min(100, Math.max(0, Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)))
+      : 0;
+    const score = Math.round(
+      completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1,
+    );
+    return Math.min(100, Math.max(0, score));
   };
 
   /** Sprints sorted chronologically for "next sprint" comparisons. */

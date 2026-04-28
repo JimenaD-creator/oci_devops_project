@@ -41,6 +41,8 @@ public class ManagerChatService {
     private static final Pattern PERCENT_TOKEN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*%");
     private static final Pattern PRODUCTIVITY_SCORE_TOKEN =
         Pattern.compile("(productivity\\s+score\\s*(?:of|is|:)?\\s*)(-?\\d+(?:\\.\\d+)?)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SPRINT_ID_IN_TEXT =
+        Pattern.compile("\\bsprint\\s*#?\\s*(\\d+)\\b", Pattern.CASE_INSENSITIVE);
 
     // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC ENTRY POINT
@@ -64,8 +66,9 @@ public class ManagerChatService {
             String scope = req.getSprintId() != null
                 ? "sprint_" + req.getSprintId()
                 : "all_sprints";
-            Integer sprintProductivityScore = req.getSprintId() != null
-                ? getRoundedProductivityScoreForSprint(req.getSprintId())
+            Long targetSprintId = resolveTargetSprintId(req);
+            Integer sprintProductivityScore = targetSprintId != null
+                ? getRoundedProductivityScoreForSprint(targetSprintId)
                 : null;
 
             String systemPrompt = buildSystemPrompt(contextJson, scope);
@@ -486,49 +489,75 @@ public class ManagerChatService {
             .setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
     }
 
-    private double computeProductivityScorePercent(Sprint s) {
-        if (s == null) return 0.0;
-        double cr = toPercent(s.getCompletionRate());
-        double otd = toPercent(s.getOnTimeDelivery());
-        double tp = toPercent(s.getTeamParticipation());
-        double wb = toPercent(s.getWorkloadBalance());
-        double score = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
-        double clamped = Math.max(0.0, Math.min(100.0, score));
-        return java.math.BigDecimal.valueOf(clamped)
-            .setScale(1, java.math.RoundingMode.HALF_UP)
-            .doubleValue();
-    }
-
     /**
      * Align chat "productivityScore" with KPI Analytics behavior:
-     * productivity score = completion percentage from sprint tasks (Done / Total * 100).
-     * Falls back to legacy weighted score only when task list is unavailable/empty.
+     * completionRate/tasks + onTimeDelivery/tasks + teamParticipation/sprint + workloadBalance/sprint.
      */
     private int computeProductivityScoreFromTasks(List<Map<String, Object>> tasks, Sprint sprintFallback) {
+        double completionRate = 0.0;
+        double onTimeDelivery = 0.0;
         if (tasks != null && !tasks.isEmpty()) {
             int total = tasks.size();
             int done = 0;
+            int doneOnTime = 0;
             for (Map<String, Object> t : tasks) {
                 if (t == null) continue;
                 String st = String.valueOf(t.get("status"));
-                if ("Done".equalsIgnoreCase(st)) done++;
+                boolean isDone = "Done".equalsIgnoreCase(st);
+                if (!isDone) continue;
+                done++;
+                String finish = t.get("finishDate") != null ? String.valueOf(t.get("finishDate")) : null;
+                String due = t.get("dueDate") != null ? String.valueOf(t.get("dueDate")) : null;
+                if (finish != null && due != null) {
+                    try {
+                        LocalDateTime finishDt = LocalDateTime.parse(finish);
+                        LocalDateTime dueDt = LocalDateTime.parse(due);
+                        if (!finishDt.isAfter(dueDt)) {
+                            doneOnTime++;
+                        }
+                    } catch (Exception ignore) {
+                        // If date format is not parseable, skip on-time contribution for this row.
+                    }
+                }
             }
-            double pct = total > 0 ? (100.0 * done) / total : 0.0;
-            return (int) Math.round(Math.max(0.0, Math.min(100.0, pct)));
+            completionRate = total > 0 ? (100.0 * done) / total : 0.0;
+            onTimeDelivery = done > 0 ? (100.0 * doneOnTime) / done : 0.0;
+        } else if (sprintFallback != null) {
+            completionRate = toPercent(sprintFallback.getCompletionRate());
+            onTimeDelivery = toPercent(sprintFallback.getOnTimeDelivery());
         }
-        return (int) Math.round(computeProductivityScorePercent(sprintFallback));
+
+        double teamParticipation = sprintFallback != null ? toPercent(sprintFallback.getTeamParticipation()) : 0.0;
+        double workloadBalance = sprintFallback != null ? toPercent(sprintFallback.getWorkloadBalance()) : 0.0;
+        teamParticipation = Math.max(0.0, Math.min(100.0, teamParticipation));
+        workloadBalance = Math.max(0.0, Math.min(100.0, workloadBalance));
+        completionRate = Math.max(0.0, Math.min(100.0, completionRate));
+        onTimeDelivery = Math.max(0.0, Math.min(100.0, onTimeDelivery));
+
+        double score = completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1;
+        return (int) Math.round(Math.max(0.0, Math.min(100.0, score)));
     }
 
     private Integer getRoundedProductivityScoreForSprint(Long sprintId) {
         if (sprintId == null) return null;
         List<Map<String, Object>> tasks = buildTasksForSprint(sprintId);
-        if (tasks != null && !tasks.isEmpty()) {
-            return computeProductivityScoreFromTasks(tasks, null);
-        }
         return sprintRepository.findById(sprintId)
-            .map(this::computeProductivityScorePercent)
-            .map(v -> (int) Math.round(v))
+            .map(s -> computeProductivityScoreFromTasks(tasks, s))
             .orElse(null);
+    }
+
+    private Long resolveTargetSprintId(ManagerChatRequest req) {
+        if (req == null) return null;
+        if (req.getSprintId() != null) return req.getSprintId();
+        String msg = req.getMessage();
+        if (msg == null || msg.isBlank()) return null;
+        Matcher m = SPRINT_ID_IN_TEXT.matcher(msg);
+        if (!m.find()) return null;
+        try {
+            return Long.parseLong(m.group(1));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String sanitizeErrorCode(String msg) {
