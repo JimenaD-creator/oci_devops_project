@@ -1,10 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import {
   BarChart,
   Bar,
@@ -15,9 +12,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { shortDevName, buildBlockedReportsForAiSprint } from '../dashboard/dashboardSprintData';
+import { shortDevName } from '../dashboard/dashboardSprintData';
 import { CHART_LEGEND_STYLE, CHART_LEGEND_ITEM_SX } from '../dashboard/dashboardTypography';
-import { API_BASE } from '../sprints/constants/sprintConstants';
 
 const FALLBACK_SPRINT_COLOR = '#546E7A';
 const CHART_ACCENT_ICON_BG = 'rgba(199, 70, 52, 0.09)';
@@ -111,89 +107,6 @@ function ChartCard({ title, subtitle, iconElement, children }) {
   );
 }
 
-function AIDeveloperVariationCard({ title, rows, emptyText }) {
-  if (!rows?.length) {
-    return (
-      <Paper
-        sx={{
-          mt: 1.5,
-          p: 1.5,
-          borderRadius: 2,
-          border: '1px dashed #D0D7DE',
-          bgcolor: '#FAFBFC',
-        }}
-      >
-        <Typography sx={{ color: '#607D8B', fontSize: '0.9rem' }}>{emptyText}</Typography>
-      </Paper>
-    );
-  }
-
-  return (
-    <Paper
-      sx={{
-        mt: 1.5,
-        p: 1.5,
-        borderRadius: 2,
-        border: '1px solid #E6EEF5',
-        bgcolor: '#F8FCFF',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-        <AutoAwesomeIcon sx={{ color: '#7B1FA2', fontSize: 18 }} />
-        <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#263238' }}>
-          {title}
-        </Typography>
-      </Box>
-
-      <Stack spacing={0.8}>
-        {rows.map((r) => {
-          const up = r.delta > 0;
-          const down = r.delta < 0;
-          return (
-            <Box
-              key={r.key}
-              sx={{
-                p: 1,
-                borderRadius: 1.5,
-                bgcolor: '#FFFFFF',
-                border: '1px solid #E9EEF2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 1,
-              }}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 700, color: '#1A1A1A', fontSize: '0.88rem' }}>
-                  {r.name}
-                </Typography>
-                <Typography sx={{ fontSize: '0.8rem', color: '#546E7A' }}>{r.message}</Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, flexShrink: 0 }}>
-                {up ? (
-                  <TrendingUpIcon sx={{ color: '#2E7D32', fontSize: 18 }} />
-                ) : down ? (
-                  <TrendingDownIcon sx={{ color: '#C62828', fontSize: 18 }} />
-                ) : null}
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: '0.82rem',
-                    color: up ? '#2E7D32' : down ? '#C62828' : '#607D8B',
-                  }}
-                >
-                  {r.deltaLabel}
-                </Typography>
-              </Box>
-            </Box>
-          );
-        })}
-      </Stack>
-    </Paper>
-  );
-}
-
 function sprintFieldKey(sp, suffix) {
   return `sp${sp.id}_${suffix}`;
 }
@@ -213,62 +126,6 @@ function buildWorkedEstimatedHoursRows(selectedSprints) {
       row[sprintFieldKey(sp, 'h')] = dev ? Number(dev.hours) || 0 : 0;
     });
     return row;
-  });
-}
-
-function buildDeveloperVariationTasks(selectedSprints) {
-  if (!selectedSprints || selectedSprints.length < 2) return [];
-
-  const ordered = [...selectedSprints].sort((a, b) => Number(a.id) - Number(b.id));
-  const first = ordered[0];
-  const last = ordered[ordered.length - 1];
-
-  const devNames = new Set();
-  ordered.forEach((sp) => (sp.developers || []).forEach((d) => d?.name && devNames.add(d.name)));
-
-  return Array.from(devNames).map((name) => {
-    const firstDev = (first.developers || []).find((d) => d.name === name);
-    const lastDev = (last.developers || []).find((d) => d.name === name);
-
-    const firstCompleted = Number(firstDev?.completed || 0);
-    const lastCompleted = Number(lastDev?.completed || 0);
-    const delta = lastCompleted - firstCompleted;
-
-    return {
-      key: `tasks-${name}`,
-      name: shortDevName(name),
-      delta,
-      deltaLabel: `${delta > 0 ? '+' : ''}${delta} tasks`,
-      message: `Completed tasks: ${first.shortLabel} ${firstCompleted} -> ${last.shortLabel} ${lastCompleted}`,
-    };
-  });
-}
-
-function buildDeveloperVariationHours(selectedSprints) {
-  if (!selectedSprints || selectedSprints.length < 2) return [];
-
-  const ordered = [...selectedSprints].sort((a, b) => Number(a.id) - Number(b.id));
-  const first = ordered[0];
-  const last = ordered[ordered.length - 1];
-
-  const devNames = new Set();
-  ordered.forEach((sp) => (sp.developers || []).forEach((d) => d?.name && devNames.add(d.name)));
-
-  return Array.from(devNames).map((name) => {
-    const firstDev = (first.developers || []).find((d) => d.name === name);
-    const lastDev = (last.developers || []).find((d) => d.name === name);
-
-    const firstHours = Number(firstDev?.hours || 0);
-    const lastHours = Number(lastDev?.hours || 0);
-    const delta = Number((lastHours - firstHours).toFixed(1));
-
-    return {
-      key: `hours-${name}`,
-      name: shortDevName(name),
-      delta,
-      deltaLabel: `${delta > 0 ? '+' : ''}${delta} h`,
-      message: `Worked hours: ${first.shortLabel} ${firstHours.toFixed(1)} -> ${last.shortLabel} ${lastHours.toFixed(1)}`,
-    };
   });
 }
 
@@ -430,111 +287,6 @@ export default function DeveloperWorkloadCharts({
     return Math.min(520, Math.max(300, Math.round(240 + 0.55 * m)));
   }, [workedEstimatedRows, selectedSprints]);
 
-  const aiTaskVariationRows = useMemo(
-    () => (compareMode ? buildDeveloperVariationTasks(selectedSprints) : []),
-    [compareMode, selectedSprints],
-  );
-
-  const aiHourVariationRows = useMemo(
-    () => (compareMode ? buildDeveloperVariationHours(selectedSprints) : []),
-    [compareMode, selectedSprints],
-  );
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [aiTaskRowsFromGemini, setAiTaskRowsFromGemini] = useState([]);
-  const [aiHourRowsFromGemini, setAiHourRowsFromGemini] = useState([]);
-
-  const aiSprintPayload = useMemo(
-    () =>
-      selectedSprints.map((sp) => ({
-        id: sp.id,
-        shortLabel: sp.shortLabel,
-        developers: (sp.developers || []).map((d) => ({
-          name: d.name,
-          assigned: Number(d.assigned || 0),
-          completed: Number(d.completed || 0),
-          hours: Number(d.hours || 0),
-          assignedHoursEstimate: Number(d.assignedHoursEstimate || 0),
-        })),
-        blockedReports: buildBlockedReportsForAiSprint(sp),
-      })),
-    [selectedSprints],
-  );
-
-  useEffect(() => {
-    if (!compareMode || aiSprintPayload.length < 2) {
-      setAiTaskRowsFromGemini([]);
-      setAiHourRowsFromGemini([]);
-      setAiError('');
-      setAiLoading(false);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    let cancelled = false;
-    const run = async () => {
-      setAiLoading(true);
-      setAiError('');
-      try {
-        const res = await fetch(`${API_BASE}/api/insights/developer-variation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sprints: aiSprintPayload }),
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const insights = data?.insights ?? {};
-        const tasks = Array.isArray(insights.tasks) ? insights.tasks : [];
-        const hours = Array.isArray(insights.hours) ? insights.hours : [];
-
-        if (!cancelled) {
-          setAiTaskRowsFromGemini(
-            tasks.map((r, idx) => {
-              const delta = Number(r?.delta ?? 0);
-              return {
-                key: r?.key || `ai-task-${idx}`,
-                name: r?.developerName || 'Developer',
-                delta,
-                deltaLabel: `${delta > 0 ? '+' : ''}${delta} tasks`,
-                message: r?.message || 'No additional AI explanation available.',
-              };
-            }),
-          );
-          setAiHourRowsFromGemini(
-            hours.map((r, idx) => {
-              const delta = Number(r?.delta ?? 0);
-              return {
-                key: r?.key || `ai-hour-${idx}`,
-                name: r?.developerName || 'Developer',
-                delta,
-                deltaLabel: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} h`,
-                message: r?.message || 'No additional AI explanation available.',
-              };
-            }),
-          );
-        }
-      } catch (_e) {
-        if (!cancelled) {
-          setAiError('AI insights are temporarily unavailable. Showing computed variation.');
-          setAiTaskRowsFromGemini([]);
-          setAiHourRowsFromGemini([]);
-        }
-      } finally {
-        if (!cancelled) setAiLoading(false);
-      }
-    };
-
-    run();
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [compareMode, aiSprintPayload]);
-
-  const shownTaskRows = aiTaskRowsFromGemini.length ? aiTaskRowsFromGemini : aiTaskVariationRows;
-  const shownHourRows = aiHourRowsFromGemini.length ? aiHourRowsFromGemini : aiHourVariationRows;
-
   if (!hasData) {
     return (
       <Box
@@ -625,17 +377,6 @@ export default function DeveloperWorkloadCharts({
                   </ChartPlot>
                 </Box>
               </Box>
-              {compareMode ? (
-                <AIDeveloperVariationCard
-                  title="AI Summary: variation in completed tasks by developer"
-                  rows={shownTaskRows}
-                  emptyText={
-                    aiLoading
-                      ? 'Generating AI insights for completed-task variation...'
-                      : aiError || 'Select at least 2 sprints to analyze completed-task variation.'
-                  }
-                />
-              ) : null}
             </ChartCard>
           </Box>
         ) : null}
@@ -702,17 +443,6 @@ export default function DeveloperWorkloadCharts({
                 })}
               </BarChart>
             </ChartPlot>
-            {compareMode ? (
-              <AIDeveloperVariationCard
-                title="AI Summary: variation in worked hours by developer"
-                rows={shownHourRows}
-                emptyText={
-                  aiLoading
-                    ? 'Generating AI insights for worked-hours variation...'
-                    : aiError || 'Select at least 2 sprints to analyze worked-hours variation.'
-                }
-              />
-            ) : null}
           </ChartCard>
         ) : null}
       </Stack>

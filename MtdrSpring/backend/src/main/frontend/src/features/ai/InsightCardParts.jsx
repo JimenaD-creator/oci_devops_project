@@ -22,7 +22,13 @@ import {
   Users,
   LineChart,
 } from 'lucide-react';
-import { KPI_LABELS, RECOMMENDATION_CATEGORY_LABELS } from './aiInsightsConstants';
+import {
+  KPI_LABELS,
+  RECOMMENDATION_CATEGORY_LABELS,
+  KPI_ALERT_PERCENT_KEYS,
+  alignAlertMessagePercent,
+  clampKpiPercentForDisplay,
+} from './aiInsightsConstants';
 
 const SEVERITY = {
   critical: {
@@ -45,6 +51,9 @@ const SEVERITY = {
 export function AlertCard({ alert }) {
   const cfg = SEVERITY[alert.severity] ?? SEVERITY.info;
   const { Icon } = cfg;
+  const messageText = alignAlertMessagePercent(alert.message, alert.value);
+  const kpiKey = typeof alert.kpi === 'string' ? alert.kpi : '';
+  const valueIsPercentKpi = KPI_ALERT_PERCENT_KEYS.has(kpiKey);
   return (
     <Box
       sx={{
@@ -74,12 +83,16 @@ export function AlertCard({ alert }) {
           {alert.kpi && (
             <Typography sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: '#607D8B', fontWeight: 600 }}>
               {KPI_LABELS[alert.kpi] ?? alert.kpi}
-              {alert.value != null ? ` — ${alert.value}%` : ''}
+              {alert.value != null
+                ? valueIsPercentKpi
+                  ? ` — ${clampKpiPercentForDisplay(alert.value)}%`
+                  : ` — ${alert.value}`
+                : ''}
             </Typography>
           )}
         </Box>
         <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.5 }}>
-          {alert.message}
+          {messageText}
         </Typography>
       </Box>
     </Box>

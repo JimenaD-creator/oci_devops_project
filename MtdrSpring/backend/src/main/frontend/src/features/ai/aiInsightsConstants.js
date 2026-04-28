@@ -25,7 +25,34 @@ export const KPI_LABELS = {
   teamParticipation: 'Team Participation',
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
+  blockers: 'Blockers',
 };
+
+/** Only these `kpi` fields on alerts are 0–100% — others (e.g. blockers) must not show a % suffix. */
+export const KPI_ALERT_PERCENT_KEYS = new Set([
+  'completionRate',
+  'onTimeDelivery',
+  'teamParticipation',
+  'workloadBalance',
+  'productivityScore',
+]);
+
+/** KPI alert values are shown as %; clamp to [0, 100] (e.g. team participation can exceed 100 when hours > expected). */
+export function clampKpiPercentForDisplay(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return Math.min(100, Math.max(0, n));
+}
+
+/** If AI prose repeats the same raw % as {@code value}, align it to the clamped % (e.g. 117% → 100%). */
+export function alignAlertMessagePercent(prose, rawValue) {
+  if (prose == null || rawValue == null) return prose;
+  const raw = Number(rawValue);
+  if (!Number.isFinite(raw)) return prose;
+  const clamped = Number(clampKpiPercentForDisplay(rawValue));
+  if (raw === clamped) return prose;
+  return String(prose).split(`${raw}%`).join(`${clamped}%`);
+}
 
 /** Gemini `actionableRecommendations[].category` → UI label */
 export const RECOMMENDATION_CATEGORY_LABELS = {

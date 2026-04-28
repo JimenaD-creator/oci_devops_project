@@ -772,8 +772,6 @@ export default function DashboardDeveloperCharts({
 }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [aiTaskRows, setAiTaskRows] = useState([]);
-  const [aiHourRows, setAiHourRows] = useState([]);
   const [aiProductivityRows, setAiProductivityRows] = useState([]);
 
   const orderedSelectedSprints = useMemo(
@@ -818,8 +816,6 @@ export default function DashboardDeveloperCharts({
 
   useEffect(() => {
     if (!compareMode || aiSprintPayload.length < 2) {
-      setAiTaskRows([]);
-      setAiHourRows([]);
       setAiProductivityRows([]);
       setAiLoading(false);
       setAiError('');
@@ -830,8 +826,6 @@ export default function DashboardDeveloperCharts({
     const run = async () => {
       setAiLoading(true);
       setAiError('');
-      setAiTaskRows([]);
-      setAiHourRows([]);
       setAiProductivityRows([]);
       try {
         const res = await fetch(`${API_BASE}/api/insights/developer-variation`, {
@@ -844,19 +838,13 @@ export default function DashboardDeveloperCharts({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const insights = data?.insights ?? {};
-        const tasks = Array.isArray(insights.tasks) ? insights.tasks : [];
-        const hours = Array.isArray(insights.hours) ? insights.hours : [];
         const productivity = Array.isArray(insights.productivity) ? insights.productivity : [];
         if (!cancelled) {
-          setAiTaskRows(tasks.map((r, idx) => ({ key: r?.key || `dash-task-${idx}`, name: r?.developerName || 'Developer', message: r?.message || 'No AI explanation returned.' })));
-          setAiHourRows(hours.map((r, idx) => ({ key: r?.key || `dash-hour-${idx}`, name: r?.developerName || 'Developer', message: r?.message || 'No AI explanation returned.' })));
           setAiProductivityRows(productivity.map((r, idx) => ({ key: r?.key || `dash-productivity-${idx}`, name: r?.developerName || 'Developer', message: r?.message || 'No AI explanation returned.' })));
         }
       } catch (_e) {
         if (!cancelled) {
           setAiError('AI insights are temporarily unavailable.');
-          setAiTaskRows([]);
-          setAiHourRows([]);
           setAiProductivityRows([]);
         }
       } finally {
@@ -1031,15 +1019,6 @@ export default function DashboardDeveloperCharts({
           height={hWorkload}
           accent={firstAccent}
           tint={alpha(firstAccent, 0.08)}
-          footerTitle="AI summary: completed-task variation by developer"
-          footer={
-            <AIDeveloperVariationGrid
-              rows={aiTaskRows}
-              loading={aiLoading}
-              emptyText={aiEmptyText}
-              tone="workload"
-            />
-          }
         >
           <BarChart
             data={workloadRowsWithTotals}
@@ -1150,15 +1129,6 @@ export default function DashboardDeveloperCharts({
           height={hHours}
           accent="#FB8C00"
           tint="rgba(251, 140, 0, 0.1)"
-          footerTitle="AI summary: worked-hours variation by developer"
-          footer={
-            <AIDeveloperVariationGrid
-              rows={aiHourRows}
-              loading={aiLoading}
-              emptyText={aiEmptyText}
-              tone="hours"
-            />
-          }
         >
           <BarChart
             data={hoursRows}

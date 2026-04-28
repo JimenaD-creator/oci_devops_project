@@ -55,6 +55,10 @@ public class GeminiService {
         "^(?i)Task status in this sprint:\\s*\\d+\\s+To do,\\s*\\d+\\s+In progress,\\s*\\d+\\s+In review,\\s*\\d+\\s+Done\\."
             + "(\\s*\\d+\\s+task\\(s\\)\\s+use other or unknown statuses\\.)?\\s*");
 
+    /** "blocked" / "blocker(s)" in user-facing alert prose (avoids matching arbitrary "block" substrings). */
+    private static final Pattern ALERT_BLOCKER_LEXEMES = Pattern.compile(
+        "\\b(blocked|blockers|blocker|blocking)\\b", Pattern.CASE_INSENSITIVE);
+
     /** JSON keys whose string values must stay machine-readable for the UI / API contract. */
     private static final Set<String> PRETTIFY_SKIP_KEYS = Set.of(
         "category", "severity", "kpi", "trend", "confidence");
@@ -664,12 +668,14 @@ public class GeminiService {
             + "refer to task statuses in plain English with title-style words: \"To do\", \"In progress\", \"In review\", \"Done\". "
             + "Never write TODO, IN_REVIEW, IN_PROCESS, DONE, or snake_case status tokens in user-facing text. "
             + "Counts must still match the integers in \"Canonical status totals\".\n" +
-            "- alerts: severity exactly 'critical' (KPI < 40 or dropped 20+ pts in 2+ sprints), 'warning' (KPI < 60), or 'info' (useful positives or context without urgency). Use [] if none.\n" +
+            "- alerts: severity must follow the numeric 'value' on the 0-100 scale for the five main KPIs: 'critical' only if value < 40 (or the message states a 20+ point drop across 2+ sprints), " +
+            "'warning' only if 40 <= value < 60, and 'info' if value >= 60. For teamParticipation and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
+            "For workloadBalance, values >= 70 mean reasonably balanced work distribution; 'warning' typically applies when value is below 70. For blocker-related alerts, prefer severity 'warning' when the blocked-assignment list is non-empty; do not put a 0-100 percentage in 'value' for those — omit 'value' or use the count of blocked rows. Use [] if there are no alerts.\n" +
             "- actionableRecommendations: 3-8 items when useful; if phase is in_progress or not_started and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload, blocked-assignment list above, or KPIs. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data.\n" +
             "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
-            "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts (severity warning or info as appropriate), actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
+            "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
             "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
@@ -813,6 +819,7 @@ public class GeminiService {
             enrichExecutiveSummaryIfSparse(root);
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
             injectBlockedAssignmentsSnapshot(root, sprintId);
+            normalizeAlertSeverities(root);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
@@ -1549,6 +1556,71 @@ public class GeminiService {
             root.set("blockedAssignments", blocked);
         } else {
             root.set("blockedAssignments", mapper.createArrayNode());
+        }
+    }
+
+    /**
+     * Aligns severities with prompt rules: high scores on "higher is better" KPIs are not warnings;
+     * when {@code blockedAssignments} is non-empty, blocker-themed alerts are {@code warning}, not info.
+     */
+    private void normalizeAlertSeverities(ObjectNode root) {
+        JsonNode alertsNode = root.get("alerts");
+        if (alertsNode == null || !alertsNode.isArray()) {
+            return;
+        }
+        int blockedCount = 0;
+        JsonNode blockedArr = root.get("blockedAssignments");
+        if (blockedArr != null && blockedArr.isArray()) {
+            blockedCount = blockedArr.size();
+        }
+        ArrayNode alerts = (ArrayNode) alertsNode;
+        for (int i = 0; i < alerts.size(); i++) {
+            JsonNode item = alerts.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpiRaw = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            if (o.has("value") && o.get("value").isNumber()) {
+                double v = o.get("value").asDouble();
+                if ("teamparticipation".equals(kpi)
+                    || "completionrate".equals(kpi)
+                    || "ontimedelivery".equals(kpi)
+                    || "productivityscore".equals(kpi)) {
+                    if (v >= 60.0) {
+                        o.put("severity", "info");
+                    }
+                } else if ("workloadbalance".equals(kpi) && v >= 70.0) {
+                    o.put("severity", "info");
+                }
+            }
+        }
+        // Blocker-themed alerts are warnings when the sprint snapshot still has blocked assignments; apply last so it wins.
+        if (blockedCount <= 0) {
+            return;
+        }
+        for (int i = 0; i < alerts.size(); i++) {
+            JsonNode item = alerts.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpiRaw = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            String message = o.path("message").isTextual() ? o.get("message").asText("") : "";
+            boolean kpiIsBlocker = kpi.contains("block");
+            boolean messageMentionsBlocker = ALERT_BLOCKER_LEXEMES.matcher(message).find();
+            if (kpiIsBlocker) {
+                o.put("severity", "warning");
+                o.remove("value");
+            } else if (kpiRaw.isEmpty() && messageMentionsBlocker) {
+                o.put("severity", "warning");
+                o.put("kpi", "blockers");
+                o.remove("value");
+            } else if (messageMentionsBlocker) {
+                o.put("severity", "warning");
+            }
         }
     }
 
