@@ -40,7 +40,10 @@ public class ManagerChatService {
     private static final long GEMINI_RETRY_BASE_MS = 1000L;
     private static final Pattern PERCENT_TOKEN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*%");
     private static final Pattern PRODUCTIVITY_SCORE_TOKEN =
-        Pattern.compile("(productivity\\s+score\\s*(?:of|is|:)?\\s*)(-?\\d+(?:\\.\\d+)?)", Pattern.CASE_INSENSITIVE);
+        Pattern.compile(
+            "(productivity\\s+score(?:[^\\d%\\n]{0,60})?)(-?\\d+(?:\\.\\d+)?)(?:\\s*%)?",
+            Pattern.CASE_INSENSITIVE
+        );
     private static final Pattern SPRINT_ID_IN_TEXT =
         Pattern.compile("\\bsprint\\s*#?\\s*(\\d+)\\b", Pattern.CASE_INSENSITIVE);
 
@@ -341,7 +344,7 @@ public class ManagerChatService {
         StringBuffer out = new StringBuffer();
         while (matcher.find()) {
             String prefix = matcher.group(1);
-            String replacement = prefix + expectedScore;
+            String replacement = prefix + expectedScore + "%";
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);

@@ -75,8 +75,8 @@ export default function KpiManagerGuidePanel({
   const alignGenericScorePhrase = (text) => {
     if (text == null || !hasCurrentProductivityScore) return text;
     const n = Math.max(0, Math.min(100, Number(resolvedCurrentProductivityScore)));
-    const display = Number.isInteger(n) ? `${n}` : `${n.toFixed(1)}`;
-    return String(text).replace(/(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)/gi, `$1${display}`);
+    const display = Number.isInteger(n) ? `${n}%` : `${n.toFixed(1)}%`;
+    return String(text).replace(/(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi, `$1${display}`);
   };
   const productivityDeltaTextRaw = clampOver100ForDisplay(
     typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',

@@ -93,16 +93,16 @@ export function alignTrendsProductivityScore(text, actualScore) {
   const n = Number(actualScore);
   if (!Number.isFinite(n)) return text;
   const clampedActual = Math.max(0, Math.min(100, n));
-  const display = Number.isInteger(clampedActual) ? `${clampedActual}` : `${clampedActual.toFixed(1)}`;
+  const display = Number.isInteger(clampedActual) ? `${clampedActual}%` : `${clampedActual.toFixed(1)}%`;
   const source = String(text);
   const explicit = source.replace(
-    /(productivity\s+score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)/gi,
+    /(productivity\s+score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
     `$1${display}`,
   );
   if (explicit !== source) return explicit;
   // Fallback for common wording: "Productivity remains high with a score of 100"
   if (/productiv/i.test(source)) {
-    return source.replace(/(\bscore\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)/i, `$1${display}`);
+    return source.replace(/(\bscore\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/i, `$1${display}`);
   }
   return source;
 }
