@@ -673,6 +673,7 @@ public class GeminiService {
             "For workloadBalance, values >= 70 mean reasonably balanced work distribution; 'warning' typically applies when value is below 70. For blocker-related alerts, prefer severity 'warning' when the blocked-assignment list is non-empty; do not put a 0-100 percentage in 'value' for those — omit 'value' or use the count of blocked rows. Use [] if there are no alerts.\n" +
             "- actionableRecommendations: 3-8 items when useful; if phase is in_progress or not_started and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload, blocked-assignment list above, or KPIs. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data.\n" +
             "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
+            "  For workload_redistribution, also evaluate worked-hour imbalance: if someone with urgent/open tasks has clearly higher logged hours than peers, recommend moving 1-2 suitable tasks to a teammate with lower logged hours and little/no open work.\n" +
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
@@ -682,7 +683,7 @@ public class GeminiService {
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
             "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero.\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
-            "- workloadRecommendations: only if workloadBalance < 70; else [].\n" +
+            "- workloadRecommendations: only if workloadBalance < 70; else []. When generated, base from/to decisions on real logged hours (workedHoursSum) and open urgent work so recommendations reduce overload; avoid assigning additional tasks to developers already above team-average logged hours unless no alternative exists.\n" +
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
@@ -1049,6 +1050,7 @@ public class GeminiService {
         int completed;
         int open;
         int urgentPending;
+        long workedHours;
     }
 
     private static class StatusSpread {
@@ -1214,11 +1216,17 @@ public class GeminiService {
                 Task t = ut.getTask();
                 if (isTaskDone(t)) {
                     d.completed++;
+                    if (ut.getWorkedHours() != null) {
+                        d.workedHours += ut.getWorkedHours();
+                    }
                     continue;
                 }
                 d.open++;
                 if (isHighPriorityTask(t) || isDueSoon(t, now)) {
                     d.urgentPending++;
+                }
+                if (ut.getWorkedHours() != null) {
+                    d.workedHours += ut.getWorkedHours();
                 }
             }
         } catch (Exception e) {
@@ -1378,14 +1386,17 @@ public class GeminiService {
             List<DeveloperUrgencyLoad> urg = new ArrayList<>(buildDeveloperUrgencyLoad(sprintId).values());
             DeveloperUrgencyLoad sender = urg.stream()
                 .filter(d -> d.completed == 0 && d.urgentPending > 0)
-                .max(Comparator.comparingInt(d -> d.urgentPending))
+                .max(Comparator.comparingInt((DeveloperUrgencyLoad d) -> d.urgentPending)
+                    .thenComparingLong(d -> d.workedHours))
                 .orElse(null);
             DeveloperUrgencyLoad receiver = urg.stream()
                 .filter(d -> d.open == 0 && d.completed > 0)
-                .max(Comparator.comparingInt(d -> d.completed))
+                .min(Comparator.comparingLong((DeveloperUrgencyLoad d) -> d.workedHours)
+                    .thenComparingInt(d -> -d.completed))
                 .orElse(null);
             if (sender != null && receiver != null && !Objects.equals(sender.name, receiver.name)) {
                 int moveUrgent = Math.max(1, Math.min(2, sender.urgentPending));
+                boolean hourGapMaterial = sender.workedHours >= receiver.workedHours + 4;
                 boolean rewritten = false;
                 for (JsonNode n : actionable) {
                     if (!n.isObject()) continue;
@@ -1394,25 +1405,30 @@ public class GeminiService {
                     o.put(
                         "text",
                         String.format(
-                            "%s has %d urgent pending task(s) (high priority or due soon) and no completed tasks yet; %s currently has no open tasks. Reassign ~%d urgent task(s) to balance delivery risk.",
+                            "%s has %d urgent pending task(s), no completed tasks yet, and %d logged hour(s); %s currently has no open tasks and %d logged hour(s). Reassign ~%d urgent task(s) to balance delivery risk and effort load%s.",
                             sender.name,
                             sender.urgentPending,
+                            sender.workedHours,
                             receiver.name,
-                            moveUrgent));
+                            receiver.workedHours,
+                            moveUrgent,
+                            hourGapMaterial ? "" : " (hours are close, so prioritize skill fit)"));
                     o.put("guardrailCorrected", true);
                     rewritten = true;
                     break;
                 }
-                if (!rewritten) {
+                if (!rewritten && hourGapMaterial) {
                     ObjectNode add = mapper.createObjectNode();
                     add.put("category", "workload_redistribution");
                     add.put(
                         "text",
                         String.format(
-                            "%s has %d urgent pending task(s) (high priority or due soon) and no completed tasks yet; %s currently has no open tasks. Reassign ~%d urgent task(s) to balance delivery risk.",
+                            "%s has %d urgent pending task(s), no completed tasks yet, and %d logged hour(s); %s currently has no open tasks and %d logged hour(s). Reassign ~%d urgent task(s) to balance delivery risk and effort load.",
                             sender.name,
                             sender.urgentPending,
+                            sender.workedHours,
                             receiver.name,
+                            receiver.workedHours,
                             moveUrgent));
                     add.put("guardrailCorrected", true);
                     actionable.add(add);
@@ -1425,10 +1441,12 @@ public class GeminiService {
                     o.put(
                         "reason",
                         String.format(
-                            "%s carries %d urgent pending task(s) with 0 completed, while %s has no open tasks.",
+                            "%s carries %d urgent pending task(s) with 0 completed and %d logged hour(s), while %s has no open tasks and %d logged hour(s).",
                             sender.name,
                             sender.urgentPending,
-                            receiver.name));
+                            sender.workedHours,
+                            receiver.name,
+                            receiver.workedHours));
                     workloadRecs.add(o);
                 } else {
                     for (JsonNode n : workloadRecs) {
@@ -1440,10 +1458,12 @@ public class GeminiService {
                         o.put(
                             "reason",
                             String.format(
-                                "%s carries %d urgent pending task(s) with 0 completed, while %s has no open tasks.",
+                                "%s carries %d urgent pending task(s) with 0 completed and %d logged hour(s), while %s has no open tasks and %d logged hour(s).",
                                 sender.name,
                                 sender.urgentPending,
-                                receiver.name));
+                                sender.workedHours,
+                                receiver.name,
+                                receiver.workedHours));
                     }
                 }
             }
