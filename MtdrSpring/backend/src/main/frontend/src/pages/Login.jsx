@@ -69,16 +69,16 @@ export default function Login() {
       const match = users.find((u) => {
         const pass = u.userPassword != null ? String(u.userPassword).trim() : '';
         if (pass !== String(password).trim()) return false;
-        const phoneDigits =
-          u.phoneNumber != null ? String(u.phoneNumber).replace(/\D/g, '') : '';
+        const phoneDigits = u.phoneNumber != null ? String(u.phoneNumber).replace(/\D/g, '') : '';
         const phoneOk = idDigits.length > 0 && phoneDigits === idDigits;
-        const nameOk =
-          u.name != null && String(u.name).trim().toLowerCase() === idLower;
-        const emailOk =
-          u.email != null &&
-          String(u.email).trim().toLowerCase() === idLower;
+        const nameOk = u.name != null && String(u.name).trim().toLowerCase() === idLower;
+        const emailOk = u.email != null && String(u.email).trim().toLowerCase() === idLower;
         return phoneOk || nameOk || emailOk;
       });
+
+      console.log('match keys:', match ? Object.keys(match) : 'no match');
+      console.log('profilePicture:', match?.profilePicture?.substring(0, 50));
+
       if (match) {
         const userRole = (match.type || 'DEVELOPER').toUpperCase();
 
@@ -93,7 +93,8 @@ export default function Login() {
         const userData = { 
           id: match.id,
           name: match.name, 
-          role: userRole 
+          role: userRole,
+          profilePicture: match.profilePicture || null
         };
         
         localStorage.setItem('currentUser', JSON.stringify(userData));
@@ -111,7 +112,7 @@ export default function Login() {
           } catch (e) { 
             console.error('Could not pre-load the manager project'); 
           }
-          navigate('/'); // Go to dashboard
+          navigate('/');
         }
       } else {
         setFormError('Invalid credentials. Please try again.');
