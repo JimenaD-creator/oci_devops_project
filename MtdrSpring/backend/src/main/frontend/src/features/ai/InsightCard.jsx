@@ -35,6 +35,9 @@ import {
   BlockedAssignmentsSnapshot,
 } from './InsightCardParts';
 
+import DeveloperRadarCards from './DeveloperRadarCards';
+
+
 function computeRecommendationList(ins) {
   if (!ins) return [];
   const list = [...(ins.actionableRecommendations ?? [])];
@@ -582,8 +585,11 @@ export default function InsightCard({
               Per-developer analysis
             </SectionHeading>
             {insights.developerInsights?.length > 0 ? (
-              <DeveloperInsightsTable rows={insights.developerInsights} />
-            ) : (
+              <>
+    <DeveloperInsightsTable rows={insights.developerInsights} />
+    <DeveloperRadarCards sprintId={sprintId} />
+  </>
+            ) :(
               <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
                 {AI_INSIGHTS_EMPTY.developers}
               </Typography>

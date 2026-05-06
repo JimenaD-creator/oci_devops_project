@@ -134,6 +134,7 @@ export default function Login() {
           id: match.id,
           name: match.name,
           role: userRole,
+          profilePicture: match.profilePicture || null,
         };
 
         localStorage.setItem('currentUser', JSON.stringify(userData));
