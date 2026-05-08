@@ -2,9 +2,12 @@ package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.UserRepository;
+import com.springboot.MyTodoList.repository.TeamMemberRepository;
+import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.dto.UserDetailDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +17,12 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TeamMemberRepository teamMemberRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -28,16 +37,26 @@ public class UserService {
     }
 
     public User saveUser(User user) {
-        if (user.getType() == null || 
+        if (user.getType() == null ||
            (!user.getType().equalsIgnoreCase("MANAGER") && !user.getType().equalsIgnoreCase("DEVELOPER"))) {
             throw new RuntimeException("Rol no permitido. Solo se permite MANAGER o DEVELOPER.");
         }
-        // Normalizar a mayúsculas para consistencia
         user.setType(user.getType().toUpperCase());
         return userRepository.save(user);
     }
 
+    @Transactional
     public void deleteUser(Long id) {
+        // 1. Borrar membresías del usuario en equipos
+        teamMemberRepository.deleteByUserId(id);
+
+        // 2. Desasignar de cualquier equipo donde sea manager
+        teamRepository.findByManagerId(id).ifPresent(team -> {
+            team.setManager(null);
+            teamRepository.save(team);
+        });
+
+        // 3. Borrar el usuario
         userRepository.deleteById(id);
     }
 
@@ -47,45 +66,26 @@ public class UserService {
             user.setEmail(userDetails.getEmail());
             user.setPhoneNumber(userDetails.getPhoneNumber());
             user.setUserPassword(userDetails.getUserPassword());
-            
-            if (userDetails.getType() != null && 
+            if (userDetails.getProfilePicture() != null) {
+                user.setProfilePicture(userDetails.getProfilePicture());
+            }
+            if (userDetails.getType() != null &&
                (userDetails.getType().equalsIgnoreCase("MANAGER") || userDetails.getType().equalsIgnoreCase("DEVELOPER"))) {
                 user.setType(userDetails.getType().toUpperCase());
             }
-            
             return userRepository.save(user);
         }).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
-    /**
-     * Verify user credentials against database.
-     * Checks if the provided phone/email and password match a user with the given ID.
-     *
-     * @param userId The user ID to verify
-     * @param phoneOrEmail The phone number or email provided by user
-     * @param password The password provided by user
-     * @return true if credentials are valid, false otherwise
-     */
     public boolean verifyUserCredentials(Long userId, String phoneOrEmail, String password) {
         Optional<User> user = userRepository.findById(userId);
-        if (!user.isPresent()) {
-            return false;
-        }
+        if (!user.isPresent()) return false;
 
         User foundUser = user.get();
-        
-        // Check if provided phone/email matches
         boolean phoneMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getPhoneNumber());
         boolean emailMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getEmail());
-        
-        if (!phoneMatches && !emailMatches) {
-            return false;
-        }
-
-        // Check if password matches
-        if (password == null || !password.equals(foundUser.getUserPassword())) {
-            return false;
-        }
+        if (!phoneMatches && !emailMatches) return false;
+        if (password == null || !password.equals(foundUser.getUserPassword())) return false;
 
         return true;
     }

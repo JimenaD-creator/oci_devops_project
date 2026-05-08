@@ -31,6 +31,7 @@ public class ManagerChatService {
     @Autowired private TaskRepository taskRepository;
     @Autowired private UserTaskRepository userTaskRepository;
     @Autowired private UserSprintRepository userSprintRepository;
+    @Autowired private EmbeddingService embeddingService;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -74,7 +75,8 @@ public class ManagerChatService {
                 ? getRoundedProductivityScoreForSprint(targetSprintId)
                 : null;
 
-            String systemPrompt = buildSystemPrompt(contextJson, scope);
+            String ragContext = buildRagContext(req.getMessage(), req.getSprintId());
+            String systemPrompt = buildSystemPrompt(contextJson, ragContext, scope);
             String reply = callGemini(systemPrompt, req.getMessage(), req.getHistory());
             reply = clampPercentagesToRange(reply);
             reply = alignProductivityScoreMentions(reply, sprintProductivityScore);
@@ -84,6 +86,28 @@ public class ManagerChatService {
             System.err.println("[ManagerChatService] Error: " + e.getMessage());
             String code = sanitizeErrorCode(e.getMessage());
             return ManagerChatResponse.error(code, friendlyError(code));
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RAG CONTEXT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private String buildRagContext(String query, Long sprintId) {
+        try {
+            List<TaskEmbedding> relevant = embeddingService.findRelevantTasks(query, sprintId, 8);
+            if (relevant.isEmpty()) {
+                return "No indexed tasks found — using full project data below.";
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Top relevant tasks retrieved by semantic search:\n");
+            for (TaskEmbedding te : relevant) {
+                sb.append("- ").append(te.getTextoChunk()).append("\n");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            System.err.println("[ManagerChatService] buildRagContext error: " + e.getMessage());
+            return "Vector search unavailable — using full project data below.";
         }
     }
 
@@ -113,13 +137,11 @@ public class ManagerChatService {
             sd.put("teamParticipation", toPercent(s.getTeamParticipation()));
             sd.put("workloadBalance", toPercent(s.getWorkloadBalance()));
 
-            // Tasks for this sprint
             List<Map<String, Object>> tasks = buildTasksForSprint(s.getId());
             sd.put("tasks", tasks);
             sd.put("phase", resolvePhase(s, tasks));
             sd.put("productivityScore", computeProductivityScoreFromTasks(tasks, s));
 
-            // Developers summary
             List<Map<String, Object>> devSummary = buildDevSummaryForSprint(s.getId());
             sd.put("developers", devSummary);
 
@@ -137,32 +159,19 @@ public class ManagerChatService {
         return mapper.writeValueAsString(context);
     }
 
-    /**
-     * Assignments flagged blocked for the sprint; assignee is who reported the block on that assignment.
-     */
     private List<Map<String, Object>> buildBlockedAssignmentsForSprint(Long sprintId) {
         try {
             List<UserTask> userTasks = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
-            if (userTasks == null) {
-                return List.of();
-            }
+            if (userTasks == null) return List.of();
             List<Map<String, Object>> out = new ArrayList<>();
             Set<String> seen = new HashSet<>();
             for (UserTask ut : userTasks) {
-                if (ut == null || ut.getId() == null || !Boolean.TRUE.equals(ut.getIsBlocked())) {
-                    continue;
-                }
-                if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
-                    continue;
-                }
+                if (ut == null || ut.getId() == null || !Boolean.TRUE.equals(ut.getIsBlocked())) continue;
+                if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) continue;
                 String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
-                if (!seen.add(key)) {
-                    continue;
-                }
+                if (!seen.add(key)) continue;
                 Task t = ut.getTask();
-                if (t == null) {
-                    continue;
-                }
+                if (t == null) continue;
                 User u = ut.getUser();
                 String name = (u != null && u.getName() != null && !u.getName().isBlank())
                     ? u.getName().trim()
@@ -186,7 +195,6 @@ public class ManagerChatService {
             List<UserTask> userTasks = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
             if (userTasks == null) return List.of();
 
-            // Deduplicate by taskId
             Map<Long, UserTask> deduped = new LinkedHashMap<>();
             for (UserTask ut : userTasks) {
                 if (ut == null || ut.getTask() == null) continue;
@@ -257,7 +265,6 @@ public class ManagerChatService {
                 }
             }
 
-            // Add roster-only members (on sprint but no tasks)
             List<UserSprint> roster = userSprintRepository.findBySprintIdWithUser(sprintId);
             if (roster != null) {
                 for (UserSprint us : roster) {
@@ -288,7 +295,7 @@ public class ManagerChatService {
     // PROMPT BUILDING
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String buildSystemPrompt(String contextJson, String scope) {
+    private String buildSystemPrompt(String contextJson, String ragContext, String scope) {
         String scopeDesc = scope.startsWith("sprint_")
             ? "Sprint " + scope.replace("sprint_", "")
             : "all sprints in the project";
@@ -310,7 +317,9 @@ public class ManagerChatService {
             + "- Respond in the same language the manager uses (Spanish or English).\n\n"
             + "- Any percentage you mention must stay between 0% and 100%.\n\n"
             + "## Current data scope: " + scopeDesc + "\n\n"
-            + "## Project data (JSON)\n"
+            + "## Most relevant tasks (vector search)\n"
+            + ragContext + "\n\n"
+            + "## Full project data (JSON)\n"
             + contextJson;
     }
 
@@ -358,14 +367,11 @@ public class ManagerChatService {
     private String callGemini(String systemPrompt, String userMessage,
                                List<ManagerChatRequest.ChatMessage> history) throws Exception {
 
-        // Build contents array: system context as first user turn, then history, then current message
         List<Map<String, Object>> contents = new ArrayList<>();
 
-        // System instruction as the first user/model exchange (Gemini doesn't have a system role)
         contents.add(buildGeminiTurn("user", systemPrompt));
         contents.add(buildGeminiTurn("model", "Understood. I'm ready to answer questions about the project data."));
 
-        // Chat history (up to last 10 turns to stay within token limits)
         if (history != null) {
             int start = Math.max(0, history.size() - 10);
             for (int i = start; i < history.size(); i++) {
@@ -375,7 +381,6 @@ public class ManagerChatService {
             }
         }
 
-        // Current user message
         contents.add(buildGeminiTurn("user", userMessage));
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -400,9 +405,7 @@ public class ManagerChatService {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 int status = response.statusCode();
 
-                if (status == 200) {
-                    return extractTextFromGeminiResponse(response.body());
-                }
+                if (status == 200) return extractTextFromGeminiResponse(response.body());
                 if (status == 429) throw new RuntimeException("HTTP_429_QUOTA_EXCEEDED");
                 if (status == 401 || status == 403) throw new RuntimeException("HTTP_401_403_API_KEY_INVALID");
 
@@ -418,6 +421,7 @@ public class ManagerChatService {
 
                 if (status >= 500) throw new RuntimeException("HTTP_" + status + "_UPSTREAM_ERROR");
                 throw new RuntimeException("HTTP_" + status + "_UNEXPECTED");
+
             } catch (HttpTimeoutException e) {
                 lastRetryable = new RuntimeException("GEMINI_TIMEOUT", e);
                 if (attempt < GEMINI_MAX_RETRIES) {
@@ -470,7 +474,6 @@ public class ManagerChatService {
     // ─────────────────────────────────────────────────────────────────────────
 
     private String resolvePhase(Sprint s, List<Map<String, Object>> tasks) {
-        // If task data shows full completion, expose completed state even before dueDate.
         if (tasks != null && !tasks.isEmpty()) {
             boolean allDone = true;
             for (Map<String, Object> t : tasks) {
@@ -482,10 +485,7 @@ public class ManagerChatService {
             }
             if (allDone) return "completed";
         }
-        // Fallback: if sprint KPI completionRate is already 100%, mark completed.
-        if (toPercent(s != null ? s.getCompletionRate() : null) >= 100.0) {
-            return "completed";
-        }
+        if (toPercent(s != null ? s.getCompletionRate() : null) >= 100.0) return "completed";
         LocalDateTime now = LocalDateTime.now();
         if (s.getStartDate() != null && now.isBefore(s.getStartDate())) return "not_started";
         if (s.getDueDate() != null && now.isAfter(s.getDueDate())) return "ended";
@@ -508,10 +508,6 @@ public class ManagerChatService {
             .setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
     }
 
-    /**
-     * Align chat "productivityScore" with KPI Analytics behavior:
-     * completionRate/tasks + onTimeDelivery/tasks + teamParticipation/sprint + workloadBalance/sprint.
-     */
     private int computeProductivityScoreFromTasks(List<Map<String, Object>> tasks, Sprint sprintFallback) {
         double completionRate = 0.0;
         double onTimeDelivery = 0.0;
@@ -531,12 +527,8 @@ public class ManagerChatService {
                     try {
                         LocalDateTime finishDt = LocalDateTime.parse(finish);
                         LocalDateTime dueDt = LocalDateTime.parse(due);
-                        if (!finishDt.isAfter(dueDt)) {
-                            doneOnTime++;
-                        }
-                    } catch (Exception ignore) {
-                        // If date format is not parseable, skip on-time contribution for this row.
-                    }
+                        if (!finishDt.isAfter(dueDt)) doneOnTime++;
+                    } catch (Exception ignore) {}
                 }
             }
             completionRate = total > 0 ? (100.0 * done) / total : 0.0;
@@ -592,19 +584,20 @@ public class ManagerChatService {
     }
 
     private String friendlyError(String code) {
-    if ("QUOTA_EXCEEDED".equals(code)) {
-        return "The AI service is temporarily rate-limited. Please try again in a moment.";
-    } else if ("API_KEY_INVALID".equals(code)) {
-        return "The Gemini API key is invalid or expired.";
-    } else if ("UPSTREAM_TIMEOUT".equals(code)) {
-        return "The AI service took too long to respond. Please try again in a few seconds.";
-    } else if ("REQUEST_INTERRUPTED".equals(code)) {
-        return "The request was interrupted before completion. Please send your message again.";
-    } else if ("EMPTY_AI_RESPONSE".equals(code)) {
-        return "The AI service returned an empty response. Please try rephrasing your message.";
-    } else if ("UPSTREAM_UNAVAILABLE".equals(code)) {
-        return "The AI service is temporarily unavailable. Please try again shortly.";
-    } else {
-        return "An error occurred while processing your request. Please try again.";
+        if ("QUOTA_EXCEEDED".equals(code)) {
+            return "The AI service is temporarily rate-limited. Please try again in a moment.";
+        } else if ("API_KEY_INVALID".equals(code)) {
+            return "The Gemini API key is invalid or expired.";
+        } else if ("UPSTREAM_TIMEOUT".equals(code)) {
+            return "The AI service took too long to respond. Please try again in a few seconds.";
+        } else if ("REQUEST_INTERRUPTED".equals(code)) {
+            return "The request was interrupted before completion. Please send your message again.";
+        } else if ("EMPTY_AI_RESPONSE".equals(code)) {
+            return "The AI service returned an empty response. Please try rephrasing your message.";
+        } else if ("UPSTREAM_UNAVAILABLE".equals(code)) {
+            return "The AI service is temporarily unavailable. Please try again shortly.";
+        } else {
+            return "An error occurred while processing your request. Please try again.";
+        }
     }
-}}
+}

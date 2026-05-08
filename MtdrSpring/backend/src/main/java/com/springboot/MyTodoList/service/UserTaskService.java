@@ -42,9 +42,6 @@ public class UserTaskService {
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
 
-    /**
-     * Users who have at least one assignment on a task in this sprint (for Telegram picker).
-     */
     @Transactional(readOnly = true)
     public List<User> findDistinctAssigneesBySprintId(Long sprintId) {
         if (sprintId == null) {
@@ -63,10 +60,6 @@ public class UserTaskService {
         return out;
     }
 
-    /**
-     * Result of one DB read for Telegram: assigned task ids in the sprint and which of those
-     * rows are already COMPLETED/DONE for this user.
-     */
     public static final class UserSprintTaskListIndex {
         public final Set<Long> assignedTaskIds;
         public final Set<Long> myCompletedAssignmentTaskIds;
@@ -77,9 +70,6 @@ public class UserTaskService {
         }
     }
 
-    /**
-     * One query: this user's USER_TASK rows for the sprint. Used to build Telegram keyboards without N+1.
-     */
     @Transactional(readOnly = true)
     public UserSprintTaskListIndex loadUserSprintTaskListIndex(Long userId, Long sprintId) {
         if (userId == null || sprintId == null) {
@@ -98,15 +88,11 @@ public class UserTaskService {
         return new UserSprintTaskListIndex(Collections.unmodifiableSet(assigned), Collections.unmodifiableSet(completed));
     }
 
-    /** Task ids in this sprint assigned to this user (via USER_TASK). */
     @Transactional(readOnly = true)
     public Set<Long> findTaskIdsForUserInSprint(Long userId, Long sprintId) {
         return loadUserSprintTaskListIndex(userId, sprintId).assignedTaskIds;
     }
 
-    /**
-     * This user's USER_TASK rows for tasks in the sprint (single DB round-trip).
-     */
     @Transactional(readOnly = true)
     public List<UserTask> findUserTasksForUserInSprint(Long userId, Long sprintId) {
         if (userId == null || sprintId == null) {
@@ -143,9 +129,6 @@ public class UserTaskService {
         return 1L;
     }
 
-    /**
-     * True if the user has a USER_TASK row for this task, or there are no assignment rows yet (legacy tasks).
-     */
     public boolean isUserAssignedToTask(Long userId, Long taskId) {
         List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
         if (uts.isEmpty()) {
@@ -154,10 +137,6 @@ public class UserTaskService {
         return uts.stream().anyMatch(ut -> ut.getUser().getId().equals(userId));
     }
 
-    /**
-     * Whether this user's assignment row is finished (shared tasks: TASK may still be open).
-     * Used by Telegram to hide completed work from the "pending" keyboard for that user only.
-     */
     @Transactional(readOnly = true)
     public boolean isMyAssignmentCompleted(Long userId, Long taskId) {
         if (userId == null || taskId == null) {
@@ -171,11 +150,6 @@ public class UserTaskService {
         return assignmentStatusIsCompleted(opt.get().getStatus());
     }
 
-    /**
-     * Telegram "undo": only reopen this user's assignment, then recompute TASK status from all assignees.
-     *
-     * @return false if there were no USER_TASK rows (legacy); caller may fall back to updating the task row only.
-     */
     @Transactional
     public boolean reopenMyAssignment(Long telegramUserId, Long taskId) {
         List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
@@ -197,32 +171,21 @@ public class UserTaskService {
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
         return true;
     }
-    
-    /**
-     * Adds {@code workedHours} to the existing {@code WORKED_HOURS} total for this user–task row (Telegram / logging).
-     * Previous behaviour replaced the total, so repeat entries did not accumulate.
-     */
+
     @Transactional
     public UserTask saveWorkedHours(Long userId, Long taskId, Integer workedHours) {
         try {
             Long effectiveUserId = resolveAssigneeUserIdForWorkedHours(userId, taskId);
             UserTaskId id = new UserTaskId(effectiveUserId, taskId);
-            
             Optional<UserTask> existingUserTask = userTaskRepository.findById(id);
-            
             int delta = workedHours == null ? 0 : workedHours;
-            if (delta < 0) {
-                delta = 0;
-            }
-
+            if (delta < 0) delta = 0;
             UserTask userTask;
             long previous = 0L;
             if (existingUserTask.isPresent()) {
                 userTask = existingUserTask.get();
                 Long wh = userTask.getWorkedHours();
-                if (wh != null && wh > 0) {
-                    previous = wh;
-                }
+                if (wh != null && wh > 0) previous = wh;
                 logger.info("Adding {}h for userId {} taskId {} (was {}h)", delta, effectiveUserId, taskId, previous);
             } else {
                 User user = userRepository.findById(effectiveUserId)
@@ -232,28 +195,24 @@ public class UserTaskService {
                 userTask = new UserTask(user, task);
                 logger.info("Creating USER_TASK for userId {} taskId {} with {}h (first log)", effectiveUserId, taskId, delta);
             }
-            
             userTask.setWorkedHours(previous + delta);
             userTask.setStatus("COMPLETED");
             userTask.setIsBlocked(false);
             userTask.setBlockedReason(null);
-
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
             logger.info("Worked hours total for userId {} taskId {} is now {}", effectiveUserId, taskId, userTask.getWorkedHours());
             return saved;
-            
         } catch (Exception e) {
             logger.error("Error saving worked hours for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
             throw new RuntimeException("Failed to save worked hours", e);
         }
     }
-    
+
     public Integer getWorkedHours(Long userId, Long taskId) {
         try {
             UserTaskId id = new UserTaskId(userId, taskId);
             Optional<UserTask> userTask = userTaskRepository.findById(id);
-            
             if (userTask.isPresent()) {
                 Long hours = userTask.get().getWorkedHours();
                 return hours != null ? hours.intValue() : 0;
@@ -265,23 +224,12 @@ public class UserTaskService {
         }
     }
 
-    /**
-     * Saves the blocked reason/message for a task (Telegram).
-     * Updates the USER_TASK record with the blocked reason and sets status to BLOCKED.
-     *
-     * @param userId The user ID
-     * @param taskId The task ID
-     * @param blockedReason The reason/message why the task is blocked
-     * @return The updated UserTask
-     */
     @Transactional
     public UserTask saveBlockedReason(Long userId, Long taskId, String blockedReason) {
         try {
             Long effectiveUserId = resolveAssigneeUserIdForWorkedHours(userId, taskId);
             UserTaskId id = new UserTaskId(effectiveUserId, taskId);
-
             Optional<UserTask> existingUserTask = userTaskRepository.findById(id);
-
             UserTask userTask;
             if (existingUserTask.isPresent()) {
                 userTask = existingUserTask.get();
@@ -294,16 +242,13 @@ public class UserTaskService {
                 userTask = new UserTask(user, task);
                 logger.info("Creating USER_TASK for userId {} taskId {} with blocked reason (first log)", effectiveUserId, taskId);
             }
-
             userTask.setBlockedReason(blockedReason);
             userTask.setStatus("BLOCKED");
             userTask.setIsBlocked(true);
-
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
             logger.info("Blocked reason saved for userId {} taskId {}: {}", effectiveUserId, taskId, blockedReason);
             return saved;
-
         } catch (Exception e) {
             logger.error("Error saving blocked reason for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
             throw new RuntimeException("Failed to save blocked reason", e);

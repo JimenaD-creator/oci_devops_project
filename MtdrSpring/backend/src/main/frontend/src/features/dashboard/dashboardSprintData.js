@@ -391,6 +391,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       sp._devMap[devKey] = {
         name: initialName,
         initials: initialsFromName(initialName),
+        profilePicture: ut.user?.profilePicture ?? null,
         _taskIds: new Set(),
         _completedTaskIds: new Set(),
         _assignedHoursEstimate: 0,
@@ -403,6 +404,9 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const dm = sp._devMap[devKey];
     dm.name = pickDeveloperDisplayName(ut, dm.name);
     dm.initials = initialsFromName(dm.name);
+    if (!dm.profilePicture && ut.user?.profilePicture) {
+  dm.profilePicture = ut.user.profilePicture;  // 👈 agrega esto
+}
     if (taskId != null) {
       if (!dm._taskIds.has(taskId)) {
         dm._assignedHoursEstimate += Number(taskSprintMap[taskId]?.assignedHours) || 0;
