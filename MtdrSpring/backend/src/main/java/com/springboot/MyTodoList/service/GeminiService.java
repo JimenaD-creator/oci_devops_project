@@ -40,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.Comparator;
+import java.util.HashMap;
 
 @Service
 public class GeminiService {
@@ -678,14 +679,18 @@ public class GeminiService {
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
             "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
-            "  Each object MUST include a boolean field 'overloaded'. Set overloaded=true ONLY when this developer is clearly carrying more work than peers — for example: workedHoursSum is significantly above the team average (roughly 1.4x+ the team mean) AND/OR assignedTaskRows is significantly above the team average, OR the developer is juggling multiple blocked or urgent tasks that add real pressure. Otherwise set overloaded=false. Roster-only developers and developers with zero assignment rows MUST have overloaded=false. When the team has 2 or fewer developers, mark overloaded=true only if there is an unmistakable disparity.\n" +
-            "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure).\n" +
+            "  Each object MUST include a boolean field 'overloaded'. Set overloaded=true ONLY when BOTH (a) and (b) are met:\n" +
+            "    (a) The developer still has uncompleted work in this sprint — i.e., (assignedTaskRows − completedTasks) ≥ 1. If they have already completed all their assigned work, overloaded MUST be false regardless of how many hours they logged.\n" +
+            "    (b) The developer is clearly carrying more in-flight work than peers — for example: workedHoursSum is significantly above the team average (roughly 1.4x+ the team mean) AND/OR assignedTaskRows is significantly above the team average, OR the developer is juggling multiple blocked or urgent tasks that add real pressure.\n" +
+            "  Otherwise set overloaded=false. Roster-only developers and developers with zero assignment rows MUST have overloaded=false. High logged hours alone do not justify overload when there is no pending work. When the team has 2 or fewer developers, mark overloaded=true only if there is an unmistakable disparity.\n" +
+            "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure) AND mention that uncompleted work remains.\n" +
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
             "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero.\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
             "- workloadRecommendations: only if workloadBalance < 70; else []. When generated, base from/to decisions on real logged hours (workedHoursSum) and open urgent work so recommendations reduce overload; avoid assigning additional tasks to developers already above team-average logged hours unless no alternative exists.\n" +
+            "  Never set 'to' / destination to a developer who has the highest workedHoursSum on the team workload list when another teammate has lower hours and can take work — especially do not move tasks onto someone who already logged the most hours this sprint.\n" +
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
@@ -814,6 +819,7 @@ public class GeminiService {
             normalizeDeveloperInsightRows(root);
             normalizeActionableRecommendationRows(root);
             enrichDeveloperInsightsIfEmpty(root, sprintId);
+            enforceOverloadFromWorkloadSnapshot(root, sprintId);
             Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
             enrichActionableRecommendationsIfEmpty(root, sprint);
             normalizeActionableRecommendationCounts(root, sprintId);
@@ -901,6 +907,55 @@ public class GeminiService {
                 boolean truthy = s.equals("true") || s.equals("yes") || s.equals("1");
                 o.put("overloaded", truthy);
             }
+        }
+    }
+
+    /**
+     * Deterministic guardrail: Gemini may still mark overloaded=true when assignedTaskRows equals completedTasks
+     * (no incomplete assignments). Force overloaded=false from Team workload JSON so UI stays consistent without
+     * requiring regeneration — persisted insights are re-enriched on GET when sprintId is known.
+     */
+    private void enforceOverloadFromWorkloadSnapshot(ObjectNode root, Long sprintId) {
+        try {
+            JsonNode wl = mapper.readTree(buildTeamWorkloadJson(sprintId));
+            if (wl == null || !wl.isArray()) {
+                return;
+            }
+            Map<String, JsonNode> rowByDevLower = new HashMap<>();
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                String dn = row.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+                if (!dn.isEmpty()) {
+                    rowByDevLower.put(dn, row);
+                }
+            }
+            JsonNode insights = root.get("developerInsights");
+            if (insights == null || !insights.isArray()) {
+                return;
+            }
+            for (JsonNode item : insights) {
+                if (item == null || !item.isObject()) {
+                    continue;
+                }
+                ObjectNode o = (ObjectNode) item;
+                String nameKey = o.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+                JsonNode row = nameKey.isEmpty() ? null : rowByDevLower.get(nameKey);
+                if (row == null) {
+                    continue;
+                }
+                boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
+                int assignedRows = row.path("assignedTaskRows").asInt(0);
+                int completedTasks = row.path("completedTasks").asInt(0);
+                int pendingIncompleteAssignments = assignedRows - completedTasks;
+                if (rosterOnly || pendingIncompleteAssignments <= 0) {
+                    o.put("overloaded", false);
+                    o.put("overloadGuardrailCorrected", true);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] enforceOverloadFromWorkloadSnapshot: " + e.getMessage());
         }
     }
 
@@ -1399,13 +1454,17 @@ public class GeminiService {
             // Precision rule: only when it applies, suggest moving urgent work
             // from developers with zero completed tasks to developers with no open tasks.
             List<DeveloperUrgencyLoad> urg = new ArrayList<>(buildDeveloperUrgencyLoad(sprintId).values());
+            long maxWorkedAcrossTeam = urg.stream().mapToLong(d -> d.workedHours).max().orElse(0L);
             DeveloperUrgencyLoad sender = urg.stream()
                 .filter(d -> d.completed == 0 && d.urgentPending > 0)
                 .max(Comparator.comparingInt((DeveloperUrgencyLoad d) -> d.urgentPending)
                     .thenComparingLong(d -> d.workedHours))
                 .orElse(null);
+            // Do not move work onto the teammate who already logged the most hours (e.g. finished all tasks
+            // with heavy logging while others are idle for other reasons).
             DeveloperUrgencyLoad receiver = urg.stream()
                 .filter(d -> d.open == 0 && d.completed > 0)
+                .filter(d -> maxWorkedAcrossTeam == 0L || d.workedHours < maxWorkedAcrossTeam)
                 .min(Comparator.comparingLong((DeveloperUrgencyLoad d) -> d.workedHours)
                     .thenComparingInt(d -> -d.completed))
                 .orElse(null);
