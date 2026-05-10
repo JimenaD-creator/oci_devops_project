@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Sparkles } from 'lucide-react';
 import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
+import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
@@ -61,11 +62,8 @@ export default function AIInsightsPage({ projectId }) {
         setSelectedSprintId((prev) => {
           if (filtered.length === 0) return null;
           if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
-          const active = filtered.find((s) => {
-            const now = new Date();
-            return now >= new Date(s.startDate) && now <= new Date(s.dueDate);
-          });
-          return active?.id ?? filtered[filtered.length - 1]?.id ?? null;
+          const defaultSprint = pickDefaultSelectedSprint(filtered);
+          return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
         });
       })
       .catch(() => setSprints([]))
@@ -81,7 +79,13 @@ export default function AIInsightsPage({ projectId }) {
     return Math.min(100, Math.max(0, normalized));
   };
 
-  // Keep AI Trends aligned with KPI Analytics formula.
+  const normalizeKpiPercent = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(100, Math.max(0, n));
+  };
+
+  // Keep AI Trends aligned with KPI Analytics formula (must be declared before currentSprintKpiMetrics).
   const productivityFromSprintWork = (sprint) => {
     if (!sprint) return null;
     const completionRate = Math.min(100, Math.max(0, Number(sprint?.kpis?.completionRate) || 0));
@@ -96,6 +100,21 @@ export default function AIInsightsPage({ projectId }) {
     );
     return Math.min(100, Math.max(0, score));
   };
+
+  const currentSprintKpiMetrics = selectedSprint
+    ? {
+        completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
+        onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
+        teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
+        workloadBalance: (() => {
+          const rawWb = Number(selectedSprint.kpis?.workloadBalance);
+          if (!Number.isFinite(rawWb)) return 0;
+          const wb = rawWb <= 1 ? rawWb * 100 : rawWb;
+          return Math.min(100, Math.max(0, Math.round(wb)));
+        })(),
+        productivityScore: productivityFromSprintWork(selectedSprint),
+      }
+    : null;
 
   /** Sprints sorted chronologically for "next sprint" comparisons. */
   const sortedSprints = useMemo(() => {
@@ -242,6 +261,7 @@ export default function AIInsightsPage({ projectId }) {
           nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
           nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
           currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
+          currentSprintMetrics={currentSprintKpiMetrics}
           refreshToken={refreshToken}
         />
       )}

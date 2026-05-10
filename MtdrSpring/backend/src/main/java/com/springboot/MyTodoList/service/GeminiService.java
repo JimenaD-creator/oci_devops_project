@@ -1738,9 +1738,14 @@ public class GeminiService {
 
     private double toPercent(BigDecimal value) {
         if (value == null) return 0.0;
-        return value.multiply(BigDecimal.valueOf(100))
-                    .setScale(1, RoundingMode.HALF_UP)
-                    .doubleValue();
+        // KPI sources are mixed in this project: some persist ratios [0..1], others store percentages [0..100].
+        // Normalize both formats into the same 0..100 scale used by KPI cards in the frontend.
+        double raw = value.doubleValue();
+        double normalized = Math.abs(raw) <= 1.0 ? raw * 100.0 : raw;
+        double clamped = Math.max(0.0, Math.min(100.0, normalized));
+        return BigDecimal.valueOf(clamped)
+            .setScale(0, RoundingMode.HALF_UP)
+            .doubleValue();
     }
 
     private double computeProductivityScore(Sprint s) {
@@ -1748,7 +1753,8 @@ public class GeminiService {
         double otd = toPercent(s.getOnTimeDelivery());
         double tp  = toPercent(s.getTeamParticipation());
         double wb  = toPercent(s.getWorkloadBalance());
-        return (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
+        double score = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
+        return Math.max(0.0, Math.min(100.0, Math.round(score)));
     }
 
     private JsonNode buildDeveloperVariationFallback(List<Map<String, Object>> sprintSnapshots) {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper, Button, CircularProgress } from '@mui/material';
 import { Sparkles } from 'lucide-react';
-import { KPI_LABELS, alignTrendsProductivityScore } from '../ai/aiInsightsConstants';
+import { KPI_LABELS, alignTrendsProductivityScore, alignKpiMetricsInText } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -58,6 +58,7 @@ export default function KpiManagerGuidePanel({
   fetchFailed,
   productivityDelta,
   currentProductivityScore = null,
+  currentSprintKpis = {},
   onOpenAiInsights,
 }) {
   const resolvedCurrentProductivityScore = Number.isFinite(Number(currentProductivityScore))
@@ -69,9 +70,16 @@ export default function KpiManagerGuidePanel({
   const introTextRaw = clampOver100ForDisplay(
     typeof guide?.intro === 'string' ? guide.intro.trim() : '',
   );
+  const alignedIntroText = alignKpiMetricsInText(introTextRaw, {
+    completionRate: currentSprintKpis.completionRate,
+    onTimeDelivery: currentSprintKpis.onTimeDelivery,
+    teamParticipation: currentSprintKpis.teamParticipation,
+    workloadBalance: currentSprintKpis.workloadBalance,
+    productivityScore: resolvedCurrentProductivityScore,
+  });
   const introText = hasCurrentProductivityScore
-    ? alignTrendsProductivityScore(introTextRaw, resolvedCurrentProductivityScore)
-    : introTextRaw;
+    ? alignTrendsProductivityScore(alignedIntroText, resolvedCurrentProductivityScore)
+    : alignedIntroText;
   const alignGenericScorePhrase = (text) => {
     if (text == null || !hasCurrentProductivityScore) return text;
     const n = Math.max(0, Math.min(100, Number(resolvedCurrentProductivityScore)));
@@ -82,11 +90,18 @@ export default function KpiManagerGuidePanel({
     typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',
     { aggressive: true },
   );
+  const productivityDeltaTextAligned = alignKpiMetricsInText(productivityDeltaTextRaw, {
+    completionRate: currentSprintKpis.completionRate,
+    onTimeDelivery: currentSprintKpis.onTimeDelivery,
+    teamParticipation: currentSprintKpis.teamParticipation,
+    workloadBalance: currentSprintKpis.workloadBalance,
+    productivityScore: resolvedCurrentProductivityScore,
+  });
   const productivityDeltaText = hasCurrentProductivityScore
     ? alignGenericScorePhrase(
-        alignTrendsProductivityScore(productivityDeltaTextRaw, resolvedCurrentProductivityScore),
+        alignTrendsProductivityScore(productivityDeltaTextAligned, resolvedCurrentProductivityScore),
       )
-    : productivityDeltaTextRaw;
+    : productivityDeltaTextAligned;
   const hasMetricLines =
     byMetric &&
     METRIC_KEYS.some((k) => {
@@ -254,12 +269,19 @@ export default function KpiManagerGuidePanel({
               const sanitizedText = clampOver100ForDisplay(text.trim(), {
                 aggressive: key === 'teamParticipation' || key === 'productivityScore',
               });
+              const alignedText = alignKpiMetricsInText(sanitizedText, {
+                completionRate: currentSprintKpis.completionRate,
+                onTimeDelivery: currentSprintKpis.onTimeDelivery,
+                teamParticipation: currentSprintKpis.teamParticipation,
+                workloadBalance: currentSprintKpis.workloadBalance,
+                productivityScore: resolvedCurrentProductivityScore,
+              });
               const displayText =
                 key === 'productivityScore' && hasCurrentProductivityScore
                   ? alignGenericScorePhrase(
-                      alignTrendsProductivityScore(sanitizedText, resolvedCurrentProductivityScore),
+                      alignTrendsProductivityScore(alignedText, resolvedCurrentProductivityScore),
                     )
-                  : sanitizedText;
+                  : alignedText;
               const title = KPI_LABELS[key] ?? key;
               const style = METRIC_STYLES[key] ?? {
                 title: SECTION_ACCENT,

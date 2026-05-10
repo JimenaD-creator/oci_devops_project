@@ -21,6 +21,7 @@ import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import { API_BASE } from '../sprints/constants/sprintConstants';
+import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -284,11 +285,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       setSelectedSprintId((prev) => {
         if (sprintsData.length === 0) return null;
         if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
-        const activeSprint = sprintsData.find((s) => {
-          const now = new Date();
-          return now >= new Date(s.startDate) && now <= new Date(s.dueDate);
-        });
-        return activeSprint?.id ?? sprintsData[0]?.id ?? null;
+        const defaultSprint = pickDefaultSelectedSprint(sprintsData);
+        return defaultSprint?.id ?? sprintsData[0]?.id ?? null;
       });
     } catch (error) {
       console.error('Error loading KPI data:', error);
@@ -658,6 +656,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             fetchFailed={managerGuideFetchFailed}
             productivityDelta={productivityDelta}
             currentProductivityScore={kpis.productivityScore}
+            currentSprintKpis={kpis}
             onOpenAiInsights={onOpenAiInsights}
           />
         </Box>

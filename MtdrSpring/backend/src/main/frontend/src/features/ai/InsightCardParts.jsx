@@ -30,6 +30,7 @@ import {
   clampKpiPercentForDisplay,
   clampTrendsPercentLikeValues,
   alignTrendsProductivityScore,
+  alignKpiMetricsInText,
 } from './aiInsightsConstants';
 
 const SEVERITY = {
@@ -50,11 +51,16 @@ const SEVERITY = {
   info: { color: '#01579B', bg: '#E3F2FD', border: '#90CAF9', label: 'Info', Icon: Info },
 };
 
-export function AlertCard({ alert }) {
+export function AlertCard({ alert, currentSprintMetrics = null }) {
   const cfg = SEVERITY[alert.severity] ?? SEVERITY.info;
   const { Icon } = cfg;
-  const messageText = alignAlertMessagePercent(alert.message, alert.value);
   const kpiKey = typeof alert.kpi === 'string' ? alert.kpi : '';
+  const normalizedKpiMetric =
+    currentSprintMetrics && currentSprintMetrics[kpiKey] != null
+      ? clampKpiPercentForDisplay(currentSprintMetrics[kpiKey])
+      : null;
+  const effectiveAlertValue = normalizedKpiMetric != null ? normalizedKpiMetric : alert.value;
+  const messageText = alignAlertMessagePercent(alert.message, effectiveAlertValue);
   const valueIsPercentKpi = KPI_ALERT_PERCENT_KEYS.has(kpiKey);
   return (
     <Box
@@ -85,10 +91,10 @@ export function AlertCard({ alert }) {
           {alert.kpi && (
             <Typography sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: '#607D8B', fontWeight: 600 }}>
               {KPI_LABELS[alert.kpi] ?? alert.kpi}
-              {alert.value != null
+              {effectiveAlertValue != null
                 ? valueIsPercentKpi
-                  ? ` — ${clampKpiPercentForDisplay(alert.value)}%`
-                  : ` — ${alert.value}`
+                  ? ` — ${clampKpiPercentForDisplay(effectiveAlertValue)}%`
+                  : ` — ${effectiveAlertValue}`
                 : ''}
             </Typography>
           )}
@@ -309,13 +315,30 @@ export function ActionableRecommendationsList({ items }) {
   );
 }
 
-export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskStatusBreakdown, currentSprintActualScore = null }) {
+export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskStatusBreakdown, currentSprintActualScore = null, currentSprintMetrics = null }) {
   const es = executiveSummary;
-  const trendsText = alignTrendsProductivityScore(
-    clampTrendsPercentLikeValues(es?.trends),
-    currentSprintActualScore,
+  const trendsText = alignKpiMetricsInText(
+    alignTrendsProductivityScore(
+      clampTrendsPercentLikeValues(es?.trends),
+      currentSprintActualScore,
+    ),
+    currentSprintMetrics ?? {
+      productivityScore: currentSprintActualScore,
+    },
   );
-  const hasEsContent = Boolean(es && (es.overview || trendsText || es.improvementAreas || es.nextSteps));
+  const alignedMetrics = currentSprintMetrics ?? {
+    productivityScore: currentSprintActualScore,
+  };
+  const overviewText = es?.overview
+    ? alignKpiMetricsInText(es.overview, alignedMetrics)
+    : null;
+  const improvementAreasText = es?.improvementAreas
+    ? alignKpiMetricsInText(es.improvementAreas, alignedMetrics)
+    : null;
+  const nextStepsText = es?.nextSteps
+    ? alignKpiMetricsInText(es.nextSteps, alignedMetrics)
+    : null;
+  const hasEsContent = Boolean(es && (overviewText || trendsText || improvementAreasText || nextStepsText));
   const hasBreakdown = taskStatusBreakdown != null && taskStatusBreakdown.total != null;
 
   const statusChips =
@@ -364,13 +387,13 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
         }}
       >
         {statusChips}
-        {es.overview && (
+        {overviewText && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Overview
             </Typography>
             <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
-              {es.overview}
+              {overviewText}
             </Typography>
           </Box>
         )}
@@ -384,23 +407,23 @@ export function ExecutiveSummaryBlock({ executiveSummary, fallbackSummary, taskS
             </Typography>
           </Box>
         )}
-        {es.improvementAreas && (
+        {improvementAreasText && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Improvement areas
             </Typography>
             <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
-              {es.improvementAreas}
+              {improvementAreasText}
             </Typography>
           </Box>
         )}
-        {es.nextSteps && (
+        {nextStepsText && (
           <Box>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
               Next steps
             </Typography>
             <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.55 }}>
-              {es.nextSteps}
+              {nextStepsText}
             </Typography>
           </Box>
         )}

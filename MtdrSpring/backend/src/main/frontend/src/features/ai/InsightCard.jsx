@@ -58,6 +58,7 @@ export default function InsightCard({
   nextSprintLabel = null,
   nextSprintActualScore = null,
   currentSprintActualScore = null,
+  currentSprintMetrics = null,
   refreshToken = 0,
 }) {
   const [status, setStatus] = useState('idle');
@@ -451,7 +452,9 @@ export default function InsightCard({
                 <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                   <AlertTypesLegend />
                   {insights.alerts?.length > 0 ? (
-                    insights.alerts.map((a, i) => <AlertCard key={i} alert={a} />)
+                    insights.alerts.map((a, i) => (
+                      <AlertCard key={i} alert={a} currentSprintMetrics={currentSprintMetrics} />
+                    ))
                   ) : (
                     <Box
                       sx={{
@@ -499,8 +502,7 @@ export default function InsightCard({
                           executiveSummary={insights.executiveSummary}
                           fallbackSummary={hasExecFields ? null : insights.summary}
                           taskStatusBreakdown={tsb}
-                          currentSprintActualScore={currentSprintActualScore}
-                        />
+                          currentSprintActualScore={currentSprintActualScore}                            currentSprintMetrics={currentSprintMetrics}                        />
                       );
                     }
                     return (
