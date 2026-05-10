@@ -35,11 +35,8 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Typography component="h2" sx={{ fontWeight: 800, fontSize: '1.15rem', color: '#1A1A1A', mb: 0.5 }}>
+      <Typography component="h2" sx={{ fontWeight: 800, fontSize: '1.15rem', color: '#1A1A1A', mb: 1.5 }}>
         Blocked tasks
-      </Typography>
-      <Typography sx={{ color: '#607D8B', fontWeight: 500, mb: 1.5 }}>
-        Developers with task blockers in the selected sprint(s).
       </Typography>
 
       <Stack spacing={1.25}>
@@ -97,7 +94,36 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  sx={{ textTransform: 'none', fontWeight: 700, borderColor: palette.fg, color: palette.fg }}
+                  color="inherit"
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderColor: palette.fg,
+                    color: palette.fg,
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    '&:hover': {
+                      borderColor: palette.fg,
+                      bgcolor: `${palette.fg}14`,
+                      color: palette.fg,
+                    },
+                    '&:focus': { outline: 'none' },
+                    '&:focus-visible': {
+                      outline: 'none',
+                      borderColor: palette.fg,
+                      boxShadow: `0 0 0 2px ${palette.fg}55`,
+                    },
+                    '&.Mui-focusVisible': {
+                      outline: 'none',
+                      borderColor: palette.fg,
+                      boxShadow: `0 0 0 2px ${palette.fg}55`,
+                    },
+                    '&:active': {
+                      borderColor: palette.fg,
+                      color: palette.fg,
+                      boxShadow: 'none',
+                    },
+                  }}
                 >
                   View tasks
                 </Button>

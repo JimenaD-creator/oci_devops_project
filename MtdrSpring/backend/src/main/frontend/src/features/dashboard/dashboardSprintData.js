@@ -3,20 +3,20 @@ import { inferStatusByDate } from '../sprints/utils/sprintUtils';
 /** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-/** Distinct chart series colors (no red/green — reserved for KPI / status cues elsewhere). */
+/** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
-  '#1E88E5',
+  '#1565C0',
   '#FB8C00',
+  '#26A69A',
   '#8E24AA',
-  '#455A64',
   '#5E35B1',
   '#0277BD',
   '#F57C00',
-  '#6D4C41',
+  '#00897B',
   '#3949AB',
   '#00ACC1',
   '#7E57C2',
-  '#5C6BC0',
+  '#43A047',
 ];
 
 // Cache variables
@@ -104,7 +104,7 @@ export function bucketTaskStatus(raw) {
 const TASK_STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const STATUS_DIST_META = {
-  TODO: { name: 'To Do', color: '#FB8C00' },
+  TODO: { name: 'To Do', color: '#FFC107' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
   IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
   DONE: { name: 'Completed', color: '#3949AB' },
@@ -596,7 +596,7 @@ export function shortDevName(fullName) {
 const TASK_STATUS_KEYS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const MERGE_STATUS_META = {
-  TODO: { name: 'To Do', color: '#FB8C00' },
+  TODO: { name: 'To Do', color: '#FFC107' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
   IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
   DONE: { name: 'Completed', color: '#3949AB' },

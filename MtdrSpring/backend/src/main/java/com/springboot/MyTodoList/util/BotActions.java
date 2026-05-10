@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.util;
 
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -510,16 +511,24 @@ public class BotActions {
         String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty() 
                 ? task.getDescription() 
                 : "No description provided";
+        String dueDateLine;
+        if (task.getDueDate() == null) {
+            dueDateLine = "Not set";
+        } else {
+            dueDateLine = task.getDueDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX"));
+        }
         
         String message = String.format(
                 "📋 *Task Details*\n\n" +
                 "*Title:* %s\n\n" +
                 "*Description:* %s\n\n" +
                 "*Current Status:* %s\n\n" +
+                "*Due date:* %s\n\n" +
                 "Select a new status:",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
-                taskStatus
+                taskStatus,
+                escapeMarkdown(dueDateLine)
         );
         
         // Store task selection state

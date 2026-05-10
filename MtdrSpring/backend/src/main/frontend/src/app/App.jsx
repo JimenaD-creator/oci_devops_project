@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import { taskAPI } from '../services/API';
@@ -32,6 +32,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import GroupIcon from '@mui/icons-material/Group';
 
 // Lazy load pages
 const SprintsPage = lazy(() => import('../features/sprints/SprintsPage'));
@@ -40,6 +41,7 @@ const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const KPIAnalytics = lazy(() => import('../features/kpis/KPIAnalytics'));
 const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
 const AIInsightsPage = lazy(() => import('../features/ai/AIInsightsPage'));
+const TeamPage = lazy(() => import('../features/team/TeamPage'));
 
 const DRAWER_WIDTH = 240;
 
@@ -73,6 +75,20 @@ function App() {
   const [selectedProjectName, setSelectedProjectName] = useState(
     localStorage.getItem('currentProjectName'),
   );
+  const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
+
+  const handleTeamLandingConsumed = useCallback(() => {
+    setTeamLandingSprintId(null);
+  }, []);
+
+  const handleOpenTeamFromAi = useCallback((sprintId) => {
+    setTeamLandingSprintId(sprintId != null ? Number(sprintId) : null);
+    setActivePage('team');
+  }, []);
+
+  const handleOpenAiInsightsFromTeam = useCallback(() => {
+    setActivePage('ai-insights');
+  }, []);
 
   const [user] = useState(() => {
     try {
@@ -159,11 +175,14 @@ function App() {
       id: 'analytics',
       roles: ['ADMIN', 'MANAGER'],
     },
+    { text: 'Team', icon: <GroupIcon />, id: 'team', roles: ['ADMIN', 'MANAGER'] },
     { text: 'Change project', icon: <SwapHorizIcon />, id: 'selector', roles: ['ADMIN'] },
   ].filter((item) => item.roles.includes(user.role));
-  const topNavItems = NAV_ITEMS.filter((item) => item.id === 'dashboard' || item.id === 'ai-insights');
+  const topNavItems = NAV_ITEMS.filter(
+    (item) => item.id === 'dashboard' || item.id === 'ai-insights' || item.id === 'analytics',
+  );
   const secondaryNavItems = NAV_ITEMS.filter(
-    (item) => item.id !== 'dashboard' && item.id !== 'ai-insights',
+    (item) => item.id !== 'dashboard' && item.id !== 'ai-insights' && item.id !== 'analytics',
   );
 
   const SPRINTS_SUBITEMS = [
@@ -469,10 +488,20 @@ function App() {
               onOpenAiInsights={() => setActivePage('ai-insights')}
             />
           )}
-          {activePage === 'ai-insights' && <AIInsightsPage projectId={selectedProjectId} />}
+          {activePage === 'ai-insights' && (
+            <AIInsightsPage projectId={selectedProjectId} onOpenTeam={handleOpenTeamFromAi} />
+          )}
+          {activePage === 'team' && (
+            <TeamPage
+              projectId={selectedProjectId}
+              landingSprintId={teamLandingSprintId}
+              onLandingConsumed={handleTeamLandingConsumed}
+              onOpenAiInsights={handleOpenAiInsightsFromTeam}
+            />
+          )}
         </Suspense>
 
-        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team'].includes(activePage) && (
           <Box
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}
           >

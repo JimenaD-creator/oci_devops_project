@@ -545,7 +545,7 @@ export function TaskDetailDialog({
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#1565C0' }}>
                   Sprint
                 </Typography>
-                <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 700 }}>
+                <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 700, color: ORACLE_RED_ACTION }}>
                   {task.assignedSprint?.id != null ? `Sprint ${task.assignedSprint.id}` : '—'}
                 </Typography>
               </Box>
@@ -761,11 +761,30 @@ export function TaskDetailDialog({
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
                       label="Status"
+                      renderValue={(val) => {
+                        const key = String(val || 'TODO').toUpperCase();
+                        const chipKey = STATUS_CHIP_SX[key] ? key : 'TODO';
+                        return (
+                          <Chip
+                            size="small"
+                            label={TASK_STATUS_LABEL[chipKey] ?? key}
+                            sx={{ fontWeight: 700, ...STATUS_CHIP_SX[chipKey] }}
+                          />
+                        );
+                      }}
                     >
-                      <MenuItem value="TODO">To Do</MenuItem>
-                      <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                      <MenuItem value="IN_REVIEW">In Review</MenuItem>
-                      <MenuItem value="DONE">Done</MenuItem>
+                      <MenuItem value="TODO" sx={{ fontWeight: 700, color: STATUS_CHIP_SX.TODO.color }}>
+                        To Do
+                      </MenuItem>
+                      <MenuItem value="IN_PROGRESS" sx={{ fontWeight: 600, color: '#1565C0' }}>
+                        In Progress
+                      </MenuItem>
+                      <MenuItem value="IN_REVIEW" sx={{ fontWeight: 600, color: '#6A1B9A' }}>
+                        In Review
+                      </MenuItem>
+                      <MenuItem value="DONE" sx={{ fontWeight: 600, color: '#2E7D32' }}>
+                        Done
+                      </MenuItem>
                     </Select>
                   </FormControl>
                   <FormControl size="small" fullWidth>
@@ -801,7 +820,9 @@ export function TaskDetailDialog({
                       label="Sprint"
                     >
                       {sprints.map((s) => (
-                        <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
+                        <MenuItem key={s.id} value={String(s.id)} sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}>
+                          {`Sprint ${s.id}`}
+                        </MenuItem>
                       ))}
                     </Select>
                   </FormControl>

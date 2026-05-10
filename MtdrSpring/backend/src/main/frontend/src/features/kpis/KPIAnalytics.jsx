@@ -27,6 +27,7 @@ import {
   SECTION_ACCENT,
   sectionRgba,
 } from '../dashboard/constants/dashboardConstants';
+import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
 //import KPIInsightsPanel from './KPIInsightsPanel';
 
@@ -451,9 +452,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             >
               KPI Analytics
             </Typography>
-            <Typography variant="body2" sx={{ color: '#607D8B', mt: 0.5, fontWeight: 600 }}>
-              {currentSprint ? `Sprint ${currentSprint.id} selected` : 'No sprint selected'}
-            </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             {sprints.length > 0 && (
@@ -461,7 +459,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 size="small"
                 sx={{
                   minWidth: { xs: '100%', sm: 220 },
-                  '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+                  ...pageFormFieldOutline(),
                   '& .MuiSelect-select': {
                     color: '#1A1A1A',
                     fontWeight: 600,
@@ -470,19 +468,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                     textOverflow: 'ellipsis',
                     pr: 4,
                   },
-                  '& .MuiSelect-icon': { color: '#546E7A' },
-                  '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
-                    borderColor: sectionRgba(0.32),
-                  },
-                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: sectionRgba(0.48),
-                  },
-                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderWidth: 2,
-                    borderColor: SECTION_ACCENT,
-                  },
-                  '& .MuiInputLabel-root': { color: '#607D8B' },
-                  '& .MuiInputLabel-root.Mui-focused': { color: SECTION_ACCENT },
                 }}
               >
                 <InputLabel id="kpi-analytics-sprint-filter" shrink>

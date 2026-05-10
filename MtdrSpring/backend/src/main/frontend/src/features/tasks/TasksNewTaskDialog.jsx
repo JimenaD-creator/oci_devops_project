@@ -24,6 +24,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { developerAvatarColors } from '../../utils/developerColors';
 import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
 import { API_BASE, ORACLE_RED } from './constants/taskConstants';
+import { FORM_FIELD_TINT_BG, ORACLE_RED_ACTION, STATUS_CHIP_SX, TASK_STATUS_LABEL } from '../sprints/constants/sprintConstants';
 import { createTaskSelectFillSx, pageFormFieldOutline } from './utils/taskUtils';
 
 export function TasksNewTaskDialog({
@@ -212,6 +213,17 @@ export function TasksNewTaskDialog({
     finiteUserIds(assignedToIds).length > 0,
   );
 
+  const fieldOutlineTint = useMemo(() => {
+    const b = pageFormFieldOutline();
+    return {
+      ...b,
+      '& .MuiOutlinedInput-root': {
+        ...b['& .MuiOutlinedInput-root'],
+        bgcolor: FORM_FIELD_TINT_BG,
+      },
+    };
+  }, []);
+
   return (
     <Dialog
       open={open}
@@ -278,7 +290,14 @@ export function TasksNewTaskDialog({
         </Box>
       </DialogTitle>
       <DialogContent
-        sx={{ pt: 3.5, px: { xs: 3.5, sm: 5 }, pb: 3.25, flex: 1, minHeight: 0, overflowY: 'auto' }}
+        sx={{
+          pt: 3.5,
+          px: { xs: 3.5, sm: 5 },
+          pb: 3.25,
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
       >
         <Stack spacing={2.25} sx={{ mx: { xs: 0.75, sm: 1.25 }, my: { xs: 0.5, sm: 0.75 } }}>
           <TextField
@@ -289,8 +308,11 @@ export function TasksNewTaskDialog({
             multiline
             minRows={2}
             sx={{
-              ...pageFormFieldOutline(),
-              '& .MuiOutlinedInput-root': { bgcolor: 'rgba(199, 70, 52, 0.07)' },
+              ...fieldOutlineTint,
+              '& .MuiOutlinedInput-root': {
+                ...fieldOutlineTint['& .MuiOutlinedInput-root'],
+                bgcolor: FORM_FIELD_TINT_BG,
+              },
             }}
           />
           <TextField
@@ -300,7 +322,7 @@ export function TasksNewTaskDialog({
             fullWidth
             multiline
             minRows={5}
-            sx={pageFormFieldOutline()}
+            sx={fieldOutlineTint}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
@@ -316,13 +338,43 @@ export function TasksNewTaskDialog({
                 <MenuItem value="USER_STORY">User Story</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={pageFormFieldOutline()}>
+            <FormControl
+              size="small"
+              fullWidth
+              sx={{
+                ...fieldOutlineTint,
+                '& .MuiSelect-select': { display: 'flex', alignItems: 'center' },
+              }}
+            >
               <InputLabel>Status</InputLabel>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} label="Status">
-                <MenuItem value="TODO">To Do</MenuItem>
-                <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                <MenuItem value="IN_REVIEW">In Review</MenuItem>
-                <MenuItem value="DONE">Done</MenuItem>
+              <Select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                label="Status"
+                renderValue={(val) => {
+                  const key = String(val || 'TODO').toUpperCase();
+                  const chipKey = STATUS_CHIP_SX[key] ? key : 'TODO';
+                  return (
+                    <Chip
+                      size="small"
+                      label={TASK_STATUS_LABEL[chipKey] ?? key}
+                      sx={{ fontWeight: 700, ...STATUS_CHIP_SX[chipKey] }}
+                    />
+                  );
+                }}
+              >
+                <MenuItem value="TODO" sx={{ fontWeight: 700, color: STATUS_CHIP_SX.TODO.color }}>
+                  To Do
+                </MenuItem>
+                <MenuItem value="IN_PROGRESS" sx={{ fontWeight: 600, color: '#1565C0' }}>
+                  In Progress
+                </MenuItem>
+                <MenuItem value="IN_REVIEW" sx={{ fontWeight: 600, color: '#6A1B9A' }}>
+                  In Review
+                </MenuItem>
+                <MenuItem value="DONE" sx={{ fontWeight: 600, color: '#2E7D32' }}>
+                  Done
+                </MenuItem>
               </Select>
             </FormControl>
             <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
@@ -344,7 +396,9 @@ export function TasksNewTaskDialog({
               <InputLabel>Sprint</InputLabel>
               <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
                 {sprints.map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
+                  <MenuItem key={s.id} value={String(s.id)} sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}>
+                    {`Sprint ${s.id}`}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -356,7 +410,7 @@ export function TasksNewTaskDialog({
               fullWidth
               size="small"
               inputProps={{ min: 0 }}
-              sx={pageFormFieldOutline()}
+              sx={fieldOutlineTint}
             />
           </Stack>
           {pickerProjectId == null || !Number.isFinite(Number(pickerProjectId)) ? (
@@ -389,7 +443,7 @@ export function TasksNewTaskDialog({
             fullWidth
             size="small"
             sx={{
-              ...pageFormFieldOutline(),
+              ...fieldOutlineTint,
               '& .MuiSelect-select': {
                 color: '#1A1A1A',
                 display: 'flex',
@@ -471,7 +525,7 @@ export function TasksNewTaskDialog({
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={pageFormFieldOutline()}
+              sx={fieldOutlineTint}
             />
             <TextField
               label="Due Date"
@@ -481,7 +535,7 @@ export function TasksNewTaskDialog({
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={pageFormFieldOutline()}
+              sx={fieldOutlineTint}
             />
           </Stack>
           {error && (

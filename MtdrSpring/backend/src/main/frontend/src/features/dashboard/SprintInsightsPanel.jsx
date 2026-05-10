@@ -12,12 +12,12 @@ export default function SprintInsightsPanel({ insights, visible }) {
         borderRadius: 3,
         border: '1px solid #EFEFEF',
         boxShadow: 'none',
-        borderLeft: '4px solid #C74634',
+        borderLeft: '4px solid #00897B',
         bgcolor: '#FFFAFA',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-        <LightbulbOutlinedIcon sx={{ color: '#C74634', fontSize: 22 }} />
+        <LightbulbOutlinedIcon sx={{ color: '#00897B', fontSize: 22 }} />
         <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
           Sprint comparison insights
         </Typography>

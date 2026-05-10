@@ -17,7 +17,7 @@ export const SECTION_TITLE_SX = {
 export const SECTION_DESC_SX = {
   fontSize: '0.875rem',
   fontWeight: 600,
-  color: '#546E7A',
+  color: '#263238',
   lineHeight: 1.55,
   fontFamily: FONT,
 };
@@ -57,7 +57,7 @@ export const METRIC_VALUE_SX = {
 export const METRIC_HELPER_SX = {
   fontSize: '0.875rem',
   fontWeight: 500,
-  color: '#546E7A',
+  color: '#263238',
   lineHeight: 1.5,
   fontFamily: FONT,
 };
@@ -75,13 +75,13 @@ export const CHART_TITLE_SX = {
 export const CHART_DESC_SX = {
   fontSize: '0.875rem',
   fontWeight: 500,
-  color: '#455A64',
+  color: '#263238',
   lineHeight: 1.55,
   fontFamily: FONT,
 };
 
 /** Recharts axis tick (single size; SVG text may not apply webfont uniformly) */
-export const CHART_TICK = { fontSize: 15, fill: '#37474F', fontWeight: 600 };
+export const CHART_TICK = { fontSize: 15, fill: '#1A1A1A', fontWeight: 600 };
 
 /** Axis titles (Hours, Tasks, etc.) — slightly larger than ticks */
 export const CHART_AXIS_LABEL = { fontSize: 16, fontWeight: 700 };

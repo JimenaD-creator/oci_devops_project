@@ -24,12 +24,6 @@ const LockIcon = () => (
   </svg>
 );
 
-const ShieldIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-  </svg>
-);
-
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export default function Login() {
@@ -54,7 +48,7 @@ export default function Login() {
   async function completeLogin() {
     setFormError('');
     if (!email.trim() || !password) {
-      setFormError('Please enter your email, phone, or username and password.');
+      setFormError('Please enter your email, phone number, or username and password.');
       return;
     }
     
@@ -66,14 +60,20 @@ export default function Login() {
       const idRaw = String(email).trim();
       const idLower = idRaw.toLowerCase();
       const idDigits = idRaw.replace(/\D/g, '');
+      const looksLikeEmail = idRaw.includes('@');
       const match = users.find((u) => {
         const pass = u.userPassword != null ? String(u.userPassword).trim() : '';
         if (pass !== String(password).trim()) return false;
-        const phoneDigits = u.phoneNumber != null ? String(u.phoneNumber).replace(/\D/g, '') : '';
+        const storedEmail = u.email != null ? String(u.email).trim().toLowerCase() : '';
+        if (storedEmail && idLower === storedEmail) return true;
+        if (looksLikeEmail) {
+          return false;
+        }
+        const phoneRaw = u.phoneNumber ?? u.phonenumber;
+        const phoneDigits = phoneRaw != null ? String(phoneRaw).replace(/\D/g, '') : '';
         const phoneOk = idDigits.length > 0 && phoneDigits === idDigits;
         const nameOk = u.name != null && String(u.name).trim().toLowerCase() === idLower;
-        const emailOk = u.email != null && String(u.email).trim().toLowerCase() === idLower;
-        return phoneOk || nameOk || emailOk;
+        return phoneOk || nameOk;
       });
 
       console.log('match keys:', match ? Object.keys(match) : 'no match');
@@ -141,7 +141,7 @@ export default function Login() {
 
         <form className="login-form" onSubmit={handleSignIn} noValidate>
           <div className="login-field-group">
-            <label className="login-label" htmlFor="login-email">Email, phone, or username</label>
+            <label className="login-label" htmlFor="login-email">Email, phone number, or username</label>
             <div className={focusedField === 'email' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
               <span className="login-input-icon"><MailIcon /></span>
               <input
@@ -222,15 +222,6 @@ export default function Login() {
               Forgot your password?
             </a>
           </div>
-
-          <div className="login-divider">
-            <div className="login-divider-line" />
-          </div>
-
-          <button type="button" className="login-sso-btn" onClick={completeLogin}>
-            <ShieldIcon />
-            <span>Secure sign-in with Oracle SSO</span>
-          </button>
         </form>
 
         <div className="login-footer">

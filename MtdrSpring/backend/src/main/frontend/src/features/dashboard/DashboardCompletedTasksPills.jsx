@@ -3,7 +3,7 @@ import { Box, Chip } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 
 /** When a sprint has no accent color yet, cycle these (aligned with chart sprint colors). */
-const COMPARE_FALLBACK_ACCENTS = ['#1565C0', '#C62828', '#2E7D32', '#6A1B9A', '#F57C00', '#00897B'];
+const COMPARE_FALLBACK_ACCENTS = ['#1565C0', '#FB8C00', '#26A69A', '#8E24AA', '#5E35B1', '#0277BD'];
 
 /**
  * Task-table DONE count per sprint (`totalCompleted`), not a sum of per-dev USER_TASK rows.

@@ -17,7 +17,7 @@ import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardCon
 import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
 
-export default function AIInsightsPage({ projectId }) {
+export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -69,6 +69,27 @@ export default function AIInsightsPage({ projectId }) {
       .catch(() => setSprints([]))
       .finally(() => setLoading(false));
   }, [projectId, refreshToken]);
+
+  useEffect(() => {
+    if (sprints.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('aiInsightsLandingSprintId');
+      if (raw == null || String(raw).trim() === '') return;
+      const id = Number(raw);
+      if (!Number.isFinite(id)) {
+        sessionStorage.removeItem('aiInsightsLandingSprintId');
+        return;
+      }
+      if (!sprints.some((s) => Number(s.id) === id)) {
+        sessionStorage.removeItem('aiInsightsLandingSprintId');
+        return;
+      }
+      sessionStorage.removeItem('aiInsightsLandingSprintId');
+      setSelectedSprintId(id);
+    } catch {
+      sessionStorage.removeItem('aiInsightsLandingSprintId');
+    }
+  }, [sprints]);
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
 
@@ -189,7 +210,7 @@ export default function AIInsightsPage({ projectId }) {
             </Typography>
           </Box>
           <Typography variant="body1" sx={{ color: '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
-            Gemini-powered sprint analysis: alerts, recommendations, summary, per-developer insights, and predictions.
+            Gemini-powered sprint analysis: alerts, recommendations, summary, and predictions.
           </Typography>
         </Box>
         {sprints.length > 0 && (
@@ -263,6 +284,7 @@ export default function AIInsightsPage({ projectId }) {
           currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
           currentSprintMetrics={currentSprintKpiMetrics}
           refreshToken={refreshToken}
+          onOpenTeam={onOpenTeam}
         />
       )}
     </Box>

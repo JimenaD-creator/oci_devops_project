@@ -22,12 +22,11 @@ import {
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId } from '../../utils/userIds';
-import { TasksNewTaskDialog } from './TasksNewTaskDialog';
+import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
@@ -455,29 +454,15 @@ export default function TasksPage({ projectId }) {
               </Select>
             </FormControl>
             <Button
-              variant="outlined"
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={loadData}
-              sx={{
-                textTransform: 'none',
-                borderColor: '#DDD',
-                color: '#555',
-                borderRadius: 2,
-                minHeight: 40,
-              }}
-            >
-              Sync data
-            </Button>
-            <Button
               variant="contained"
+              size="small"
               startIcon={<AddIcon />}
               onClick={() => setDialogOpen(true)}
               sx={{
                 bgcolor: ORACLE_RED,
                 textTransform: 'none',
                 fontWeight: 700,
-                borderRadius: 2,
+                minHeight: 40,
                 '&:hover': { bgcolor: '#A83B2D' },
               }}
             >
@@ -704,7 +689,7 @@ export default function TasksPage({ projectId }) {
         </DialogActions>
       </Dialog>
 
-      <TasksNewTaskDialog
+      <NewTaskDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreated={() => {
@@ -712,8 +697,7 @@ export default function TasksPage({ projectId }) {
         }}
         sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers}
-        defaultSprintId={selectedSprintId}
-        pickerProjectId={effectiveProjectId}
+        defaultSprintId={kanbanSprintId || selectedSprintId || undefined}
       />
 
       <TaskDetailDialog

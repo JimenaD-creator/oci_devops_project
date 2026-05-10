@@ -107,19 +107,21 @@ export function alignTrendsProductivityScore(text, actualScore) {
   return source;
 }
 
+
 function formatKpiMetricValue(rawValue) {
   const n = Number(rawValue);
   if (!Number.isFinite(n)) return rawValue;
   const clamped = Math.max(0, Math.min(100, n));
-  return Number.isInteger(clamped) ? `${clamped}%` : `${clamped.toFixed(1)}%`;
+  return `${Math.round(clamped)}%`;
 }
 
+
 const KPI_METRIC_PATTERNS = {
-  completionRate: /completion\s*rate\s*(?:of|is|was|at)?\s*(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  onTimeDelivery: /on[- ]time\s*delivery\s*(?:of|is|was|at)?\s*(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  teamParticipation: /team\s*participation\s*(?:of|is|was|at)?\s*(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  workloadBalance: /workload\s*balance\s*(?:of|is|was|at)?\s*(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  productivityScore: /productivity\s*score\s*(?:of|is|was|at)?\s*(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  completionRate: /(completion\s*rate\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  onTimeDelivery: /(on[- ]time\s*delivery\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  teamParticipation: /(team\s*participation\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  workloadBalance: /(workload\s*balance\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  productivityScore: /(productivity\s*score\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
 };
 
 export function alignKpiMetricsInText(text, metrics = {}) {
@@ -128,8 +130,7 @@ export function alignKpiMetricsInText(text, metrics = {}) {
   Object.entries(KPI_METRIC_PATTERNS).forEach(([key, pattern]) => {
     const actual = metrics[key];
     if (actual == null) return;
-    const replacement = `$1${formatKpiMetricValue(actual)}`;
-    result = result.replace(pattern, replacement);
+    result = result.replace(pattern, (_, prefix) => `${prefix}${formatKpiMetricValue(actual)}`);
   });
   return result;
 }

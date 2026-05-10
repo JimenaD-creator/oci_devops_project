@@ -5,6 +5,9 @@ export const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localho
 export const ORACLE_RED = '#E53935';
 export const ORACLE_RED_ACTION = '#C74634';
 
+/** Light fill for modal form fields (warm, same family as brand chrome). */
+export const FORM_FIELD_TINT_BG = '#FFF5F2';
+
 /** Progress bars & % labels: no red/green in the bar fill (neutral blue/indigo). */
 export const PROGRESS_BAR = '#1565C0';
 export const PROGRESS_BAR_COMPLETE = '#2E7D32';
@@ -26,7 +29,8 @@ export const PRIORITY_CHIP_SX = {
 };
 
 export const STATUS_CHIP_SX = {
-  TODO: { bgcolor: '#ECEFF1', color: '#455A64' },
+  /** To do / backlog — teal (no amber/orange). */
+  TODO: { bgcolor: '#E0F2F1', color: '#00695C' },
   IN_PROGRESS: { bgcolor: '#E3F2FD', color: '#1565C0' },
   IN_REVIEW: { bgcolor: '#F3E5F5', color: '#6A1B9A' },
   PENDING: { bgcolor: '#FFF1F0', color: '#C62828' },

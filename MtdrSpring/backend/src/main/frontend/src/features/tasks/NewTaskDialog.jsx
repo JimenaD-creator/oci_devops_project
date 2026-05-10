@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
-  Typography,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -18,13 +16,217 @@ import {
   Chip,
   Button,
   IconButton,
+  Typography,
+  Stack,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import CheckIcon from '@mui/icons-material/Check';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import { developerAvatarColors } from '../../utils/developerColors';
 import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
-import { API_BASE, ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
+import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { newSprintDialogFieldOutline, oracleRgba } from '../sprints/utils/sprintUtils';
+
+
+const TYPE_OPTIONS = [
+  {
+    value: 'FEATURE',
+    label: 'Feature',
+    bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489',
+    icon: '✦',
+  },
+  {
+    value: 'BUG',
+    label: 'Bug',
+    bg: '#FCEBEB', border: '#F09595', color: '#791F1F',
+    icon: '⬡',
+  },
+  {
+    value: 'TASK',
+    label: 'Task',
+    bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C',
+    icon: '◻',
+  },
+  {
+    value: 'USER_STORY',
+    label: 'User Story',
+    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+    icon: '◈',
+  },
+];
+
+const STATUS_OPTIONS = [
+  {
+    value: 'TODO',
+    label: 'To Do',
+    bg: '#E0F2F1',
+    border: '#80CBC4',
+    color: '#00695C',
+    dot: '#00897B',
+  },
+  {
+    value: 'IN_PROGRESS',
+    label: 'In Progress',
+    bg: '#FAEEDA', border: '#FAC775', color: '#633806',
+    dot: '#BA7517',
+  },
+  {
+    value: 'IN_REVIEW',
+    label: 'In Review',
+    bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C',
+    dot: '#185FA5',
+  },
+  {
+    value: 'DONE',
+    label: 'Done',
+    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+    dot: '#3B6D11',
+  },
+];
+
+const PRIORITY_OPTIONS = [
+  {
+    value: 'LOW',
+    label: 'Low',
+    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+  },
+  {
+    value: 'MEDIUM',
+    label: 'Medium',
+    bg: '#FAEEDA', border: '#FAC775', color: '#633806',
+  },
+  {
+    value: 'HIGH',
+    label: 'High',
+    bg: '#FAECE7', border: '#F0997B', color: '#712B13',
+  },
+  {
+    value: 'CRITICAL',
+    label: 'Critical',
+    bg: '#FCEBEB', border: '#F09595', color: '#791F1F',
+  },
+];
+
+// ── Subcomponentes ────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'text.secondary',
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {children}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+    </Box>
+  );
+}
+
+function SegmentedButtons({ options, value, onChange, sx }) {
+  return (
+    <Box sx={{ display: 'flex', gap: 0.75, ...sx }}>
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <Box
+            key={opt.value}
+            component="button"
+            onClick={() => onChange(opt.value)}
+            sx={{
+              flex: 1,
+              py: 0.875,
+              px: 0.5,
+              borderRadius: '8px',
+              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              bgcolor: active ? opt.bg : 'transparent',
+              color: active ? opt.color : 'text.secondary',
+              fontSize: 15,
+              fontWeight: active ? 600 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.12s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.5,
+              '&:hover': {
+                bgcolor: active ? opt.bg : 'action.hover',
+                borderColor: opt.border,
+              },
+            }}
+          >
+            {opt.dot && (
+              <Box
+                sx={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  bgcolor: active ? opt.dot : '#BDBDBD',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {opt.label}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+function TypeGrid({ value, onChange }) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 0.75,
+      }}
+    >
+      {TYPE_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <Box
+            key={opt.value}
+            component="button"
+            onClick={() => onChange(opt.value)}
+            sx={{
+              py: 1,
+              px: 0.5,
+              borderRadius: '8px',
+              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              bgcolor: active ? opt.bg : 'transparent',
+              color: active ? opt.color : 'text.secondary',
+              fontSize: 15,
+              fontWeight: active ? 600 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 0.5,
+              transition: 'all 0.12s',
+              '&:hover': {
+                bgcolor: active ? opt.bg : 'action.hover',
+                borderColor: opt.border,
+              },
+            }}
+          >
+            <Box sx={{ fontSize: 18, lineHeight: 1 }}>{opt.icon}</Box>
+            {opt.label}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 
 export function NewTaskDialog({
   open,
@@ -84,9 +286,7 @@ export function NewTaskDialog({
     assignedToIds.length > 0,
   );
 
-  const handleClose = () => {
-    if (!saving) onClose();
-  };
+  const handleClose = () => { if (!saving) onClose(); };
 
   const handleSave = async () => {
     if (!canSave) {
@@ -132,6 +332,23 @@ export function NewTaskDialog({
     }
   };
 
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      fontSize: 15,
+      bgcolor: FORM_FIELD_TINT_BG,
+      '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#C74126',
+        boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
+      },
+    },
+    '& .MuiInputLabel-root': { fontSize: 15 },
+    '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
+    '& .MuiMenuItem-root': { fontSize: 15 },
+  };
+
   return (
     <Dialog
       open={open}
@@ -141,125 +358,112 @@ export function NewTaskDialog({
       PaperProps={{
         elevation: 0,
         sx: {
-          borderRadius: 3,
+          borderRadius: '16px',
           border: '1px solid #ECECEC',
-          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
           bgcolor: '#FFFFFF',
-          boxShadow: `0 16px 40px ${oracleRgba(0.1)}`,
           overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 24px)', sm: 760 },
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 680 },
         },
       }}
     >
+      {/* ── Header ── */}
       <DialogTitle sx={{ p: 0 }}>
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 2,
+            bgcolor: ORACLE_RED_ACTION,
             px: 2.5,
-            pt: 2.5,
-            pb: 2,
-            borderBottom: `1px solid ${oracleRgba(0.12)}`,
-            backgroundColor: '#FFFFFF',
+            pt: 2,
+            pb: 1.75,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1.5,
           }}
         >
-          <Box sx={{ display: 'flex', gap: 1.75 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2,
-                bgcolor: oracleRgba(0.12),
-                border: `1px solid ${oracleRgba(0.2)}`,
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                bgcolor: 'rgba(255,255,255,0.18)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              <TaskAltIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
+              <AccountTreeOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.3rem' }}>
+              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 16, lineHeight: 1.2 }}>
                 Create task
               </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: '#616161', fontWeight: 600, display: 'block' }}
-              >
+              <Typography sx={{ fontSize: 14, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
                 Details, planning & assignees
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={handleClose} disabled={saving} size="small">
-            <CloseIcon />
+          <IconButton onClick={handleClose} disabled={saving} size="small"
+            sx={{ color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.3)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ pt: 3.5, px: { xs: 3.5, sm: 4.5 }, pb: 3, overflowY: 'auto' }}>
-        <Stack spacing={2.25} sx={{ mx: { xs: 0.5, sm: 0.75 }, my: { xs: 0.5, sm: 0.75 } }}>
+
+      {/* ── Body ── */}
+      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
+        <Stack spacing={2}>
+
           <TextField
-            label="Task title"
+            label="Task title *"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             fullWidth
             multiline
             minRows={2}
-            sx={{ ...newSprintDialogFieldOutline(), mt: 0.5 }}
+            size="small"
+            sx={fieldSx}
           />
+
           <TextField
-            label="Task description"
+            label="Description *"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             fullWidth
             multiline
-            minRows={4}
-            sx={newSprintDialogFieldOutline()}
+            minRows={3}
+            size="small"
+            sx={fieldSx}
           />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
-              <InputLabel>Work item type</InputLabel>
-              <Select
-                value={classification}
-                onChange={(e) => setClassification(e.target.value)}
-                label="Work item type"
-              >
-                <MenuItem value="FEATURE">Feature</MenuItem>
-                <MenuItem value="BUG">Bug</MenuItem>
-                <MenuItem value="TASK">Task</MenuItem>
-                <MenuItem value="USER_STORY">User Story</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
-              <InputLabel>Status</InputLabel>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} label="Status">
-                <MenuItem value="TODO">To Do</MenuItem>
-                <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                <MenuItem value="IN_REVIEW">In Review</MenuItem>
-                <MenuItem value="DONE">Done</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
-              <InputLabel>Priority</InputLabel>
-              <Select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                label="Priority"
-              >
-                <MenuItem value="LOW">Low</MenuItem>
-                <MenuItem value="MEDIUM">Medium</MenuItem>
-                <MenuItem value="HIGH">High</MenuItem>
-                <MenuItem value="CRITICAL">Critical</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={newSprintDialogFieldOutline()}>
-              <InputLabel>Sprint</InputLabel>
-              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
+
+          {/* Type*/}
+          <Box>
+            <SectionLabel>Work item type</SectionLabel>
+            <TypeGrid value={classification} onChange={setClassification} />
+          </Box>
+
+          {/* Status */}
+          <Box>
+            <SectionLabel>Status</SectionLabel>
+            <SegmentedButtons options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+          </Box>
+
+          {/* Priority */}
+          <Box>
+            <SectionLabel>Priority</SectionLabel>
+            <SegmentedButtons options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
+          </Box>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <FormControl size="small" fullWidth sx={fieldSx}>
+              <InputLabel>Sprint *</InputLabel>
+              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint *">
                 {(sprints || []).map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
+                  <MenuItem key={s.id} value={String(s.id)} sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}>
+                    {`Sprint ${s.id}`}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -271,20 +475,19 @@ export function NewTaskDialog({
               fullWidth
               size="small"
               inputProps={{ min: 0 }}
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
           </Stack>
+
+          {/* Developers */}
           <FormControl
             fullWidth
             size="small"
             sx={{
-              ...newSprintDialogFieldOutline(),
-              /* MUI Select multiple defaults to nowrap + ellipsis; chips need wrap + visible overflow */
+              ...fieldSx,
               '& .MuiSelect-select': {
                 display: 'flex',
                 flexWrap: 'wrap',
-                alignItems: 'center',
-                alignContent: 'center',
                 gap: 0.5,
                 minHeight: 40,
                 whiteSpace: 'normal',
@@ -294,48 +497,44 @@ export function NewTaskDialog({
               },
             }}
           >
-            <InputLabel id="create-task-assigned-label">Developers</InputLabel>
+            <InputLabel id="dev-label">Developers *</InputLabel>
             <Select
-              labelId="create-task-assigned-label"
+              labelId="dev-label"
               multiple
               value={finiteUserIds(assignedToIds)}
               onChange={(e) => setAssignedToIds(multiselectNumericIds(e.target.value))}
-              input={<OutlinedInput label="Developers" />}
+              input={<OutlinedInput label="Developers *" />}
               renderValue={(selected) => {
                 const ids = finiteUserIds(selected);
+               
+                const chipPalettes = [
+                  { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
+                  { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
+                  { bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
+                  { bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
+                ];
                 return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 0.5,
-                      maxHeight: 80,
-                      overflowY: 'auto',
-                      py: 0.25,
-                      width: '100%',
-                    }}
-                  >
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.25 }}>
                     {ids.length === 0 ? (
-                      <Typography component="span" variant="body2" sx={{ color: '#9E9E9E' }}>
+                      <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 15 }}>
                         Select developers
                       </Typography>
                     ) : (
-                      ids.map((id) => {
-                        const name =
-                          validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
-                        const av = developerAvatarColors(name);
+                      ids.map((id, i) => {
+                        const name = validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
+                        const pal = chipPalettes[i % chipPalettes.length];
                         return (
                           <Chip
                             key={id}
                             size="small"
                             label={name}
-                            variant="outlined"
                             sx={{
                               fontWeight: 600,
-                              bgcolor: 'transparent',
-                              color: av.color,
-                              borderColor: av.color,
-                              borderWidth: 1,
+                              fontSize: 14,
+                              bgcolor: pal.bg,
+                              color: pal.color,
+                              border: `1px solid ${pal.border}`,
+                              borderRadius: '20px',
                             }}
                           />
                         );
@@ -348,64 +547,100 @@ export function NewTaskDialog({
             >
               {validDevelopers.map((u) => (
                 <MenuItem key={u.uid} value={u.uid}>
-                  <Checkbox checked={finiteUserIds(assignedToIds).includes(u.uid)} size="small" />
-                  <ListItemText primary={u.displayName} />
+                  <Checkbox checked={finiteUserIds(assignedToIds).includes(u.uid)} size="small"
+                    sx={{ '&.Mui-checked': { color: ORACLE_RED_ACTION } }} />
+                  <ListItemText
+                    primary={u.displayName}
+                    primaryTypographyProps={{ fontSize: 15, fontWeight: 500 }}
+                  />
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+
+          {/* Dates */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <TextField
-              label="Start Date"
+              label="Start date *"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
             <TextField
-              label="Due Date"
+              label="Due date *"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
           </Stack>
+
           {error && (
-            <Typography variant="caption" sx={{ color: '#C62828', fontWeight: 600 }}>
+            <Typography sx={{ fontSize: 13, color: '#C62828', fontWeight: 600 }}>
               {error}
             </Typography>
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 2, gap: 1, borderTop: `1px solid ${oracleRgba(0.12)}` }}>
-        <Button
-          onClick={handleClose}
-          disabled={saving}
-          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          variant="contained"
-          disableElevation
-          sx={{
-            bgcolor: ORACLE_RED_ACTION,
-            textTransform: 'none',
-            fontWeight: 700,
-            borderRadius: 2,
-            '&:hover': { bgcolor: '#A83B2D' },
-          }}
-        >
-          {saving ? 'Creating…' : 'Create task'}
-        </Button>
+
+      {/* ── Footer ── */}
+      <DialogActions
+        sx={{
+          px: 3,
+          py: 1.5,
+          gap: 1,
+          borderTop: '1px solid #F0F0F0',
+          bgcolor: '#FAFAFA',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+          Fields marked with <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>*</Box> are required
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            onClick={handleClose}
+            disabled={saving}
+            sx={{
+              fontSize: 14,
+              color: 'text.secondary',
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              border: '1px solid #E0E0E0',
+              px: 2,
+              '&:hover': { bgcolor: '#F5F5F5' },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            variant="contained"
+            disableElevation
+            startIcon={<CheckIcon sx={{ fontSize: '18px !important' }} />}
+            sx={{
+              fontSize: 14,
+              bgcolor: ORACLE_RED_ACTION,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              px: 2.5,
+              '&:hover': { bgcolor: '#A83B2D' },
+              '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' },
+            }}
+          >
+            {saving ? 'Creating…' : 'Create task'}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
