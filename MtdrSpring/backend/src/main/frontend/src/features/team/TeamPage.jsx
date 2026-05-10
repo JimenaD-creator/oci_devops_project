@@ -9,12 +9,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
 } from '@mui/material';
 import { Users, UserCircle } from 'lucide-react';
 import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
@@ -24,6 +18,8 @@ import { ORACLE_RED } from '../tasks/constants/taskConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { DeveloperInsightsTable } from '../ai/InsightCardParts';
 import DeveloperRadarCards from '../ai/DeveloperRadarCards';
+import DashboardBlockedTasksPanel from '../dashboard/DashboardBlockedTasksPanel';
+import TeamWorkloadBreakdown from './TeamWorkloadBreakdown';
 
 export default function TeamPage({ projectId, landingSprintId = null, onLandingConsumed, onOpenAiInsights }) {
   const [sprints, setSprints] = useState([]);
@@ -113,7 +109,6 @@ export default function TeamPage({ projectId, landingSprintId = null, onLandingC
   }, [selectedSprintId]);
 
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
-  const developers = Array.isArray(selectedSprint?.developers) ? selectedSprint.developers : [];
 
   if (loading) {
     return (
@@ -213,68 +208,12 @@ export default function TeamPage({ projectId, landingSprintId = null, onLandingC
 
       {selectedSprint && (
         <>
-          <Paper
-            sx={{
-              mb: 3,
-              borderRadius: 2,
-              border: '1px solid rgba(0,0,0,0.08)',
-              overflow: 'hidden',
-            }}
-          >
-            <Box sx={{ px: 2, py: 1.25, bgcolor: 'rgba(229, 57, 53, 0.08)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-              <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#1A1A1A' }}>
-                Sprint snapshot — {selectedSprint.shortLabel ?? `Sprint ${selectedSprint.id}`}
-              </Typography>
-            </Box>
-            <TableContainer>
-              <Table size="small" sx={{ '& td, & th': { fontSize: { xs: '0.85rem', sm: '0.9rem' } } }}>
-                <TableHead sx={{ bgcolor: '#FAFAFA' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Developer</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Assigned
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Completed
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Pending
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Hours
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Workload %
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      Blocked
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {developers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} sx={{ color: '#78909C', fontStyle: 'italic' }}>
-                        No developer rows in this sprint snapshot yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    developers.map((d) => (
-                      <TableRow key={d.name} hover>
-                        <TableCell sx={{ fontWeight: 600, color: '#3949AB' }}>{d.name}</TableCell>
-                        <TableCell align="right">{d.assigned ?? 0}</TableCell>
-                        <TableCell align="right">{d.completed ?? 0}</TableCell>
-                        <TableCell align="right">{d.pending ?? 0}</TableCell>
-                        <TableCell align="right">{Number(d.hours ?? 0).toFixed(1)}</TableCell>
-                        <TableCell align="right">{d.workload ?? 0}%</TableCell>
-                        <TableCell align="right">{d.blockedCount ?? 0}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+          <TeamWorkloadBreakdown
+            sprint={selectedSprint}
+            aiDeveloperInsights={developerInsightRows}
+          />
+
+          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
 
           <Paper
             sx={{

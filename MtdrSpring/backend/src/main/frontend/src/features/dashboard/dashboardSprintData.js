@@ -364,6 +364,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       blocked: isTaskBlocked(task),
       title: String(task?.title || `Task #${tid}`),
       blockedSince: task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
+      dueDate: task?.dueDate ?? task?.due_date ?? null,
+      finishDate: task?.finishDate ?? task?.finish_date ?? null,
     };
     sprintMap[sid].totalAssignedHoursTasks += ah;
     if (taskSprintMap[tid].blocked) sprintMap[sid].blockedTasksTotal += 1;
@@ -394,6 +396,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         profilePicture: ut.user?.profilePicture ?? null,
         _taskIds: new Set(),
         _completedTaskIds: new Set(),
+        _completedOnTimeIds: new Set(),
         _assignedHoursEstimate: 0,
         hours: 0,
         workload: 0,
@@ -412,7 +415,19 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         dm._assignedHoursEstimate += Number(taskSprintMap[taskId]?.assignedHours) || 0;
       }
       dm._taskIds.add(taskId);
-      if (utCompleted) dm._completedTaskIds.add(taskId);
+      if (utCompleted) {
+        dm._completedTaskIds.add(taskId);
+        const meta = taskSprintMap[taskId];
+        const fd = meta?.finishDate;
+        const dd = meta?.dueDate;
+        if (fd != null && dd != null) {
+          const fdMs = new Date(fd).getTime();
+          const ddMs = new Date(dd).getTime();
+          if (Number.isFinite(fdMs) && Number.isFinite(ddMs) && fdMs <= ddMs) {
+            dm._completedOnTimeIds.add(taskId);
+          }
+        }
+      }
     }
     /** Per-developer chart: all logged worked hours on USER_TASK (incl. in progress). */
     dm.hours += loggedHours;

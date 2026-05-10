@@ -650,7 +650,7 @@ public class GeminiService {
             "{\"category\":\"blockers\",\"text\":\"Task #45 has been blocked for 3 days — review with the team.\"}]," +
             "\"executiveSummary\":{\"overview\":\"Task status in this sprint: 4 To do, 6 In progress, 2 In review, 18 Done. The team completed 28 of 32 tasks (88% completion rate).\",\"trends\":\"Productivity improved 12% vs the previous sprint.\"," +
             "\"improvementAreas\":\"On-Time Delivery fell to 72%. Focus on meeting deadlines.\",\"nextSteps\":\"Distribute tasks more evenly in the next sprint.\"}," +
-            "\"developerInsights\":[{\"developerName\":\"Carlos\",\"insight\":\"Completed all tasks on time. Strong performance.\"}]," +
+            "\"developerInsights\":[{\"developerName\":\"Carlos\",\"insight\":\"Completed all tasks on time. Strong performance.\",\"overloaded\":false}]," +
             "\"predictions\":{\"productivityOutlook\":\"If the current trend holds, Productivity Score may reach 90% next sprint.\"," +
             "\"risks\":\"Risk of missing the current sprint unless active blockers are resolved.\"," +
             "\"deliveryEstimate\":\"At the current pace, the project may finish later than planned.\"}," +
@@ -678,6 +678,8 @@ public class GeminiService {
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
             "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
+            "  Each object MUST include a boolean field 'overloaded'. Set overloaded=true ONLY when this developer is clearly carrying more work than peers — for example: workedHoursSum is significantly above the team average (roughly 1.4x+ the team mean) AND/OR assignedTaskRows is significantly above the team average, OR the developer is juggling multiple blocked or urgent tasks that add real pressure. Otherwise set overloaded=false. Roster-only developers and developers with zero assignment rows MUST have overloaded=false. When the team has 2 or fewer developers, mark overloaded=true only if there is an unmistakable disparity.\n" +
+            "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure).\n" +
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
@@ -887,6 +889,18 @@ public class GeminiService {
             renameFieldIfPresent(o, "developer_name", "developerName");
             renameFieldIfPresent(o, "DeveloperName", "developerName");
             renameFieldIfPresent(o, "Insight", "insight");
+            renameFieldIfPresent(o, "Overloaded", "overloaded");
+            renameFieldIfPresent(o, "over_loaded", "overloaded");
+            renameFieldIfPresent(o, "is_overloaded", "overloaded");
+            renameFieldIfPresent(o, "isOverloaded", "overloaded");
+            JsonNode flag = o.get("overloaded");
+            if (flag == null || flag.isNull()) {
+                o.put("overloaded", false);
+            } else if (!flag.isBoolean()) {
+                String s = flag.asText("").trim().toLowerCase();
+                boolean truthy = s.equals("true") || s.equals("yes") || s.equals("1");
+                o.put("overloaded", truthy);
+            }
         }
     }
 
@@ -952,6 +966,7 @@ public class GeminiService {
             ObjectNode o = mapper.createObjectNode();
             o.put("developerName", name);
             o.put("insight", insight);
+            o.put("overloaded", false);
             dev.add(o);
         }
     }
