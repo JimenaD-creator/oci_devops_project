@@ -26,7 +26,7 @@ import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
-import { developerNumericId } from '../../utils/userIds';
+import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -36,6 +36,7 @@ import {
   mapTaskToKanban,
   isUserTaskAssigneeComplete,
   pageFormFieldOutline,
+  userTaskRowTaskId,
 } from './utils/taskUtils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 
@@ -58,8 +59,9 @@ export default function TasksPage({ projectId }) {
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setIsLoading(true);
     try {
       const { tasksData, sprintsData, userTasksData } =
         await fetchTasksPageBundle(effectiveProjectId);
@@ -71,7 +73,7 @@ export default function TasksPage({ projectId }) {
       setRawTasks([]);
       setSprints([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [effectiveProjectId]);
 
@@ -739,12 +741,39 @@ export default function TasksPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
         onClose={closeTaskDetailDialog}
-        onSaved={(updated) => {
+        onSaved={(updated, meta) => {
           setRawTasks((prev) =>
-            prev.map((t) => (Number(t.id) === Number(updated.id) ? updated : t)),
+            prev.map((t) => (Number(t.id) === Number(updated.id) ? { ...t, ...updated } : t)),
           );
+          if (meta?.assigneesChanged) {
+            const tid = Number(updated.id);
+            const ids = finiteUserIds(meta.assigneeUserIds);
+            setUserTasks((prev) => {
+              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+              if (ids.length === 0) return rest;
+              const st = updated?.status ?? 'TODO';
+              const added = ids.map((userId) => {
+                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+                const name = String(
+                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+                ).trim();
+                return {
+                  user: { id: userId, name: name || `User ${userId}` },
+                  task: { id: tid },
+                  status: st,
+                };
+              });
+              return [...rest, ...added];
+            });
+          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+            const tid = Number(updated.id);
+            const st = meta.assignmentStatus;
+            setUserTasks((prev) =>
+              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
+            );
+          }
           closeTaskDetailDialog();
-          loadData();
+          void loadData({ silent: true });
         }}
         onDeleted={(taskId) => {
           setRawTasks((prev) => prev.filter((t) => Number(t.id) !== Number(taskId)));

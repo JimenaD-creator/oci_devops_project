@@ -37,6 +37,7 @@ import {
   HOURS_FILL,
   HOURS_LINE,
   HOURS_ASSIGNED,
+  HOURS_ASSIGNED_LABEL,
   STACK_DONE,
   STACK_PENDING,
   GRID,
@@ -1875,7 +1876,7 @@ export default function DashboardDeveloperCharts({
           >
             <LabelList
               dataKey="hAssigned"
-              content={(p) => <HoursValueLabel {...p} fill="#00695C" />}
+              content={(p) => <HoursValueLabel {...p} fill={HOURS_ASSIGNED_LABEL} />}
             />
           </Bar>
         </BarChart>

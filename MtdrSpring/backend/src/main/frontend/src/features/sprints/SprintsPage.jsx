@@ -19,7 +19,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import TaskTable from '../tasks/TaskTable';
-import { isUserTaskAssigneeComplete } from '../tasks/utils/taskUtils';
+import { isUserTaskAssigneeComplete, userTaskRowTaskId } from '../tasks/utils/taskUtils';
 import {
   EditSprintDialog,
   NewSprintDialog,
@@ -180,8 +180,7 @@ export default function SprintsPage({ projectId }) {
   }, [tasks, selectedSprint]);
   const assignmentsByTaskId = useMemo(() => {
     return (Array.isArray(userTasks) ? userTasks : []).reduce((acc, ut) => {
-      const tidRaw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId;
-      const tid = Number(tidRaw);
+      const tid = userTaskRowTaskId(ut);
       if (!Number.isFinite(tid)) return acc;
       if (!acc[tid]) acc[tid] = [];
       acc[tid].push(ut);
@@ -735,12 +734,41 @@ export default function SprintsPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={() => setSelectedTaskForDialog(null)}
-        onSaved={(updated) => {
+        onSaved={(updated, meta) => {
           setTasks((prev) => {
-            const next = prev.map((x) => (x.id === updated.id ? updated : x));
+            const next = prev.map((x) =>
+              Number(x.id) === Number(updated.id) ? { ...x, ...updated } : x,
+            );
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });
+          if (meta?.assigneesChanged) {
+            const tid = Number(updated.id);
+            const ids = finiteUserIds(meta.assigneeUserIds);
+            setUserTasks((prev) => {
+              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+              if (ids.length === 0) return rest;
+              const st = updated?.status ?? 'TODO';
+              const added = ids.map((userId) => {
+                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+                const name = String(
+                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+                ).trim();
+                return {
+                  user: { id: userId, name: name || `User ${userId}` },
+                  task: { id: tid },
+                  status: st,
+                };
+              });
+              return [...rest, ...added];
+            });
+          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+            const tid = Number(updated.id);
+            const st = meta.assignmentStatus;
+            setUserTasks((prev) =>
+              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
+            );
+          }
           setSelectedTaskForDialog(null);
           void loadData({ silent: true });
         }}

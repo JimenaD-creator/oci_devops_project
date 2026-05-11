@@ -501,8 +501,9 @@ export function TaskDetailDialog({
     try {
       const nextIds = [...finiteUserIds(assignedUserIds)].sort();
       const prevIds = [...finiteUserIds(loadedAssigneeUserIds)].sort();
-      const sameSet =
-        nextIds.length === prevIds.length && nextIds.every((id, i) => id === prevIds[i]);
+      const assigneesChanged =
+        nextIds.length !== prevIds.length || nextIds.some((id, i) => id !== prevIds[i]);
+      const sameSet = !assigneesChanged;
       if (!sameSet) {
         const tid = task.id;
         if (nextIds.length === 0) {
@@ -521,16 +522,22 @@ export function TaskDetailDialog({
             setError('Could not update assignees.');
             return;
           }
-          for (const uid of nextIds) {
-            const postRes = await postUserTask({ userId: uid, taskId: tid, status });
-            if (!postRes.ok) {
-              setError('Could not update assignees.');
-              return;
-            }
+          const posts = await Promise.all(
+            nextIds.map((uid) => postUserTask({ userId: uid, taskId: tid, status })),
+          );
+          if (posts.some((r) => !r.ok)) {
+            setError('Could not update assignees.');
+            return;
           }
           setLoadedAssigneeUserIds(nextIds);
-          const refreshed = await fetchUserTasksForTask(tid);
-          setTaskUserTasks(Array.isArray(refreshed) ? refreshed : []);
+          // Avoid extra round-trip before PUT; list view refreshes via parent loadData.
+          setTaskUserTasks(
+            nextIds.map((userId) => ({
+              user: { id: userId, name: displayNameForAssignee(userId) },
+              task: { id: tid },
+              status,
+            })),
+          );
         }
       }
       const { finishDate: _omitFinish, ...taskRest } = task;
@@ -548,10 +555,28 @@ export function TaskDetailDialog({
       };
       const res = await putTask(task.id, payload);
       if (res.ok) {
-        const updated = await res.json();
+        let body = null;
+        try {
+          body = await res.json();
+        } catch {
+          body = null;
+        }
+        const updated =
+          body && typeof body === 'object' && !Array.isArray(body)
+            ? { ...task, ...body }
+            : { ...task, ...payload };
         setTask(updated);
+        const stillHasAssignees = finiteUserIds(assignedUserIds).length > 0;
+        let saveMeta;
+        if (assigneesChanged) {
+          saveMeta = { assigneesChanged: true, assigneeUserIds: finiteUserIds(assignedUserIds) };
+        } else if (stillHasAssignees && updated?.status != null) {
+          saveMeta = { syncAssignmentStatuses: true, assignmentStatus: updated.status };
+        } else {
+          saveMeta = undefined;
+        }
+        onSaved?.(updated, saveMeta);
         onClose();
-        onSaved(updated);
       } else if (res.status === 409) {
         setError(
           'Cannot set this task to Done until every assigned developer is marked complete, or change assignees first.',

@@ -19,6 +19,8 @@ export const HOURS_FILL = '#FB8C00';
 export const HOURS_LINE = '#F57C00';
 /** Planned / estimated hours — warm tint, legible (not washed gray). */
 export const HOURS_ASSIGNED = '#FFCC80';
+/** Text for estimated-hours values (muted; not primary orange, not teal). */
+export const HOURS_ASSIGNED_LABEL = '#757575';
 
 export const STACK_DONE = '#1565C0';
 export const STACK_PENDING = '#64B5F6';
