@@ -3,12 +3,12 @@ import { Box, Typography, Paper } from '@mui/material';
 import { Chart } from 'chart.js/auto';
 
 const METRICS = [
-  { key: 'completionRate',  label: 'Completion' },
-  { key: 'onTimeRate',      label: 'On-time' },
-  { key: 'participation',   label: 'Participation' },
-  { key: 'hoursLogged',     label: 'Hours' },
-  { key: 'efficiency',      label: 'Efficiency' },
-  { key: 'deliveryVolume',  label: 'Volume' },
+  { key: 'completionRate', label: 'Completion' },
+  { key: 'onTimeRate', label: 'On-time' },
+  { key: 'participation', label: 'Participation' },
+  { key: 'hoursLogged', label: 'Hours' },
+  { key: 'efficiency', label: 'Efficiency' },
+  { key: 'deliveryVolume', label: 'Volume' },
 ];
 
 function overall(dev) {
@@ -24,7 +24,7 @@ function getColor(score) {
 
 function RadarChart({ dev }) {
   const canvasRef = useRef(null);
-  const chartRef  = useRef(null);
+  const chartRef = useRef(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -36,15 +36,17 @@ function RadarChart({ dev }) {
     chartRef.current = new Chart(canvasRef.current, {
       type: 'radar',
       data: {
-        labels: METRICS.map(m => m.label),
-        datasets: [{
-          data: METRICS.map(m => dev[m.key] ?? 1),
-          backgroundColor: color + '22',
-          borderColor: color,
-          borderWidth: 2.5,
-          pointBackgroundColor: color,
-          pointRadius: 4,
-        }],
+        labels: METRICS.map((m) => m.label),
+        datasets: [
+          {
+            data: METRICS.map((m) => dev[m.key] ?? 1),
+            backgroundColor: color + '22',
+            borderColor: color,
+            borderWidth: 2.5,
+            pointBackgroundColor: color,
+            pointRadius: 4,
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -52,43 +54,48 @@ function RadarChart({ dev }) {
         plugins: { legend: { display: false } },
         scales: {
           r: {
-            min: 0, max: 99,
+            min: 0,
+            max: 99,
             ticks: {
               stepSize: 33,
               font: { size: 11 },
               color: '#90A4AE',
               backdropColor: 'transparent',
             },
-            grid:        { color: 'rgba(0,0,0,0.08)' },
-            angleLines:  { color: 'rgba(0,0,0,0.08)' },
+            grid: { color: 'rgba(0,0,0,0.08)' },
+            angleLines: { color: 'rgba(0,0,0,0.08)' },
             pointLabels: { font: { size: 13 }, color: '#546E7A' },
           },
         },
       },
     });
-    return () => { if (chartRef.current) chartRef.current.destroy(); };
+    return () => {
+      if (chartRef.current) chartRef.current.destroy();
+    };
   }, [dev]);
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: 260 }}>
-      <canvas
-        ref={canvasRef}
-        role="img"
-        aria-label={`Radar de métricas de ${dev.developerName}`}
-      />
+      <canvas ref={canvasRef} role="img" aria-label={`Radar de métricas de ${dev.developerName}`} />
     </Box>
   );
 }
 
 function Avatar({ dev, color, initials }) {
   return (
-    <Box sx={{
-      width: 44, height: 44, borderRadius: '50%',
-      bgcolor: color + '22',
-      flexShrink: 0,
-      overflow: 'hidden',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
+    <Box
+      sx={{
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        bgcolor: color + '22',
+        flexShrink: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       {dev.profilePicture ? (
         <img
           src={dev.profilePicture}
@@ -96,19 +103,21 @@ function Avatar({ dev, color, initials }) {
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
-        <Typography sx={{ fontSize: 15, fontWeight: 700, color }}>
-          {initials}
-        </Typography>
+        <Typography sx={{ fontSize: 15, fontWeight: 700, color }}>{initials}</Typography>
       )}
     </Box>
   );
 }
 
 function DevCard({ dev }) {
-  const ov    = overall(dev);
+  const ov = overall(dev);
   const color = getColor(ov);
   const initials = dev.developerName
-    .split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <Paper
@@ -128,7 +137,10 @@ function DevCard({ dev }) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Avatar dev={dev} color={color} initials={initials} />
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: '#1A1A1A', lineHeight: 1.2 }} noWrap>
+          <Typography
+            sx={{ fontWeight: 700, fontSize: '1rem', color: '#1A1A1A', lineHeight: 1.2 }}
+            noWrap
+          >
             {dev.developerName}
           </Typography>
           <Typography sx={{ fontSize: '0.8rem', color: '#78909C' }}>
@@ -149,18 +161,20 @@ function DevCard({ dev }) {
       <RadarChart dev={dev} />
 
       {/* Mini stats */}
-      <Box sx={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 0.75, mt: 0.5,
-      }}>
-        {METRICS.map(m => (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 0.75,
+          mt: 0.5,
+        }}
+      >
+        {METRICS.map((m) => (
           <Box key={m.key} sx={{ textAlign: 'center' }}>
             <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#37474F' }}>
               {dev[m.key] ?? 1}
             </Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: '#90A4AE' }}>
-              {m.label}
-            </Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: '#90A4AE' }}>{m.label}</Typography>
           </Box>
         ))}
       </Box>
@@ -178,8 +192,8 @@ export default function DeveloperRadarCards({ sprintId }) {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
     })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setDevs(Array.isArray(data) ? data : []))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setDevs(Array.isArray(data) ? data : []))
       .catch(() => setDevs([]));
   }, [sprintId]);
 
@@ -190,12 +204,16 @@ export default function DeveloperRadarCards({ sprintId }) {
       <Typography sx={{ fontSize: '0.8rem', color: '#90A4AE', fontWeight: 600, mb: 1.5 }}>
         Scores normalized relative to team — higher is better within the sprint.
       </Typography>
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-        gap: 2.5,
-      }}>
-        {devs.map(d => <DevCard key={d.developerName} dev={d} />)}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 2.5,
+        }}
+      >
+        {devs.map((d) => (
+          <DevCard key={d.developerName} dev={d} />
+        ))}
       </Box>
     </Box>
   );

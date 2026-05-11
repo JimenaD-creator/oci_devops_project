@@ -57,10 +57,11 @@ export default function TasksPage({ projectId }) {
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
+      const { tasksData, sprintsData, userTasksData } =
+        await fetchTasksPageBundle(effectiveProjectId);
       setRawTasks(tasksData);
       setSprints(sprintsData);
       setUserTasks(userTasksData);
@@ -71,11 +72,11 @@ export default function TasksPage({ projectId }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [effectiveProjectId]);
 
   useEffect(() => {
     loadData();
-  }, [effectiveProjectId]);
+  }, [loadData]);
 
   useEffect(() => {
     try {

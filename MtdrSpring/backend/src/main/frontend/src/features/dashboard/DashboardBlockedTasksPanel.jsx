@@ -35,7 +35,10 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Typography component="h2" sx={{ fontWeight: 800, fontSize: '1.15rem', color: '#1A1A1A', mb: 1.5 }}>
+      <Typography
+        component="h2"
+        sx={{ fontWeight: 800, fontSize: '1.15rem', color: '#1A1A1A', mb: 1.5 }}
+      >
         Blocked tasks
       </Typography>
 
@@ -59,7 +62,14 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                 bgcolor: palette.bg,
               }}
             >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 2,
+                  alignItems: 'flex-start',
+                }}
+              >
                 <Box sx={{ minWidth: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <AlertTriangle size={16} color={palette.fg} />

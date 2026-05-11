@@ -38,7 +38,9 @@ function buildAiOverloadMap(aiRows) {
   const map = new Map();
   if (!Array.isArray(aiRows)) return map;
   aiRows.forEach((row) => {
-    const name = String(row?.developerName || '').trim().toLowerCase();
+    const name = String(row?.developerName || '')
+      .trim()
+      .toLowerCase();
     if (!name) return;
     map.set(name, {
       overloaded: row?.overloaded === true,
@@ -49,7 +51,10 @@ function buildAiOverloadMap(aiRows) {
 }
 
 export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = null }) {
-  const aiOverloadMap = useMemo(() => buildAiOverloadMap(aiDeveloperInsights), [aiDeveloperInsights]);
+  const aiOverloadMap = useMemo(
+    () => buildAiOverloadMap(aiDeveloperInsights),
+    [aiDeveloperInsights],
+  );
   const aiAvailable = Array.isArray(aiDeveloperInsights) && aiDeveloperInsights.length > 0;
 
   const rows = useMemo(() => {

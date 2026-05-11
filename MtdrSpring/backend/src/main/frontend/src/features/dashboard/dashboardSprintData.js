@@ -363,7 +363,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       assignedHours: ah,
       blocked: isTaskBlocked(task),
       title: String(task?.title || `Task #${tid}`),
-      blockedSince: task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
+      blockedSince:
+        task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
       dueDate: task?.dueDate ?? task?.due_date ?? null,
       finishDate: task?.finishDate ?? task?.finish_date ?? null,
     };
@@ -408,8 +409,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     dm.name = pickDeveloperDisplayName(ut, dm.name);
     dm.initials = initialsFromName(dm.name);
     if (!dm.profilePicture && ut.user?.profilePicture) {
-  dm.profilePicture = ut.user.profilePicture;  // 👈 agrega esto
-}
+      dm.profilePicture = ut.user.profilePicture; // 👈 agrega esto
+    }
     if (taskId != null) {
       if (!dm._taskIds.has(taskId)) {
         dm._assignedHoursEstimate += Number(taskSprintMap[taskId]?.assignedHours) || 0;
@@ -699,9 +700,7 @@ export function buildBlockedReportsForAiSprint(sp) {
       out.push({
         reportedByDeveloperName,
         taskId: Number.isFinite(taskId) ? taskId : null,
-        taskTitle: String(
-          t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : ''),
-        ).trim(),
+        taskTitle: String(t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : '')).trim(),
         blockedReason: String(t?.blockedReason || '').trim(),
       });
     });

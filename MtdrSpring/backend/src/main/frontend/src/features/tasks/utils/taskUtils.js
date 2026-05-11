@@ -48,10 +48,16 @@ export function normalizeTaskStatus(value) {
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
-  if (normalized === 'DONE' || normalized === 'COMPLETED' || normalized === 'COMPLETE') return 'DONE';
+  if (normalized === 'DONE' || normalized === 'COMPLETED' || normalized === 'COMPLETE')
+    return 'DONE';
   if (normalized === 'IN_PROGRESS' || normalized === 'IN_PROCESS') return 'IN_PROGRESS';
   if (normalized === 'IN_REVIEW' || normalized === 'REVIEW') return 'IN_REVIEW';
-  if (normalized === 'PENDING' || normalized === 'TODO' || normalized === 'TO_DO' || normalized === '')
+  if (
+    normalized === 'PENDING' ||
+    normalized === 'TODO' ||
+    normalized === 'TO_DO' ||
+    normalized === ''
+  )
     return 'TODO';
   return 'TODO';
 }

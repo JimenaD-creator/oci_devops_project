@@ -21,7 +21,12 @@ import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import DashboardBlockedTasksPanel from '../dashboard/DashboardBlockedTasksPanel';
 import TeamWorkloadBreakdown from './TeamWorkloadBreakdown';
 
-export default function TeamPage({ projectId, landingSprintId = null, onLandingConsumed, onOpenAiInsights }) {
+export default function TeamPage({
+  projectId,
+  landingSprintId = null,
+  onLandingConsumed,
+  onOpenAiInsights,
+}) {
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -159,7 +164,14 @@ export default function TeamPage({ projectId, landingSprintId = null, onLandingC
           </Box>
         </Box>
         {sprints.length > 0 && (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', minWidth: { xs: '100%', sm: 220 } }}>
+          <Box
+            sx={{
+              ml: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              minWidth: { xs: '100%', sm: 220 },
+            }}
+          >
             <FormControl
               size="small"
               sx={{
@@ -248,9 +260,15 @@ export default function TeamPage({ projectId, landingSprintId = null, onLandingC
               ) : developerInsightRows?.length > 0 ? (
                 <DeveloperInsightsTable rows={developerInsightRows} />
               ) : (
-                <Typography sx={{ fontSize: { xs: '0.95rem', md: '1rem' }, color: '#78909C', fontStyle: 'italic' }}>
-                  {AI_INSIGHTS_EMPTY.developers} Use AI Insights for this sprint and run Generate (or Regenerate) to
-                  store narrative rows here.
+                <Typography
+                  sx={{
+                    fontSize: { xs: '0.95rem', md: '1rem' },
+                    color: '#78909C',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {AI_INSIGHTS_EMPTY.developers} Use AI Insights for this sprint and run Generate
+                  (or Regenerate) to store narrative rows here.
                 </Typography>
               )}
               {typeof onOpenAiInsights === 'function' &&
@@ -262,7 +280,10 @@ export default function TeamPage({ projectId, landingSprintId = null, onLandingC
                       type="button"
                       onClick={() => {
                         if (selectedSprint?.id != null) {
-                          sessionStorage.setItem('aiInsightsLandingSprintId', String(selectedSprint.id));
+                          sessionStorage.setItem(
+                            'aiInsightsLandingSprintId',
+                            String(selectedSprint.id),
+                          );
                         }
                         onOpenAiInsights();
                       }}

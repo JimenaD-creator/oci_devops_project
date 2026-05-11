@@ -38,4 +38,3 @@ test('changing status to Done calls onStatusChange with DONE', async () => {
 
   expect(onStatusChange).toHaveBeenCalledWith(42, 'DONE');
 });
-

@@ -1,9 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Container, Typography, Grid, Card, Button, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Divider,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
+  Box,
+  Container,
+  Typography,
+  Grid,
+  Card,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
@@ -25,7 +43,7 @@ const ProjectSelector = () => {
     try {
       const [resProj, resUsers] = await Promise.all([
         fetch(`${API_BASE}/api/projects/all`),
-        fetch(`${API_BASE}/users/details`)
+        fetch(`${API_BASE}/users/details`),
       ]);
       if (resProj.ok) setProjects(await resProj.json());
       if (resUsers.ok) setUserDetails(await resUsers.json());
@@ -36,7 +54,9 @@ const ProjectSelector = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const openAndClear = (modalName) => {
     setFormData({});
@@ -51,15 +71,15 @@ const ProjectSelector = () => {
   const handleAction = async () => {
     let endpoint = '';
     if (openModal === 'project') endpoint = '/api/admin/projects';
-    if (openModal === 'team')    endpoint = '/api/admin/teams';
-    if (openModal === 'member')  endpoint = '/api/admin/teams/members';
-    if (openModal === 'user')    endpoint = '/users/create';
+    if (openModal === 'team') endpoint = '/api/admin/teams';
+    if (openModal === 'member') endpoint = '/api/admin/teams/members';
+    if (openModal === 'user') endpoint = '/users/create';
 
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
       if (res.ok) {
         setOpenModal(null);
@@ -77,33 +97,60 @@ const ProjectSelector = () => {
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#FFFFFF', py: 6 }}>
       <Container maxWidth="lg">
-
         <Box sx={{ mb: 6, textAlign: 'center' }}>
           <Typography sx={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: 4, color: '#000' }}>
             ORACLE
           </Typography>
-          <div style={{ margin: '0 auto', width: '60px', height: '4px', backgroundColor: '#E53935', marginBottom: '20px' }} />
+          <div
+            style={{
+              margin: '0 auto',
+              width: '60px',
+              height: '4px',
+              backgroundColor: '#E53935',
+              marginBottom: '20px',
+            }}
+          />
           <Typography variant="h5">System Administration</Typography>
         </Box>
 
         <Grid container spacing={2} sx={{ mb: 6, justifyContent: 'center' }}>
           <Grid item>
-            <Button variant="contained" startIcon={<AddBoxIcon />} onClick={() => openAndClear('project')} sx={{ bgcolor: '#000' }}>
+            <Button
+              variant="contained"
+              startIcon={<AddBoxIcon />}
+              onClick={() => openAndClear('project')}
+              sx={{ bgcolor: '#000' }}
+            >
               Nuevo Proyecto
             </Button>
           </Grid>
           <Grid item>
-            <Button variant="outlined" startIcon={<GroupAddIcon />} onClick={() => openAndClear('team')} sx={{ color: '#000', borderColor: '#000' }}>
+            <Button
+              variant="outlined"
+              startIcon={<GroupAddIcon />}
+              onClick={() => openAndClear('team')}
+              sx={{ color: '#000', borderColor: '#000' }}
+            >
               Nuevo Equipo
             </Button>
           </Grid>
           <Grid item>
-            <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => openAndClear('member')} sx={{ color: '#000', borderColor: '#000' }}>
+            <Button
+              variant="outlined"
+              startIcon={<PersonAddIcon />}
+              onClick={() => openAndClear('member')}
+              sx={{ color: '#000', borderColor: '#000' }}
+            >
               Asignar Miembro
             </Button>
           </Grid>
           <Grid item>
-            <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => openAndClear('user')} sx={{ bgcolor: '#E53935' }}>
+            <Button
+              variant="contained"
+              startIcon={<PersonAddIcon />}
+              onClick={() => openAndClear('user')}
+              sx={{ bgcolor: '#E53935' }}
+            >
               Registrar Usuario
             </Button>
           </Grid>
@@ -121,10 +168,13 @@ const ProjectSelector = () => {
                 <Card
                   onClick={() => handleSelectProject(proj)}
                   sx={{
-                    p: 3, cursor: 'pointer',
+                    p: 3,
+                    cursor: 'pointer',
                     border: '1px solid #E0E0E0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    '&:hover': { borderColor: '#000', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    '&:hover': { borderColor: '#000', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
                   }}
                 >
                   <Typography sx={{ fontWeight: 700 }}>{proj.name}</Typography>
@@ -136,7 +186,10 @@ const ProjectSelector = () => {
         )}
 
         <Divider sx={{ mb: 4 }}>DETALLES DE USUARIOS</Divider>
-        <TableContainer component={Paper} sx={{ border: '1px solid #EEE', boxShadow: 'none', mb: 4 }}>
+        <TableContainer
+          component={Paper}
+          sx={{ border: '1px solid #EEE', boxShadow: 'none', mb: 4 }}
+        >
           <Table>
             <TableHead sx={{ bgcolor: '#F5F5F5' }}>
               <TableRow>
@@ -155,7 +208,9 @@ const ProjectSelector = () => {
                   <TableCell sx={{ fontWeight: 600 }}>{user.name?.toUpperCase()}</TableCell>
                   <TableCell>{user.role ? user.role.toUpperCase() : 'SIN ROL'}</TableCell>
                   <TableCell>{user.teamId || '---'}</TableCell>
-                  <TableCell>{(user.teamName || user.managedTeamName || '---').toUpperCase()}</TableCell>
+                  <TableCell>
+                    {(user.teamName || user.managedTeamName || '---').toUpperCase()}
+                  </TableCell>
                   <TableCell>{user.projectName || '---'}</TableCell>
                 </TableRow>
               ))}
@@ -168,11 +223,16 @@ const ProjectSelector = () => {
           <DialogTitle>NUEVO PROYECTO</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="NOMBRE" margin="dense"
+              fullWidth
+              label="NOMBRE"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
             <TextField
-              fullWidth label="ID EQUIPO" type="number" margin="dense"
+              fullWidth
+              label="ID EQUIPO"
+              type="number"
+              margin="dense"
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
                 if (!isNaN(v)) setFormData({ ...formData, assignedTeam: { id: v } });
@@ -181,7 +241,9 @@ const ProjectSelector = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>CREAR</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+              CREAR
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -189,17 +251,27 @@ const ProjectSelector = () => {
           <DialogTitle>NUEVO EQUIPO</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="NOMBRE" margin="dense"
+              fullWidth
+              label="NOMBRE"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
             <TextField
-              fullWidth label="ID MANAGER" type="number" margin="dense"
-              onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) setFormData({ ...formData, manager: { id: v } }); }}
+              fullWidth
+              label="ID MANAGER"
+              type="number"
+              margin="dense"
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setFormData({ ...formData, manager: { id: v } });
+              }}
             />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>CREAR</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+              CREAR
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -207,15 +279,28 @@ const ProjectSelector = () => {
           <DialogTitle>ASIGNAR MIEMBRO</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="ID USUARIO" type="number" margin="dense"
-              onChange={(e) => setFormData({ ...formData, user: { id: parseInt(e.target.value, 10) } })}
+              fullWidth
+              label="ID USUARIO"
+              type="number"
+              margin="dense"
+              onChange={(e) =>
+                setFormData({ ...formData, user: { id: parseInt(e.target.value, 10) } })
+              }
             />
             <TextField
-              fullWidth label="ID EQUIPO" type="number" margin="dense"
-              onChange={(e) => setFormData({ ...formData, team: { id: parseInt(e.target.value, 10) } })}
+              fullWidth
+              label="ID EQUIPO"
+              type="number"
+              margin="dense"
+              onChange={(e) =>
+                setFormData({ ...formData, team: { id: parseInt(e.target.value, 10) } })
+              }
             />
             <TextField
-              fullWidth select label="ROL" margin="dense"
+              fullWidth
+              select
+              label="ROL"
+              margin="dense"
               value={formData.role || ''}
               onChange={(e) => setFormData({ ...formData, role: e.target.value.toUpperCase() })}
             >
@@ -225,7 +310,9 @@ const ProjectSelector = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>ASIGNAR</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+              ASIGNAR
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -233,19 +320,29 @@ const ProjectSelector = () => {
           <DialogTitle>REGISTRAR USUARIO</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="NOMBRE" margin="dense"
+              fullWidth
+              label="NOMBRE"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
             <TextField
-              fullWidth label="EMAIL" margin="dense"
+              fullWidth
+              label="EMAIL"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
             <TextField
-              fullWidth label="PASSWORD" type="password" margin="dense"
+              fullWidth
+              label="PASSWORD"
+              type="password"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
             />
             <TextField
-              fullWidth select label="TIPO" margin="dense"
+              fullWidth
+              select
+              label="TIPO"
+              margin="dense"
               value={formData.type || ''}
               onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
             >
@@ -255,10 +352,11 @@ const ProjectSelector = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#E53935' }}>REGISTRAR</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#E53935' }}>
+              REGISTRAR
+            </Button>
           </DialogActions>
         </Dialog>
-
       </Container>
     </Box>
   );

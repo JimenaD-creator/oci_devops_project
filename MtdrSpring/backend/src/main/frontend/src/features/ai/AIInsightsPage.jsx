@@ -93,13 +93,6 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
 
-  const normalizeProductivityValue = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return null;
-    const normalized = n <= 1 ? Math.round(n * 100) : Math.round(n);
-    return Math.min(100, Math.max(0, normalized));
-  };
-
   const normalizeKpiPercent = (v) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return 0;
@@ -111,7 +104,10 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
     if (!sprint) return null;
     const completionRate = Math.min(100, Math.max(0, Number(sprint?.kpis?.completionRate) || 0));
     const onTimeDelivery = Math.min(100, Math.max(0, Number(sprint?.kpis?.onTimeDelivery) || 0));
-    const teamParticipation = Math.min(100, Math.max(0, Number(sprint?.kpis?.teamParticipation) || 0));
+    const teamParticipation = Math.min(
+      100,
+      Math.max(0, Number(sprint?.kpis?.teamParticipation) || 0),
+    );
     const rawWb = Number(sprint?.kpis?.workloadBalance);
     const workloadBalance = Number.isFinite(rawWb)
       ? Math.min(100, Math.max(0, Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)))
@@ -214,7 +210,14 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
           </Typography>
         </Box>
         {sprints.length > 0 && (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', minWidth: { xs: '100%', sm: 220 } }}>
+          <Box
+            sx={{
+              ml: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              minWidth: { xs: '100%', sm: 220 },
+            }}
+          >
             <FormControl
               size="small"
               sx={{

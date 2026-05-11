@@ -1,7 +1,11 @@
 import React from 'react';
 import { Box, Typography, Paper, Button, CircularProgress } from '@mui/material';
 import { Sparkles } from 'lucide-react';
-import { KPI_LABELS, alignTrendsProductivityScore, alignKpiMetricsInText } from '../ai/aiInsightsConstants';
+import {
+  KPI_LABELS,
+  alignTrendsProductivityScore,
+  alignKpiMetricsInText,
+} from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -84,7 +88,10 @@ export default function KpiManagerGuidePanel({
     if (text == null || !hasCurrentProductivityScore) return text;
     const n = Math.max(0, Math.min(100, Number(resolvedCurrentProductivityScore)));
     const display = Number.isInteger(n) ? `${n}%` : `${n.toFixed(1)}%`;
-    return String(text).replace(/(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi, `$1${display}`);
+    return String(text).replace(
+      /(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+      `$1${display}`,
+    );
   };
   const productivityDeltaTextRaw = clampOver100ForDisplay(
     typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',
@@ -99,7 +106,10 @@ export default function KpiManagerGuidePanel({
   });
   const productivityDeltaText = hasCurrentProductivityScore
     ? alignGenericScorePhrase(
-        alignTrendsProductivityScore(productivityDeltaTextAligned, resolvedCurrentProductivityScore),
+        alignTrendsProductivityScore(
+          productivityDeltaTextAligned,
+          resolvedCurrentProductivityScore,
+        ),
       )
     : productivityDeltaTextAligned;
   const hasMetricLines =
@@ -158,14 +168,24 @@ export default function KpiManagerGuidePanel({
                 >
                   Strong productivity gain
                 </Typography>
-                <Typography sx={{ fontSize: '0.88rem', color: '#1B5E20', fontWeight: 600, lineHeight: 1.55 }}>
+                <Typography
+                  sx={{ fontSize: '0.88rem', color: '#1B5E20', fontWeight: 600, lineHeight: 1.55 }}
+                >
                   Productivity score vs Sprint {productivityDelta.previousSprintId}:{' '}
                   {productivityDelta.previousScore}% → {productivityDelta.currentScore}%
                   {productivityDelta.deltaPoints != null && (
-                    <> (+{productivityDelta.deltaPoints} point{productivityDelta.deltaPoints === 1 ? '' : 's'})</>
+                    <>
+                      {' '}
+                      (+{productivityDelta.deltaPoints} point
+                      {productivityDelta.deltaPoints === 1 ? '' : 's'})
+                    </>
                   )}
                   {productivityDelta.relativePct != null && productivityDelta.previousScore > 0 && (
-                    <> — that is a +{productivityDelta.relativePct.toFixed(0)}% change vs the previous sprint.</>
+                    <>
+                      {' '}
+                      — that is a +{productivityDelta.relativePct.toFixed(0)}% change vs the
+                      previous sprint.
+                    </>
                   )}
                 </Typography>
               </Box>
@@ -213,7 +233,9 @@ export default function KpiManagerGuidePanel({
       {loading && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
           <CircularProgress size={22} sx={{ color: '#C74634' }} />
-          <Typography sx={{ color: '#607D8B', fontSize: '0.95rem' }}>Loading AI context…</Typography>
+          <Typography sx={{ color: '#607D8B', fontSize: '0.95rem' }}>
+            Loading AI context…
+          </Typography>
         </Box>
       )}
 
@@ -226,8 +248,8 @@ export default function KpiManagerGuidePanel({
       {!loading && !fetchFailed && !hasGuide && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'flex-start' }}>
           <Typography sx={{ color: '#546E7A', fontSize: '0.95rem', lineHeight: 1.55 }}>
-            No manager KPI narrative yet for this sprint. Open AI Insights, select this sprint, and run
-            Generate (or Regenerate) so Gemini can store a short interpretation here.
+            No manager KPI narrative yet for this sprint. Open AI Insights, select this sprint, and
+            run Generate (or Regenerate) so Gemini can store a short interpretation here.
           </Typography>
           {typeof onOpenAiInsights === 'function' && (
             <Button

@@ -4,18 +4,54 @@ import { APP_FONT_FAMILY } from '../../theme';
 import { developerAvatarColors } from '../../utils/developerColors';
 
 const initialData = [
-  { name: 'Developer 1', initials: 'D1', assigned: 8,  completed: 6, hours: 32.5, onTime: 70, participation: 100, workload: 80 },
-  { name: 'Developer 2', initials: 'D2', assigned: 10, completed: 8, hours: 45.0, onTime: 85, participation: 90,  workload: 100 },
-  { name: 'Developer 3', initials: 'D3', assigned: 6,  completed: 5, hours: 20.0, onTime: 60, participation: 80,  workload: 60 },
-  { name: 'Developer 4', initials: 'D4', assigned: 7,  completed: 6, hours: 31.0, onTime: 75, participation: 95,  workload: 70 },
+  {
+    name: 'Developer 1',
+    initials: 'D1',
+    assigned: 8,
+    completed: 6,
+    hours: 32.5,
+    onTime: 70,
+    participation: 100,
+    workload: 80,
+  },
+  {
+    name: 'Developer 2',
+    initials: 'D2',
+    assigned: 10,
+    completed: 8,
+    hours: 45.0,
+    onTime: 85,
+    participation: 90,
+    workload: 100,
+  },
+  {
+    name: 'Developer 3',
+    initials: 'D3',
+    assigned: 6,
+    completed: 5,
+    hours: 20.0,
+    onTime: 60,
+    participation: 80,
+    workload: 60,
+  },
+  {
+    name: 'Developer 4',
+    initials: 'D4',
+    assigned: 7,
+    completed: 6,
+    hours: 31.0,
+    onTime: 75,
+    participation: 95,
+    workload: 70,
+  },
 ];
 
-const rate     = (completed, assigned) => Math.round((completed / assigned) * 100);
-const avgHours = (hours, completed)    => (hours / completed).toFixed(1);
+const rate = (completed, assigned) => Math.round((completed / assigned) * 100);
+const avgHours = (hours, completed) => (hours / completed).toFixed(1);
 
 function getBadgeClass(val, highThreshold, midThreshold) {
   if (val >= highThreshold) return 'badge-tier-high';
-  if (val >= midThreshold)  return 'badge-tier-mid';
+  if (val >= midThreshold) return 'badge-tier-mid';
   return 'badge-tier-low';
 }
 
@@ -45,8 +81,16 @@ function DevAvatar({ name, initials, profilePicture, avatarColors }) {
         <img
           src={profilePicture}
           alt={name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
-          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center top',
+            display: 'block',
+          }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
         />
       </div>
     );
@@ -61,15 +105,15 @@ function DevAvatar({ name, initials, profilePicture, avatarColors }) {
 }
 
 const fullColumns = [
-  { key: 'name',           label: 'Developer',          sortable: true  },
-  { key: 'assigned',       label: 'Tasks Assigned',      sortable: true  },
-  { key: 'completed',      label: 'Tasks Completed',     sortable: true  },
-  { key: 'completionRate', label: 'Completion Rate',     sortable: true  },
-  { key: 'hours',          label: 'Total Hours',         sortable: true  },
-  { key: 'avgHours',       label: 'Average Hrs / Task',  sortable: true  },
-  { key: 'onTime',         label: 'On-Time Delivery',    sortable: true  },
-  { key: 'participation',  label: 'Participation Rate',  sortable: true  },
-  { key: 'workload',       label: 'Workload Balance',    sortable: false },
+  { key: 'name', label: 'Developer', sortable: true },
+  { key: 'assigned', label: 'Tasks Assigned', sortable: true },
+  { key: 'completed', label: 'Tasks Completed', sortable: true },
+  { key: 'completionRate', label: 'Completion Rate', sortable: true },
+  { key: 'hours', label: 'Total Hours', sortable: true },
+  { key: 'avgHours', label: 'Average Hrs / Task', sortable: true },
+  { key: 'onTime', label: 'On-Time Delivery', sortable: true },
+  { key: 'participation', label: 'Participation Rate', sortable: true },
+  { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
 const SHARED_DEVELOPER_TABLE_CSS = `
@@ -181,7 +225,7 @@ function sortValue(v) {
 
 function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
   const [search, setSearch] = useState('');
-  const [sort, setSort]     = useState({ key: null, dir: 'asc' });
+  const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
   const rows = useMemo(() => {
     const names = new Set();
@@ -193,15 +237,15 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
       selectedSprints.forEach((sp) => {
         const d = (sp.developers || []).find((x) => x.name === name);
         if (d) {
-          if (!initials)        initials       = d.initials || initialsFromName(name);
-          if (!profilePicture)  profilePicture = d.profilePicture ?? null;
+          if (!initials) initials = d.initials || initialsFromName(name);
+          if (!profilePicture) profilePicture = d.profilePicture ?? null;
         }
-        row[`${sp.id}_assigned`]  = d ? d.assigned  : '—';
+        row[`${sp.id}_assigned`] = d ? d.assigned : '—';
         row[`${sp.id}_completed`] = d ? d.completed : '—';
-        row[`${sp.id}_hours`]     = d ? d.hours     : '—';
-        row[`${sp.id}_workload`]  = d && typeof d.workload === 'number' ? d.workload : '—';
+        row[`${sp.id}_hours`] = d ? d.hours : '—';
+        row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : '—';
       });
-      row.initials       = initials || initialsFromName(name);
+      row.initials = initials || initialsFromName(name);
       row.profilePicture = profilePicture;
       return row;
     });
@@ -215,8 +259,14 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   const sorted = useMemo(() => {
     if (!sort.key) {
       return [...filtered].sort((a, b) => {
-        const totalA = selectedSprints.reduce((acc, sp) => acc + (Number(a[`${sp.id}_completed`]) || 0), 0);
-        const totalB = selectedSprints.reduce((acc, sp) => acc + (Number(b[`${sp.id}_completed`]) || 0), 0);
+        const totalA = selectedSprints.reduce(
+          (acc, sp) => acc + (Number(a[`${sp.id}_completed`]) || 0),
+          0,
+        );
+        const totalB = selectedSprints.reduce(
+          (acc, sp) => acc + (Number(b[`${sp.id}_completed`]) || 0),
+          0,
+        );
         const diff = totalB - totalA;
         return diff !== 0 ? diff : String(a.name).localeCompare(String(b.name));
       });
@@ -231,10 +281,12 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
       const bs = String(b[sort.key] ?? '');
       return sort.dir === 'asc' ? as.localeCompare(bs) : bs.localeCompare(as);
     });
-  }, [filtered, sort]);
+  }, [filtered, sort, selectedSprints]);
 
   const toggleSort = (key) =>
-    setSort((s) => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    );
 
   const avgForKey = (key) => {
     const nums = sorted.map((r) => r[key]).filter((v) => typeof v === 'number');
@@ -256,17 +308,20 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
 
-  const renderHours        = (v) => typeof v === 'number' ? `${v}h` : v;
-  const renderWorkloadCell = (v) => typeof v === 'number'
-    ? <WorkloadBar val={v} />
-    : <span className="cell-muted">—</span>;
+  const renderHours = (v) => (typeof v === 'number' ? `${v}h` : v);
+  const renderWorkloadCell = (v) =>
+    typeof v === 'number' ? <WorkloadBar val={v} /> : <span className="cell-muted">—</span>;
 
   const sortIcon = (key) =>
-    sort.key === key
-      ? sort.dir === 'asc'
-        ? <ChevronUp size={12} color="#C74634" />
-        : <ChevronDown size={12} color="#C74634" />
-      : <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />;
+    sort.key === key ? (
+      sort.dir === 'asc' ? (
+        <ChevronUp size={12} color="#C74634" />
+      ) : (
+        <ChevronDown size={12} color="#C74634" />
+      )
+    ) : (
+      <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+    );
 
   return (
     <>
@@ -308,8 +363,11 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                       </div>
                     </th>
                     {selectedSprints.map((sp, si) => (
-                      <th key={sp.id} colSpan={4}
-                        className={`th-sprint-compare-group${si > 0 ? ' th-sprint-compare-group-bordered' : ''}`}>
+                      <th
+                        key={sp.id}
+                        colSpan={4}
+                        className={`th-sprint-compare-group${si > 0 ? ' th-sprint-compare-group-bordered' : ''}`}
+                      >
                         {sp.shortLabel}
                         <span className="sprint-range-caption">{sp.dateRange}</span>
                       </th>
@@ -319,17 +377,37 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                     {selectedSprints.flatMap((sp, si) => {
                       const b = si > 0 ? ' th-sprint-compare-sub-bordered' : '';
                       return [
-                        <th key={`${sp.id}-a`} className={`sortable${b}`} onClick={() => toggleSort(`${sp.id}_assigned`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Tasks Assigned {sortIcon(`${sp.id}_assigned`)}</div>
+                        <th
+                          key={`${sp.id}-a`}
+                          className={`sortable${b}`}
+                          onClick={() => toggleSort(`${sp.id}_assigned`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Tasks Assigned {sortIcon(`${sp.id}_assigned`)}
+                          </div>
                         </th>,
-                        <th key={`${sp.id}-d`} className="sortable" onClick={() => toggleSort(`${sp.id}_completed`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Tasks Completed {sortIcon(`${sp.id}_completed`)}</div>
+                        <th
+                          key={`${sp.id}-d`}
+                          className="sortable"
+                          onClick={() => toggleSort(`${sp.id}_completed`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Tasks Completed {sortIcon(`${sp.id}_completed`)}
+                          </div>
                         </th>,
-                        <th key={`${sp.id}-h`} className="sortable" onClick={() => toggleSort(`${sp.id}_hours`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Total Hours {sortIcon(`${sp.id}_hours`)}</div>
+                        <th
+                          key={`${sp.id}-h`}
+                          className="sortable"
+                          onClick={() => toggleSort(`${sp.id}_hours`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Total Hours {sortIcon(`${sp.id}_hours`)}
+                          </div>
                         </th>,
                         <th key={`${sp.id}-w`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Workload Balance</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Workload Balance
+                          </div>
                         </th>,
                       ];
                     })}
@@ -338,23 +416,33 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
               ) : (
                 <tr>
                   <th className="sortable" onClick={() => toggleSort('name')}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Developer {sortIcon('name')}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Developer {sortIcon('name')}
+                    </div>
                   </th>
                   {(() => {
                     const sp = selectedSprints[0];
                     return (
                       <>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_assigned`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Tasks Assigned {sortIcon(`${sp.id}_assigned`)}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Tasks Assigned {sortIcon(`${sp.id}_assigned`)}
+                          </div>
                         </th>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_completed`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Tasks Completed {sortIcon(`${sp.id}_completed`)}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Tasks Completed {sortIcon(`${sp.id}_completed`)}
+                          </div>
                         </th>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_hours`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Total Hours {sortIcon(`${sp.id}_hours`)}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Total Hours {sortIcon(`${sp.id}_hours`)}
+                          </div>
                         </th>
                         <th>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Workload Balance</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Workload Balance
+                          </div>
                         </th>
                       </>
                     );
@@ -382,10 +470,21 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                       ? selectedSprints.flatMap((sp, si) => {
                           const bc = si > 0 ? ' td-sprint-compare-first' : '';
                           return [
-                            <td key={`${r.name}-${sp.id}-a`} className={`text-center cell-muted${bc}`}>{r[`${sp.id}_assigned`]}</td>,
-                            <td key={`${r.name}-${sp.id}-d`} className="text-center cell-strong">{r[`${sp.id}_completed`]}</td>,
-                            <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">{renderHours(r[`${sp.id}_hours`])}</td>,
-                            <td key={`${r.name}-${sp.id}-w`}>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>,
+                            <td
+                              key={`${r.name}-${sp.id}-a`}
+                              className={`text-center cell-muted${bc}`}
+                            >
+                              {r[`${sp.id}_assigned`]}
+                            </td>,
+                            <td key={`${r.name}-${sp.id}-d`} className="text-center cell-strong">
+                              {r[`${sp.id}_completed`]}
+                            </td>,
+                            <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">
+                              {renderHours(r[`${sp.id}_hours`])}
+                            </td>,
+                            <td key={`${r.name}-${sp.id}-w`}>
+                              {renderWorkloadCell(r[`${sp.id}_workload`])}
+                            </td>,
                           ];
                         })
                       : (() => {
@@ -394,7 +493,9 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                             <>
                               <td className="text-center cell-muted">{r[`${sp.id}_assigned`]}</td>
                               <td className="text-center cell-strong">{r[`${sp.id}_completed`]}</td>
-                              <td className="text-center cell-muted">{renderHours(r[`${sp.id}_hours`])}</td>
+                              <td className="text-center cell-muted">
+                                {renderHours(r[`${sp.id}_hours`])}
+                              </td>
                               <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
                             </>
                           );
@@ -409,11 +510,21 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                       const bc = si > 0 ? ' td-sprint-compare-first' : '';
                       const wAvg = workloadAvgForSprint(sp.id);
                       return [
-                        <td key={`avg-${sp.id}-a`} className={`summary-cell text-center${bc}`}>{avgForKey(`${sp.id}_assigned`)}</td>,
-                        <td key={`avg-${sp.id}-d`} className="summary-cell text-center">{avgForKey(`${sp.id}_completed`)}</td>,
-                        <td key={`avg-${sp.id}-h`} className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>,
+                        <td key={`avg-${sp.id}-a`} className={`summary-cell text-center${bc}`}>
+                          {avgForKey(`${sp.id}_assigned`)}
+                        </td>,
+                        <td key={`avg-${sp.id}-d`} className="summary-cell text-center">
+                          {avgForKey(`${sp.id}_completed`)}
+                        </td>,
+                        <td key={`avg-${sp.id}-h`} className="summary-cell text-center">
+                          {hoursAvgForSprint(sp.id)}
+                        </td>,
                         <td key={`avg-${sp.id}-w`} className="summary-cell">
-                          {wAvg != null ? <WorkloadBar val={wAvg} /> : <span className="cell-muted">—</span>}
+                          {wAvg != null ? (
+                            <WorkloadBar val={wAvg} />
+                          ) : (
+                            <span className="cell-muted">—</span>
+                          )}
                         </td>,
                       ];
                     })
@@ -422,11 +533,19 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                       const wAvg = workloadAvgForSprint(sp.id);
                       return (
                         <>
-                          <td className="summary-cell text-center">{avgForKey(`${sp.id}_assigned`)}</td>
-                          <td className="summary-cell text-center">{avgForKey(`${sp.id}_completed`)}</td>
+                          <td className="summary-cell text-center">
+                            {avgForKey(`${sp.id}_assigned`)}
+                          </td>
+                          <td className="summary-cell text-center">
+                            {avgForKey(`${sp.id}_completed`)}
+                          </td>
                           <td className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>
                           <td className="summary-cell">
-                            {wAvg != null ? <WorkloadBar val={wAvg} /> : <span className="cell-muted">—</span>}
+                            {wAvg != null ? (
+                              <WorkloadBar val={wAvg} />
+                            ) : (
+                              <span className="cell-muted">—</span>
+                            )}
                           </td>
                         </>
                       );
@@ -442,14 +561,15 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
 
 function FullAnalyticsTable() {
   const [search, setSearch] = useState('');
-  const [sort, setSort]     = useState({ key: null, dir: 'asc' });
+  const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
   const enriched = useMemo(
-    () => initialData.map((r) => ({
-      ...r,
-      completionRate: rate(r.completed, r.assigned),
-      avgHours: parseFloat(avgHours(r.hours, r.completed)),
-    })),
+    () =>
+      initialData.map((r) => ({
+        ...r,
+        completionRate: rate(r.completed, r.assigned),
+        avgHours: parseFloat(avgHours(r.hours, r.completed)),
+      })),
     [],
   );
 
@@ -463,13 +583,16 @@ function FullAnalyticsTable() {
     return [...filtered].sort((a, b) => {
       const av = a[sort.key];
       const bv = b[sort.key];
-      if (typeof av === 'string') return sort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (typeof av === 'string')
+        return sort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       return sort.dir === 'asc' ? av - bv : bv - av;
     });
   }, [filtered, sort]);
 
   const toggleSort = (key) =>
-    setSort((s) => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    );
 
   const avg = (key) => {
     const vals = enriched.map((r) => r[key]).filter((v) => typeof v === 'number');
@@ -503,15 +626,23 @@ function FullAnalyticsTable() {
             <thead>
               <tr>
                 {fullColumns.map((col) => (
-                  <th key={col.key} onClick={() => col.sortable && toggleSort(col.key)}
-                    className={col.sortable ? 'sortable' : ''}>
+                  <th
+                    key={col.key}
+                    onClick={() => col.sortable && toggleSort(col.key)}
+                    className={col.sortable ? 'sortable' : ''}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {col.label}
-                      {col.sortable && (
-                        sort.key === col.key
-                          ? sort.dir === 'asc' ? <ChevronUp size={12} color="#C74634" /> : <ChevronDown size={12} color="#C74634" />
-                          : <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
-                      )}
+                      {col.sortable &&
+                        (sort.key === col.key ? (
+                          sort.dir === 'asc' ? (
+                            <ChevronUp size={12} color="#C74634" />
+                          ) : (
+                            <ChevronDown size={12} color="#C74634" />
+                          )
+                        ) : (
+                          <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+                        ))}
                     </div>
                   </th>
                 ))}
@@ -535,12 +666,20 @@ function FullAnalyticsTable() {
                     </td>
                     <td className="text-center cell-muted">{r.assigned}</td>
                     <td className="text-center cell-strong">{r.completed}</td>
-                    <td className="text-center"><Badge val={r.completionRate} green={80} yellow={50} /></td>
+                    <td className="text-center">
+                      <Badge val={r.completionRate} green={80} yellow={50} />
+                    </td>
                     <td className="text-center cell-muted">{r.hours}h</td>
                     <td className="text-center cell-muted">{r.avgHours}h</td>
-                    <td className="text-center"><Badge val={r.onTime} green={90} yellow={70} /></td>
-                    <td className="text-center"><Badge val={r.participation} green={90} yellow={70} /></td>
-                    <td><WorkloadBar val={r.workload} /></td>
+                    <td className="text-center">
+                      <Badge val={r.onTime} green={90} yellow={70} />
+                    </td>
+                    <td className="text-center">
+                      <Badge val={r.participation} green={90} yellow={70} />
+                    </td>
+                    <td>
+                      <WorkloadBar val={r.workload} />
+                    </td>
                   </tr>
                 );
               })}
@@ -548,12 +687,20 @@ function FullAnalyticsTable() {
                 <td className="summary-cell">Team Average</td>
                 <td className="summary-cell text-center">{avg('assigned')}</td>
                 <td className="summary-cell text-center">{avg('completed')}</td>
-                <td className="text-center"><span className="summary-cell">{avg('completionRate')}%</span></td>
+                <td className="text-center">
+                  <span className="summary-cell">{avg('completionRate')}%</span>
+                </td>
                 <td className="summary-cell text-center">{avg('hours')}h</td>
                 <td className="summary-cell text-center">{avg('avgHours')}h</td>
-                <td className="text-center"><span className="summary-cell">{avg('onTime')}%</span></td>
-                <td className="text-center"><span className="summary-cell">{avg('participation')}%</span></td>
-                <td><WorkloadBar val={parseFloat(avg('workload'))} /></td>
+                <td className="text-center">
+                  <span className="summary-cell">{avg('onTime')}%</span>
+                </td>
+                <td className="text-center">
+                  <span className="summary-cell">{avg('participation')}%</span>
+                </td>
+                <td>
+                  <WorkloadBar val={parseFloat(avg('workload'))} />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -563,10 +710,20 @@ function FullAnalyticsTable() {
   );
 }
 
-export default function DeveloperTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
+export default function DeveloperTable({
+  selectedSprints,
+  compareMode,
+  suppressCardTitle = false,
+}) {
   if (selectedSprints != null) {
     if (!selectedSprints.length) return null;
-    return <SprintMetricsTable selectedSprints={selectedSprints} compareMode={!!compareMode} suppressCardTitle={!!suppressCardTitle} />;
+    return (
+      <SprintMetricsTable
+        selectedSprints={selectedSprints}
+        compareMode={!!compareMode}
+        suppressCardTitle={!!suppressCardTitle}
+      />
+    );
   }
   return <FullAnalyticsTable />;
 }

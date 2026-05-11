@@ -118,7 +118,7 @@ function App() {
         })
         .catch(() => {});
     }
-  }, [user]);
+  }, [user, selectedProjectId]);
 
   useEffect(() => {
     if (user && user.role === 'DEVELOPER') {
@@ -400,17 +400,17 @@ function App() {
         <Box sx={{ p: 2, borderTop: '1px solid #2A2A2A' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Avatar
-  src={user.profilePicture || undefined}
-  sx={{
-    bgcolor: '#E53935',
-    width: 34,
-    height: 34,
-    fontSize: '0.75rem',
-    fontWeight: 700,
-  }}
->
-  {!user.profilePicture && getInitials(user.name)}
-</Avatar>
+              src={user.profilePicture || undefined}
+              sx={{
+                bgcolor: '#E53935',
+                width: 34,
+                height: 34,
+                fontSize: '0.75rem',
+                fontWeight: 700,
+              }}
+            >
+              {!user.profilePicture && getInitials(user.name)}
+            </Avatar>
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', noWrap: true }}>
                 {user.name}
@@ -501,7 +501,9 @@ function App() {
           )}
         </Suspense>
 
-        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team'].includes(
+          activePage,
+        ) && (
           <Box
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}
           >

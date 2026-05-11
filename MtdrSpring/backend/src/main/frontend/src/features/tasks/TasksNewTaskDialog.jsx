@@ -24,7 +24,12 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { developerAvatarColors } from '../../utils/developerColors';
 import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
 import { API_BASE, ORACLE_RED } from './constants/taskConstants';
-import { FORM_FIELD_TINT_BG, ORACLE_RED_ACTION, STATUS_CHIP_SX, TASK_STATUS_LABEL } from '../sprints/constants/sprintConstants';
+import {
+  FORM_FIELD_TINT_BG,
+  ORACLE_RED_ACTION,
+  STATUS_CHIP_SX,
+  TASK_STATUS_LABEL,
+} from '../sprints/constants/sprintConstants';
 import { createTaskSelectFillSx, pageFormFieldOutline } from './utils/taskUtils';
 
 export function TasksNewTaskDialog({
@@ -396,7 +401,11 @@ export function TasksNewTaskDialog({
               <InputLabel>Sprint</InputLabel>
               <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
                 {sprints.map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)} sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}>
+                  <MenuItem
+                    key={s.id}
+                    value={String(s.id)}
+                    sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
+                  >
                     {`Sprint ${s.id}`}
                   </MenuItem>
                 ))}

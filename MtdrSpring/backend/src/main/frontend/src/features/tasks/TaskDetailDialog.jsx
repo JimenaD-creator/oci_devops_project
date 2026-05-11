@@ -27,7 +27,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
-import { developerAvatarColors } from '../../utils/developerColors';
 import {
   developerNumericId,
   finiteUserIds,
@@ -37,9 +36,6 @@ import {
 import {
   ORACLE_RED,
   ORACLE_RED_ACTION,
-  CLASSIFICATION_CHIP_SX,
-  PRIORITY_CHIP_SX,
-  STATUS_CHIP_SX,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
 import {
@@ -53,8 +49,6 @@ import {
 } from './taskDetailApi';
 import {
   formatDate,
-  oracleRgba,
-  PLANNING_CARD_SX,
   resolveProjectIdForDevelopers,
   taskDisplayName,
   userIdFromUserTaskRow,
@@ -73,23 +67,79 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TYPE_OPTIONS = [
-  { value: 'FEATURE', label: 'Feature', bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489', icon: '\u2726' },
-  { value: 'BUG',     label: 'Bug',     bg: '#FCEBEB', border: '#F09595', color: '#791F1F', icon: '\u2B21' },
-  { value: 'TASK',    label: 'Task',    bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C', icon: '\u25FB' },
-  { value: 'USER_STORY', label: 'User Story', bg: '#EAF3DE', border: '#97C459', color: '#27500A', icon: '\u25C8' },
+  {
+    value: 'FEATURE',
+    label: 'Feature',
+    bg: '#EEEDFE',
+    border: '#AFA9EC',
+    color: '#3C3489',
+    icon: '\u2726',
+  },
+  {
+    value: 'BUG',
+    label: 'Bug',
+    bg: '#FCEBEB',
+    border: '#F09595',
+    color: '#791F1F',
+    icon: '\u2B21',
+  },
+  {
+    value: 'TASK',
+    label: 'Task',
+    bg: '#E6F1FB',
+    border: '#85B7EB',
+    color: '#0C447C',
+    icon: '\u25FB',
+  },
+  {
+    value: 'USER_STORY',
+    label: 'User Story',
+    bg: '#EAF3DE',
+    border: '#97C459',
+    color: '#27500A',
+    icon: '\u25C8',
+  },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'TODO',        label: 'To Do',       bg: '#F1EFE8', border: '#D3D1C7', color: '#5F5E5A', dot: '#888780' },
-  { value: 'IN_PROGRESS', label: 'In Progress', bg: '#FAEEDA', border: '#FAC775', color: '#633806', dot: '#BA7517' },
-  { value: 'IN_REVIEW',   label: 'In Review',   bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C', dot: '#185FA5' },
-  { value: 'DONE',        label: 'Done',        bg: '#EAF3DE', border: '#97C459', color: '#27500A', dot: '#3B6D11' },
+  {
+    value: 'TODO',
+    label: 'To Do',
+    bg: '#F1EFE8',
+    border: '#D3D1C7',
+    color: '#5F5E5A',
+    dot: '#888780',
+  },
+  {
+    value: 'IN_PROGRESS',
+    label: 'In Progress',
+    bg: '#FAEEDA',
+    border: '#FAC775',
+    color: '#633806',
+    dot: '#BA7517',
+  },
+  {
+    value: 'IN_REVIEW',
+    label: 'In Review',
+    bg: '#E6F1FB',
+    border: '#85B7EB',
+    color: '#0C447C',
+    dot: '#185FA5',
+  },
+  {
+    value: 'DONE',
+    label: 'Done',
+    bg: '#EAF3DE',
+    border: '#97C459',
+    color: '#27500A',
+    dot: '#3B6D11',
+  },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: 'LOW',      label: 'Low',      bg: '#EAF3DE', border: '#97C459', color: '#27500A' },
-  { value: 'MEDIUM',   label: 'Medium',   bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
-  { value: 'HIGH',     label: 'High',     bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
+  { value: 'LOW', label: 'Low', bg: '#EAF3DE', border: '#97C459', color: '#27500A' },
+  { value: 'MEDIUM', label: 'Medium', bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
+  { value: 'HIGH', label: 'High', bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
   { value: 'CRITICAL', label: 'Critical', bg: '#FCEBEB', border: '#F09595', color: '#791F1F' },
 ];
 
@@ -121,7 +171,16 @@ const fieldSx = {
 function SectionLabel({ children }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'text.secondary',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+        }}
+      >
         {children}
       </Typography>
       <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
@@ -131,7 +190,16 @@ function SectionLabel({ children }) {
 
 function FieldLabel({ children, color = '#1565C0' }) {
   return (
-    <Typography sx={{ fontSize: 11, fontWeight: 600, color, letterSpacing: '0.04em', textTransform: 'uppercase', mb: 0.5 }}>
+    <Typography
+      sx={{
+        fontSize: 11,
+        fontWeight: 600,
+        color,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        mb: 0.5,
+      }}
+    >
       {children}
     </Typography>
   );
@@ -139,7 +207,16 @@ function FieldLabel({ children, color = '#1565C0' }) {
 
 function InfoCard({ children, accentColor = ORACLE_RED_ACTION, sx = {} }) {
   return (
-    <Paper elevation={0} sx={{ p: 2.25, borderRadius: '12px', border: '0.5px solid #E8E8E8', borderTop: `3px solid ${accentColor}`, ...sx }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.25,
+        borderRadius: '12px',
+        border: '0.5px solid #E8E8E8',
+        borderTop: `3px solid ${accentColor}`,
+        ...sx,
+      }}
+    >
       {children}
     </Paper>
   );
@@ -156,19 +233,34 @@ function SegmentedButtons({ options, value, onChange }) {
             component="button"
             onClick={() => onChange(opt.value)}
             sx={{
-              flex: 1, py: 0.875, px: 0.5,
+              flex: 1,
+              py: 0.875,
+              px: 0.5,
               borderRadius: '8px',
               border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : 'text.secondary',
-              fontSize: 13, fontWeight: active ? 600 : 500,
-              cursor: 'pointer', transition: 'all 0.12s',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
+              fontSize: 13,
+              fontWeight: active ? 600 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.12s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.5,
               '&:hover': { bgcolor: active ? opt.bg : 'action.hover', borderColor: opt.border },
             }}
           >
             {opt.dot && (
-              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: active ? opt.dot : '#BDBDBD', flexShrink: 0 }} />
+              <Box
+                sx={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  bgcolor: active ? opt.dot : '#BDBDBD',
+                  flexShrink: 0,
+                }}
+              />
             )}
             {opt.label}
           </Box>
@@ -189,14 +281,20 @@ function TypeGrid({ value, onChange }) {
             component="button"
             onClick={() => onChange(opt.value)}
             sx={{
-              py: 1, px: 0.5,
+              py: 1,
+              px: 0.5,
               borderRadius: '8px',
               border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : 'text.secondary',
-              fontSize: 13, fontWeight: active ? 600 : 500,
-              cursor: 'pointer', transition: 'all 0.12s',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
+              fontSize: 13,
+              fontWeight: active ? 600 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.12s',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 0.5,
               '&:hover': { bgcolor: active ? opt.bg : 'action.hover', borderColor: opt.border },
             }}
           >
@@ -243,14 +341,23 @@ export function TaskDetailDialog({
   const [taskUserTasks, setTaskUserTasks] = useState([]);
 
   const resolvedDeveloperProjectId = useMemo(() => {
-    const source = task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
+    const source =
+      task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
     return resolveProjectIdForDevelopers(source, sprints, activeProjectId);
   }, [task, initialTask, sprints, activeProjectId]);
 
   useEffect(() => {
-    if (!open) { setPickerDevelopers([]); setPickerLoading(false); return; }
+    if (!open) {
+      setPickerDevelopers([]);
+      setPickerLoading(false);
+      return;
+    }
     const pid = resolvedDeveloperProjectId;
-    if (pid == null) { setPickerDevelopers([]); setPickerLoading(false); return; }
+    if (pid == null) {
+      setPickerDevelopers([]);
+      setPickerLoading(false);
+      return;
+    }
     let cancelled = false;
     setPickerLoading(true);
     (async () => {
@@ -263,7 +370,9 @@ export function TaskDetailDialog({
         if (!cancelled) setPickerLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, resolvedDeveloperProjectId]);
 
   const availableDevelopers = useMemo(() => {
@@ -283,9 +392,14 @@ export function TaskDetailDialog({
 
   useEffect(() => {
     if (!open) {
-      setTask(null); setLoadedAssigneeUserIds([]); setAssigneeNamesByUserId({});
-      setTaskUserTasks([]); setPickerDevelopers([]); setPickerLoading(false);
-      setEditMode(false); setError('');
+      setTask(null);
+      setLoadedAssigneeUserIds([]);
+      setAssigneeNamesByUserId({});
+      setTaskUserTasks([]);
+      setPickerDevelopers([]);
+      setPickerLoading(false);
+      setEditMode(false);
+      setError('');
       return;
     }
     if (!initialTask?.id) return;
@@ -300,7 +414,11 @@ export function TaskDetailDialog({
         if (cancelled) return;
         const list = Array.isArray(utList) ? utList : [];
         setTaskUserTasks(list);
-        const ids = [...new Set(list.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)))];
+        const ids = [
+          ...new Set(
+            list.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)),
+          ),
+        ];
         const nameMap = {};
         list.forEach((row) => {
           const uid = userIdFromUserTaskRow(row);
@@ -314,14 +432,20 @@ export function TaskDetailDialog({
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, initialTask?.id]);
 
   useEffect(() => {
     if (!editMode) return;
     if (availableDevelopers.length === 0) return;
     setAssignedUserIds((prev) => {
-      const allowed = new Set((availableDevelopers || []).map((u) => developerNumericId(u)).filter((id) => id != null && Number.isFinite(id)));
+      const allowed = new Set(
+        (availableDevelopers || [])
+          .map((u) => developerNumericId(u))
+          .filter((id) => id != null && Number.isFinite(id)),
+      );
       const next = finiteUserIds(prev).filter((id) => allowed.has(id));
       if (next.length === prev.length) return prev;
       return next;
@@ -342,34 +466,67 @@ export function TaskDetailDialog({
     setAssignedUserIds(finiteUserIds(loadedAssigneeUserIds));
   };
 
-  const handleStartEdit = () => { if (!task) return; applyTaskToForm(task); setEditMode(true); setError(''); };
-  const handleCancelEdit = () => { if (task) applyTaskToForm(task); setEditMode(false); setError(''); };
+  const handleStartEdit = () => {
+    if (!task) return;
+    applyTaskToForm(task);
+    setEditMode(true);
+    setError('');
+  };
+  const handleCancelEdit = () => {
+    if (task) applyTaskToForm(task);
+    setEditMode(false);
+    setError('');
+  };
 
   const handleSave = async () => {
     if (!task) return;
-    if (!title.trim()) { setError('Title is required.'); return; }
-    if (!startDate || !dueDate) { setError('Start and due dates are required.'); return; }
-    if (!sprintId) { setError('Sprint is required.'); return; }
-    if (new Date(startDate) > new Date(dueDate)) { setError('Start date must be on or before due date.'); return; }
-    setSaving(true); setError('');
+    if (!title.trim()) {
+      setError('Title is required.');
+      return;
+    }
+    if (!startDate || !dueDate) {
+      setError('Start and due dates are required.');
+      return;
+    }
+    if (!sprintId) {
+      setError('Sprint is required.');
+      return;
+    }
+    if (new Date(startDate) > new Date(dueDate)) {
+      setError('Start date must be on or before due date.');
+      return;
+    }
+    setSaving(true);
+    setError('');
     try {
       const nextIds = [...finiteUserIds(assignedUserIds)].sort();
       const prevIds = [...finiteUserIds(loadedAssigneeUserIds)].sort();
-      const sameSet = nextIds.length === prevIds.length && nextIds.every((id, i) => id === prevIds[i]);
+      const sameSet =
+        nextIds.length === prevIds.length && nextIds.every((id, i) => id === prevIds[i]);
       if (!sameSet) {
         const tid = task.id;
         if (nextIds.length === 0) {
           if (prevIds.length > 0) {
             const delRes = await deleteUserTasksForTask(tid);
-            if (!delRes.ok) { setError('Could not update assignees.'); return; }
-            setLoadedAssigneeUserIds([]); setTaskUserTasks([]);
+            if (!delRes.ok) {
+              setError('Could not update assignees.');
+              return;
+            }
+            setLoadedAssigneeUserIds([]);
+            setTaskUserTasks([]);
           }
         } else {
           const delRes = await deleteUserTasksForTask(tid);
-          if (!delRes.ok) { setError('Could not update assignees.'); return; }
+          if (!delRes.ok) {
+            setError('Could not update assignees.');
+            return;
+          }
           for (const uid of nextIds) {
             const postRes = await postUserTask({ userId: uid, taskId: tid, status });
-            if (!postRes.ok) { setError('Could not update assignees.'); return; }
+            if (!postRes.ok) {
+              setError('Could not update assignees.');
+              return;
+            }
           }
           setLoadedAssigneeUserIds(nextIds);
           const refreshed = await fetchUserTasksForTask(tid);
@@ -381,7 +538,9 @@ export function TaskDetailDialog({
         ...taskRest,
         title: title.trim(),
         description: (description || '').trim(),
-        classification, status, priority,
+        classification,
+        status,
+        priority,
         assignedHours: assignedHours === '' ? null : Number(assignedHours),
         startDate: new Date(startDate).toISOString(),
         dueDate: new Date(dueDate).toISOString(),
@@ -390,9 +549,13 @@ export function TaskDetailDialog({
       const res = await putTask(task.id, payload);
       if (res.ok) {
         const updated = await res.json();
-        setTask(updated); onClose(); onSaved(updated);
+        setTask(updated);
+        onClose();
+        onSaved(updated);
       } else if (res.status === 409) {
-        setError('Cannot set this task to Done until every assigned developer is marked complete, or change assignees first.');
+        setError(
+          'Cannot set this task to Done until every assigned developer is marked complete, or change assignees first.',
+        );
       } else {
         setError('Could not save changes.');
       }
@@ -403,16 +566,26 @@ export function TaskDetailDialog({
     }
   };
 
-  const handleDialogClose = () => { if (!saving) onClose(); };
+  const handleDialogClose = () => {
+    if (!saving) onClose();
+  };
 
   const handleDeleteTask = async () => {
     if (!task?.id) return;
-    if (!window.confirm('Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.')) return;
-    setSaving(true); setError('');
+    if (
+      !window.confirm(
+        'Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.',
+      )
+    )
+      return;
+    setSaving(true);
+    setError('');
     try {
       const res = await deleteTaskById(task.id);
-      if (res.ok) { onDeleted?.(task.id); onClose(); }
-      else setError('Could not delete task.');
+      if (res.ok) {
+        onDeleted?.(task.id);
+        onClose();
+      } else setError('Could not delete task.');
     } catch {
       setError('Connection error.');
     } finally {
@@ -421,29 +594,63 @@ export function TaskDetailDialog({
   };
 
   const statusLabel = task ? (TASK_STATUS_LABEL[task.status] ?? task.status) : '';
-  const classificationKey = task?.classification && CLASSIFICATION_CHIP_SX[task.classification] ? task.classification : null;
-  const priorityKey = task?.priority && PRIORITY_CHIP_SX[task.priority] ? task.priority : null;
-  const statusKey = task?.status && STATUS_CHIP_SX[task.status] ? task.status : null;
-  const viewAssigneeIds = useMemo(() => finiteUserIds(loadedAssigneeUserIds), [loadedAssigneeUserIds]);
+  const viewAssigneeIds = useMemo(
+    () => finiteUserIds(loadedAssigneeUserIds),
+    [loadedAssigneeUserIds],
+  );
   const editAssigneeIds = useMemo(() => finiteUserIds(assignedUserIds), [assignedUserIds]);
 
   // Derive active status/type/priority option for view mode badges
   const statusOpt = STATUS_OPTIONS.find((o) => o.value === task?.status) ?? STATUS_OPTIONS[0];
   const typeOpt = TYPE_OPTIONS.find((o) => o.value === task?.classification) ?? TYPE_OPTIONS[0];
-  const priorityOpt = PRIORITY_OPTIONS.find((o) => o.value === task?.priority) ?? PRIORITY_OPTIONS[1];
+  const priorityOpt =
+    PRIORITY_OPTIONS.find((o) => o.value === task?.priority) ?? PRIORITY_OPTIONS[1];
 
   return (
-    <Dialog open={open} onClose={handleDialogClose} maxWidth="md" fullWidth scroll="paper"
+    <Dialog
+      open={open}
+      onClose={handleDialogClose}
+      maxWidth="md"
+      fullWidth
+      scroll="paper"
       PaperProps={{
         elevation: 0,
-        sx: { borderRadius: '16px', border: '1px solid #ECECEC', bgcolor: '#FFFFFF', overflow: 'hidden', maxWidth: { xs: 'calc(100% - 24px)', sm: 720 } },
+        sx: {
+          borderRadius: '16px',
+          border: '1px solid #ECECEC',
+          bgcolor: '#FFFFFF',
+          overflow: 'hidden',
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 720 },
+        },
       }}
     >
       {/* ── Header ── */}
       <DialogTitle sx={{ p: 0 }}>
-        <Box sx={{ bgcolor: ORACLE_RED_ACTION, px: 2.5, pt: 2, pb: 1.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+        <Box
+          sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            px: 2.5,
+            pt: 2,
+            pb: 1.75,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1.5,
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ width: 38, height: 38, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                bgcolor: 'rgba(255,255,255,0.18)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
               <AssignmentOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
             <Box>
@@ -451,7 +658,9 @@ export function TaskDetailDialog({
                 {editMode ? 'Edit task' : 'Task details'}
               </Typography>
               {task?.id != null && (
-                <Typography sx={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
+                <Typography
+                  sx={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}
+                >
                   ID #{task.id}
                 </Typography>
               )}
@@ -465,7 +674,16 @@ export function TaskDetailDialog({
                   startIcon={<EditIcon sx={{ fontSize: '15px !important' }} />}
                   onClick={handleStartEdit}
                   disableElevation
-                  sx={{ fontSize: 13, bgcolor: 'rgba(255,255,255,0.22)', color: '#fff', textTransform: 'none', fontWeight: 600, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.35)', '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' } }}
+                  sx={{
+                    fontSize: 13,
+                    bgcolor: 'rgba(255,255,255,0.22)',
+                    color: '#fff',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' },
+                  }}
                 >
                   Edit
                 </Button>
@@ -474,14 +692,30 @@ export function TaskDetailDialog({
                   startIcon={<DeleteOutlineIcon sx={{ fontSize: '15px !important' }} />}
                   onClick={handleDeleteTask}
                   disabled={saving}
-                  sx={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)', textTransform: 'none', fontWeight: 600, borderRadius: '8px', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}
+                  sx={{
+                    fontSize: 13,
+                    color: 'rgba(255,255,255,0.85)',
+                    borderColor: 'rgba(255,255,255,0.4)',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+                  }}
                 >
                   Delete
                 </Button>
               </>
             )}
-            <IconButton onClick={handleDialogClose} disabled={saving} size="small"
-              sx={{ color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.3)', '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
+            <IconButton
+              onClick={handleDialogClose}
+              disabled={saving}
+              size="small"
+              sx={{
+                color: 'rgba(255,255,255,0.85)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+              }}
+            >
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
@@ -489,8 +723,9 @@ export function TaskDetailDialog({
       </DialogTitle>
 
       {/* ── Body ── */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: '#FAFAFA' }}>
-
+      <DialogContent
+        sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: '#FAFAFA' }}
+      >
         {loading && !task && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
             <CircularProgress size={32} sx={{ color: ORACLE_RED }} />
@@ -516,18 +751,72 @@ export function TaskDetailDialog({
 
               {/* Status / Type / Priority as colored badges */}
               <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.25, py: 0.5, borderRadius: '20px', bgcolor: typeOpt.bg, border: `1px solid ${typeOpt.border}`, color: typeOpt.color, fontSize: 12, fontWeight: 600 }}>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: '20px',
+                    bgcolor: typeOpt.bg,
+                    border: `1px solid ${typeOpt.border}`,
+                    color: typeOpt.color,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
                   {typeOpt.icon} {typeOpt.label}
                 </Box>
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.25, py: 0.5, borderRadius: '20px', bgcolor: statusOpt.bg, border: `1px solid ${statusOpt.border}`, color: statusOpt.color, fontSize: 12, fontWeight: 600 }}>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: '20px',
+                    bgcolor: statusOpt.bg,
+                    border: `1px solid ${statusOpt.border}`,
+                    color: statusOpt.color,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
                   <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: statusOpt.dot }} />
                   {statusLabel}
                 </Box>
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1.25, py: 0.5, borderRadius: '20px', bgcolor: priorityOpt.bg, border: `1px solid ${priorityOpt.border}`, color: priorityOpt.color, fontSize: 12, fontWeight: 600 }}>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: '20px',
+                    bgcolor: priorityOpt.bg,
+                    border: `1px solid ${priorityOpt.border}`,
+                    color: priorityOpt.color,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
                   {priorityOpt.label}
                 </Box>
                 {task.assignedHours != null && (
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1.25, py: 0.5, borderRadius: '20px', bgcolor: '#E1F5EE', border: '1px solid #5DCAA5', color: '#085041', fontSize: 12, fontWeight: 600 }}>
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      px: 1.25,
+                      py: 0.5,
+                      borderRadius: '20px',
+                      bgcolor: '#E1F5EE',
+                      border: '1px solid #5DCAA5',
+                      color: '#085041',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
                     {task.assignedHours}h assigned
                   </Box>
                 )}
@@ -553,7 +842,21 @@ export function TaskDetailDialog({
                         const name = displayNameForAssignee(uidRaw);
                         const pal = CHIP_PALETTES[i % CHIP_PALETTES.length];
                         return (
-                          <Box key={String(uidRaw)} sx={{ display: 'inline-flex', alignItems: 'center', px: 1, py: 0.4, borderRadius: '20px', bgcolor: pal.bg, border: `1px solid ${pal.border}`, color: pal.color, fontSize: 12, fontWeight: 600 }}>
+                          <Box
+                            key={String(uidRaw)}
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              px: 1,
+                              py: 0.4,
+                              borderRadius: '20px',
+                              bgcolor: pal.bg,
+                              border: `1px solid ${pal.border}`,
+                              color: pal.color,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
                             {name}
                           </Box>
                         );
@@ -566,13 +869,51 @@ export function TaskDetailDialog({
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#FAEEDA', border: '1px solid #FAC775' }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#854F0B', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Start date</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#412402', mt: 0.5 }}>{formatDate(task.startDate)}</Typography>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '10px',
+                    bgcolor: '#FAEEDA',
+                    border: '1px solid #FAC775',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#854F0B',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Start date
+                  </Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#412402', mt: 0.5 }}>
+                    {formatDate(task.startDate)}
+                  </Typography>
                 </Box>
-                <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#E6F1FB', border: '1px solid #85B7EB' }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#185FA5', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Due date</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#042C53', mt: 0.5 }}>{formatDate(task.dueDate)}</Typography>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '10px',
+                    bgcolor: '#E6F1FB',
+                    border: '1px solid #85B7EB',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#185FA5',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Due date
+                  </Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#042C53', mt: 0.5 }}>
+                    {formatDate(task.dueDate)}
+                  </Typography>
                 </Box>
               </Box>
             </InfoCard>
@@ -587,25 +928,92 @@ export function TaskDetailDialog({
                       const uid = userIdFromUserTaskRow(ut);
                       const name = displayNameForAssignee(uid);
                       const done = isUserTaskAssigneeComplete(ut);
-                      const hrs = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0) || 0;
+                      const hrs =
+                        Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0) || 0;
                       return { ut, uid, name, done, hrs };
                     })
-                    .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))
+                    .sort((a, b) =>
+                      String(a.name).localeCompare(String(b.name), undefined, {
+                        sensitivity: 'base',
+                      }),
+                    )
                     .map(({ ut, uid, name, done, hrs }) => {
-                      const pal = ASSIGNEE_IDENTITY_PALETTE[assigneeIdentityPaletteIndex({ userId: uid, name })];
+                      const pal =
+                        ASSIGNEE_IDENTITY_PALETTE[
+                          assigneeIdentityPaletteIndex({ userId: uid, name })
+                        ];
                       return (
-                        <Box key={`${uid ?? 'x'}-${ut?.id?.taskId ?? task.id}`}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, borderBottom: '0.5px solid #EEEEEE', '&:last-of-type': { borderBottom: 'none' } }}>
-                          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', borderRadius: '8px', overflow: 'hidden', border: '0.5px solid rgba(0,0,0,0.08)' }}>
-                            <Box sx={{ flex: 1, minWidth: 0, pl: 1, pr: 0.5, py: 0.6, bgcolor: pal.light, borderLeft: `3px solid ${pal.strip}`, color: pal.name, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Box
+                          key={`${uid ?? 'x'}-${ut?.id?.taskId ?? task.id}`}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            py: 0.5,
+                            borderBottom: '0.5px solid #EEEEEE',
+                            '&:last-of-type': { borderBottom: 'none' },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              flex: 1,
+                              minWidth: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              border: '0.5px solid rgba(0,0,0,0.08)',
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                flex: 1,
+                                minWidth: 0,
+                                pl: 1,
+                                pr: 0.5,
+                                py: 0.6,
+                                bgcolor: pal.light,
+                                borderLeft: `3px solid ${pal.strip}`,
+                                color: pal.name,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {name}
                             </Box>
-                            <Box sx={{ flexShrink: 0, px: 1, py: 0.6, fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#fff', bgcolor: done ? '#2E7D32' : '#E65100' }}>
+                            <Box
+                              sx={{
+                                flexShrink: 0,
+                                px: 1,
+                                py: 0.6,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                letterSpacing: '0.05em',
+                                textTransform: 'uppercase',
+                                color: '#fff',
+                                bgcolor: done ? '#2E7D32' : '#E65100',
+                              }}
+                            >
                               {done ? 'Done' : 'Pending'}
                             </Box>
                           </Box>
                           {hrs > 0 && (
-                            <Box sx={{ px: 1, py: 0.4, borderRadius: '20px', bgcolor: '#E6F1FB', border: '1px solid #85B7EB', color: '#0C447C', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                            <Box
+                              sx={{
+                                px: 1,
+                                py: 0.4,
+                                borderRadius: '20px',
+                                bgcolor: '#E6F1FB',
+                                border: '1px solid #85B7EB',
+                                color: '#0C447C',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                flexShrink: 0,
+                              }}
+                            >
                               {hrs}h
                             </Box>
                           )}
@@ -624,8 +1032,26 @@ export function TaskDetailDialog({
             <InfoCard accentColor={ORACLE_RED_ACTION}>
               <SectionLabel>Overview</SectionLabel>
               <Stack spacing={2}>
-                <TextField label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth multiline minRows={2} size="small" sx={fieldSx} />
-                <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={3} size="small" sx={fieldSx} />
+                <TextField
+                  label="Task title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  size="small"
+                  sx={fieldSx}
+                />
+                <TextField
+                  label="Description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  size="small"
+                  sx={fieldSx}
+                />
                 <Box>
                   <SectionLabel>Work item type</SectionLabel>
                   <TypeGrid value={classification} onChange={setClassification} />
@@ -636,7 +1062,11 @@ export function TaskDetailDialog({
                 </Box>
                 <Box>
                   <SectionLabel>Priority</SectionLabel>
-                  <SegmentedButtons options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
+                  <SegmentedButtons
+                    options={PRIORITY_OPTIONS}
+                    value={priority}
+                    onChange={setPriority}
+                  />
                 </Box>
               </Stack>
             </InfoCard>
@@ -647,16 +1077,46 @@ export function TaskDetailDialog({
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                   <FormControl size="small" fullWidth sx={fieldSx}>
                     <InputLabel>Sprint</InputLabel>
-                    <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
+                    <Select
+                      value={sprintId}
+                      onChange={(e) => setSprintId(e.target.value)}
+                      label="Sprint"
+                    >
                       {sprints.map((s) => (
                         <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
                       ))}
                     </Select>
                   </FormControl>
-                  <TextField label="Assigned hours" type="number" value={assignedHours} onChange={(e) => setAssignedHours(e.target.value)} fullWidth size="small" inputProps={{ min: 0 }} sx={fieldSx} />
+                  <TextField
+                    label="Assigned hours"
+                    type="number"
+                    value={assignedHours}
+                    onChange={(e) => setAssignedHours(e.target.value)}
+                    fullWidth
+                    size="small"
+                    inputProps={{ min: 0 }}
+                    sx={fieldSx}
+                  />
                 </Stack>
 
-                <FormControl fullWidth size="small" sx={{ ...fieldSx, '& .MuiSelect-select': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5, minHeight: 40, whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', py: 0.75 } }}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  sx={{
+                    ...fieldSx,
+                    '& .MuiSelect-select': {
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      minHeight: 40,
+                      whiteSpace: 'normal',
+                      overflow: 'visible',
+                      textOverflow: 'clip',
+                      py: 0.75,
+                    },
+                  }}
+                >
                   <InputLabel id="task-assignees-label">Assigned to</InputLabel>
                   <Select
                     labelId="task-assignees-label"
@@ -667,14 +1127,27 @@ export function TaskDetailDialog({
                     renderValue={(selected) => (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.25 }}>
                         {selected.length === 0 ? (
-                          <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>Unassigned</Typography>
+                          <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+                            Unassigned
+                          </Typography>
                         ) : (
                           selected.map((id, i) => {
                             const name = displayNameForAssignee(id);
                             const pal = CHIP_PALETTES[i % CHIP_PALETTES.length];
                             return (
-                              <Chip key={id} size="small" label={name}
-                                sx={{ fontSize: 12, fontWeight: 600, bgcolor: pal.bg, color: pal.color, border: `1px solid ${pal.border}`, borderRadius: '20px' }} />
+                              <Chip
+                                key={id}
+                                size="small"
+                                label={name}
+                                sx={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  bgcolor: pal.bg,
+                                  color: pal.color,
+                                  border: `1px solid ${pal.border}`,
+                                  borderRadius: '20px',
+                                }}
+                              />
                             );
                           })
                         )}
@@ -687,59 +1160,157 @@ export function TaskDetailDialog({
                       if (uid == null || !Number.isFinite(uid)) return null;
                       return (
                         <MenuItem key={uid} value={uid} sx={{ fontSize: 13 }}>
-                          <Checkbox checked={editAssigneeIds.includes(uid)} size="small" sx={{ py: 0, '&.Mui-checked': { color: ORACLE_RED_ACTION } }} />
-                          <ListItemText primary={u.name} primaryTypographyProps={{ sx: { fontSize: 13 } }} />
+                          <Checkbox
+                            checked={editAssigneeIds.includes(uid)}
+                            size="small"
+                            sx={{ py: 0, '&.Mui-checked': { color: ORACLE_RED_ACTION } }}
+                          />
+                          <ListItemText
+                            primary={u.name}
+                            primaryTypographyProps={{ sx: { fontSize: 13 } }}
+                          />
                         </MenuItem>
                       );
                     })}
                   </Select>
-                  {editMode && pickerLoading && <LinearProgress sx={{ mt: 1, borderRadius: 1, height: 3, '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED_ACTION } }} />}
+                  {editMode && pickerLoading && (
+                    <LinearProgress
+                      sx={{
+                        mt: 1,
+                        borderRadius: 1,
+                        height: 3,
+                        '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED_ACTION },
+                      }}
+                    />
+                  )}
                   {editMode && !pickerLoading && resolvedDeveloperProjectId == null && (
-                    <Typography sx={{ fontSize: 12, display: 'block', mt: 0.75, color: '#C62828', fontWeight: 600 }}>
-                      Could not determine the project for this task. Select a project or fix the task sprint.
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        display: 'block',
+                        mt: 0.75,
+                        color: '#C62828',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Could not determine the project for this task. Select a project or fix the
+                      task sprint.
                     </Typography>
                   )}
-                  {editMode && !pickerLoading && resolvedDeveloperProjectId != null && availableDevelopers.length === 0 && (
-                    <Typography sx={{ fontSize: 12, display: 'block', mt: 0.75, color: 'text.secondary' }}>
-                      {`No developers returned for project #${resolvedDeveloperProjectId}.`}
-                    </Typography>
-                  )}
+                  {editMode &&
+                    !pickerLoading &&
+                    resolvedDeveloperProjectId != null &&
+                    availableDevelopers.length === 0 && (
+                      <Typography
+                        sx={{ fontSize: 12, display: 'block', mt: 0.75, color: 'text.secondary' }}
+                      >
+                        {`No developers returned for project #${resolvedDeveloperProjectId}.`}
+                      </Typography>
+                    )}
                 </FormControl>
 
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                  <TextField label="Start date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={fieldSx} />
-                  <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" sx={fieldSx} />
+                  <TextField
+                    label="Start date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    size="small"
+                    sx={fieldSx}
+                  />
+                  <TextField
+                    label="Due date"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    size="small"
+                    sx={fieldSx}
+                  />
                 </Stack>
               </Stack>
             </InfoCard>
 
             {error && (
-              <Typography sx={{ fontSize: 12, color: '#C62828', fontWeight: 600 }}>{error}</Typography>
+              <Typography sx={{ fontSize: 12, color: '#C62828', fontWeight: 600 }}>
+                {error}
+              </Typography>
             )}
           </Stack>
         )}
       </DialogContent>
 
       {/* ── Footer ── */}
-      <DialogActions sx={{ px: 3, py: 1.5, gap: 1, borderTop: '1px solid #F0F0F0', bgcolor: '#FAFAFA', justifyContent: editMode ? 'space-between' : 'flex-end' }}>
+      <DialogActions
+        sx={{
+          px: 3,
+          py: 1.5,
+          gap: 1,
+          borderTop: '1px solid #F0F0F0',
+          bgcolor: '#FAFAFA',
+          justifyContent: editMode ? 'space-between' : 'flex-end',
+        }}
+      >
         {editMode ? (
           <>
-            <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>Unsaved changes will be lost on cancel</Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>
+              Unsaved changes will be lost on cancel
+            </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button onClick={handleCancelEdit} disabled={saving}
-                sx={{ fontSize: 13, color: 'text.secondary', textTransform: 'none', fontWeight: 600, borderRadius: '8px', border: '1px solid #E0E0E0', px: 2, '&:hover': { bgcolor: '#F5F5F5' } }}>
+              <Button
+                onClick={handleCancelEdit}
+                disabled={saving}
+                sx={{
+                  fontSize: 13,
+                  color: 'text.secondary',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: '1px solid #E0E0E0',
+                  px: 2,
+                  '&:hover': { bgcolor: '#F5F5F5' },
+                }}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={saving} variant="contained" disableElevation
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                variant="contained"
+                disableElevation
                 startIcon={<SaveOutlinedIcon sx={{ fontSize: '16px !important' }} />}
-                sx={{ fontSize: 13, bgcolor: ORACLE_RED_ACTION, textTransform: 'none', fontWeight: 600, borderRadius: '8px', px: 2.5, '&:hover': { bgcolor: '#A83B2D' }, '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' } }}>
+                sx={{
+                  fontSize: 13,
+                  bgcolor: ORACLE_RED_ACTION,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  px: 2.5,
+                  '&:hover': { bgcolor: '#A83B2D' },
+                  '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' },
+                }}
+              >
                 {saving ? 'Saving…' : 'Save changes'}
               </Button>
             </Box>
           </>
         ) : (
-          <Button onClick={handleDialogClose}
-            sx={{ fontSize: 13, color: 'text.secondary', textTransform: 'none', fontWeight: 600, borderRadius: '8px', border: '1px solid #E0E0E0', px: 2, '&:hover': { bgcolor: '#F5F5F5' } }}>
+          <Button
+            onClick={handleDialogClose}
+            sx={{
+              fontSize: 13,
+              color: 'text.secondary',
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              border: '1px solid #E0E0E0',
+              px: 2,
+              '&:hover': { bgcolor: '#F5F5F5' },
+            }}
+          >
             Close
           </Button>
         )}

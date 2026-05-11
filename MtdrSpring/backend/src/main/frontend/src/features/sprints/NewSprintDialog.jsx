@@ -15,7 +15,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import { newSprintDialogFieldOutline, oracleRgba } from './utils/sprintUtils';
 
 export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
   const [startDate, setStartDate] = useState('');
@@ -171,7 +170,15 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
         </Typography>
 
         {!hasValidProject && (
-          <Typography sx={{ fontSize: 13, color: ORACLE_RED_ACTION, fontWeight: 600, display: 'block', mb: 1.5 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              color: ORACLE_RED_ACTION,
+              fontWeight: 600,
+              display: 'block',
+              mb: 1.5,
+            }}
+          >
             No active project is selected. Select a project in the app or sign in again.
           </Typography>
         )}
@@ -242,8 +249,10 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
       >
         <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
           Fields marked with{' '}
-          <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>*</Box>
-          {' '}are required
+          <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>
+            *
+          </Box>{' '}
+          are required
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button

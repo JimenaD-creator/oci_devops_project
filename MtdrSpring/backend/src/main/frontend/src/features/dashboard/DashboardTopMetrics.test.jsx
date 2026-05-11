@@ -46,4 +46,3 @@ test('shows Total hours worked, value, helper copy, and Scorecards heading', () 
   expect(screen.getByText('40.0')).toBeInTheDocument();
   expect(screen.getByText('Hours logged this sprint')).toBeInTheDocument();
 });
-

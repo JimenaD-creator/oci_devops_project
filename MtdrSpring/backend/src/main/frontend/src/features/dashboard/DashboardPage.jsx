@@ -53,28 +53,15 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
-  useEffect(() => {
+  const loadProjectInfo = useCallback(async () => {
     if (!projectId) return;
-    loadProjectInfo();
-    handleRefresh();
-  }, [projectId]);
-
-  useEffect(() => {
-    setSeenBlockedKeysCsv('');
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) setSprintsLoading(false);
-  }, [projectId]);
-
-  const loadProjectInfo = async () => {
     try {
       const project = await fetchProjectById(projectId);
       if (project) setCurrentProject(project);
     } catch (err) {
       console.error('Error loading project:', err);
     }
-  };
+  }, [projectId]);
 
   const handleRefresh = useCallback(() => {
     setSprintsLoading(true);
@@ -90,6 +77,20 @@ export default function DashboardPage({ projectId: propProjectId }) {
         });
       })
       .finally(() => setSprintsLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    loadProjectInfo();
+    handleRefresh();
+  }, [projectId, loadProjectInfo, handleRefresh]);
+
+  useEffect(() => {
+    setSeenBlockedKeysCsv('');
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) setSprintsLoading(false);
   }, [projectId]);
 
   const normalizedSelectedIds = useMemo(() => {
@@ -110,7 +111,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
     const uniqueRaw = [...new Set(raw)];
     const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw
+      .slice()
+      .sort((a, b) => a - b)
+      .join(',');
     const hasDuplicateEntries = raw.length !== uniqueRaw.length;
     const needsPrune = uniqSorted !== normSorted;
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
@@ -324,7 +328,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
                       <Box component="span" sx={{ color: '#666' }}>
                         Sprint dates:{' '}
                       </Box>
-                      <Box component="span" sx={{ color: '#424242' }}>{sprintDateLabel}</Box>
+                      <Box component="span" sx={{ color: '#424242' }}>
+                        {sprintDateLabel}
+                      </Box>
                     </>
                   ) : (
                     <>
@@ -418,7 +424,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
               }}
             >
               <Box sx={{ p: 2, maxHeight: 400, overflowY: 'auto' }}>
-                <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', mb: 1.25 }}>
+                <Typography
+                  sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', mb: 1.25 }}
+                >
                   Task block reports
                 </Typography>
                 {!hasBlockedNotifications ? (
@@ -441,14 +449,25 @@ export default function DashboardPage({ projectId: propProjectId }) {
                         <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#B71C1C' }}>
                           {n.developerName}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.84rem', color: '#1A1A1A', fontWeight: 700, mt: 0.35 }}>
+                        <Typography
+                          sx={{ fontSize: '0.84rem', color: '#1A1A1A', fontWeight: 700, mt: 0.35 }}
+                        >
                           {n.taskTitle}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: 600, mt: 0.25 }}>
+                        <Typography
+                          sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: 600, mt: 0.25 }}
+                        >
                           Blocked for: {formatBlockedSinceAge(n.blockedSince)}
                         </Typography>
                         {compareMode ? (
-                          <Typography sx={{ fontSize: '0.75rem', color: '#616161', mt: 0.25, fontWeight: 600 }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.75rem',
+                              color: '#616161',
+                              mt: 0.25,
+                              fontWeight: 600,
+                            }}
+                          >
                             {n.sprintLabel}
                           </Typography>
                         ) : null}
@@ -474,13 +493,11 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
-              {compareMode ? (
-                'Multi-sprint comparison'
-              ) : primarySprint?.name ? (
-                primarySprint.name
-              ) : (
-                'Project Progress'
-              )}
+              {compareMode
+                ? 'Multi-sprint comparison'
+                : primarySprint?.name
+                  ? primarySprint.name
+                  : 'Project Progress'}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
@@ -610,7 +627,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
             >
               <Typography
                 component="h2"
-                sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                sx={{
+                  ...SECTION_TITLE_SX,
+                  color: '#1A1A1A',
+                  mb: 0.5,
+                  textAlign: 'left',
+                  width: '100%',
+                }}
               >
                 Scorecards
               </Typography>
@@ -646,7 +669,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
               >
                 <Typography
                   component="h2"
-                  sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                  sx={{
+                    ...SECTION_TITLE_SX,
+                    color: '#1A1A1A',
+                    mb: 0.5,
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
                 >
                   Project status
                 </Typography>

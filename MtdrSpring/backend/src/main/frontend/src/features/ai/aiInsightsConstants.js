@@ -93,7 +93,9 @@ export function alignTrendsProductivityScore(text, actualScore) {
   const n = Number(actualScore);
   if (!Number.isFinite(n)) return text;
   const clampedActual = Math.max(0, Math.min(100, n));
-  const display = Number.isInteger(clampedActual) ? `${clampedActual}%` : `${clampedActual.toFixed(1)}%`;
+  const display = Number.isInteger(clampedActual)
+    ? `${clampedActual}%`
+    : `${clampedActual.toFixed(1)}%`;
   const source = String(text);
   const explicit = source.replace(
     /(productivity\s+score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
@@ -107,14 +109,12 @@ export function alignTrendsProductivityScore(text, actualScore) {
   return source;
 }
 
-
 function formatKpiMetricValue(rawValue) {
   const n = Number(rawValue);
   if (!Number.isFinite(n)) return rawValue;
   const clamped = Math.max(0, Math.min(100, n));
   return `${Math.round(clamped)}%`;
 }
-
 
 const KPI_METRIC_PATTERNS = {
   completionRate: /(completion\s*rate\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
@@ -146,7 +146,8 @@ export const RECOMMENDATION_CATEGORY_LABELS = {
 
 /** Shown when a sprint insight section has no AI content yet */
 export const AI_INSIGHTS_EMPTY = {
-  recommendations: 'No recommendations for this sprint yet. Generate insights to populate this list.',
+  recommendations:
+    'No recommendations for this sprint yet. Generate insights to populate this list.',
   executive:
     'No executive summary yet. Generate insights to see overview, trends, improvement areas, and next steps.',
   developers:

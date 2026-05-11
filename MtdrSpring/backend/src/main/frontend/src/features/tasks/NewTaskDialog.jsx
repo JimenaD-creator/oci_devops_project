@@ -22,35 +22,44 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
-import { developerAvatarColors } from '../../utils/developerColors';
 import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
-import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
-import { newSprintDialogFieldOutline, oracleRgba } from '../sprints/utils/sprintUtils';
-
+import {
+  API_BASE,
+  FORM_FIELD_TINT_BG,
+  ORACLE_RED_ACTION,
+} from '../sprints/constants/sprintConstants';
 
 const TYPE_OPTIONS = [
   {
     value: 'FEATURE',
     label: 'Feature',
-    bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489',
+    bg: '#EEEDFE',
+    border: '#AFA9EC',
+    color: '#3C3489',
     icon: '✦',
   },
   {
     value: 'BUG',
     label: 'Bug',
-    bg: '#FCEBEB', border: '#F09595', color: '#791F1F',
+    bg: '#FCEBEB',
+    border: '#F09595',
+    color: '#791F1F',
     icon: '⬡',
   },
   {
     value: 'TASK',
     label: 'Task',
-    bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C',
+    bg: '#E6F1FB',
+    border: '#85B7EB',
+    color: '#0C447C',
     icon: '◻',
   },
   {
     value: 'USER_STORY',
     label: 'User Story',
-    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+    bg: '#EAF3DE',
+    border: '#97C459',
+    color: '#27500A',
     icon: '◈',
   },
 ];
@@ -67,19 +76,25 @@ const STATUS_OPTIONS = [
   {
     value: 'IN_PROGRESS',
     label: 'In Progress',
-    bg: '#FAEEDA', border: '#FAC775', color: '#633806',
+    bg: '#FAEEDA',
+    border: '#FAC775',
+    color: '#633806',
     dot: '#BA7517',
   },
   {
     value: 'IN_REVIEW',
     label: 'In Review',
-    bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C',
+    bg: '#E6F1FB',
+    border: '#85B7EB',
+    color: '#0C447C',
     dot: '#185FA5',
   },
   {
     value: 'DONE',
     label: 'Done',
-    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+    bg: '#EAF3DE',
+    border: '#97C459',
+    color: '#27500A',
     dot: '#3B6D11',
   },
 ];
@@ -88,22 +103,30 @@ const PRIORITY_OPTIONS = [
   {
     value: 'LOW',
     label: 'Low',
-    bg: '#EAF3DE', border: '#97C459', color: '#27500A',
+    bg: '#EAF3DE',
+    border: '#97C459',
+    color: '#27500A',
   },
   {
     value: 'MEDIUM',
     label: 'Medium',
-    bg: '#FAEEDA', border: '#FAC775', color: '#633806',
+    bg: '#FAEEDA',
+    border: '#FAC775',
+    color: '#633806',
   },
   {
     value: 'HIGH',
     label: 'High',
-    bg: '#FAECE7', border: '#F0997B', color: '#712B13',
+    bg: '#FAECE7',
+    border: '#F0997B',
+    color: '#712B13',
   },
   {
     value: 'CRITICAL',
     label: 'Critical',
-    bg: '#FCEBEB', border: '#F09595', color: '#791F1F',
+    bg: '#FCEBEB',
+    border: '#F09595',
+    color: '#791F1F',
   },
 ];
 
@@ -286,7 +309,9 @@ export function NewTaskDialog({
     assignedToIds.length > 0,
   );
 
-  const handleClose = () => { if (!saving) onClose(); };
+  const handleClose = () => {
+    if (!saving) onClose();
+  };
 
   const handleSave = async () => {
     if (!canSave) {
@@ -404,9 +429,16 @@ export function NewTaskDialog({
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={handleClose} disabled={saving} size="small"
-            sx={{ color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.3)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
+          <IconButton
+            onClick={handleClose}
+            disabled={saving}
+            size="small"
+            sx={{
+              color: 'rgba(255,255,255,0.85)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -415,7 +447,6 @@ export function NewTaskDialog({
       {/* ── Body ── */}
       <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
         <Stack spacing={2}>
-
           <TextField
             label="Task title *"
             value={title}
@@ -459,9 +490,17 @@ export function NewTaskDialog({
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <FormControl size="small" fullWidth sx={fieldSx}>
               <InputLabel>Sprint *</InputLabel>
-              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint *">
+              <Select
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
+                label="Sprint *"
+              >
                 {(sprints || []).map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)} sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}>
+                  <MenuItem
+                    key={s.id}
+                    value={String(s.id)}
+                    sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
+                  >
                     {`Sprint ${s.id}`}
                   </MenuItem>
                 ))}
@@ -506,7 +545,7 @@ export function NewTaskDialog({
               input={<OutlinedInput label="Developers *" />}
               renderValue={(selected) => {
                 const ids = finiteUserIds(selected);
-               
+
                 const chipPalettes = [
                   { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
                   { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
@@ -521,7 +560,8 @@ export function NewTaskDialog({
                       </Typography>
                     ) : (
                       ids.map((id, i) => {
-                        const name = validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
+                        const name =
+                          validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
                         const pal = chipPalettes[i % chipPalettes.length];
                         return (
                           <Chip
@@ -547,8 +587,11 @@ export function NewTaskDialog({
             >
               {validDevelopers.map((u) => (
                 <MenuItem key={u.uid} value={u.uid}>
-                  <Checkbox checked={finiteUserIds(assignedToIds).includes(u.uid)} size="small"
-                    sx={{ '&.Mui-checked': { color: ORACLE_RED_ACTION } }} />
+                  <Checkbox
+                    checked={finiteUserIds(assignedToIds).includes(u.uid)}
+                    size="small"
+                    sx={{ '&.Mui-checked': { color: ORACLE_RED_ACTION } }}
+                  />
                   <ListItemText
                     primary={u.displayName}
                     primaryTypographyProps={{ fontSize: 15, fontWeight: 500 }}
@@ -602,7 +645,11 @@ export function NewTaskDialog({
         }}
       >
         <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
-          Fields marked with <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>*</Box> are required
+          Fields marked with{' '}
+          <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>
+            *
+          </Box>{' '}
+          are required
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button

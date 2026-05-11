@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -118,31 +118,34 @@ export default function SprintsPage({ projectId }) {
     };
   }, [effectiveProjectIdNum]);
 
-  const loadData = async (opts = {}) => {
-    const silent = opts.silent === true;
-    if (!silent) setLoading(true);
-    try {
-      const { pid, sprintsList, tasksList, userTasksList } =
-        await fetchSprintsTasksAndAssignments(projectId);
-      const sorted = sortSprintsForDisplay(sprintsList, tasksList);
-      setSprints(sorted);
-      setTasks(tasksList);
-      setUserTasks(userTasksList);
-      setSelectedSprint((prev) => {
-        if (prev) {
-          const stillThere = sorted.find((s) => s.id === prev.id);
-          if (stillThere) return stillThere;
-        }
-        return pickDefaultSelectedSprint(sorted) ?? sorted[0];
-      });
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+  const loadData = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      if (!silent) setLoading(true);
+      try {
+        const { sprintsList, tasksList, userTasksList } =
+          await fetchSprintsTasksAndAssignments(projectId);
+        const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+        setSprints(sorted);
+        setTasks(tasksList);
+        setUserTasks(userTasksList);
+        setSelectedSprint((prev) => {
+          if (prev) {
+            const stillThere = sorted.find((s) => s.id === prev.id);
+            if (stillThere) return stillThere;
+          }
+          return pickDefaultSelectedSprint(sorted) ?? sorted[0];
+        });
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [projectId],
+  );
 
   useEffect(() => {
     loadData();
-  }, [projectId, effectiveProjectIdNum]);
+  }, [loadData, effectiveProjectIdNum]);
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -456,7 +459,13 @@ export default function SprintsPage({ projectId }) {
           </Grid>
           <Grid item xs={12}>
             <Typography
-              sx={{ fontWeight: 800, color: '#333', fontSize: '1.02rem', mb: 1.25, display: 'block' }}
+              sx={{
+                fontWeight: 800,
+                color: '#333',
+                fontSize: '1.02rem',
+                mb: 1.25,
+                display: 'block',
+              }}
             >
               {selectedSprint ? `Tasks · Sprint ${selectedSprint.id}` : 'Tasks'}
             </Typography>
