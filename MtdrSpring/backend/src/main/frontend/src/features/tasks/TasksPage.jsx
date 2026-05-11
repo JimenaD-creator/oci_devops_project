@@ -20,6 +20,7 @@ import {
   DialogActions,
   Alert,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
@@ -555,15 +556,45 @@ export default function TasksPage({ projectId }) {
             <Button
               size="small"
               variant="outlined"
+              color="inherit"
+              disableRipple
               onClick={clearAllFilters}
               sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                borderColor: ORACLE_RED,
-                color: ORACLE_RED,
-                flexShrink: 0,
-                minHeight: 34,
-                py: 0.25,
+                '&&': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  minHeight: 34,
+                  py: 0.25,
+                  border: `1px solid ${ORACLE_RED}`,
+                  color: ORACLE_RED,
+                  outline: 0,
+                  boxShadow: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  '&:hover': {
+                    borderColor: ORACLE_RED,
+                    bgcolor: alpha(ORACLE_RED, 0.06),
+                  },
+                  '&:focus': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&:focus-visible': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&.Mui-focusVisible': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&:active': {
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                },
               }}
             >
               Clear filters

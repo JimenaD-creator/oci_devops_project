@@ -12,6 +12,7 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -585,22 +586,45 @@ export default function SprintsPage({ projectId }) {
                 <Button
                   size="small"
                   variant="outlined"
+                  color="inherit"
+                  disableRipple
                   onClick={clearTaskTableFilters}
                   sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    height: 40,
-                    minHeight: 40,
-                    borderColor: ORACLE_RED_ACTION,
-                    color: ORACLE_RED_ACTION,
-                    width: { xs: '100%', sm: 'auto' },
-                    flex: { xs: '1 1 100%', sm: '0 0 auto' },
-                    outline: 'none',
-                    '&:focus': { outline: 'none' },
-                    '&.Mui-focusVisible': {
-                      outline: 'none',
-                      boxShadow: '0 0 0 2px rgba(199, 70, 52, 0.35)',
-                      borderColor: ORACLE_RED_ACTION,
+                    '&&': {
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      height: 40,
+                      minHeight: 40,
+                      width: { xs: '100%', sm: 'auto' },
+                      flex: { xs: '1 1 100%', sm: '0 0 auto' },
+                      border: `1px solid ${ORACLE_RED_ACTION}`,
+                      color: ORACLE_RED_ACTION,
+                      outline: 0,
+                      boxShadow: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      '&:hover': {
+                        borderColor: ORACLE_RED_ACTION,
+                        bgcolor: alpha(ORACLE_RED_ACTION, 0.06),
+                      },
+                      '&:focus': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&:focus-visible': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&.Mui-focusVisible': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&:active': {
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
                     },
                   }}
                 >

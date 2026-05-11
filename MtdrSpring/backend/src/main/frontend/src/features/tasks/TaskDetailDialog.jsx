@@ -667,7 +667,7 @@ export function TaskDetailDialog({
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-            {!editMode && task && !loading && (
+            {!editMode && task && (
               <>
                 <Button
                   variant="contained"
