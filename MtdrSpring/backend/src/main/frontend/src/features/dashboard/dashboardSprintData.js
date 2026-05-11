@@ -883,24 +883,6 @@ export function buildCompareDeveloperChartsModel(selectedSprints) {
   return { sprintDefs, workloadRows, hoursRows, comboRows };
 }
 
-export function buildSprintInsights(selectedSprints) {
-  if (selectedSprints.length < 2) return [];
-  const insights = [];
-  const byProd = [...selectedSprints].sort(
-    (a, b) => b.kpis.productivityScore - a.kpis.productivityScore,
-  );
-  insights.push(
-    `${byProd[0].name} registered the highest productivity score (${byProd[0].kpis.productivityScore}).`,
-  );
-  const byCompletion = [...selectedSprints].sort(
-    (a, b) => b.kpis.completionRate - a.kpis.completionRate,
-  );
-  insights.push(
-    `Best task completion rate: ${byCompletion[0].shortLabel} at ${byCompletion[0].kpis.completionRate}%.`,
-  );
-  return [...new Set(insights)].slice(0, 5);
-}
-
 export const DEVELOPER_DISPLAY_NAME = {};
 export const DEFINED_DEVELOPER_IDS = [];
 export const DEFAULT_SELECTED_SPRINT_IDS_FALLBACK = [];
