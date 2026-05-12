@@ -1,16 +1,64 @@
-/*
- * UI-only session gate. Replace with JWT handling when backend auth is added.
- */
-const AUTH_KEY = 'mtdr_authenticated';
+const LEGACY_AUTH_KEY = 'mtdr_authenticated';
+const TOKEN_KEY = 'mtdr_auth_token';
+const USER_KEY = 'currentUser';
+const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export function isAuthenticated() {
-  return sessionStorage.getItem(AUTH_KEY) === 'true';
+  return Boolean(getAuthToken());
 }
 
-export function login() {
-  sessionStorage.setItem(AUTH_KEY, 'true');
+export function getAuthToken() {
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+}
+
+export function login(authData, remember = false) {
+  const storage = remember ? localStorage : sessionStorage;
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(LEGACY_AUTH_KEY);
+
+  storage.setItem(TOKEN_KEY, authData.token);
+  localStorage.setItem(USER_KEY, JSON.stringify(authData.user));
 }
 
 export function logout() {
-  sessionStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(LEGACY_AUTH_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+let authFetchInterceptorInstalled = false;
+
+export function installAuthFetchInterceptor() {
+  if (authFetchInterceptorInstalled || typeof window === 'undefined') return;
+  authFetchInterceptorInstalled = true;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const token = getAuthToken();
+    if (!token || !shouldAttachToken(input)) {
+      return originalFetch(input, init);
+    }
+
+    const inputHeaders = input instanceof Request ? input.headers : undefined;
+    const headers = new Headers(init.headers || inputHeaders || {});
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    return originalFetch(input, { ...init, headers });
+  };
+}
+
+function shouldAttachToken(input) {
+  const rawUrl = input instanceof Request ? input.url : String(input);
+
+  try {
+    const requestUrl = new URL(rawUrl, window.location.origin);
+    const apiUrl = new URL(API_BASE || window.location.origin, window.location.origin);
+    return requestUrl.origin === apiUrl.origin;
+  } catch {
+    return false;
+  }
 }

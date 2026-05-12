@@ -1,8 +1,20 @@
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-export async function fetchAllUsers() {
-  const response = await fetch(`${API_BASE}/users`);
-  if (!response.ok) throw new Error('Server error');
+export async function loginWithCredentials(identifier, password) {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ identifier, password }),
+  });
+
+  if (!response.ok) {
+    const error = new Error('Invalid credentials');
+    error.status = response.status;
+    throw error;
+  }
+
   return response.json();
 }
 

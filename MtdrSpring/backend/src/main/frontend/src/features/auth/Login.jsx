@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setSessionAuthenticated } from '../../utils/auth';
-import { fetchAllUsers, fetchManagerPrimaryProject } from './loginApi';
+import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
+import { fetchManagerPrimaryProject, loginWithCredentials } from './loginApi';
 
 const EyeIcon = ({ open }) => (
   <svg
@@ -89,67 +89,37 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const users = await fetchAllUsers();
-      const idRaw = String(email).trim();
-      const idLower = idRaw.toLowerCase();
-      const idDigits = idRaw.replace(/\D/g, '');
-      const looksLikeEmail = idRaw.includes('@');
-      const match = users.find((u) => {
-        const pass = u.userPassword != null ? String(u.userPassword).trim() : '';
-        if (pass !== String(password).trim()) return false;
-        const storedEmail = u.email != null ? String(u.email).trim().toLowerCase() : '';
-        if (storedEmail && idLower === storedEmail) return true;
-        if (looksLikeEmail) {
-          return false;
-        }
-        const phoneRaw = u.phoneNumber ?? u.phonenumber;
-        const phoneDigits = phoneRaw != null ? String(phoneRaw).replace(/\D/g, '') : '';
-        const phoneOk = idDigits.length > 0 && phoneDigits === idDigits;
-        const nameOk = u.name != null && String(u.name).trim().toLowerCase() === idLower;
-        return phoneOk || nameOk;
-      });
-      if (match) {
-        const userRole = (match.type || 'DEVELOPER').toUpperCase();
+      const authData = await loginWithCredentials(email.trim(), password.trim());
+      const userData = {
+        ...authData.user,
+        role: (authData.user.role || 'DEVELOPER').toUpperCase(),
+      };
 
-        if (userRole === 'DEVELOPER') {
-          setFormError(
-            'Access denied: developers do not have permission to access this application.',
-          );
-          setIsLoading(false);
-          return;
-        }
+      setAuthenticated({ token: authData.token, user: userData }, rememberMe);
 
-        setSessionAuthenticated();
-
-        const userData = {
-          id: match.id,
-          name: match.name,
-          role: userRole,
-          profilePicture: match.profilePicture || null,
-        };
-
-        localStorage.setItem('currentUser', JSON.stringify(userData));
-
-        if (userData.role === 'ADMIN') {
-          navigate('/project-selector');
-        } else if (userData.role === 'MANAGER') {
-          try {
-            const project = await fetchManagerPrimaryProject(match.id);
-            if (project) {
-              // Same keys as App.js — avoids empty dashboard on first paint (selected* was never read).
-              localStorage.setItem('currentProjectId', String(project.id));
-              localStorage.setItem('currentProjectName', project.name);
-            }
-          } catch (e) {
-            console.error('Could not pre-load the manager project');
+      if (userData.role === 'ADMIN') {
+        navigate('/project-selector');
+      } else if (userData.role === 'MANAGER') {
+        try {
+          const project = await fetchManagerPrimaryProject(userData.id);
+          if (project) {
+            // Same keys as App.js avoids empty dashboard on first paint.
+            localStorage.setItem('currentProjectId', String(project.id));
+            localStorage.setItem('currentProjectName', project.name);
           }
-          navigate('/');
+        } catch (e) {
+          console.error('Could not pre-load the manager project');
         }
-      } else {
-        setFormError('Invalid credentials. Please try again.');
+        navigate('/');
       }
     } catch (err) {
-      setFormError('Could not connect to the server.');
+      setFormError(
+        !err.status
+          ? 'Could not connect to the server.'
+          : err.status === 403
+            ? 'Access denied: developers do not have permission to access this application.'
+            : 'Invalid credentials. Please try again.',
+      );
     } finally {
       setIsLoading(false);
     }
