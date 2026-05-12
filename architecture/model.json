@@ -1,0 +1,769 @@
+{
+  "configuration" : { },
+  "description" : "Architecture model for the Task Manager with AI RAG Context",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedDate" : "2026-05-12T18:05:53Z",
+  "model" : {
+    "deploymentNodes" : [ {
+      "children" : [ {
+        "children" : [ {
+          "containerInstances" : [ {
+            "containerId" : "6",
+            "environment" : "Production",
+            "id" : "46",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "7915746b-7f1b-4044-8e3f-d542d5f59cea"
+            },
+            "relationships" : [ {
+              "description" : "API Calls (JSON/HTTPS)",
+              "destinationId" : "48",
+              "id" : "50",
+              "linkedRelationshipId" : "24",
+              "sourceId" : "46"
+            } ],
+            "tags" : "Container Instance"
+          } ],
+          "environment" : "Production",
+          "id" : "45",
+          "instances" : "1",
+          "name" : "Frontend Pod",
+          "properties" : {
+            "structurizr.dsl.identifier" : "df97cacb-a9d4-49f8-a23c-2aa6ba1e494c"
+          },
+          "tags" : "Element,Deployment Node"
+        }, {
+          "containerInstances" : [ {
+            "containerId" : "7",
+            "environment" : "Production",
+            "id" : "48",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "bc91ef40-1a17-4a7d-a536-de6852c4ddba"
+            },
+            "relationships" : [ {
+              "description" : "SQL/JDBC",
+              "destinationId" : "43",
+              "id" : "49",
+              "linkedRelationshipId" : "40",
+              "sourceId" : "48"
+            } ],
+            "tags" : "Container Instance"
+          } ],
+          "environment" : "Production",
+          "id" : "47",
+          "instances" : "1",
+          "name" : "Backend Pod",
+          "properties" : {
+            "structurizr.dsl.identifier" : "c65a9bd3-0aba-4ddf-b6e1-11cf75c435ef"
+          },
+          "tags" : "Element,Deployment Node"
+        } ],
+        "environment" : "Production",
+        "id" : "44",
+        "instances" : "1",
+        "name" : "Oracle Kubernetes Engine (OKE)",
+        "properties" : {
+          "structurizr.dsl.identifier" : "bb919a25-6f6e-442b-9ad9-0a10c1031794"
+        },
+        "tags" : "Element,Deployment Node"
+      } ],
+      "containerInstances" : [ {
+        "containerId" : "16",
+        "environment" : "Production",
+        "id" : "43",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "8dd1bf48-a64f-4e5a-bff3-f19a911a686d"
+        },
+        "tags" : "Container Instance"
+      } ],
+      "environment" : "Production",
+      "id" : "42",
+      "instances" : "1",
+      "name" : "Oracle Cloud Infrastructure",
+      "properties" : {
+        "structurizr.dsl.identifier" : "355aa7ca-40b5-4091-8c01-1464590af7bf"
+      },
+      "tags" : "Element,Deployment Node"
+    } ],
+    "people" : [ {
+      "description" : "Manages tasks and views personal KPIs.",
+      "id" : "1",
+      "name" : "Developer",
+      "properties" : {
+        "structurizr.dsl.identifier" : "developer"
+      },
+      "relationships" : [ {
+        "description" : "Uses",
+        "destinationId" : "6",
+        "id" : "17",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Uses",
+        "destinationId" : "5",
+        "id" : "18",
+        "linkedRelationshipId" : "17",
+        "sourceId" : "1"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Monitors team performance via AI insights and Semantic Chat.",
+      "id" : "2",
+      "name" : "Manager",
+      "properties" : {
+        "structurizr.dsl.identifier" : "manager"
+      },
+      "relationships" : [ {
+        "description" : "Uses commands /kpi, /insights",
+        "destinationId" : "3",
+        "id" : "19",
+        "sourceId" : "2",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Asks semantic questions about the project",
+        "destinationId" : "9",
+        "id" : "20",
+        "sourceId" : "2",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Asks semantic questions about the project",
+        "destinationId" : "7",
+        "id" : "21",
+        "linkedRelationshipId" : "20",
+        "sourceId" : "2"
+      }, {
+        "description" : "Asks semantic questions about the project",
+        "destinationId" : "5",
+        "id" : "22",
+        "linkedRelationshipId" : "20",
+        "sourceId" : "2"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "description" : "External interface for bot interactions.",
+      "documentation" : { },
+      "id" : "3",
+      "name" : "Telegram",
+      "properties" : {
+        "structurizr.dsl.identifier" : "telegram"
+      },
+      "relationships" : [ {
+        "description" : "Sends Webhook Updates",
+        "destinationId" : "10",
+        "id" : "25",
+        "sourceId" : "3",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Sends Webhook Updates",
+        "destinationId" : "7",
+        "id" : "26",
+        "linkedRelationshipId" : "25",
+        "sourceId" : "3"
+      }, {
+        "description" : "Sends Webhook Updates",
+        "destinationId" : "5",
+        "id" : "27",
+        "linkedRelationshipId" : "25",
+        "sourceId" : "3"
+      } ],
+      "tags" : "Element,Software System,External System"
+    }, {
+      "description" : "LLM used for Embeddings and Text Generation.",
+      "documentation" : { },
+      "id" : "4",
+      "name" : "Google Gemini API",
+      "properties" : {
+        "structurizr.dsl.identifier" : "gemini"
+      },
+      "tags" : "Element,Software System,External System"
+    }, {
+      "containers" : [ {
+        "description" : "Web Dashboard for KPI visualization.",
+        "documentation" : { },
+        "id" : "6",
+        "name" : "React Frontend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "reactApp"
+        },
+        "relationships" : [ {
+          "description" : "API Calls (JSON/HTTPS)",
+          "destinationId" : "8",
+          "id" : "23",
+          "sourceId" : "6",
+          "tags" : "Relationship"
+        }, {
+          "description" : "API Calls (JSON/HTTPS)",
+          "destinationId" : "7",
+          "id" : "24",
+          "linkedRelationshipId" : "23",
+          "sourceId" : "6"
+        } ],
+        "tags" : "Element,Container,Web Browser",
+        "technology" : "React 18"
+      }, {
+        "components" : [ {
+          "description" : "Exposes endpoints for metrics.",
+          "documentation" : { },
+          "id" : "8",
+          "name" : "Kpi Controller",
+          "properties" : {
+            "structurizr.dsl.identifier" : "kpiController"
+          },
+          "relationships" : [ {
+            "description" : "Requests calculations",
+            "destinationId" : "11",
+            "id" : "29",
+            "sourceId" : "8",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring REST"
+        }, {
+          "description" : "Entry point for AI Semantic Chat.",
+          "documentation" : { },
+          "id" : "9",
+          "name" : "Manager Chat Controller",
+          "properties" : {
+            "structurizr.dsl.identifier" : "chatController"
+          },
+          "relationships" : [ {
+            "description" : "Uses",
+            "destinationId" : "14",
+            "id" : "30",
+            "sourceId" : "9",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring REST"
+        }, {
+          "description" : "Telegram bot event handler.",
+          "documentation" : { },
+          "id" : "10",
+          "name" : "MyTodoListBot",
+          "properties" : {
+            "structurizr.dsl.identifier" : "botLogic"
+          },
+          "relationships" : [ {
+            "description" : "Requests data",
+            "destinationId" : "11",
+            "id" : "28",
+            "sourceId" : "10",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "TelegramBots SDK"
+        }, {
+          "description" : "Calculates weighted productivity scores.",
+          "documentation" : { },
+          "id" : "11",
+          "name" : "Kpi Service",
+          "properties" : {
+            "structurizr.dsl.identifier" : "kpiService"
+          },
+          "relationships" : [ {
+            "description" : "Provides context for sprint insights",
+            "destinationId" : "12",
+            "id" : "37",
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring Service"
+        }, {
+          "description" : "Orchestrates AI prompts and async calls.",
+          "documentation" : { },
+          "id" : "12",
+          "name" : "Gemini Service",
+          "properties" : {
+            "structurizr.dsl.identifier" : "geminiService"
+          },
+          "relationships" : [ {
+            "description" : "Async LLM request",
+            "destinationId" : "4",
+            "id" : "38",
+            "sourceId" : "12",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring Service"
+        }, {
+          "description" : "Generates vector representations.",
+          "documentation" : { },
+          "id" : "13",
+          "name" : "Embedding Service",
+          "properties" : {
+            "structurizr.dsl.identifier" : "embeddingService"
+          },
+          "relationships" : [ {
+            "description" : "Generates vector",
+            "destinationId" : "4",
+            "id" : "32",
+            "sourceId" : "13",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          }, {
+            "description" : "Stores and updates Task Embeddings",
+            "destinationId" : "15",
+            "id" : "41",
+            "sourceId" : "13",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring Service"
+        }, {
+          "description" : "Orchestrates RAG flow.",
+          "documentation" : { },
+          "id" : "14",
+          "name" : "Manager Chat Service",
+          "properties" : {
+            "structurizr.dsl.identifier" : "chatService"
+          },
+          "relationships" : [ {
+            "description" : "Requests query embedding",
+            "destinationId" : "13",
+            "id" : "31",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Retrieves top-K similar tasks",
+            "destinationId" : "15",
+            "id" : "35",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Sends context-augmented prompt",
+            "destinationId" : "12",
+            "id" : "36",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring Service"
+        }, {
+          "description" : "Data access layer using Spring Data JPA.",
+          "documentation" : { },
+          "id" : "15",
+          "name" : "JPA Repositories",
+          "properties" : {
+            "structurizr.dsl.identifier" : "dataRepo"
+          },
+          "relationships" : [ {
+            "description" : "SQL/JDBC",
+            "destinationId" : "16",
+            "id" : "39",
+            "sourceId" : "15",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring Data JPA"
+        } ],
+        "description" : "Processes business logic and AI orchestration.",
+        "documentation" : { },
+        "id" : "7",
+        "name" : "Spring Boot Backend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "apiApp"
+        },
+        "relationships" : [ {
+          "description" : "Generates vector",
+          "destinationId" : "4",
+          "id" : "33",
+          "linkedRelationshipId" : "32",
+          "sourceId" : "7",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "SQL/JDBC",
+          "destinationId" : "16",
+          "id" : "40",
+          "linkedRelationshipId" : "39",
+          "sourceId" : "7"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java 17, Spring Boot"
+      }, {
+        "description" : "Persistent storage for tasks and embeddings.",
+        "documentation" : { },
+        "id" : "16",
+        "name" : "Oracle Autonomous DB",
+        "properties" : {
+          "structurizr.dsl.identifier" : "database"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "Oracle ADB"
+      } ],
+      "description" : "Main System",
+      "documentation" : { },
+      "id" : "5",
+      "name" : "Task Manager AI",
+      "properties" : {
+        "structurizr.dsl.identifier" : "taskManager"
+      },
+      "relationships" : [ {
+        "description" : "Generates vector",
+        "destinationId" : "4",
+        "id" : "34",
+        "linkedRelationshipId" : "32",
+        "sourceId" : "5",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "MtdrSpring - Task Manager AI",
+  "properties" : {
+    "structurizr.inspection.error" : "34",
+    "structurizr.dsl" : "d29ya3NwYWNlICJNdGRyU3ByaW5nIC0gVGFzayBNYW5hZ2VyIEFJIiAiQXJjaGl0ZWN0dXJlIG1vZGVsIGZvciB0aGUgVGFzayBNYW5hZ2VyIHdpdGggQUkgUkFHIENvbnRleHQiIHsKCiAgICBtb2RlbCB7CiAgICAgICAgZGV2ZWxvcGVyID0gcGVyc29uICJEZXZlbG9wZXIiICJNYW5hZ2VzIHRhc2tzIGFuZCB2aWV3cyBwZXJzb25hbCBLUElzLiIgIlBlcnNvbiIKICAgICAgICBtYW5hZ2VyID0gcGVyc29uICJNYW5hZ2VyIiAiTW9uaXRvcnMgdGVhbSBwZXJmb3JtYW5jZSB2aWEgQUkgaW5zaWdodHMgYW5kIFNlbWFudGljIENoYXQuIiAiUGVyc29uIgogICAgICAgIAogICAgICAgIHRlbGVncmFtID0gc29mdHdhcmVTeXN0ZW0gIlRlbGVncmFtIiAiRXh0ZXJuYWwgaW50ZXJmYWNlIGZvciBib3QgaW50ZXJhY3Rpb25zLiIgIkV4dGVybmFsIFN5c3RlbSIKICAgICAgICBnZW1pbmkgPSBzb2Z0d2FyZVN5c3RlbSAiR29vZ2xlIEdlbWluaSBBUEkiICJMTE0gdXNlZCBmb3IgRW1iZWRkaW5ncyBhbmQgVGV4dCBHZW5lcmF0aW9uLiIgIkV4dGVybmFsIFN5c3RlbSIKCiAgICAgICAgdGFza01hbmFnZXIgPSBzb2Z0d2FyZVN5c3RlbSAiVGFzayBNYW5hZ2VyIEFJIiAiTWFpbiBTeXN0ZW0iIHsKICAgICAgICAgICAgcmVhY3RBcHAgPSBjb250YWluZXIgIlJlYWN0IEZyb250ZW5kIiAiV2ViIERhc2hib2FyZCBmb3IgS1BJIHZpc3VhbGl6YXRpb24uIiAiUmVhY3QgMTgiICJXZWIgQnJvd3NlciIKICAgICAgICAgICAgCiAgICAgICAgICAgIGFwaUFwcCA9IGNvbnRhaW5lciAiU3ByaW5nIEJvb3QgQmFja2VuZCIgIlByb2Nlc3NlcyBidXNpbmVzcyBsb2dpYyBhbmQgQUkgb3JjaGVzdHJhdGlvbi4iICJKYXZhIDE3LCBTcHJpbmcgQm9vdCIgewogICAgICAgICAgICAgICAga3BpQ29udHJvbGxlciA9IGNvbXBvbmVudCAiS3BpIENvbnRyb2xsZXIiICJFeHBvc2VzIGVuZHBvaW50cyBmb3IgbWV0cmljcy4iICJTcHJpbmcgUkVTVCIKICAgICAgICAgICAgICAgIGNoYXRDb250cm9sbGVyID0gY29tcG9uZW50ICJNYW5hZ2VyIENoYXQgQ29udHJvbGxlciIgIkVudHJ5IHBvaW50IGZvciBBSSBTZW1hbnRpYyBDaGF0LiIgIlNwcmluZyBSRVNUIgogICAgICAgICAgICAgICAgYm90TG9naWMgPSBjb21wb25lbnQgIk15VG9kb0xpc3RCb3QiICJUZWxlZ3JhbSBib3QgZXZlbnQgaGFuZGxlci4iICJUZWxlZ3JhbUJvdHMgU0RLIgogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICBrcGlTZXJ2aWNlID0gY29tcG9uZW50ICJLcGkgU2VydmljZSIgIkNhbGN1bGF0ZXMgd2VpZ2h0ZWQgcHJvZHVjdGl2aXR5IHNjb3Jlcy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIGdlbWluaVNlcnZpY2UgPSBjb21wb25lbnQgIkdlbWluaSBTZXJ2aWNlIiAiT3JjaGVzdHJhdGVzIEFJIHByb21wdHMgYW5kIGFzeW5jIGNhbGxzLiIgIlNwcmluZyBTZXJ2aWNlIgogICAgICAgICAgICAgICAgZW1iZWRkaW5nU2VydmljZSA9IGNvbXBvbmVudCAiRW1iZWRkaW5nIFNlcnZpY2UiICJHZW5lcmF0ZXMgdmVjdG9yIHJlcHJlc2VudGF0aW9ucy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIGNoYXRTZXJ2aWNlID0gY29tcG9uZW50ICJNYW5hZ2VyIENoYXQgU2VydmljZSIgIk9yY2hlc3RyYXRlcyBSQUcgZmxvdy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgZGF0YVJlcG8gPSBjb21wb25lbnQgIkpQQSBSZXBvc2l0b3JpZXMiICJEYXRhIGFjY2VzcyBsYXllciB1c2luZyBTcHJpbmcgRGF0YSBKUEEuIiAiU3ByaW5nIERhdGEgSlBBIgogICAgICAgICAgICB9CgogICAgICAgICAgICBkYXRhYmFzZSA9IGNvbnRhaW5lciAiT3JhY2xlIEF1dG9ub21vdXMgREIiICJQZXJzaXN0ZW50IHN0b3JhZ2UgZm9yIHRhc2tzIGFuZCBlbWJlZGRpbmdzLiIgIk9yYWNsZSBBREIiICJEYXRhYmFzZSIKICAgICAgICB9CgogICAgICAgIGRldmVsb3BlciAtPiByZWFjdEFwcCAiVXNlcyIKICAgICAgICBtYW5hZ2VyIC0+IHRlbGVncmFtICJVc2VzIGNvbW1hbmRzIC9rcGksIC9pbnNpZ2h0cyIKICAgICAgICBtYW5hZ2VyIC0+IGNoYXRDb250cm9sbGVyICJBc2tzIHNlbWFudGljIHF1ZXN0aW9ucyBhYm91dCB0aGUgcHJvamVjdCIKICAgICAgICAKICAgICAgICByZWFjdEFwcCAtPiBrcGlDb250cm9sbGVyICJBUEkgQ2FsbHMgKEpTT04vSFRUUFMpIgogICAgICAgIHRlbGVncmFtIC0+IGJvdExvZ2ljICJTZW5kcyBXZWJob29rIFVwZGF0ZXMiCiAgICAgICAgCiAgICAgICAgYm90TG9naWMgLT4ga3BpU2VydmljZSAiUmVxdWVzdHMgZGF0YSIKICAgICAgICBrcGlDb250cm9sbGVyIC0+IGtwaVNlcnZpY2UgIlJlcXVlc3RzIGNhbGN1bGF0aW9ucyIKICAgICAgICAKICAgICAgICBjaGF0Q29udHJvbGxlciAtPiBjaGF0U2VydmljZSAiVXNlcyIKICAgICAgICAKICAgICAgICBjaGF0U2VydmljZSAtPiBlbWJlZGRpbmdTZXJ2aWNlICJSZXF1ZXN0cyBxdWVyeSBlbWJlZGRpbmciCiAgICAgICAgZW1iZWRkaW5nU2VydmljZSAtPiBnZW1pbmkgIkdlbmVyYXRlcyB2ZWN0b3IiICJIVFRQUyIKICAgICAgICBjaGF0U2VydmljZSAtPiBkYXRhUmVwbyAiUmV0cmlldmVzIHRvcC1LIHNpbWlsYXIgdGFza3MiCiAgICAgICAgY2hhdFNlcnZpY2UgLT4gZ2VtaW5pU2VydmljZSAiU2VuZHMgY29udGV4dC1hdWdtZW50ZWQgcHJvbXB0IgogICAgICAgIAogICAgICAgIGtwaVNlcnZpY2UgLT4gZ2VtaW5pU2VydmljZSAiUHJvdmlkZXMgY29udGV4dCBmb3Igc3ByaW50IGluc2lnaHRzIgogICAgICAgIGdlbWluaVNlcnZpY2UgLT4gZ2VtaW5pICJBc3luYyBMTE0gcmVxdWVzdCIgIkhUVFBTIgogICAgICAgIAogICAgICAgIGRhdGFSZXBvIC0+IGRhdGFiYXNlICJTUUwvSkRCQyIKICAgICAgICBlbWJlZGRpbmdTZXJ2aWNlIC0+IGRhdGFSZXBvICJTdG9yZXMgYW5kIHVwZGF0ZXMgVGFzayBFbWJlZGRpbmdzIgogICAgICAgIAogICAgICAgIGRlcGxveW1lbnRFbnZpcm9ubWVudCAiUHJvZHVjdGlvbiIgewogICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiT3JhY2xlIENsb3VkIEluZnJhc3RydWN0dXJlIiB7CiAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSBkYXRhYmFzZQogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiT3JhY2xlIEt1YmVybmV0ZXMgRW5naW5lIChPS0UpIiB7CiAgICAgICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIkZyb250ZW5kIFBvZCIgewogICAgICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSByZWFjdEFwcAogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiQmFja2VuZCBQb2QiIHsKICAgICAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgYXBpQXBwCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICBzeXN0ZW1Db250ZXh0IHRhc2tNYW5hZ2VyICJTeXN0ZW1Db250ZXh0IiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBjb250YWluZXIgdGFza01hbmFnZXIgIkNvbnRhaW5lcnMiIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCBhcGlBcHAgIkNvbXBvbmVudHMiIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGRlcGxveW1lbnQgdGFza01hbmFnZXIgIlByb2R1Y3Rpb24iICJEZXBsb3ltZW50IiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkeW5hbWljIGFwaUFwcCAiUkFHX0luc2lnaHRfRmxvdyIgIlNob3dzIGhvdyB0aGUgc3lzdGVtIHJldHJpZXZlcyBjb250ZXh0IGJlZm9yZSBjYWxsaW5nIHRoZSBMTE0uIiB7CiAgICAgICAgICAgIGNoYXRDb250cm9sbGVyIC0+IGNoYXRTZXJ2aWNlICIxLiBVc2VyIHF1ZXJ5IHJlY2VpdmVkIgogICAgICAgICAgICBjaGF0U2VydmljZSAtPiBlbWJlZGRpbmdTZXJ2aWNlICIyLiBDb252ZXJ0IHF1ZXJ5IHRvIHZlY3RvciIKICAgICAgICAgICAgZW1iZWRkaW5nU2VydmljZSAtPiBnZW1pbmkgIjMuIENhbGwgZW1iZWRkaW5nIEFQSSIKICAgICAgICAgICAgY2hhdFNlcnZpY2UgLT4gZGF0YVJlcG8gIjQuIFNlbWFudGljIHNlYXJjaCBmb3IgcmVsZXZhbnQgdGFza3MiCiAgICAgICAgICAgIGNoYXRTZXJ2aWNlIC0+IGdlbWluaVNlcnZpY2UgIjUuIENhbGwgTExNIHdpdGggcmV0cmlldmVkIGNvbnRleHQiCiAgICAgICAgICAgIGdlbWluaVNlcnZpY2UgLT4gZ2VtaW5pICI2LiBHZW5lcmF0ZSBmaW5hbCByZXNwb25zZSIKICAgICAgICAgICAgYXV0b0xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgc3R5bGVzIHsKICAgICAgICAgICAgZWxlbWVudCAiRXh0ZXJuYWwgU3lzdGVtIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICM5OTk5OTkKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJEYXRhYmFzZSIgewogICAgICAgICAgICAgICAgc2hhcGUgQ3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJXZWIgQnJvd3NlciIgewogICAgICAgICAgICAgICAgc2hhcGUgV2ViQnJvd3NlcgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlBlcnNvbiIgewogICAgICAgICAgICAgICAgc2hhcGUgUGVyc29uCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICMwODQyN2IKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KfQ==",
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.warning" : "0"
+  },
+  "views" : {
+    "componentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "7",
+      "elements" : [ {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "Components",
+      "name" : "Component View: Task Manager AI - Spring Boot Backend",
+      "order" : 3,
+      "relationships" : [ {
+        "id" : "19"
+      }, {
+        "id" : "20"
+      }, {
+        "id" : "23"
+      }, {
+        "id" : "25"
+      }, {
+        "id" : "28"
+      }, {
+        "id" : "29"
+      }, {
+        "id" : "30"
+      }, {
+        "id" : "31"
+      }, {
+        "id" : "32"
+      }, {
+        "id" : "35"
+      }, {
+        "id" : "36"
+      }, {
+        "id" : "37"
+      }, {
+        "id" : "38"
+      }, {
+        "id" : "39"
+      }, {
+        "id" : "41"
+      } ]
+    } ],
+    "configuration" : {
+      "styles" : {
+        "elements" : [ {
+          "shape" : "Cylinder",
+          "tag" : "Database"
+        }, {
+          "background" : "#999999",
+          "color" : "#ffffff",
+          "tag" : "External System"
+        }, {
+          "background" : "#08427b",
+          "color" : "#ffffff",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "shape" : "WebBrowser",
+          "tag" : "Web Browser"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Containers",
+      "name" : "Container View: Task Manager AI",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "17"
+      }, {
+        "id" : "19"
+      }, {
+        "id" : "21"
+      }, {
+        "id" : "24"
+      }, {
+        "id" : "26"
+      }, {
+        "id" : "33"
+      }, {
+        "id" : "40"
+      } ],
+      "softwareSystemId" : "5"
+    } ],
+    "deploymentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "elements" : [ {
+        "id" : "42",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "43",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "44",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "45",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "46",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "47",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "48",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Production",
+      "key" : "Deployment",
+      "name" : "Deployment View: Task Manager AI - Production",
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "49"
+      }, {
+        "id" : "50"
+      } ],
+      "softwareSystemId" : "5"
+    } ],
+    "dynamicViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Shows how the system retrieves context before calling the LLM.",
+      "elementId" : "7",
+      "elements" : [ {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "RAG_Insight_Flow",
+      "name" : "Dynamic View: Task Manager AI - Spring Boot Backend",
+      "order" : 5,
+      "relationships" : [ {
+        "description" : "1. User query received",
+        "id" : "30",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Convert query to vector",
+        "id" : "31",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Call embedding API",
+        "id" : "32",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. Semantic search for relevant tasks",
+        "id" : "35",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Call LLM with retrieved context",
+        "id" : "36",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "6. Generate final response",
+        "id" : "38",
+        "order" : "6",
+        "response" : false
+      } ]
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "SystemContext",
+      "name" : "System Context View: Task Manager AI",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "18"
+      }, {
+        "id" : "19"
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "27"
+      }, {
+        "id" : "34"
+      } ],
+      "softwareSystemId" : "5"
+    } ]
+  }
+}
