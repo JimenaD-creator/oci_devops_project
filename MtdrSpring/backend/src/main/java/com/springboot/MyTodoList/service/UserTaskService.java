@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +42,15 @@ public class UserTaskService {
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Transactional(readOnly = true)
+    public List<Long> findSprintIdsWithAssignmentsForUser(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        List<Long> raw = userTaskRepository.findDistinctSprintIdsByUserId(userId);
+        return new ArrayList<>(new LinkedHashSet<>(raw));
+    }
 
     @Transactional(readOnly = true)
     public List<User> findDistinctAssigneesBySprintId(Long sprintId) {

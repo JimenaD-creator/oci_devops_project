@@ -89,4 +89,26 @@ public class UserService {
 
         return true;
     }
+
+    /**
+     * Looks up a user by email (case-insensitive) or exact phone, then checks password (plain-text match, same as verifyUserCredentials).
+     */
+    public Optional<Long> verifyCredentialsByPhoneOrEmailAndPassword(String phoneOrEmail, String password) {
+        if (phoneOrEmail == null || phoneOrEmail.isBlank()) {
+            return Optional.empty();
+        }
+        String trimmed = phoneOrEmail.trim();
+        Optional<User> user = userRepository.findByEmailIgnoreCase(trimmed);
+        if (user.isEmpty()) {
+            user = userRepository.findByPhonenumber(trimmed);
+        }
+        if (user.isEmpty()) {
+            return Optional.empty();
+        }
+        User u = user.get();
+        if (password == null || !password.equals(u.getUserPassword())) {
+            return Optional.empty();
+        }
+        return Optional.of(u.getId());
+    }
 }

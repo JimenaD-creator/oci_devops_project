@@ -19,6 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * - "WAITING_FOR_HOURS": User just marked a task as DONE and is waiting to enter hours
  * - "SELECTING_USER_IN_SPRINT": User picked a sprint; choosing which assignee's tasks to list
  * - "VIEWING_SPRINT_TASKS": Showing tasks for one assignee in a sprint
+ * - "WAITING_FOR_NEW_TASK_DESCRIPTION": User chose Add New Item; next message is the task text
+ * - "SESSION_LOGIN_AWAITING_IDENTIFIER" / "SESSION_LOGIN_AWAITING_PASSWORD": Startup sign-in flow
+ * - Signed-in user id is also stored in {@link #telegramSignedInUserId} so sprint navigation does not overwrite it.
  */
 @Component
 public class BotStateManager {
@@ -28,6 +31,9 @@ public class BotStateManager {
     // Map: chatId → BotUserState
     // ConcurrentHashMap for thread-safe access
     private final Map<Long, BotUserState> userStates = new ConcurrentHashMap<>();
+
+    /** Survives sprint selection / task views; cleared on sign-out or {@link #clearPendingState} for full reset. */
+    private final Map<Long, Long> telegramSignedInUserId = new ConcurrentHashMap<>();
     
     // Timeout in minutes: If state is older than this, it's considered expired
     private static final long STATE_TIMEOUT_MINUTES = 30;
@@ -220,10 +226,76 @@ public class BotStateManager {
         /* Navigation-only states: not "pending input" for free-text handlers */
         if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st) ||
             "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(st) || "VERIFYING_CREDENTIALS_PASSWORD".equals(st) ||
-            "SELECTING_TASK_STATUS".equals(st)) {
+            "SELECTING_TASK_STATUS".equals(st) || "WAITING_FOR_NEW_TASK_DESCRIPTION".equals(st) ||
+            "SESSION_LOGIN_AWAITING_IDENTIFIER".equals(st) || "SESSION_LOGIN_AWAITING_PASSWORD".equals(st)) {
             return false;
         }
         return true;
+    }
+
+    /** After "Add New Item" or /additem: next free-text message becomes the new task description. */
+    public void setWaitingForNewTaskDescription(Long chatId) {
+        BotUserState state = new BotUserState(chatId, null, null, null, "WAITING_FOR_NEW_TASK_DESCRIPTION");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to waiting for new task description", chatId);
+    }
+
+    public boolean isWaitingForNewTaskDescription(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "WAITING_FOR_NEW_TASK_DESCRIPTION".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    public void setSessionLoginAwaitingIdentifier(Long chatId) {
+        BotUserState state = new BotUserState(chatId, null, null, null, "SESSION_LOGIN_AWAITING_IDENTIFIER");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to session login (awaiting phone/email)", chatId);
+    }
+
+    public boolean isSessionLoginAwaitingIdentifier(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SESSION_LOGIN_AWAITING_IDENTIFIER".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    public void setSessionLoginAwaitingPassword(Long chatId, String phoneOrEmail) {
+        BotUserState state = new BotUserState(chatId, null, null, null, "SESSION_LOGIN_AWAITING_PASSWORD");
+        state.setTempPhoneEmail(phoneOrEmail);
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to session login (awaiting password)", chatId);
+    }
+
+    public boolean isSessionLoginAwaitingPassword(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SESSION_LOGIN_AWAITING_PASSWORD".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    public String getSessionLoginPendingIdentifier(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null || isStateExpired(state)) {
+            return null;
+        }
+        if (!"SESSION_LOGIN_AWAITING_PASSWORD".equals(state.getState())) {
+            return null;
+        }
+        return state.getTempPhoneEmail();
+    }
+
+    public void setTelegramSignedInUser(Long chatId, Long userId) {
+        telegramSignedInUserId.put(chatId, userId);
+        userStates.remove(chatId);
+        logger.info("Signed in chat {} as user {}", chatId, userId);
+    }
+
+    public Long getTelegramSignedInUserId(Long chatId) {
+        return telegramSignedInUserId.get(chatId);
+    }
+
+    public boolean isTelegramSignedIn(Long chatId) {
+        return telegramSignedInUserId.containsKey(chatId);
+    }
+
+    public void clearTelegramSignedIn(Long chatId) {
+        telegramSignedInUserId.remove(chatId);
+        logger.info("Cleared sign-in for chat {}", chatId);
     }
     
     /**

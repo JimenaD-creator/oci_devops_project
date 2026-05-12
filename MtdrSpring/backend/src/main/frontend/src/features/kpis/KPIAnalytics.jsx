@@ -15,7 +15,6 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Target } from 'lucide-react';
 import KpiDonutChart from './KpiDonutChart';
-import IndividualTable from './IndividualTable';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
@@ -662,7 +661,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
               />
             </Grid>
           </Grid>
-          <IndividualTable />
           <KpiManagerGuidePanel
             sprintLabel={currentSprint ? `Sprint ${currentSprint.id}` : ''}
             guide={managerGuide}
