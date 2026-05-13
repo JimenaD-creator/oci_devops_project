@@ -20,14 +20,14 @@ import {
   DialogActions,
   Alert,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
-import { developerNumericId } from '../../utils/userIds';
-import { TasksNewTaskDialog } from './TasksNewTaskDialog';
+import { developerNumericId, finiteUserIds } from '../../utils/userIds';
+import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
@@ -36,6 +36,7 @@ import {
   mapTaskToKanban,
   isUserTaskAssigneeComplete,
   pageFormFieldOutline,
+  userTaskRowTaskId,
 } from './utils/taskUtils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 
@@ -58,10 +59,12 @@ export default function TasksPage({ projectId }) {
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setIsLoading(true);
     try {
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
+      const { tasksData, sprintsData, userTasksData } =
+        await fetchTasksPageBundle(effectiveProjectId);
       setRawTasks(tasksData);
       setSprints(sprintsData);
       setUserTasks(userTasksData);
@@ -70,13 +73,13 @@ export default function TasksPage({ projectId }) {
       setRawTasks([]);
       setSprints([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
-  };
+  }, [effectiveProjectId]);
 
   useEffect(() => {
     loadData();
-  }, [effectiveProjectId]);
+  }, [loadData]);
 
   useEffect(() => {
     try {
@@ -455,29 +458,15 @@ export default function TasksPage({ projectId }) {
               </Select>
             </FormControl>
             <Button
-              variant="outlined"
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={loadData}
-              sx={{
-                textTransform: 'none',
-                borderColor: '#DDD',
-                color: '#555',
-                borderRadius: 2,
-                minHeight: 40,
-              }}
-            >
-              Sync data
-            </Button>
-            <Button
               variant="contained"
+              size="small"
               startIcon={<AddIcon />}
               onClick={() => setDialogOpen(true)}
               sx={{
                 bgcolor: ORACLE_RED,
                 textTransform: 'none',
                 fontWeight: 700,
-                borderRadius: 2,
+                minHeight: 40,
                 '&:hover': { bgcolor: '#A83B2D' },
               }}
             >
@@ -569,15 +558,45 @@ export default function TasksPage({ projectId }) {
             <Button
               size="small"
               variant="outlined"
+              color="inherit"
+              disableRipple
               onClick={clearAllFilters}
               sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                borderColor: ORACLE_RED,
-                color: ORACLE_RED,
-                flexShrink: 0,
-                minHeight: 34,
-                py: 0.25,
+                '&&': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  minHeight: 34,
+                  py: 0.25,
+                  border: `1px solid ${ORACLE_RED}`,
+                  color: ORACLE_RED,
+                  outline: 0,
+                  boxShadow: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  '&:hover': {
+                    borderColor: ORACLE_RED,
+                    bgcolor: alpha(ORACLE_RED, 0.06),
+                  },
+                  '&:focus': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&:focus-visible': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&.Mui-focusVisible': {
+                    outline: 0,
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                  '&:active': {
+                    border: `1px solid ${ORACLE_RED}`,
+                    boxShadow: 'none',
+                  },
+                },
               }}
             >
               Clear filters
@@ -704,7 +723,7 @@ export default function TasksPage({ projectId }) {
         </DialogActions>
       </Dialog>
 
-      <TasksNewTaskDialog
+      <NewTaskDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreated={() => {
@@ -712,8 +731,7 @@ export default function TasksPage({ projectId }) {
         }}
         sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers}
-        defaultSprintId={selectedSprintId}
-        pickerProjectId={effectiveProjectId}
+        defaultSprintId={kanbanSprintId || selectedSprintId || undefined}
       />
 
       <TaskDetailDialog
@@ -723,12 +741,39 @@ export default function TasksPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
         onClose={closeTaskDetailDialog}
-        onSaved={(updated) => {
+        onSaved={(updated, meta) => {
           setRawTasks((prev) =>
-            prev.map((t) => (Number(t.id) === Number(updated.id) ? updated : t)),
+            prev.map((t) => (Number(t.id) === Number(updated.id) ? { ...t, ...updated } : t)),
           );
+          if (meta?.assigneesChanged) {
+            const tid = Number(updated.id);
+            const ids = finiteUserIds(meta.assigneeUserIds);
+            setUserTasks((prev) => {
+              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+              if (ids.length === 0) return rest;
+              const st = updated?.status ?? 'TODO';
+              const added = ids.map((userId) => {
+                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+                const name = String(
+                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+                ).trim();
+                return {
+                  user: { id: userId, name: name || `User ${userId}` },
+                  task: { id: tid },
+                  status: st,
+                };
+              });
+              return [...rest, ...added];
+            });
+          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+            const tid = Number(updated.id);
+            const st = meta.assignmentStatus;
+            setUserTasks((prev) =>
+              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
+            );
+          }
           closeTaskDetailDialog();
-          loadData();
+          void loadData({ silent: true });
         }}
         onDeleted={(taskId) => {
           setRawTasks((prev) => prev.filter((t) => Number(t.id) !== Number(taskId)));

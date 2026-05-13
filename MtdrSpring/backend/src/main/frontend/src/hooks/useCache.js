@@ -32,6 +32,7 @@ export function useCache(key, fetchFn, dependencies = [], ttl = 60000) {
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- caller-controlled dependency list mirrors hook args
   }, dependencies);
 
   const invalidateCache = () => {

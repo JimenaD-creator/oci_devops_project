@@ -36,4 +36,3 @@ test('columns show per-person assigned tasks, completed tasks, and hours', () =>
   // Worked hours
   expect(within(anaRow).getByText('18h')).toBeInTheDocument();
 });
-

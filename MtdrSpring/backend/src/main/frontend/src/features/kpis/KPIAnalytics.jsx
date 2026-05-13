@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -21,11 +21,13 @@ import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import { API_BASE } from '../sprints/constants/sprintConstants';
+import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
   sectionRgba,
 } from '../dashboard/constants/dashboardConstants';
+import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
 //import KPIInsightsPanel from './KPIInsightsPanel';
 
@@ -158,7 +160,11 @@ function ProductivityScoreCard({
         />
       </Box>
 
-      <Grid container spacing={1.5} sx={fillColumnHeight ? { flex: 1, alignContent: 'flex-start' } : undefined}>
+      <Grid
+        container
+        spacing={1.5}
+        sx={fillColumnHeight ? { flex: 1, alignContent: 'flex-start' } : undefined}
+      >
         {components.map(({ label, value, weight, color }) => (
           <Grid item xs={6} key={label}>
             <Box sx={{ bgcolor: '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
@@ -284,11 +290,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       setSelectedSprintId((prev) => {
         if (sprintsData.length === 0) return null;
         if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
-        const activeSprint = sprintsData.find((s) => {
-          const now = new Date();
-          return now >= new Date(s.startDate) && now <= new Date(s.dueDate);
-        });
-        return activeSprint?.id ?? sprintsData[0]?.id ?? null;
+        const defaultSprint = pickDefaultSelectedSprint(sprintsData);
+        return defaultSprint?.id ?? sprintsData[0]?.id ?? null;
       });
     } catch (error) {
       console.error('Error loading KPI data:', error);
@@ -315,7 +318,9 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const sprint = getSelectedSprint();
     const sprintTasks = getSprintTasks();
     const totalTasks = sprintTasks.length;
-    const completedTasks = sprintTasks.filter((t) => normalizeTaskStatus(t.status) === 'DONE').length;
+    const completedTasks = sprintTasks.filter(
+      (t) => normalizeTaskStatus(t.status) === 'DONE',
+    ).length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     const onTimeTasks = sprintTasks.filter((t) => {
@@ -353,12 +358,35 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
-  const currentSprintDevelopers = Array.isArray(currentSprint?.developers) ? currentSprint.developers : [];
-  const assignedTotalInSprint = currentSprintDevelopers.reduce((acc, d) => acc + (Number(d?.assigned) || 0), 0);
-  const completedTotalInSprint = currentSprintDevelopers.reduce((acc, d) => acc + (Number(d?.completed) || 0), 0);
-  const chartDataDensity = Math.max(assignedTotalInSprint, completedTotalInSprint, currentSprintDevelopers.length);
-  const adaptiveAssignedChartHeight = Math.min(360, Math.max(220, 200 + Math.round(chartDataDensity * 2)));
-  const adaptiveAssignedChartWidth = Math.min(640, Math.max(430, 430 + Math.round(chartDataDensity * 1.5)));
+  /** Unique tasks in sprint (multi-assignee counts once) — aligns chart Total with donut KPIs. */
+  const assignedTotalInSprint = kpis.totalTasks;
+  const completedTotalInSprint = kpis.completedTasks;
+  const selectedSprintIdForTotals = currentSprint?.id;
+  const uniqueTeamTotalsBySprintId = useMemo(() => {
+    if (selectedSprintIdForTotals == null) return undefined;
+    return {
+      [selectedSprintIdForTotals]: {
+        assigned: kpis.totalTasks,
+        completed: kpis.completedTasks,
+      },
+    };
+  }, [selectedSprintIdForTotals, kpis.totalTasks, kpis.completedTasks]);
+  const developerCountForChartLayout = Array.isArray(currentSprint?.developers)
+    ? currentSprint.developers.length
+    : 0;
+  const chartDataDensity = Math.max(
+    assignedTotalInSprint,
+    completedTotalInSprint,
+    developerCountForChartLayout,
+  );
+  const adaptiveAssignedChartHeight = Math.min(
+    360,
+    Math.max(220, 200 + Math.round(chartDataDensity * 2)),
+  );
+  const adaptiveAssignedChartWidth = Math.min(
+    640,
+    Math.max(430, 430 + Math.round(chartDataDensity * 1.5)),
+  );
 
   const normalizeProductivityValue = (v) => {
     const n = Number(v);
@@ -453,9 +481,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             >
               KPI Analytics
             </Typography>
-            <Typography variant="body2" sx={{ color: '#607D8B', mt: 0.5, fontWeight: 600 }}>
-              {currentSprint ? `Sprint ${currentSprint.id} selected` : 'No sprint selected'}
-            </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             {sprints.length > 0 && (
@@ -463,7 +488,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 size="small"
                 sx={{
                   minWidth: { xs: '100%', sm: 220 },
-                  '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+                  ...pageFormFieldOutline(),
                   '& .MuiSelect-select': {
                     color: '#1A1A1A',
                     fontWeight: 600,
@@ -472,19 +497,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                     textOverflow: 'ellipsis',
                     pr: 4,
                   },
-                  '& .MuiSelect-icon': { color: '#546E7A' },
-                  '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
-                    borderColor: sectionRgba(0.32),
-                  },
-                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: sectionRgba(0.48),
-                  },
-                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderWidth: 2,
-                    borderColor: SECTION_ACCENT,
-                  },
-                  '& .MuiInputLabel-root': { color: '#607D8B' },
-                  '& .MuiInputLabel-root.Mui-focused': { color: SECTION_ACCENT },
                 }}
               >
                 <InputLabel id="kpi-analytics-sprint-filter" shrink>
@@ -623,8 +635,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
               <Box sx={{ width: '100%', minWidth: 0 }}>
                 <DeveloperWorkloadCharts
                   selectedSprints={selectedSprintRows}
-                  compareMode={false}
                   showHoursChart={false}
+                  uniqueTeamTotalsBySprintId={uniqueTeamTotalsBySprintId}
                   assignedCompletedHeight={adaptiveAssignedChartHeight}
                   assignedCompletedMaxWidth={adaptiveAssignedChartWidth}
                   suppressOuterMargin={isDesktopLayout}
@@ -657,6 +669,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             loading={managerGuideLoading}
             fetchFailed={managerGuideFetchFailed}
             productivityDelta={productivityDelta}
+            currentProductivityScore={kpis.productivityScore}
+            currentSprintKpis={kpis}
             onOpenAiInsights={onOpenAiInsights}
           />
         </Box>

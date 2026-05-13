@@ -20,7 +20,7 @@ const CHART_H_BASE = 228;
 const Y_AXIS_TICK = { fontSize: 12, fill: '#1A1A1A', fontWeight: 500 };
 const X_AXIS_LINE = { stroke: '#BDBDBD' };
 const GRID_STROKE = '#E1BEE7';
-const FALLBACK_SPRINT_COLOR = '#424242';
+const FALLBACK_SPRINT_COLOR = '#26A69A';
 
 /** Planned hours on TASK rows (assigned_hours). */
 const HOURS_PLANNED_TASK_FILL = '#5C6BC0';

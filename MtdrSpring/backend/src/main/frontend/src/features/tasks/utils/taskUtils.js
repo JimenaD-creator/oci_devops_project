@@ -14,6 +14,13 @@ export function isUserTaskAssigneeComplete(ut) {
   return u === 'COMPLETED' || u === 'DONE';
 }
 
+/** Numeric TASK_ID for a user-task row (API may nest it under task, id, or root). */
+export function userTaskRowTaskId(ut) {
+  const raw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 /** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
 export function pageFormFieldOutline() {
   return {
@@ -48,10 +55,16 @@ export function normalizeTaskStatus(value) {
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
-  if (normalized === 'DONE' || normalized === 'COMPLETED' || normalized === 'COMPLETE') return 'DONE';
+  if (normalized === 'DONE' || normalized === 'COMPLETED' || normalized === 'COMPLETE')
+    return 'DONE';
   if (normalized === 'IN_PROGRESS' || normalized === 'IN_PROCESS') return 'IN_PROGRESS';
   if (normalized === 'IN_REVIEW' || normalized === 'REVIEW') return 'IN_REVIEW';
-  if (normalized === 'PENDING' || normalized === 'TODO' || normalized === 'TO_DO' || normalized === '')
+  if (
+    normalized === 'PENDING' ||
+    normalized === 'TODO' ||
+    normalized === 'TO_DO' ||
+    normalized === ''
+  )
     return 'TODO';
   return 'TODO';
 }

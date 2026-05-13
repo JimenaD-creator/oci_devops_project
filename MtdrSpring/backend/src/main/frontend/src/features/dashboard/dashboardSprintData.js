@@ -3,20 +3,20 @@ import { inferStatusByDate } from '../sprints/utils/sprintUtils';
 /** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-/** Distinct chart series colors (no red/green — reserved for KPI / status cues elsewhere). */
+/** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
-  '#1E88E5',
+  '#1565C0',
   '#FB8C00',
+  '#26A69A',
   '#8E24AA',
-  '#455A64',
   '#5E35B1',
   '#0277BD',
   '#F57C00',
-  '#6D4C41',
+  '#00897B',
   '#3949AB',
   '#00ACC1',
   '#7E57C2',
-  '#5C6BC0',
+  '#43A047',
 ];
 
 // Cache variables
@@ -104,7 +104,7 @@ export function bucketTaskStatus(raw) {
 const TASK_STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const STATUS_DIST_META = {
-  TODO: { name: 'To Do', color: '#FB8C00' },
+  TODO: { name: 'To Do', color: '#FFC107' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
   IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
   DONE: { name: 'Completed', color: '#3949AB' },
@@ -363,7 +363,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       assignedHours: ah,
       blocked: isTaskBlocked(task),
       title: String(task?.title || `Task #${tid}`),
-      blockedSince: task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
+      blockedSince:
+        task?.updatedAt ?? task?.updated_at ?? task?.startDate ?? task?.start_date ?? null,
+      dueDate: task?.dueDate ?? task?.due_date ?? null,
+      finishDate: task?.finishDate ?? task?.finish_date ?? null,
     };
     sprintMap[sid].totalAssignedHoursTasks += ah;
     if (taskSprintMap[tid].blocked) sprintMap[sid].blockedTasksTotal += 1;
@@ -391,8 +394,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       sp._devMap[devKey] = {
         name: initialName,
         initials: initialsFromName(initialName),
+        profilePicture: ut.user?.profilePicture ?? null,
         _taskIds: new Set(),
         _completedTaskIds: new Set(),
+        _completedOnTimeIds: new Set(),
         _assignedHoursEstimate: 0,
         hours: 0,
         workload: 0,
@@ -403,12 +408,27 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const dm = sp._devMap[devKey];
     dm.name = pickDeveloperDisplayName(ut, dm.name);
     dm.initials = initialsFromName(dm.name);
+    if (!dm.profilePicture && ut.user?.profilePicture) {
+      dm.profilePicture = ut.user.profilePicture; // 👈 agrega esto
+    }
     if (taskId != null) {
       if (!dm._taskIds.has(taskId)) {
         dm._assignedHoursEstimate += Number(taskSprintMap[taskId]?.assignedHours) || 0;
       }
       dm._taskIds.add(taskId);
-      if (utCompleted) dm._completedTaskIds.add(taskId);
+      if (utCompleted) {
+        dm._completedTaskIds.add(taskId);
+        const meta = taskSprintMap[taskId];
+        const fd = meta?.finishDate;
+        const dd = meta?.dueDate;
+        if (fd != null && dd != null) {
+          const fdMs = new Date(fd).getTime();
+          const ddMs = new Date(dd).getTime();
+          if (Number.isFinite(fdMs) && Number.isFinite(ddMs) && fdMs <= ddMs) {
+            dm._completedOnTimeIds.add(taskId);
+          }
+        }
+      }
     }
     /** Per-developer chart: all logged worked hours on USER_TASK (incl. in progress). */
     dm.hours += loggedHours;
@@ -592,7 +612,7 @@ export function shortDevName(fullName) {
 const TASK_STATUS_KEYS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const MERGE_STATUS_META = {
-  TODO: { name: 'To Do', color: '#FB8C00' },
+  TODO: { name: 'To Do', color: '#FFC107' },
   IN_PROGRESS: { name: 'In Progress', color: '#1E88E5' },
   IN_REVIEW: { name: 'In Review', color: '#8E24AA' },
   DONE: { name: 'Completed', color: '#3949AB' },
@@ -680,9 +700,7 @@ export function buildBlockedReportsForAiSprint(sp) {
       out.push({
         reportedByDeveloperName,
         taskId: Number.isFinite(taskId) ? taskId : null,
-        taskTitle: String(
-          t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : ''),
-        ).trim(),
+        taskTitle: String(t?.title || (Number.isFinite(taskId) ? `Task #${taskId}` : '')).trim(),
         blockedReason: String(t?.blockedReason || '').trim(),
       });
     });
@@ -863,24 +881,6 @@ export function buildCompareDeveloperChartsModel(selectedSprints) {
   const comboRows = [...baseRows].sort((a, b) => sumComboTasks(b) - sumComboTasks(a));
 
   return { sprintDefs, workloadRows, hoursRows, comboRows };
-}
-
-export function buildSprintInsights(selectedSprints) {
-  if (selectedSprints.length < 2) return [];
-  const insights = [];
-  const byProd = [...selectedSprints].sort(
-    (a, b) => b.kpis.productivityScore - a.kpis.productivityScore,
-  );
-  insights.push(
-    `${byProd[0].name} registered the highest productivity score (${byProd[0].kpis.productivityScore}).`,
-  );
-  const byCompletion = [...selectedSprints].sort(
-    (a, b) => b.kpis.completionRate - a.kpis.completionRate,
-  );
-  insights.push(
-    `Best task completion rate: ${byCompletion[0].shortLabel} at ${byCompletion[0].kpis.completionRate}%.`,
-  );
-  return [...new Set(insights)].slice(0, 5);
 }
 
 export const DEVELOPER_DISPLAY_NAME = {};

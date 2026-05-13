@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { Box } from '@mui/material';
 
 export const VirtualizedList = ({ items, renderItem, itemHeight, containerHeight }) => {
@@ -6,10 +6,7 @@ export const VirtualizedList = ({ items, renderItem, itemHeight, containerHeight
   const containerRef = useRef();
 
   const startIndex = Math.floor(scrollTop / itemHeight);
-  const endIndex = Math.min(
-    startIndex + Math.ceil(containerHeight / itemHeight) + 1,
-    items.length
-  );
+  const endIndex = Math.min(startIndex + Math.ceil(containerHeight / itemHeight) + 1, items.length);
   const visibleItems = items.slice(startIndex, endIndex);
   const offsetY = startIndex * itemHeight;
 

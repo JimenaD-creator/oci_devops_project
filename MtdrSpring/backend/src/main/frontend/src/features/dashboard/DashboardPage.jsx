@@ -30,6 +30,7 @@ import {
   sprintDbIdSortKey,
   buildBlockedTaskNotificationItems,
   formatBlockedSinceAge,
+  SPRINT_CHART_COLORS,
 } from './dashboardSprintData';
 import {
   DASHBOARD_CONTENT_MAX_WIDTH,
@@ -38,6 +39,7 @@ import {
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { fetchProjectById } from './projectApi';
 
 export default function DashboardPage({ projectId: propProjectId }) {
@@ -51,28 +53,15 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
-  useEffect(() => {
+  const loadProjectInfo = useCallback(async () => {
     if (!projectId) return;
-    loadProjectInfo();
-    handleRefresh();
-  }, [projectId]);
-
-  useEffect(() => {
-    setSeenBlockedKeysCsv('');
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) setSprintsLoading(false);
-  }, [projectId]);
-
-  const loadProjectInfo = async () => {
     try {
       const project = await fetchProjectById(projectId);
       if (project) setCurrentProject(project);
     } catch (err) {
       console.error('Error loading project:', err);
     }
-  };
+  }, [projectId]);
 
   const handleRefresh = useCallback(() => {
     setSprintsLoading(true);
@@ -88,6 +77,20 @@ export default function DashboardPage({ projectId: propProjectId }) {
         });
       })
       .finally(() => setSprintsLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    loadProjectInfo();
+    handleRefresh();
+  }, [projectId, loadProjectInfo, handleRefresh]);
+
+  useEffect(() => {
+    setSeenBlockedKeysCsv('');
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) setSprintsLoading(false);
   }, [projectId]);
 
   const normalizedSelectedIds = useMemo(() => {
@@ -108,7 +111,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
     const uniqueRaw = [...new Set(raw)];
     const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw
+      .slice()
+      .sort((a, b) => a - b)
+      .join(',');
     const hasDuplicateEntries = raw.length !== uniqueRaw.length;
     const needsPrune = uniqSorted !== normSorted;
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
@@ -266,7 +272,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
   if (sprintsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: '#C74634' }} />
+        <CircularProgress sx={{ color: ORACLE_RED_ACTION }} />
       </Box>
     );
   }
@@ -316,15 +322,49 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 Dashboard – {projectName}
               </Typography>
               {sprintDateLabel ? (
-                <Typography variant="body2" sx={{ color: '#666', fontWeight: 600, mt: 0.75 }}>
-                  {compareMode ? 'Sprint dates: ' : 'Sprint Date: '}
-                  {sprintDateLabel}
+                <Typography variant="body2" sx={{ mt: 0.75, fontWeight: 600 }}>
+                  {compareMode ? (
+                    <>
+                      <Box component="span" sx={{ color: '#666' }}>
+                        Sprint dates:{' '}
+                      </Box>
+                      <Box component="span" sx={{ color: '#424242' }}>
+                        {sprintDateLabel}
+                      </Box>
+                    </>
+                  ) : (
+                    <>
+                      <Box component="span" sx={{ color: '#666' }}>
+                        Sprint Date:{' '}
+                      </Box>
+                      {primarySprint?.name ? (
+                        <Box component="span" sx={{ color: '#666', fontWeight: 700 }}>
+                          {primarySprint.name}
+                        </Box>
+                      ) : null}
+                      <Box component="span" sx={{ color: '#666' }}>
+                        {primarySprint?.name ? ` · ${sprintDateLabel}` : sprintDateLabel}
+                      </Box>
+                    </>
+                  )}
                 </Typography>
               ) : (
-                <Typography variant="body2" sx={{ color: '#666', fontWeight: 500, mt: 0.5 }}>
-                  {compareMode
-                    ? 'Multi-sprint comparison'
-                    : `${primarySprint?.name ?? 'Sprint'} overview`}
+                <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 500 }}>
+                  {compareMode ? (
+                    <Box component="span" sx={{ color: '#666' }}>
+                      Multi-sprint comparison
+                    </Box>
+                  ) : (
+                    <>
+                      <Box component="span" sx={{ color: '#666', fontWeight: 700 }}>
+                        {primarySprint?.name ?? 'Sprint'}
+                      </Box>
+                      <Box component="span" sx={{ color: '#666' }}>
+                        {' '}
+                        overview
+                      </Box>
+                    </>
+                  )}
                 </Typography>
               )}
             </Box>
@@ -384,7 +424,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
               }}
             >
               <Box sx={{ p: 2, maxHeight: 400, overflowY: 'auto' }}>
-                <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', mb: 1.25 }}>
+                <Typography
+                  sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', mb: 1.25 }}
+                >
                   Task block reports
                 </Typography>
                 {!hasBlockedNotifications ? (
@@ -407,14 +449,25 @@ export default function DashboardPage({ projectId: propProjectId }) {
                         <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#B71C1C' }}>
                           {n.developerName}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.84rem', color: '#1A1A1A', fontWeight: 700, mt: 0.35 }}>
+                        <Typography
+                          sx={{ fontSize: '0.84rem', color: '#1A1A1A', fontWeight: 700, mt: 0.35 }}
+                        >
                           {n.taskTitle}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: 600, mt: 0.25 }}>
+                        <Typography
+                          sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: 600, mt: 0.25 }}
+                        >
                           Blocked for: {formatBlockedSinceAge(n.blockedSince)}
                         </Typography>
                         {compareMode ? (
-                          <Typography sx={{ fontSize: '0.75rem', color: '#616161', mt: 0.25, fontWeight: 600 }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.75rem',
+                              color: '#616161',
+                              mt: 0.25,
+                              fontWeight: 600,
+                            }}
+                          >
                             {n.sprintLabel}
                           </Typography>
                         ) : null}
@@ -440,7 +493,11 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1A1A1A' }}>
-              {compareMode ? 'Multi-sprint comparison' : primarySprint?.name || 'Project Progress'}
+              {compareMode
+                ? 'Multi-sprint comparison'
+                : primarySprint?.name
+                  ? primarySprint.name
+                  : 'Project Progress'}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <GroupIcon sx={{ fontSize: 18, color: '#757575' }} />
@@ -508,7 +565,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
           </Typography>
           <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
             {allSprints.map((sp) => {
-              const sprintColor = sp.accentColor ?? '#607D8B';
+              const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[0];
               return (
                 <FormControlLabel
                   key={sp.id}
@@ -532,7 +589,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
                           flexShrink: 0,
                         }}
                       />
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1A1A1A' }}>
                         {sp.name}
                       </Typography>
                     </Box>
@@ -570,7 +627,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
             >
               <Typography
                 component="h2"
-                sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                sx={{
+                  ...SECTION_TITLE_SX,
+                  color: '#1A1A1A',
+                  mb: 0.5,
+                  textAlign: 'left',
+                  width: '100%',
+                }}
               >
                 Scorecards
               </Typography>
@@ -606,7 +669,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
               >
                 <Typography
                   component="h2"
-                  sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 0.5, textAlign: 'left', width: '100%' }}
+                  sx={{
+                    ...SECTION_TITLE_SX,
+                    color: '#1A1A1A',
+                    mb: 0.5,
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
                 >
                   Project status
                 </Typography>

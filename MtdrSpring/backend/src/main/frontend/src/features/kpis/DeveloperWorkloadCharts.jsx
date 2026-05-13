@@ -111,6 +111,25 @@ function sprintFieldKey(sp, suffix) {
   return `sp${sp.id}_${suffix}`;
 }
 
+function resolveUniqueTeamTotals(sp, uniqueTeamTotalsBySprintId) {
+  if (!uniqueTeamTotalsBySprintId || sp == null || sp.id == null) return null;
+  const id = sp.id;
+  const raw =
+    uniqueTeamTotalsBySprintId[id] ??
+    uniqueTeamTotalsBySprintId[String(id)] ??
+    uniqueTeamTotalsBySprintId[Number(id)];
+  if (
+    !raw ||
+    typeof raw.assigned !== 'number' ||
+    typeof raw.completed !== 'number' ||
+    Number.isNaN(raw.assigned) ||
+    Number.isNaN(raw.completed)
+  ) {
+    return null;
+  }
+  return raw;
+}
+
 /**
  * Per developer: hours worked vs estimated hours from task estimates.
  * Same bar pairing as “Tasks assigned vs completed” (lighter = planned, solid = worked).
@@ -130,35 +149,30 @@ function buildWorkedEstimatedHoursRows(selectedSprints) {
 }
 
 /**
- * With one sprint selected: one row comparing total tasks assigned vs total completed for that sprint.
- * With several sprints: one row per developer (same metric per sprint).
+ * One row per sprint: team totals for assigned vs completed (never per-developer comparison).
+ *
+ * @param {Record<string|number, { assigned: number, completed: number }>|undefined} uniqueTeamTotalsBySprintId
+ *        When set for a sprint, uses unique task counts (multi-assignee task counts once).
  */
-function buildAssignedCompletedRows(selectedSprints) {
-  if (selectedSprints.length === 1) {
-    const sp = selectedSprints[0];
+function buildAssignedCompletedRows(selectedSprints, uniqueTeamTotalsBySprintId) {
+  if (!selectedSprints?.length) return [];
+  return selectedSprints.map((sp) => {
+    const uniqueTotals = resolveUniqueTeamTotals(sp, uniqueTeamTotalsBySprintId);
     const devs = sp.developers || [];
-    const totalA = devs.reduce((a, d) => a + (d.assigned ?? 0), 0);
-    const totalC = devs.reduce((a, d) => a + (d.completed ?? 0), 0);
-    return [
-      {
-        name: 'Total',
-        _full: 'team',
-        [sprintFieldKey(sp, 'a')]: totalA,
-        [sprintFieldKey(sp, 'c')]: totalC,
-      },
-    ];
-  }
-
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
-    const row = { name: shortDevName(name), _full: name };
-    selectedSprints.forEach((sp) => {
-      const dev = sp.developers.find((d) => d.name === name);
-      row[sprintFieldKey(sp, 'a')] = dev ? (dev.assigned ?? 0) : 0;
-      row[sprintFieldKey(sp, 'c')] = dev ? dev.completed : 0;
-    });
-    return row;
+    const totalA = uniqueTotals
+      ? uniqueTotals.assigned
+      : devs.reduce((a, d) => a + (d.assigned ?? 0), 0);
+    const totalC = uniqueTotals
+      ? uniqueTotals.completed
+      : devs.reduce((a, d) => a + (d.completed ?? 0), 0);
+    const label =
+      sp.shortLabel || (typeof sp.name === 'string' && sp.name.trim()) || `Sprint ${sp.id}`;
+    return {
+      name: label,
+      _full: `sprint-${sp.id}`,
+      [sprintFieldKey(sp, 'a')]: totalA,
+      [sprintFieldKey(sp, 'c')]: totalC,
+    };
   });
 }
 
@@ -223,9 +237,13 @@ function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
 
 export default function DeveloperWorkloadCharts({
   selectedSprints = [],
-  compareMode = false,
   /** If false, hides the hours bar chart (e.g. when that view is already on the dashboard). */
   showHoursChart = true,
+  /**
+   * Per sprint id: unique task totals for the team row (assigned / completed).
+   * Use when per-developer counts double-count shared tasks.
+   */
+  uniqueTeamTotalsBySprintId,
   /** Optional custom height for assigned vs completed chart. */
   assignedCompletedHeight,
   /** Optional max width for assigned vs completed chart container. */
@@ -242,7 +260,7 @@ export default function DeveloperWorkloadCharts({
       };
     }
 
-    const combinedData = buildAssignedCompletedRows(selectedSprints);
+    const combinedData = buildAssignedCompletedRows(selectedSprints, uniqueTeamTotalsBySprintId);
     const workedEstimatedRows = buildWorkedEstimatedHoursRows(selectedSprints);
     const hasCompleted = combinedData.some((r) =>
       selectedSprints.some((sp) => (r[sprintFieldKey(sp, 'c')] || 0) > 0),
@@ -261,16 +279,17 @@ export default function DeveloperWorkloadCharts({
     );
     const n = devNames.size;
 
+    const hasAssignedCompletedChart = hasCompleted || hasAssigned;
     const hasData = showHoursChart
       ? n > 0 && (hasCompleted || hasHours || hasAssigned)
-      : n > 0 && (hasCompleted || hasAssigned);
+      : hasAssignedCompletedChart;
 
     return {
       combinedAssignedCompletedRows: combinedData,
       workedEstimatedRows,
       hasData,
     };
-  }, [selectedSprints, showHoursChart]);
+  }, [selectedSprints, showHoursChart, uniqueTeamTotalsBySprintId]);
 
   const hoursWorkedChartHeight = useMemo(() => {
     if (!workedEstimatedRows?.length || !selectedSprints?.length) return CHART_H;
@@ -301,7 +320,7 @@ export default function DeveloperWorkloadCharts({
         }}
       >
         <Typography sx={{ color: 'text.secondary', fontSize: '1rem' }}>
-          No developer breakdown for the selected sprints (add task assignments to see data).
+          No task assignment data for the selected sprint(s).
         </Typography>
       </Box>
     );
@@ -323,57 +342,59 @@ export default function DeveloperWorkloadCharts({
     >
       <Stack spacing={2} sx={{ width: '100%', minWidth: 0 }}>
         {showAssignedCompleted ? (
-          <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ? assignedCompletedMaxWidth + 120 : '100%', mx: 'auto' }}>
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: assignedCompletedMaxWidth ? assignedCompletedMaxWidth + 120 : '100%',
+              mx: 'auto',
+            }}
+          >
             <ChartCard
-              title={
-                compareMode
-                  ? 'Tasks assigned vs completed (by developer)'
-                  : 'Tasks assigned vs completed'
-              }
+              title="Tasks assigned vs completed"
               iconElement={<AssignmentOutlinedIcon sx={{ color: '#C74634', fontSize: 26 }} />}
             >
               <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                 <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ?? '100%' }}>
                   <ChartPlot height={assignedCompletedHeight ?? CHART_H}>
-                  <BarChart
-                    data={combinedAssignedCompletedRows}
-                    margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
-                    barGap={2}
-                    barCategoryGap={compareMode ? '20%' : '22%'}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                    <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
-                    <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} width={40} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(v, name) => {
-                        const isA = String(name).includes('Assigned');
-                        return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
-                      }}
-                    />
-                    <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
-                    {selectedSprints.map((sp) => {
-                      const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
-                      return (
-                        <React.Fragment key={sp.id}>
-                          <Bar
-                            dataKey={sprintFieldKey(sp, 'a')}
-                            name={`${sp.shortLabel} · Assigned`}
-                            fill={hexToRgba(accent, 0.55)}
-                            radius={[4, 4, 0, 0]}
-                        maxBarSize={34}
-                          />
-                          <Bar
-                            dataKey={sprintFieldKey(sp, 'c')}
-                            name={`${sp.shortLabel} · Completed`}
-                            fill={accent}
-                            radius={[4, 4, 0, 0]}
-                        maxBarSize={34}
-                          />
-                        </React.Fragment>
-                      );
-                    })}
-                  </BarChart>
+                    <BarChart
+                      data={combinedAssignedCompletedRows}
+                      margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
+                      barGap={2}
+                      barCategoryGap="22%"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                      <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
+                      <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} width={40} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(v, name) => {
+                          const isA = String(name).includes('Assigned');
+                          return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
+                        }}
+                      />
+                      <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
+                      {selectedSprints.map((sp) => {
+                        const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
+                        return (
+                          <React.Fragment key={sp.id}>
+                            <Bar
+                              dataKey={sprintFieldKey(sp, 'a')}
+                              name={`${sp.shortLabel} · Assigned`}
+                              fill={hexToRgba(accent, 0.55)}
+                              radius={[4, 4, 0, 0]}
+                              maxBarSize={34}
+                            />
+                            <Bar
+                              dataKey={sprintFieldKey(sp, 'c')}
+                              name={`${sp.shortLabel} · Completed`}
+                              fill={accent}
+                              radius={[4, 4, 0, 0]}
+                              maxBarSize={34}
+                            />
+                          </React.Fragment>
+                        );
+                      })}
+                    </BarChart>
                   </ChartPlot>
                 </Box>
               </Box>

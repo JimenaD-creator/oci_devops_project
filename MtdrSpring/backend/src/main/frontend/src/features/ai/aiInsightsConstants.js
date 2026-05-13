@@ -54,6 +54,87 @@ export function alignAlertMessagePercent(prose, rawValue) {
   return String(prose).split(`${raw}%`).join(`${clamped}%`);
 }
 
+/**
+ * Clamp percentage-like values in executive Trends prose to [0, 100].
+ * Handles explicit percentages (e.g., "117%") and phrases like "score of 102.2".
+ */
+export function clampTrendsPercentLikeValues(text) {
+  if (text == null) return text;
+  let out = String(text);
+  const clamp = (n) => Math.max(0, Math.min(100, n));
+  const toDisplay = (n) => {
+    const c = clamp(Number(n));
+    return Number.isInteger(c) ? `${c}` : `${c.toFixed(1)}`;
+  };
+
+  out = out.replace(/(-?\d+(?:\.\d+)?)%/g, (m, raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return m;
+    const c = clamp(n);
+    return c === n ? m : `${toDisplay(n)}%`;
+  });
+
+  out = out.replace(/(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)/gi, (m, prefix, raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return m;
+    const c = clamp(n);
+    return c === n ? m : `${prefix}${toDisplay(n)}`;
+  });
+
+  return out;
+}
+
+/**
+ * Align "productivity score" phrases in Trends to the selected sprint's real score.
+ * Example: "score of 100" -> "score of 97" when actual score is 97.
+ */
+export function alignTrendsProductivityScore(text, actualScore) {
+  if (text == null || actualScore == null) return text;
+  const n = Number(actualScore);
+  if (!Number.isFinite(n)) return text;
+  const clampedActual = Math.max(0, Math.min(100, n));
+  const display = Number.isInteger(clampedActual)
+    ? `${clampedActual}%`
+    : `${clampedActual.toFixed(1)}%`;
+  const source = String(text);
+  const explicit = source.replace(
+    /(productivity\s+score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+    `$1${display}`,
+  );
+  if (explicit !== source) return explicit;
+  // Fallback for common wording: "Productivity remains high with a score of 100"
+  if (/productiv/i.test(source)) {
+    return source.replace(/(\bscore\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/i, `$1${display}`);
+  }
+  return source;
+}
+
+function formatKpiMetricValue(rawValue) {
+  const n = Number(rawValue);
+  if (!Number.isFinite(n)) return rawValue;
+  const clamped = Math.max(0, Math.min(100, n));
+  return `${Math.round(clamped)}%`;
+}
+
+const KPI_METRIC_PATTERNS = {
+  completionRate: /(completion\s*rate\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  onTimeDelivery: /(on[- ]time\s*delivery\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  teamParticipation: /(team\s*participation\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  workloadBalance: /(workload\s*balance\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  productivityScore: /(productivity\s*score\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+};
+
+export function alignKpiMetricsInText(text, metrics = {}) {
+  if (text == null || typeof text !== 'string') return text;
+  let result = String(text);
+  Object.entries(KPI_METRIC_PATTERNS).forEach(([key, pattern]) => {
+    const actual = metrics[key];
+    if (actual == null) return;
+    result = result.replace(pattern, (_, prefix) => `${prefix}${formatKpiMetricValue(actual)}`);
+  });
+  return result;
+}
+
 /** Gemini `actionableRecommendations[].category` → UI label */
 export const RECOMMENDATION_CATEGORY_LABELS = {
   workload_redistribution: 'Workload redistribution',
@@ -65,7 +146,8 @@ export const RECOMMENDATION_CATEGORY_LABELS = {
 
 /** Shown when a sprint insight section has no AI content yet */
 export const AI_INSIGHTS_EMPTY = {
-  recommendations: 'No recommendations for this sprint yet. Generate insights to populate this list.',
+  recommendations:
+    'No recommendations for this sprint yet. Generate insights to populate this list.',
   executive:
     'No executive summary yet. Generate insights to see overview, trends, improvement areas, and next steps.',
   developers:

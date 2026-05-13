@@ -12,11 +12,12 @@ import {
 } from '@mui/material';
 import { Sparkles } from 'lucide-react';
 import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
+import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
 
-export default function AIInsightsPage({ projectId }) {
+export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -61,18 +62,76 @@ export default function AIInsightsPage({ projectId }) {
         setSelectedSprintId((prev) => {
           if (filtered.length === 0) return null;
           if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
-          const active = filtered.find((s) => {
-            const now = new Date();
-            return now >= new Date(s.startDate) && now <= new Date(s.dueDate);
-          });
-          return active?.id ?? filtered[filtered.length - 1]?.id ?? null;
+          const defaultSprint = pickDefaultSelectedSprint(filtered);
+          return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
         });
       })
       .catch(() => setSprints([]))
       .finally(() => setLoading(false));
   }, [projectId, refreshToken]);
 
+  useEffect(() => {
+    if (sprints.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('aiInsightsLandingSprintId');
+      if (raw == null || String(raw).trim() === '') return;
+      const id = Number(raw);
+      if (!Number.isFinite(id)) {
+        sessionStorage.removeItem('aiInsightsLandingSprintId');
+        return;
+      }
+      if (!sprints.some((s) => Number(s.id) === id)) {
+        sessionStorage.removeItem('aiInsightsLandingSprintId');
+        return;
+      }
+      sessionStorage.removeItem('aiInsightsLandingSprintId');
+      setSelectedSprintId(id);
+    } catch {
+      sessionStorage.removeItem('aiInsightsLandingSprintId');
+    }
+  }, [sprints]);
+
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
+
+  const normalizeKpiPercent = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(100, Math.max(0, n));
+  };
+
+  // Keep AI Trends aligned with KPI Analytics formula (must be declared before currentSprintKpiMetrics).
+  const productivityFromSprintWork = (sprint) => {
+    if (!sprint) return null;
+    const completionRate = Math.min(100, Math.max(0, Number(sprint?.kpis?.completionRate) || 0));
+    const onTimeDelivery = Math.min(100, Math.max(0, Number(sprint?.kpis?.onTimeDelivery) || 0));
+    const teamParticipation = Math.min(
+      100,
+      Math.max(0, Number(sprint?.kpis?.teamParticipation) || 0),
+    );
+    const rawWb = Number(sprint?.kpis?.workloadBalance);
+    const workloadBalance = Number.isFinite(rawWb)
+      ? Math.min(100, Math.max(0, Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)))
+      : 0;
+    const score = Math.round(
+      completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1,
+    );
+    return Math.min(100, Math.max(0, score));
+  };
+
+  const currentSprintKpiMetrics = selectedSprint
+    ? {
+        completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
+        onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
+        teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
+        workloadBalance: (() => {
+          const rawWb = Number(selectedSprint.kpis?.workloadBalance);
+          if (!Number.isFinite(rawWb)) return 0;
+          const wb = rawWb <= 1 ? rawWb * 100 : rawWb;
+          return Math.min(100, Math.max(0, Math.round(wb)));
+        })(),
+        productivityScore: productivityFromSprintWork(selectedSprint),
+      }
+    : null;
 
   /** Sprints sorted chronologically for "next sprint" comparisons. */
   const sortedSprints = useMemo(() => {
@@ -147,13 +206,18 @@ export default function AIInsightsPage({ projectId }) {
             </Typography>
           </Box>
           <Typography variant="body1" sx={{ color: '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
-            Gemini-powered sprint analysis: alerts, recommendations, summary, per-developer insights, and predictions.
-            Blocked assignments (assignee, task, reason) appear when present and are included when you generate
-            insights.
+            Gemini-powered sprint analysis: alerts, recommendations, summary, and predictions.
           </Typography>
         </Box>
         {sprints.length > 0 && (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', minWidth: { xs: '100%', sm: 220 } }}>
+          <Box
+            sx={{
+              ml: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              minWidth: { xs: '100%', sm: 220 },
+            }}
+          >
             <FormControl
               size="small"
               sx={{
@@ -219,8 +283,11 @@ export default function AIInsightsPage({ projectId }) {
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
           nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
-          nextSprintActualScore={nextSprintForSelected?.kpis?.productivityScore ?? null}
+          nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
+          currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
+          currentSprintMetrics={currentSprintKpiMetrics}
           refreshToken={refreshToken}
+          onOpenTeam={onOpenTeam}
         />
       )}
     </Box>

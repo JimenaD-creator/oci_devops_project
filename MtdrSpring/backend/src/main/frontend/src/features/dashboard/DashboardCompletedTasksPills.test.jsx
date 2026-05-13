@@ -17,7 +17,7 @@ describe('DashboardCompletedTasksPills', () => {
           pillTestId="dashboard-header-tasks-completed"
           compareBySprint={[
             { id: 1, shortLabel: 'S1', completed: 2, accentColor: '#1565C0' },
-            { id: 2, shortLabel: 'S2', completed: 5, accentColor: '#C62828' },
+            { id: 2, shortLabel: 'S2', completed: 5, accentColor: '#26A69A' },
           ]}
         />,
       );

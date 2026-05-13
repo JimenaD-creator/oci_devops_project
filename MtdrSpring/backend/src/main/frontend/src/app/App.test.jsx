@@ -45,16 +45,24 @@ vi.mock('../features/ai/AIInsightsPage', () => ({
   default: () => <div data-testid="mock-ai">AI</div>,
 }));
 
+vi.mock('../features/team/TeamPage', () => ({
+  __esModule: true,
+  default: () => <div data-testid="mock-team">Team</div>,
+}));
+
 vi.mock('../features/project/ProjectSelector', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-project-selector">Project selector</div>,
 }));
 
-function seedUserAndProject({ role, userId = '1', name = 'Test User', projectId = '99', projectName = 'Acme' }) {
-  localStorage.setItem(
-    'currentUser',
-    JSON.stringify({ id: userId, name, role }),
-  );
+function seedUserAndProject({
+  role,
+  userId = '1',
+  name = 'Test User',
+  projectId = '99',
+  projectName = 'Acme',
+}) {
+  localStorage.setItem('currentUser', JSON.stringify({ id: userId, name, role }));
   localStorage.setItem('currentProjectId', String(projectId));
   localStorage.setItem('currentProjectName', projectName);
 }

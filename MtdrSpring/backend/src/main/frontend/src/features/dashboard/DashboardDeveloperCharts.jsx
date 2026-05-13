@@ -37,6 +37,7 @@ import {
   HOURS_FILL,
   HOURS_LINE,
   HOURS_ASSIGNED,
+  HOURS_ASSIGNED_LABEL,
   STACK_DONE,
   STACK_PENDING,
   GRID,
@@ -66,7 +67,7 @@ function HorizontalBarEndLabel({
   width,
   height,
   value,
-  fill = '#455A64',
+  fill = '#1A1A1A',
   formatter = (v) => String(v ?? ''),
 }) {
   const n = Number(value ?? 0);
@@ -95,7 +96,7 @@ function HoursValueLabel(props) {
       width={width}
       height={height}
       value={value}
-      fill={fill || '#455A64'}
+      fill={fill || '#1A1A1A'}
       formatter={(v) => (withHoursSuffix ? `${Number(v).toFixed(1)}h` : `${Number(v).toFixed(1)}`)}
     />
   );
@@ -108,11 +109,23 @@ function resolveLabelRow(value, index, rows) {
 }
 
 function SingleWorkloadCompletedOutsideLabel(props) {
-  const { x, y, width, height, value, index, segment = 'pending', fill = '#3949AB', rows } = props || {};
+  const {
+    x,
+    y,
+    width,
+    height,
+    value,
+    index,
+    segment = 'pending',
+    fill = '#3949AB',
+    rows,
+  } = props || {};
   /** Prefer `value` = row when using `valueAccessor`; else `rows[index]` (index can diverge from data when bars are filtered). */
   const row = resolveLabelRow(value, index, rows);
   const pending = Number(row?.pending ?? 0);
-  const completed = Number(row?.completed ?? (typeof value === 'number' || typeof value === 'string' ? value : 0) ?? 0);
+  const completed = Number(
+    row?.completed ?? (typeof value === 'number' || typeof value === 'string' ? value : 0) ?? 0,
+  );
   if (!Number.isFinite(completed) || completed < 0) return null;
   const onPending = pending > 0;
   if ((onPending && segment !== 'pending') || (!onPending && segment !== 'completed')) return null;
@@ -135,11 +148,24 @@ function SingleWorkloadCompletedOutsideLabel(props) {
 }
 
 function CompareWorkloadCompletedOutsideLabel(props) {
-  const { x, y, width, height, value, index, sprintId, segment = 'pending', fill = '#3949AB', rows } = props || {};
+  const {
+    x,
+    y,
+    width,
+    height,
+    value,
+    index,
+    sprintId,
+    segment = 'pending',
+    fill = '#3949AB',
+    rows,
+  } = props || {};
   const row = resolveLabelRow(value, index, rows);
   const pending = Number(row?.[`wo_${sprintId}`] ?? 0);
   const completed = Number(
-    row?.[`wc_${sprintId}`] ?? (typeof value === 'number' || typeof value === 'string' ? value : 0) ?? 0,
+    row?.[`wc_${sprintId}`] ??
+      (typeof value === 'number' || typeof value === 'string' ? value : 0) ??
+      0,
   );
   if (!Number.isFinite(completed) || completed < 0) return null;
   const onPending = pending > 0;
@@ -208,7 +234,9 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
             <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
               {sp.shortLabel}
             </Typography>
-            <Typography sx={{ color: sp.accentColor, fontSize: '0.84rem', mt: 0.35, fontWeight: 600 }}>
+            <Typography
+              sx={{ color: sp.accentColor, fontSize: '0.84rem', mt: 0.35, fontWeight: 600 }}
+            >
               Completed: {completed} · Pending: {pending} · Assigned: {assigned}
             </Typography>
           </Box>
@@ -252,7 +280,7 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
             <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
               {sp.shortLabel}
             </Typography>
-            <Typography sx={{ color: '#546E7A', fontSize: '0.82rem', fontWeight: 600 }}>
+            <Typography sx={{ color: '#1A1A1A', fontSize: '0.82rem', fontWeight: 600 }}>
               Hours worked: {worked.toFixed(1)} h
             </Typography>
           </Box>
@@ -308,10 +336,24 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
               {sp.shortLabel}
             </Typography>
             <Box sx={{ mt: 0.35 }}>
-              <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: focused ? 700 : 600, lineHeight: 1.45 }}>
+              <Typography
+                sx={{
+                  fontSize: '0.82rem',
+                  color: '#1A1A1A',
+                  fontWeight: focused ? 700 : 600,
+                  lineHeight: 1.45,
+                }}
+              >
                 Completed tasks: {tasks}
               </Typography>
-              <Typography sx={{ fontSize: '0.82rem', color: '#546E7A', fontWeight: focused ? 700 : 600, lineHeight: 1.45 }}>
+              <Typography
+                sx={{
+                  fontSize: '0.82rem',
+                  color: '#1A1A1A',
+                  fontWeight: focused ? 700 : 600,
+                  lineHeight: 1.45,
+                }}
+              >
                 Hours: {hours.toFixed(1)} h
               </Typography>
             </Box>
@@ -327,14 +369,37 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
 // ---------------------------------------------------------------------------
 
 function CompareHoursBarLegend({ sprintDefs }) {
+  const multiSprint = (sprintDefs?.length ?? 0) > 1;
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.25, width: '100%', pb: 1.25 }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: { xs: 1.25, sm: 2 }, rowGap: 0.75 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <Box component="span" sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }} />
-          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Hours worked</Typography>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1.25,
+        width: '100%',
+        pb: 1.25,
+      }}
+    >
+      {!multiSprint ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: { xs: 1.25, sm: 2 },
+            rowGap: 0.75,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box
+              component="span"
+              sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }}
+            />
+            <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Hours worked</Typography>
+          </Box>
         </Box>
-      </Box>
+      ) : null}
       <CompareSprintLegend sprintDefs={sprintDefs} />
     </Box>
   );
@@ -358,12 +423,21 @@ function CompareSprintLegend({ sprintDefs, dense, manySprints }) {
     >
       {sprintDefs.map((sp) => (
         <Box key={sp.id} sx={{ display: 'flex', alignItems: 'center', gap: squeeze ? 0.5 : 0.75 }}>
-          <Box component="span" sx={{ width: chip, height: chip, borderRadius: 0.5, bgcolor: sp.accentColor, flexShrink: 0 }} />
+          <Box
+            component="span"
+            sx={{
+              width: chip,
+              height: chip,
+              borderRadius: 0.5,
+              bgcolor: sp.accentColor,
+              flexShrink: 0,
+            }}
+          />
           <Typography
             component="span"
             sx={{
               ...CHART_LEGEND_ITEM_SX,
-              color: '#546E7A',
+              color: '#1A1A1A',
               fontSize: squeeze ? { xs: '0.75rem', sm: '0.8125rem' } : undefined,
               lineHeight: 1.25,
             }}
@@ -410,17 +484,53 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box
             component="span"
-            sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: c, flexShrink: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}
+            sx={{
+              width: 14,
+              height: 14,
+              borderRadius: 0.5,
+              bgcolor: c,
+              flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+            }}
           />
-          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontWeight: 700, fontSize: donePendingFont }}>Completed (solid)</Typography>
+          <Typography
+            sx={{
+              ...CHART_LEGEND_ITEM_SX,
+              color: '#1A1A1A',
+              fontWeight: 700,
+              fontSize: donePendingFont,
+            }}
+          >
+            Completed (solid)
+          </Typography>
         </Box>
-        <Typography sx={{ color: '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}>·</Typography>
+        <Typography
+          sx={{ color: '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}
+        >
+          ·
+        </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box
             component="span"
-            sx={{ width: 14, height: 14, borderRadius: 0.5, bgcolor: pendingTint, flexShrink: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}
+            sx={{
+              width: 14,
+              height: 14,
+              borderRadius: 0.5,
+              bgcolor: pendingTint,
+              flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+            }}
           />
-          <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A', fontWeight: 700, fontSize: donePendingFont }}>Pending (lighter)</Typography>
+          <Typography
+            sx={{
+              ...CHART_LEGEND_ITEM_SX,
+              color: '#1A1A1A',
+              fontWeight: 700,
+              fontSize: donePendingFont,
+            }}
+          >
+            Pending (lighter)
+          </Typography>
         </Box>
       </Box>
       <Box sx={{ mt: { xs: 1.3, sm: 1.55 }, '& .MuiTypography-root': { lineHeight: 1.2 } }}>
@@ -459,16 +569,42 @@ function CompareComboLegend({ sprintDefs }) {
             boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
           }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#455A64', fontWeight: 700, fontSize: labelSize }}>
+        <Typography
+          sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A', fontWeight: 700, fontSize: labelSize }}
+        >
           Bars = completed tasks (left)
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.65 }}>
         <Box sx={{ position: 'relative', width: many ? 26 : 28, height: 12, flexShrink: 0 }}>
-          <Box sx={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 3, mt: '-1.5px', borderRadius: 1, bgcolor: HOURS_LINE }} />
-          <Box sx={{ position: 'absolute', right: 0, top: '50%', width: many ? 7 : 8, height: many ? 7 : 8, mt: many ? '-3.5px' : '-4px', borderRadius: '50%', bgcolor: HOURS_LINE }} />
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '50%',
+              height: 3,
+              mt: '-1.5px',
+              borderRadius: 1,
+              bgcolor: HOURS_LINE,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              right: 0,
+              top: '50%',
+              width: many ? 7 : 8,
+              height: many ? 7 : 8,
+              mt: many ? '-3.5px' : '-4px',
+              borderRadius: '50%',
+              bgcolor: HOURS_LINE,
+            }}
+          />
         </Box>
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#455A64', fontWeight: 700, fontSize: labelSize }}>
+        <Typography
+          sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A', fontWeight: 700, fontSize: labelSize }}
+        >
           Line = hours (right)
         </Typography>
       </Box>
@@ -476,16 +612,33 @@ function CompareComboLegend({ sprintDefs }) {
   );
 
   const dividerSm = (
-    <Box sx={{ display: { xs: 'none', sm: 'block' }, width: 1, height: 22, bgcolor: '#DCE3EA', flexShrink: 0, alignSelf: 'center' }} />
+    <Box
+      sx={{
+        display: { xs: 'none', sm: 'block' },
+        width: 1,
+        height: 22,
+        bgcolor: '#DCE3EA',
+        flexShrink: 0,
+        alignSelf: 'center',
+      }}
+    />
   );
 
   const sprintStrip = <CompareSprintLegend sprintDefs={sprintDefs} dense manySprints={many} />;
 
   if (splitRows) {
     return (
-      <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: { xs: 1, sm: 1.25 } }}>
+      <Box
+        sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: { xs: 1, sm: 1.25 } }}
+      >
         {seriesKeys}
-        <Box sx={{ width: '100%', borderTop: '1px solid rgba(15, 23, 42, 0.1)', pt: { xs: 1, sm: 1.25 } }}>
+        <Box
+          sx={{
+            width: '100%',
+            borderTop: '1px solid rgba(15, 23, 42, 0.1)',
+            pt: { xs: 1, sm: 1.25 },
+          }}
+        >
           {sprintStrip}
         </Box>
       </Box>
@@ -506,7 +659,17 @@ function CompareComboLegend({ sprintDefs }) {
     >
       {seriesKeys}
       {dividerSm}
-      <Typography sx={{ display: { xs: 'inline', sm: 'none' }, color: '#B0BEC5', fontWeight: 800, lineHeight: 1, px: 0.25 }}>·</Typography>
+      <Typography
+        sx={{
+          display: { xs: 'inline', sm: 'none' },
+          color: '#B0BEC5',
+          fontWeight: 800,
+          lineHeight: 1,
+          px: 0.25,
+        }}
+      >
+        ·
+      </Typography>
       {sprintStrip}
     </Box>
   );
@@ -514,14 +677,22 @@ function CompareComboLegend({ sprintDefs }) {
 
 function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = STACK_PENDING }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 3, pb: 1, pt: 0.5 }}>
+    <Box
+      sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 3, pb: 1, pt: 0.5 }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box component="span" sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: completedFill, flexShrink: 0 }} />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Completed tasks</Typography>
+        <Box
+          component="span"
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: completedFill, flexShrink: 0 }}
+        />
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Completed tasks</Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box component="span" sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: pendingFill, flexShrink: 0 }} />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Pending tasks</Typography>
+        <Box
+          component="span"
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: pendingFill, flexShrink: 0 }}
+        />
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Pending tasks</Typography>
       </Box>
     </Box>
   );
@@ -529,14 +700,33 @@ function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = 
 
 function SingleHoursSymbolLegend() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: { xs: 2, sm: 3 }, pb: 1, pt: 0.5 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        gap: { xs: 2, sm: 3 },
+        pb: 1,
+        pt: 0.5,
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box component="span" sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }} />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Hours worked (solid bar)</Typography>
+        <Box
+          component="span"
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }}
+        />
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>
+          Hours worked (solid bar)
+        </Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <Box component="span" sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_ASSIGNED, flexShrink: 0 }} />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#546E7A' }}>Estimated hours (lighter bar)</Typography>
+        <Box
+          component="span"
+          sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_ASSIGNED, flexShrink: 0 }}
+        />
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>
+          Estimated hours (lighter bar)
+        </Typography>
       </Box>
     </Box>
   );
@@ -553,17 +743,17 @@ function SingleHoursSymbolLegend() {
 function AIDeveloperVariationGrid({ rows, emptyText, loading, tone = 'default' }) {
   const palette =
     tone === 'workload'
-      ? { bg: '#FFF8F2', border: '#FFE2CC', name: '#8A3A08', text: '#6D4C41' }
+      ? { bg: '#FFF8F2', border: '#FFE2CC', name: '#8A3A08', text: '#263238' }
       : tone === 'hours'
-        ? { bg: '#F3F8FF', border: '#DCEAFF', name: '#0D47A1', text: '#455A64' }
+        ? { bg: '#F3F8FF', border: '#DCEAFF', name: '#0D47A1', text: '#1A1A1A' }
         : tone === 'productivity'
-          ? { bg: '#F4FBF7', border: '#D7F0E1', name: '#1B5E20', text: '#455A64' }
-          : { bg: '#F8FCFF', border: '#E6EEF5', name: '#1A1A1A', text: '#546E7A' };
+          ? { bg: '#F4FBF7', border: '#D7F0E1', name: '#1B5E20', text: '#1A1A1A' }
+          : { bg: '#F8FCFF', border: '#E6EEF5', name: '#1A1A1A', text: '#1A1A1A' };
   const cardPalettes =
     tone === 'workload'
       ? [
-          { bg: '#FFF1E8', border: '#FFB98E', stripe: '#E65100' },
-          { bg: '#FFEFF6', border: '#FF9FC5', stripe: '#C2185B' },
+          { bg: '#FFF1E8', border: '#FFB98E', stripe: '#00897B' },
+          { bg: '#F3E5F5', border: '#CE93D8', stripe: '#7B1FA2' },
           { bg: '#EEF3FF', border: '#9DB6FF', stripe: '#3949AB' },
           { bg: '#ECFAF6', border: '#89DCC1', stripe: '#00796B' },
           { bg: '#F9F5FF', border: '#BFA2FF', stripe: '#6A1B9A' },
@@ -594,7 +784,9 @@ function AIDeveloperVariationGrid({ rows, emptyText, loading, tone = 'default' }
   if (!rows?.length) {
     return (
       <Box sx={{ px: 0.5, pt: 0.5 }}>
-        <Typography sx={{ color: '#90A4AE', fontSize: '0.78rem', fontStyle: 'italic' }}>
+        <Typography
+          sx={{ color: '#1565C0', fontSize: '0.78rem', fontStyle: 'italic', fontWeight: 600 }}
+        >
           {loading ? 'Generating AI insights…' : emptyText}
         </Typography>
       </Box>
@@ -621,12 +813,14 @@ function AIDeveloperVariationGrid({ rows, emptyText, loading, tone = 'default' }
               borderLeft: `4px solid ${cardTone.stripe}`,
             }}
           >
-          <Typography sx={{ fontWeight: 700, color: cardTone.stripe, fontSize: '0.82rem', mb: 0.08 }}>
-            {r.name}
-          </Typography>
-          <Typography sx={{ color: palette.text, fontSize: '0.78rem', lineHeight: 1.3 }}>
-            {r.message}
-          </Typography>
+            <Typography
+              sx={{ fontWeight: 700, color: cardTone.stripe, fontSize: '0.82rem', mb: 0.08 }}
+            >
+              {r.name}
+            </Typography>
+            <Typography sx={{ color: palette.text, fontSize: '0.78rem', lineHeight: 1.3 }}>
+              {r.message}
+            </Typography>
           </Box>
         );
       })}
@@ -652,13 +846,22 @@ function ChartShell({
   footerTitle,
 }) {
   const chartRef = useRef(null);
-  const chartVisible = useInView(chartRef, { once: true, margin: '0px 0px -12% 0px', amount: 0.12 });
+  const chartVisible = useInView(chartRef, {
+    once: true,
+    margin: '0px 0px -12% 0px',
+    amount: 0.12,
+  });
   const a = accent ?? '#5C6BC0';
   const bg = tint ?? 'rgba(92, 107, 192, 0.06)';
   const chartBoxSx =
     typeof height === 'object' && height !== null
       ? { width: '100%', minWidth: 0, overflow: 'visible', height }
-      : { width: '100%', minWidth: 0, overflow: 'visible', height: typeof height === 'number' ? height : 400 };
+      : {
+          width: '100%',
+          minWidth: 0,
+          overflow: 'visible',
+          height: typeof height === 'number' ? height : 400,
+        };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
   const titleMb = description ? 0.5 : compact ? 1 : headerAdornment ? 1.25 : 1.5;
@@ -686,19 +889,40 @@ function ChartShell({
       }}
     >
       {/* Encabezado */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: titleMb }}>
-        <Typography sx={{ ...CHART_TITLE_SX, color: a, flex: 1, minWidth: 0, mb: 0, pr: headerAdornment ? 1 : 0 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 1.5,
+          mb: titleMb,
+        }}
+      >
+        <Typography
+          sx={{
+            ...CHART_TITLE_SX,
+            color: a,
+            flex: 1,
+            minWidth: 0,
+            mb: 0,
+            pr: headerAdornment ? 1 : 0,
+          }}
+        >
           {title}
         </Typography>
         {headerAdornment ? (
-          <Box sx={{ flexShrink: 0, pt: { xs: 0.1, sm: 0.25 }, maxWidth: { xs: '52%', sm: '46%' } }}>
+          <Box
+            sx={{ flexShrink: 0, pt: { xs: 0.1, sm: 0.25 }, maxWidth: { xs: '52%', sm: '46%' } }}
+          >
             {headerAdornment}
           </Box>
         ) : null}
       </Box>
 
       {description ? (
-        <Typography sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch' }}>{description}</Typography>
+        <Typography sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch' }}>
+          {description}
+        </Typography>
       ) : null}
 
       {belowDescription != null ? (
@@ -741,7 +965,7 @@ function ChartShell({
             sx={{
               fontWeight: 800,
               fontSize: '0.7rem',
-              color: '#607D8B',
+              color: '#00897B',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
               mb: 0.22,
@@ -793,7 +1017,8 @@ export default function DashboardDeveloperCharts({
   }, [orderedSelectedSprints]);
 
   const compareModel = useMemo(() => {
-    if (!compareMode || !orderedSelectedSprints?.length || orderedSelectedSprints.length < 2) return null;
+    if (!compareMode || !orderedSelectedSprints?.length || orderedSelectedSprints.length < 2)
+      return null;
     return buildCompareDeveloperChartsModel(orderedSelectedSprints);
   }, [compareMode, orderedSelectedSprints]);
 
@@ -840,7 +1065,13 @@ export default function DashboardDeveloperCharts({
         const insights = data?.insights ?? {};
         const productivity = Array.isArray(insights.productivity) ? insights.productivity : [];
         if (!cancelled) {
-          setAiProductivityRows(productivity.map((r, idx) => ({ key: r?.key || `dash-productivity-${idx}`, name: r?.developerName || 'Developer', message: r?.message || 'No AI explanation returned.' })));
+          setAiProductivityRows(
+            productivity.map((r, idx) => ({
+              key: r?.key || `dash-productivity-${idx}`,
+              name: r?.developerName || 'Developer',
+              message: r?.message || 'No AI explanation returned.',
+            })),
+          );
         }
       } catch (_e) {
         if (!cancelled) {
@@ -852,15 +1083,20 @@ export default function DashboardDeveloperCharts({
       }
     };
     run();
-    return () => { cancelled = true; controller.abort(); };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [compareMode, aiSprintPayload]);
 
   // ---- cálculos de ejes y alturas (sin cambios) ----
 
   const compareHoursAxis = useMemo(() => {
-    if (!compareModel?.hoursRows?.length || !compareModel?.sprintDefs?.length) return buildHoursAxisDomainTicks(0);
+    if (!compareModel?.hoursRows?.length || !compareModel?.sprintDefs?.length)
+      return buildHoursAxisDomainTicks(0);
     const maxWorked = compareModel.hoursRows.reduce(
-      (outerMax, row) => Math.max(outerMax, ...compareModel.sprintDefs.map((sp) => Number(row[`hw_${sp.id}`]) || 0)),
+      (outerMax, row) =>
+        Math.max(outerMax, ...compareModel.sprintDefs.map((sp) => Number(row[`hw_${sp.id}`]) || 0)),
       0,
     );
     return buildHoursAxisDomainTicks(maxWorked);
@@ -874,15 +1110,30 @@ export default function DashboardDeveloperCharts({
         const completed = Math.min(completedRaw, assigned);
         const pending = Math.max(0, assigned - completed);
         const pct = assigned > 0 ? Math.round((100 * completed) / assigned) : 0;
-        return { name: d.name, shortName: d.shortName ?? d.name, assigned, completed, pending, pctComplete: pct };
+        return {
+          name: d.name,
+          shortName: d.shortName ?? d.name,
+          assigned,
+          completed,
+          pending,
+          pctComplete: pct,
+        };
       })
       .sort((a, b) => b.assigned - a.assigned || String(a.name).localeCompare(String(b.name)));
   }, [developers]);
 
   const byHoursDesc = useMemo(() => {
     return [...developers]
-      .map((d) => ({ ...d, assignedHoursEstimate: Number(d.assignedHoursEstimate) || 0, hours: Number(d.hours) || 0 }))
-      .sort((a, b) => Math.max(b.hours ?? 0, b.assignedHoursEstimate ?? 0) - Math.max(a.hours ?? 0, a.assignedHoursEstimate ?? 0));
+      .map((d) => ({
+        ...d,
+        assignedHoursEstimate: Number(d.assignedHoursEstimate) || 0,
+        hours: Number(d.hours) || 0,
+      }))
+      .sort(
+        (a, b) =>
+          Math.max(b.hours ?? 0, b.assignedHoursEstimate ?? 0) -
+          Math.max(a.hours ?? 0, a.assignedHoursEstimate ?? 0),
+      );
   }, [developers]);
 
   const hoursGroupedRows = useMemo(() => {
@@ -890,8 +1141,19 @@ export default function DashboardDeveloperCharts({
       .map((d) => {
         const assigned = Number(d.assignedHoursEstimate) || 0;
         const worked = Number(d.hours) || 0;
-        const pct = assigned > 0 ? Math.min(100, Math.round((100 * worked) / assigned)) : worked > 0 ? 100 : 0;
-        return { name: d.name, shortName: d.shortName ?? d.name, hWorked: worked, hAssigned: assigned, pctOfPlan: pct };
+        const pct =
+          assigned > 0
+            ? Math.min(100, Math.round((100 * worked) / assigned))
+            : worked > 0
+              ? 100
+              : 0;
+        return {
+          name: d.name,
+          shortName: d.shortName ?? d.name,
+          hWorked: worked,
+          hAssigned: assigned,
+          pctOfPlan: pct,
+        };
       })
       .sort((a, b) => {
         const ta = Math.max(a.hWorked, a.hAssigned);
@@ -900,20 +1162,33 @@ export default function DashboardDeveloperCharts({
       });
   }, [byHoursDesc]);
 
-  const singleHoursAxis = useMemo(() => buildHoursAxisDomainTicks(maxSingleHoursGrouped(hoursGroupedRows)), [hoursGroupedRows]);
+  const singleHoursAxis = useMemo(
+    () => buildHoursAxisDomainTicks(maxSingleHoursGrouped(hoursGroupedRows)),
+    [hoursGroupedRows],
+  );
 
-  const forCombo = useMemo(() => [...developers].sort((a, b) => (b.completed ?? 0) - (a.completed ?? 0)), [developers]);
+  const forCombo = useMemo(
+    () => [...developers].sort((a, b) => (b.completed ?? 0) - (a.completed ?? 0)),
+    [developers],
+  );
 
   const singleComboRange = useMemo(() => maxSingleComboRange(forCombo), [forCombo]);
-  const comboExtraSingle = comboHeightExtraFromRange(singleComboRange.maxTasks, singleComboRange.maxHours);
+  const comboExtraSingle = comboHeightExtraFromRange(
+    singleComboRange.maxTasks,
+    singleComboRange.maxHours,
+  );
 
   const compareComboRange = useMemo(
-    () => compareModel?.comboRows?.length && compareModel?.sprintDefs?.length
-      ? maxCompareComboRange(compareModel.comboRows, compareModel.sprintDefs)
-      : { maxTasks: 0, maxHours: 0 },
+    () =>
+      compareModel?.comboRows?.length && compareModel?.sprintDefs?.length
+        ? maxCompareComboRange(compareModel.comboRows, compareModel.sprintDefs)
+        : { maxTasks: 0, maxHours: 0 },
     [compareModel],
   );
-  const comboExtraCompare = comboHeightExtraFromRange(compareComboRange.maxTasks, compareComboRange.maxHours);
+  const comboExtraCompare = comboHeightExtraFromRange(
+    compareComboRange.maxTasks,
+    compareComboRange.maxHours,
+  );
 
   const hasCompareData = compareModel && compareModel.workloadRows.length > 0;
   const hasSingleData = developers.length > 0;
@@ -923,38 +1198,90 @@ export default function DashboardDeveloperCharts({
     return sp?.accentColor ?? '#3949AB';
   }, [orderedSelectedSprints]);
 
-  const singleWorkloadTaskAxis = useMemo(() => buildTaskAxisDomainTicks(maxSingleWorkloadStack(workloadStack)), [workloadStack]);
+  const singleWorkloadTaskAxis = useMemo(
+    () => buildTaskAxisDomainTicks(maxSingleWorkloadStack(workloadStack)),
+    [workloadStack],
+  );
 
   const compareWorkloadTaskAxis = useMemo(() => {
-    if (!compareModel?.workloadRows?.length || !compareModel?.sprintDefs?.length) return buildTaskAxisDomainTicks(0);
-    return buildTaskAxisDomainTicks(maxCompareWorkloadStack(compareModel.workloadRows, compareModel.sprintDefs));
+    if (!compareModel?.workloadRows?.length || !compareModel?.sprintDefs?.length)
+      return buildTaskAxisDomainTicks(0);
+    return buildTaskAxisDomainTicks(
+      maxCompareWorkloadStack(compareModel.workloadRows, compareModel.sprintDefs),
+    );
   }, [compareModel]);
 
   const nSprints = compareModel?.sprintDefs?.length ?? 1;
   const WORKLOAD_COMPARE_LEGEND_EXTRA = Math.min(44, 4 + nSprints * 9);
 
   const hWorkloadCompareBase = hasCompareData
-    ? Math.max(300 + WORKLOAD_COMPARE_LEGEND_EXTRA, Math.min(680 + WORKLOAD_COMPARE_LEGEND_EXTRA, 240 + compareModel.workloadRows.length * (38 + nSprints * 6) + WORKLOAD_COMPARE_LEGEND_EXTRA))
+    ? Math.max(
+        300 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+        Math.min(
+          680 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+          240 +
+            compareModel.workloadRows.length * (38 + nSprints * 6) +
+            WORKLOAD_COMPARE_LEGEND_EXTRA,
+        ),
+      )
     : null;
-  const hoursScaleExtraCompare = hasCompareData ? Math.min(120, Math.round(0.42 * maxCompareHoursGrouped(compareModel.hoursRows, compareModel.sprintDefs))) : 0;
+  const hoursScaleExtraCompare = hasCompareData
+    ? Math.min(
+        120,
+        Math.round(0.42 * maxCompareHoursGrouped(compareModel.hoursRows, compareModel.sprintDefs)),
+      )
+    : 0;
   const hHoursCompareBase = hasCompareData
-    ? Math.max(320 + WORKLOAD_COMPARE_LEGEND_EXTRA, Math.min(700 + WORKLOAD_COMPARE_LEGEND_EXTRA + hoursScaleExtraCompare, 250 + compareModel.hoursRows.length * (38 + nSprints * 6) + WORKLOAD_COMPARE_LEGEND_EXTRA + hoursScaleExtraCompare))
+    ? Math.max(
+        320 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+        Math.min(
+          700 + WORKLOAD_COMPARE_LEGEND_EXTRA + hoursScaleExtraCompare,
+          250 +
+            compareModel.hoursRows.length * (38 + nSprints * 6) +
+            WORKLOAD_COMPARE_LEGEND_EXTRA +
+            hoursScaleExtraCompare,
+        ),
+      )
     : null;
   const hComboCompareBase = hasCompareData
-    ? Math.max(270, Math.min(560 + comboExtraCompare, 200 + compareModel.comboRows.length * (27 + nSprints * 3) + comboExtraCompare))
+    ? Math.max(
+        270,
+        Math.min(
+          560 + comboExtraCompare,
+          200 + compareModel.comboRows.length * (27 + nSprints * 3) + comboExtraCompare,
+        ),
+      )
     : null;
 
-  const hoursScaleExtraSingle = Math.min(120, Math.round(0.5 * maxSingleHoursGrouped(hoursGroupedRows)));
+  const hoursScaleExtraSingle = Math.min(
+    120,
+    Math.round(0.5 * maxSingleHoursGrouped(hoursGroupedRows)),
+  );
   const hWorkloadSingleBase = Math.max(340, Math.min(700, 235 + workloadStack.length * 42));
-  const hHoursSingleBase = Math.max(340, Math.min(700, 235 + hoursGroupedRows.length * 42 + hoursScaleExtraSingle));
-  const hComboSingleBase = Math.max(320, Math.min(520 + comboExtraSingle, 240 + forCombo.length * 38 + comboExtraSingle));
+  const hHoursSingleBase = Math.max(
+    340,
+    Math.min(700, 235 + hoursGroupedRows.length * 42 + hoursScaleExtraSingle),
+  );
+  const hComboSingleBase = Math.max(
+    320,
+    Math.min(520 + comboExtraSingle, 240 + forCombo.length * 38 + comboExtraSingle),
+  );
 
-  const hWorkload = hasCompareData ? compareChartHeights(hWorkloadCompareBase) : compareChartHeights(hWorkloadSingleBase);
-  const hHours = hasCompareData ? compareChartHeights(hHoursCompareBase) : compareChartHeights(hHoursSingleBase);
-  const hCombo = hasCompareData ? compareChartHeights(hComboCompareBase) : compareChartHeights(hComboSingleBase);
+  const hWorkload = hasCompareData
+    ? compareChartHeights(hWorkloadCompareBase)
+    : compareChartHeights(hWorkloadSingleBase);
+  const hHours = hasCompareData
+    ? compareChartHeights(hHoursCompareBase)
+    : compareChartHeights(hHoursSingleBase);
+  const hCombo = hasCompareData
+    ? compareChartHeights(hComboCompareBase)
+    : compareChartHeights(hComboSingleBase);
 
   const maxBarCompareCap = nSprints <= 2 ? 40 : nSprints <= 3 ? 34 : 28;
-  const maxBarCompare = Math.max(8, Math.min(maxBarCompareCap, Math.floor(96 / Math.max(1, nSprints))));
+  const maxBarCompare = Math.max(
+    8,
+    Math.min(maxBarCompareCap, Math.floor(96 / Math.max(1, nSprints))),
+  );
 
   // ---- empty state ----
 
@@ -962,9 +1289,17 @@ export default function DashboardDeveloperCharts({
     return (
       <Paper
         elevation={0}
-        sx={{ p: 4, borderRadius: 3, border: '1px dashed #B0BEC5', textAlign: 'center', bgcolor: 'rgba(21, 101, 192, 0.04)' }}
+        sx={{
+          p: 4,
+          borderRadius: 3,
+          border: '1px dashed #B0BEC5',
+          textAlign: 'center',
+          bgcolor: 'rgba(21, 101, 192, 0.04)',
+        }}
       >
-        <Typography sx={{ color: '#546E7A', fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.55 }}>
+        <Typography
+          sx={{ color: '#1A1A1A', fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.55 }}
+        >
           No developer data for the selected sprint(s).
         </Typography>
       </Paper>
@@ -987,21 +1322,43 @@ export default function DashboardDeveloperCharts({
       return enriched;
     });
     const firstAccent = sprintDefs[0]?.accentColor ?? '#3949AB';
-    const comboAccent = sprintDefs[sprintDefs.length - 1]?.accentColor ?? sprintDefs[0]?.accentColor ?? '#7E57C2';
+    const comboAccent =
+      sprintDefs[sprintDefs.length - 1]?.accentColor ?? sprintDefs[0]?.accentColor ?? '#7E57C2';
 
-    const marginTopWorkload = Math.min(280, 28 + Math.ceil(nSprints / 2) * (nSprints <= 3 ? 38 : 52) + (nSprints <= 2 ? 14 : nSprints <= 4 ? 26 : 44));
-    const marginTopHours = Math.min(144, 18 + Math.ceil(nSprints / 2) * (nSprints <= 3 ? 24 : 30) + (nSprints <= 2 ? 12 : nSprints <= 4 ? 20 : 28));
+    const marginTopWorkload = Math.min(
+      280,
+      28 +
+        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 38 : 52) +
+        (nSprints <= 2 ? 14 : nSprints <= 4 ? 26 : 44),
+    );
+    const marginTopHours = Math.min(
+      144,
+      18 +
+        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 24 : 30) +
+        (nSprints <= 2 ? 12 : nSprints <= 4 ? 20 : 28),
+    );
     const marginTopComboPlot = 16;
     const nDevRows = Math.max(workloadRows.length, hoursRows.length, comboRows.length);
-    const bottomAxisCompare = Math.min(92, 58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nDevRows - 6) * 2));
-    const xAxisTickHeight = Math.min(72, 50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nDevRows - 5) * 2));
-    const barCategoryGapCompare = nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : nSprints >= 3 ? '8%' : '5%';
+    const bottomAxisCompare = Math.min(
+      92,
+      58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nDevRows - 6) * 2),
+    );
+    const xAxisTickHeight = Math.min(
+      72,
+      50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nDevRows - 5) * 2),
+    );
+    const barCategoryGapCompare =
+      nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : nSprints >= 3 ? '8%' : '5%';
     /** Workload: wide bars, minimal gap between developers and sprint stacks. */
-    const workloadBarCategoryGap = nSprints >= 6 ? '1%' : nSprints >= 4 ? '1%' : nSprints >= 3 ? '0%' : '0%';
+    const workloadBarCategoryGap =
+      nSprints >= 6 ? '1%' : nSprints >= 4 ? '1%' : nSprints >= 3 ? '0%' : '0%';
     const workloadBarGap = 0;
     const maxBarWorkloadCompare = Math.max(
       10,
-      Math.min(nSprints <= 2 ? 54 : nSprints <= 3 ? 46 : nSprints <= 5 ? 38 : 32, Math.floor(124 / Math.max(1, nSprints))),
+      Math.min(
+        nSprints <= 2 ? 54 : nSprints <= 3 ? 46 : nSprints <= 5 ? 38 : 32,
+        Math.floor(124 / Math.max(1, nSprints)),
+      ),
     );
     const marginTopWorkloadTight = Math.max(124, marginTopWorkload + 12);
     const lineStrokeW = nSprints > 5 ? 1.5 : 2;
@@ -1011,7 +1368,6 @@ export default function DashboardDeveloperCharts({
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', minWidth: 0 }}>
-
         {/* ── Workload ── */}
         <ChartShell
           title="Assigned workload by developer"
@@ -1035,7 +1391,14 @@ export default function DashboardDeveloperCharts({
               textAnchor="end"
               height={xAxisTickHeight}
               tickMargin={12}
-              label={{ value: 'Developer', position: 'insideBottom', offset: -4, fill: '#546E7A', ...CHART_AXIS_LABEL, fontSize: 15 }}
+              label={{
+                value: 'Developer',
+                position: 'insideBottom',
+                offset: -4,
+                fill: '#1A1A1A',
+                ...CHART_AXIS_LABEL,
+                fontSize: 15,
+              }}
             />
             <YAxis
               type="number"
@@ -1045,7 +1408,14 @@ export default function DashboardDeveloperCharts({
               tick={CHART_TICK}
               tickMargin={8}
               width={52}
-              label={{ value: 'Tasks', angle: -90, position: 'insideLeft', fill: '#546E7A', ...CHART_AXIS_LABEL, fontSize: 15 }}
+              label={{
+                value: 'Tasks',
+                angle: -90,
+                position: 'insideLeft',
+                fill: '#1A1A1A',
+                ...CHART_AXIS_LABEL,
+                fontSize: 15,
+              }}
             />
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
@@ -1125,7 +1495,7 @@ export default function DashboardDeveloperCharts({
         {/* ── Hours ── */}
         <ChartShell
           title="Hours worked by developer"
-          description={CHART_DESC.compare.hours}
+          description={sprintDefs.length > 1 ? undefined : CHART_DESC.compare.hours}
           height={hHours}
           accent="#FB8C00"
           tint="rgba(251, 140, 0, 0.1)"
@@ -1144,7 +1514,14 @@ export default function DashboardDeveloperCharts({
               textAnchor="end"
               height={xAxisTickHeight}
               tickMargin={12}
-              label={{ value: 'Developer', position: 'insideBottom', offset: -4, fill: '#546E7A', ...CHART_AXIS_LABEL, fontSize: 15 }}
+              label={{
+                value: 'Developer',
+                position: 'insideBottom',
+                offset: -4,
+                fill: '#1A1A1A',
+                ...CHART_AXIS_LABEL,
+                fontSize: 15,
+              }}
             />
             <YAxis
               type="number"
@@ -1153,7 +1530,13 @@ export default function DashboardDeveloperCharts({
               tick={CHART_TICK}
               width={56}
               tickMargin={8}
-              label={{ value: Y_AXIS_HOURS, angle: -90, position: 'insideLeft', fill: HOURS_FILL, ...CHART_AXIS_LABEL }}
+              label={{
+                value: Y_AXIS_HOURS,
+                angle: -90,
+                position: 'insideLeft',
+                fill: HOURS_FILL,
+                ...CHART_AXIS_LABEL,
+              }}
             />
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
@@ -1170,8 +1553,24 @@ export default function DashboardDeveloperCharts({
             />
             {sprintDefs.map((sp) => (
               <React.Fragment key={`hr-bullet-${sp.id}`}>
-                <Bar dataKey={`hw_${sp.id}`} name={`${sp.shortLabel} · hours worked`} fill={sp.accentColor} radius={[0, 0, 0, 0]} maxBarSize={maxBarCompare} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
-                  <LabelList dataKey={`hw_${sp.id}`} position="top" fill={sp.accentColor} fontSize={13} fontWeight={800} formatter={(v) => `${Number(v || 0).toFixed(1)}h`} />
+                <Bar
+                  dataKey={`hw_${sp.id}`}
+                  name={`${sp.shortLabel} · hours worked`}
+                  fill={sp.accentColor}
+                  radius={[0, 0, 0, 0]}
+                  maxBarSize={maxBarCompare}
+                  animationDuration={CHART_BAR_ANIM_MS}
+                  animationEasing={CHART_BAR_EASING}
+                  activeBar={false}
+                >
+                  <LabelList
+                    dataKey={`hw_${sp.id}`}
+                    position="top"
+                    fill={sp.accentColor}
+                    fontSize={13}
+                    fontWeight={800}
+                    formatter={(v) => `${Number(v || 0).toFixed(1)}h`}
+                  />
                 </Bar>
               </React.Fragment>
             ))}
@@ -1202,24 +1601,77 @@ export default function DashboardDeveloperCharts({
             barCategoryGap={barCategoryGapCompare}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-            <XAxis dataKey="shortName" tick={CHART_TICK} interval={0} angle={-32} textAnchor="end" height={xAxisTickHeight} tickMargin={12} />
-            <YAxis yAxisId="tasks" tick={CHART_TICK} width={56} tickMargin={8} allowDecimals={false} label={{ value: 'Tasks', angle: -90, position: 'insideLeft', fill: COMPLETED_FILL, ...CHART_AXIS_LABEL }} />
-            <YAxis yAxisId="hrs" orientation="right" tick={CHART_TICK} width={58} tickMargin={8} label={{ value: Y_AXIS_HOURS, angle: 90, position: 'insideRight', fill: HOURS_LINE, ...CHART_AXIS_LABEL }} />
+            <XAxis
+              dataKey="shortName"
+              tick={CHART_TICK}
+              interval={0}
+              angle={-32}
+              textAnchor="end"
+              height={xAxisTickHeight}
+              tickMargin={12}
+            />
+            <YAxis
+              yAxisId="tasks"
+              tick={CHART_TICK}
+              width={56}
+              tickMargin={8}
+              allowDecimals={false}
+              label={{
+                value: 'Tasks',
+                angle: -90,
+                position: 'insideLeft',
+                fill: COMPLETED_FILL,
+                ...CHART_AXIS_LABEL,
+              }}
+            />
+            <YAxis
+              yAxisId="hrs"
+              orientation="right"
+              tick={CHART_TICK}
+              width={58}
+              tickMargin={8}
+              label={{
+                value: Y_AXIS_HOURS,
+                angle: 90,
+                position: 'insideRight',
+                fill: HOURS_LINE,
+                ...CHART_AXIS_LABEL,
+              }}
+            />
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
               shared={false}
               content={(props) => <CompareComboTooltip {...props} sprintDefs={sprintDefs} />}
             />
             {sprintDefs.map((sp) => (
-              <Bar key={`cb-${sp.id}`} yAxisId="tasks" dataKey={`cb_${sp.id}`} name={`${sp.shortLabel} · tasks`} fill={sp.accentColor} radius={[6, 6, 0, 0]} maxBarSize={Math.max(8, maxBarCompare)} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
-              </Bar>
+              <Bar
+                key={`cb-${sp.id}`}
+                yAxisId="tasks"
+                dataKey={`cb_${sp.id}`}
+                name={`${sp.shortLabel} · tasks`}
+                fill={sp.accentColor}
+                radius={[6, 6, 0, 0]}
+                maxBarSize={Math.max(8, maxBarCompare)}
+                animationDuration={CHART_BAR_ANIM_MS}
+                animationEasing={CHART_BAR_EASING}
+                activeBar={false}
+              ></Bar>
             ))}
             {sprintDefs.map((sp) => (
-              <Line key={`ln-${sp.id}`} yAxisId="hrs" type="monotone" dataKey={`ln_${sp.id}`} name={`${sp.shortLabel} · hours`} stroke={sp.accentColor} strokeWidth={lineStrokeW} animationDuration={CHART_BAR_ANIM_MS} dot={{ r: lineDotR, fill: sp.accentColor, strokeWidth: 0 }} />
+              <Line
+                key={`ln-${sp.id}`}
+                yAxisId="hrs"
+                type="monotone"
+                dataKey={`ln_${sp.id}`}
+                name={`${sp.shortLabel} · hours`}
+                stroke={sp.accentColor}
+                strokeWidth={lineStrokeW}
+                animationDuration={CHART_BAR_ANIM_MS}
+                dot={{ r: lineDotR, fill: sp.accentColor, strokeWidth: 0 }}
+              />
             ))}
           </ComposedChart>
         </ChartShell>
-
       </Box>
     );
   }
@@ -1237,7 +1689,12 @@ export default function DashboardDeveloperCharts({
         accent={singleSelectedSprintAccent}
         tint={alpha(singleSelectedSprintAccent, 0.08)}
       >
-        <BarChart layout="vertical" data={workloadStack} margin={{ top: 48, right: 90, left: 4, bottom: 56 }} barCategoryGap="10%">
+        <BarChart
+          layout="vertical"
+          data={workloadStack}
+          margin={{ top: 48, right: 90, left: 4, bottom: 56 }}
+          barCategoryGap="10%"
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
           <XAxis
             type="number"
@@ -1246,9 +1703,23 @@ export default function DashboardDeveloperCharts({
             ticks={singleWorkloadTaskAxis.ticks}
             tick={CHART_TICK}
             tickMargin={10}
-            label={{ value: 'Tasks', position: 'bottom', offset: 8, fill: '#546E7A', ...CHART_AXIS_LABEL, fontSize: 15 }}
+            label={{
+              value: 'Tasks',
+              position: 'bottom',
+              offset: 8,
+              fill: '#1A1A1A',
+              ...CHART_AXIS_LABEL,
+              fontSize: 15,
+            }}
           />
-          <YAxis type="category" dataKey="name" width={168} tick={{ ...CHART_TICK }} tickMargin={8} interval={0} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={168}
+            tick={{ ...CHART_TICK }}
+            tickMargin={8}
+            interval={0}
+          />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             contentStyle={CHART_TOOLTIP_SX}
@@ -1264,21 +1735,56 @@ export default function DashboardDeveloperCharts({
             align="center"
             layout="horizontal"
             wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingBottom: 6, marginBottom: 2 }}
-            content={() => <SingleWorkloadSymbolLegend completedFill={singleSelectedSprintAccent} pendingFill={workloadPendingTint} />}
+            content={() => (
+              <SingleWorkloadSymbolLegend
+                completedFill={singleSelectedSprintAccent}
+                pendingFill={workloadPendingTint}
+              />
+            )}
           />
-          <Bar stackId="load" dataKey="completed" name="Completed tasks" fill={singleSelectedSprintAccent} radius={[0, 6, 6, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+          <Bar
+            stackId="load"
+            dataKey="completed"
+            name="Completed tasks"
+            fill={singleSelectedSprintAccent}
+            radius={[0, 6, 6, 0]}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
+            activeBar={false}
+          >
             <LabelList
               valueAccessor={(entry) => entry?.payload}
               content={(p) => (
-                <SingleWorkloadCompletedOutsideLabel {...p} fill={singleSelectedSprintAccent} segment="completed" rows={workloadStack} />
+                <SingleWorkloadCompletedOutsideLabel
+                  {...p}
+                  fill={singleSelectedSprintAccent}
+                  segment="completed"
+                  rows={workloadStack}
+                />
               )}
             />
           </Bar>
-          <Bar stackId="load" dataKey="pending" name="Pending tasks" fill={workloadPendingTint} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
+          <Bar
+            stackId="load"
+            dataKey="pending"
+            name="Pending tasks"
+            fill={workloadPendingTint}
+            radius={[6, 0, 0, 6]}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
+            activeBar={false}
+          >
             <LabelList
               valueAccessor={(entry) => entry?.payload}
               content={(p) => (
-                <SingleWorkloadCompletedOutsideLabel {...p} fill={singleSelectedSprintAccent} segment="pending" rows={workloadStack} />
+                <SingleWorkloadCompletedOutsideLabel
+                  {...p}
+                  fill={singleSelectedSprintAccent}
+                  segment="pending"
+                  rows={workloadStack}
+                />
               )}
             />
           </Bar>
@@ -1292,7 +1798,12 @@ export default function DashboardDeveloperCharts({
         accent="#FB8C00"
         tint="rgba(251, 140, 0, 0.1)"
       >
-        <BarChart layout="vertical" data={hoursGroupedRows} margin={{ top: 48, right: 24, left: 4, bottom: 56 }} barCategoryGap="10%">
+        <BarChart
+          layout="vertical"
+          data={hoursGroupedRows}
+          margin={{ top: 48, right: 24, left: 4, bottom: 56 }}
+          barCategoryGap="10%"
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
           <XAxis
             type="number"
@@ -1300,9 +1811,23 @@ export default function DashboardDeveloperCharts({
             ticks={singleHoursAxis.ticks}
             tick={CHART_TICK}
             tickMargin={10}
-            label={{ value: Y_AXIS_HOURS, position: 'bottom', offset: 8, fill: '#546E7A', ...CHART_AXIS_LABEL, fontSize: 15 }}
+            label={{
+              value: Y_AXIS_HOURS,
+              position: 'bottom',
+              offset: 8,
+              fill: '#1A1A1A',
+              ...CHART_AXIS_LABEL,
+              fontSize: 15,
+            }}
           />
-          <YAxis type="category" dataKey="name" width={168} tick={{ ...CHART_TICK }} tickMargin={8} interval={0} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={168}
+            tick={{ ...CHART_TICK }}
+            tickMargin={8}
+            interval={0}
+          />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             contentStyle={CHART_TOOLTIP_SX}
@@ -1320,11 +1845,39 @@ export default function DashboardDeveloperCharts({
             wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingBottom: 6, marginBottom: 2 }}
             content={() => <SingleHoursSymbolLegend />}
           />
-          <Bar dataKey="hWorked" name="Hours worked" fill={HOURS_FILL} radius={[0, 6, 6, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
-            <LabelList dataKey="hWorked" position="right" fill={HOURS_FILL} fontSize={13} fontWeight={800} formatter={(v) => `${Number(v || 0).toFixed(1)}h`} />
+          <Bar
+            dataKey="hWorked"
+            name="Hours worked"
+            fill={HOURS_FILL}
+            radius={[0, 6, 6, 0]}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
+            activeBar={false}
+          >
+            <LabelList
+              dataKey="hWorked"
+              position="right"
+              fill={HOURS_FILL}
+              fontSize={13}
+              fontWeight={800}
+              formatter={(v) => `${Number(v || 0).toFixed(1)}h`}
+            />
           </Bar>
-          <Bar dataKey="hAssigned" name="Estimated hours" fill={HOURS_ASSIGNED} radius={[6, 0, 0, 6]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
-            <LabelList dataKey="hAssigned" content={(p) => <HoursValueLabel {...p} fill="#607D8B" />} />
+          <Bar
+            dataKey="hAssigned"
+            name="Estimated hours"
+            fill={HOURS_ASSIGNED}
+            radius={[6, 0, 0, 6]}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
+            activeBar={false}
+          >
+            <LabelList
+              dataKey="hAssigned"
+              content={(p) => <HoursValueLabel {...p} fill={HOURS_ASSIGNED_LABEL} />}
+            />
           </Bar>
         </BarChart>
       </ChartShell>
@@ -1338,9 +1891,43 @@ export default function DashboardDeveloperCharts({
       >
         <ComposedChart data={forCombo} margin={{ top: 12, right: 22, left: 10, bottom: 82 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-          <XAxis dataKey="shortName" tick={CHART_TICK} interval={0} angle={-32} textAnchor="end" height={80} tickMargin={12} />
-          <YAxis yAxisId="tasks" tick={CHART_TICK} width={56} tickMargin={8} allowDecimals={false} label={{ value: 'Tasks', angle: -90, position: 'insideLeft', fill: COMPLETED_FILL, ...CHART_AXIS_LABEL }} />
-          <YAxis yAxisId="hrs" orientation="right" tick={CHART_TICK} width={58} tickMargin={8} label={{ value: Y_AXIS_HOURS, angle: 90, position: 'insideRight', fill: HOURS_LINE, ...CHART_AXIS_LABEL }} />
+          <XAxis
+            dataKey="shortName"
+            tick={CHART_TICK}
+            interval={0}
+            angle={-32}
+            textAnchor="end"
+            height={80}
+            tickMargin={12}
+          />
+          <YAxis
+            yAxisId="tasks"
+            tick={CHART_TICK}
+            width={56}
+            tickMargin={8}
+            allowDecimals={false}
+            label={{
+              value: 'Tasks',
+              angle: -90,
+              position: 'insideLeft',
+              fill: COMPLETED_FILL,
+              ...CHART_AXIS_LABEL,
+            }}
+          />
+          <YAxis
+            yAxisId="hrs"
+            orientation="right"
+            tick={CHART_TICK}
+            width={58}
+            tickMargin={8}
+            label={{
+              value: Y_AXIS_HOURS,
+              angle: 90,
+              position: 'insideRight',
+              fill: HOURS_LINE,
+              ...CHART_AXIS_LABEL,
+            }}
+          />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             contentStyle={CHART_TOOLTIP_SX}
@@ -1351,9 +1938,27 @@ export default function DashboardDeveloperCharts({
             }}
           />
           <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, paddingTop: 8 }} />
-          <Bar yAxisId="tasks" dataKey="completed" name="Tasks completed" fill={COMPLETED_FILL} radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={CHART_BAR_ANIM_MS} animationEasing={CHART_BAR_EASING} activeBar={false}>
-          </Bar>
-          <Line yAxisId="hrs" type="monotone" dataKey="hours" name={Y_AXIS_HOURS} stroke={HOURS_LINE} strokeWidth={3} animationDuration={CHART_BAR_ANIM_MS} dot={{ r: 5, fill: HOURS_LINE, strokeWidth: 0 }} />
+          <Bar
+            yAxisId="tasks"
+            dataKey="completed"
+            name="Tasks completed"
+            fill={COMPLETED_FILL}
+            radius={[6, 6, 0, 0]}
+            maxBarSize={38}
+            animationDuration={CHART_BAR_ANIM_MS}
+            animationEasing={CHART_BAR_EASING}
+            activeBar={false}
+          ></Bar>
+          <Line
+            yAxisId="hrs"
+            type="monotone"
+            dataKey="hours"
+            name={Y_AXIS_HOURS}
+            stroke={HOURS_LINE}
+            strokeWidth={3}
+            animationDuration={CHART_BAR_ANIM_MS}
+            dot={{ r: 5, fill: HOURS_LINE, strokeWidth: 0 }}
+          />
         </ComposedChart>
       </ChartShell>
     </Box>

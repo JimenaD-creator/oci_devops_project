@@ -1,5 +1,3 @@
-import { alpha } from '@mui/material/styles';
-
 /** One line under chart titles — what the reader should take away. */
 export const CHART_DESC = {
   compare: {
@@ -7,7 +5,7 @@ export const CHART_DESC = {
       'One column per developer, stacked: solid = completed, lighter = pending, one stack per sprint.',
     hours:
       'Per sprint: solid bar = hours worked; lighter bar = estimated hours from task estimates.',
-    combo: 'Bars show completed tasks; lines show hours — both broken down by sprint.',
+    combo: 'Bars show completed tasks; lines show hours.',
   },
   single: {
     workload: 'Completed and pending tasks assigned to each developer in this sprint.',
@@ -19,11 +17,13 @@ export const CHART_DESC = {
 export const COMPLETED_FILL = '#5C6BC0';
 export const HOURS_FILL = '#FB8C00';
 export const HOURS_LINE = '#F57C00';
-/** Planned / estimated hours (lighter bar next to worked). */
-export const HOURS_ASSIGNED = alpha(HOURS_FILL, 0.45);
+/** Planned / estimated hours — warm tint, legible (not washed gray). */
+export const HOURS_ASSIGNED = '#FFCC80';
+/** Text for estimated-hours values (muted; not primary orange, not teal). */
+export const HOURS_ASSIGNED_LABEL = '#757575';
 
 export const STACK_DONE = '#1565C0';
-export const STACK_PENDING = '#90CAF9';
+export const STACK_PENDING = '#64B5F6';
 
 export const GRID = '#E0E0E0';
 

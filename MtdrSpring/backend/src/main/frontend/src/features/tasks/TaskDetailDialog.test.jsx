@@ -85,14 +85,8 @@ test('save persists title, hours, type, and priority; notifies parent', async ()
   await user.clear(within(dialog).getByLabelText('Assigned hours'));
   await user.type(within(dialog).getByLabelText('Assigned hours'), '13');
 
-  // MUI <Select> exposes the trigger as role="button" in this environment (not combobox).
-  const taskTypeTrigger = within(dialog).getByRole('button', { name: 'Task' });
-  await user.click(taskTypeTrigger);
-  await user.click(await screen.findByRole('option', { name: /user story/i }));
-
-  const priorityTrigger = within(dialog).getByRole('button', { name: 'Medium' });
-  await user.click(priorityTrigger);
-  await user.click(await screen.findByRole('option', { name: /^high$/i }));
+  await user.click(within(dialog).getByRole('button', { name: /User Story$/ }));
+  await user.click(within(dialog).getByRole('button', { name: /High$/i }));
 
   await user.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -105,4 +99,3 @@ test('save persists title, hours, type, and priority; notifies parent', async ()
   expect(lastPutBody?.classification).toBe('USER_STORY');
   expect(lastPutBody?.priority).toBe('HIGH');
 }, 20000);
-

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Menu, MenuItem, Divider } from '@mui/material';
 import { developerAvatarColors } from '../../utils/developerColors';
+import { STATUS_CHIP_SX } from '../sprints/constants/sprintConstants';
 import './KanbanBoard.css';
 
 const COLUMN_DEFS = [
@@ -29,7 +30,7 @@ const STATUS_MENU_OPTIONS = [
 ];
 
 const STATUS_PILL_STYLE = {
-  TODO: { bg: '#F5F5F5', color: '#616161' },
+  TODO: { bg: STATUS_CHIP_SX.TODO.bgcolor, color: STATUS_CHIP_SX.TODO.color },
   IN_PROGRESS: { bg: '#E3F2FD', color: '#1565C0' },
   IN_REVIEW: { bg: '#F3E5F5', color: '#7B1FA2' },
   DONE: { bg: '#E8F5E9', color: '#2E7D32' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -6,21 +6,20 @@ import {
   Grid,
   Button,
   CircularProgress,
-  Stack,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   TextField,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import TaskTable from '../tasks/TaskTable';
-import { isUserTaskAssigneeComplete } from '../tasks/utils/taskUtils';
+import { isUserTaskAssigneeComplete, userTaskRowTaskId } from '../tasks/utils/taskUtils';
 import {
   EditSprintDialog,
   NewSprintDialog,
@@ -120,31 +119,34 @@ export default function SprintsPage({ projectId }) {
     };
   }, [effectiveProjectIdNum]);
 
-  const loadData = async (opts = {}) => {
-    const silent = opts.silent === true;
-    if (!silent) setLoading(true);
-    try {
-      const { pid, sprintsList, tasksList, userTasksList } =
-        await fetchSprintsTasksAndAssignments(projectId);
-      const sorted = sortSprintsForDisplay(sprintsList, tasksList);
-      setSprints(sorted);
-      setTasks(tasksList);
-      setUserTasks(userTasksList);
-      setSelectedSprint((prev) => {
-        if (prev) {
-          const stillThere = sorted.find((s) => s.id === prev.id);
-          if (stillThere) return stillThere;
-        }
-        return pickDefaultSelectedSprint(sorted) ?? sorted[0];
-      });
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+  const loadData = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      if (!silent) setLoading(true);
+      try {
+        const { sprintsList, tasksList, userTasksList } =
+          await fetchSprintsTasksAndAssignments(projectId);
+        const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+        setSprints(sorted);
+        setTasks(tasksList);
+        setUserTasks(userTasksList);
+        setSelectedSprint((prev) => {
+          if (prev) {
+            const stillThere = sorted.find((s) => s.id === prev.id);
+            if (stillThere) return stillThere;
+          }
+          return pickDefaultSelectedSprint(sorted) ?? sorted[0];
+        });
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [projectId],
+  );
 
   useEffect(() => {
     loadData();
-  }, [projectId, effectiveProjectIdNum]);
+  }, [loadData, effectiveProjectIdNum]);
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -178,8 +180,7 @@ export default function SprintsPage({ projectId }) {
   }, [tasks, selectedSprint]);
   const assignmentsByTaskId = useMemo(() => {
     return (Array.isArray(userTasks) ? userTasks : []).reduce((acc, ut) => {
-      const tidRaw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId;
-      const tid = Number(tidRaw);
+      const tid = userTaskRowTaskId(ut);
       if (!Number.isFinite(tid)) return acc;
       if (!acc[tid]) acc[tid] = [];
       acc[tid].push(ut);
@@ -266,21 +267,6 @@ export default function SprintsPage({ projectId }) {
     if (developerFilter === 'all') return;
     if (!developerFilterOptions.includes(developerFilter)) setDeveloperFilter('all');
   }, [developerFilter, developerFilterOptions]);
-  useEffect(() => {
-    if (statusFilter === 'all') return;
-    const want = String(statusFilter).toUpperCase();
-    const exists = selectedSprintRows.some((r) => {
-      const rowStatus = String(r.status || '').toUpperCase();
-      if (rowStatus === want) return true;
-      if (want === 'DONE' && developerFilter !== 'all') {
-        const f = String(developerFilter).trim();
-        const mine = (r.assigneeProgress || []).find((p) => String(p.name).trim() === f);
-        return Boolean(mine?.completed);
-      }
-      return false;
-    });
-    if (!exists) setStatusFilter('all');
-  }, [statusFilter, selectedSprintRows, developerFilter]);
   const clearTaskTableFilters = () => {
     setDeveloperFilter('all');
     setStatusFilter('all');
@@ -407,21 +393,6 @@ export default function SprintsPage({ projectId }) {
             Delete sprint
           </Button>
           <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadData}
-            size="small"
-            sx={{
-              textTransform: 'none',
-              borderColor: '#DDD',
-              color: '#555',
-              borderRadius: 2,
-              mr: 1,
-            }}
-          >
-            Sync
-          </Button>
-          <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setDialogOpen(true)}
@@ -487,16 +458,35 @@ export default function SprintsPage({ projectId }) {
             </Box>
           </Grid>
           <Grid item xs={12}>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.25}
-              alignItems={{ xs: 'stretch', sm: 'center' }}
-              sx={{ mb: 1.5, flexWrap: 'wrap' }}
+            <Typography
+              sx={{
+                fontWeight: 800,
+                color: '#333',
+                fontSize: '1.02rem',
+                mb: 1.25,
+                display: 'block',
+              }}
             >
-              <Typography sx={{ fontWeight: 800, color: '#333', fontSize: '1.02rem' }}>
-                {selectedSprint ? `Tasks · Sprint ${selectedSprint.id}` : 'Tasks'}
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 220 } }}>
+              {selectedSprint ? `Tasks · Sprint ${selectedSprint.id}` : 'Tasks'}
+            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 1.25,
+                mb: 1.5,
+                rowGap: 1.25,
+              }}
+            >
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { xs: '100%', sm: 220 },
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                }}
+              >
                 <InputLabel id="overview-sprint-dev-filter">Developer</InputLabel>
                 <Select
                   labelId="overview-sprint-dev-filter"
@@ -512,7 +502,14 @@ export default function SprintsPage({ projectId }) {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { xs: '100%', sm: 170 },
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                }}
+              >
                 <InputLabel id="overview-sprint-status-filter">Status</InputLabel>
                 <Select
                   labelId="overview-sprint-status-filter"
@@ -527,7 +524,14 @@ export default function SprintsPage({ projectId }) {
                   <MenuItem value="DONE">Done</MenuItem>
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { xs: '100%', sm: 170 },
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                }}
+              >
                 <InputLabel id="overview-sprint-priority-filter">Priority</InputLabel>
                 <Select
                   labelId="overview-sprint-priority-filter"
@@ -549,18 +553,28 @@ export default function SprintsPage({ projectId }) {
                 value={dueDateFilter}
                 onChange={(e) => setDueDateFilter(e.target.value)}
                 InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: { xs: '100%', sm: 160 } }}
+                sx={{
+                  minWidth: { xs: '100%', sm: 160 },
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                }}
               />
               <Button
                 size="small"
                 variant="contained"
-                startIcon={<TaskAltIcon />}
+                startIcon={<TaskAltIcon sx={{ fontSize: 20 }} />}
                 onClick={handleOpenNewTask}
                 disabled={effectiveProjectIdNum == null}
                 sx={{
                   textTransform: 'none',
                   fontWeight: 700,
+                  fontSize: '0.875rem',
+                  height: 40,
                   minHeight: 40,
+                  px: 2,
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { xs: '1 1 100%', sm: '0 0 auto' },
+                  whiteSpace: 'nowrap',
                   bgcolor: ORACLE_RED,
                   '&:hover': { bgcolor: ORACLE_RED_ACTION },
                 }}
@@ -571,28 +585,87 @@ export default function SprintsPage({ projectId }) {
                 <Button
                   size="small"
                   variant="outlined"
+                  color="inherit"
+                  disableRipple
                   onClick={clearTaskTableFilters}
                   sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: ORACLE_RED_ACTION,
-                    color: ORACLE_RED_ACTION,
-                    minHeight: 40,
+                    '&&': {
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      height: 40,
+                      minHeight: 40,
+                      width: { xs: '100%', sm: 'auto' },
+                      flex: { xs: '1 1 100%', sm: '0 0 auto' },
+                      border: `1px solid ${ORACLE_RED_ACTION}`,
+                      color: ORACLE_RED_ACTION,
+                      outline: 0,
+                      boxShadow: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      '&:hover': {
+                        borderColor: ORACLE_RED_ACTION,
+                        bgcolor: alpha(ORACLE_RED_ACTION, 0.06),
+                      },
+                      '&:focus': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&:focus-visible': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&.Mui-focusVisible': {
+                        outline: 0,
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                      '&:active': {
+                        border: `1px solid ${ORACLE_RED_ACTION}`,
+                        boxShadow: 'none',
+                      },
+                    },
                   }}
                 >
                   Clear filters
                 </Button>
               ) : null}
-            </Stack>
-            <TaskTable
-              items={filteredSprintRows}
-              variant="manager"
-              onRowClick={(row) => {
-                const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
-                if (task) setSelectedTaskForDialog(task);
-              }}
-              scrollMaxHeight={420}
-            />
+            </Box>
+            {selectedSprint &&
+            selectedSprintRows.length > 0 &&
+            filteredSprintRows.length === 0 &&
+            hasTaskTableFilters ? (
+              <Box
+                sx={{
+                  py: 3.5,
+                  px: 2,
+                  textAlign: 'center',
+                  border: '1px dashed #E0E0E0',
+                  borderRadius: 2,
+                  bgcolor: '#FAFAFA',
+                  mt: 0.5,
+                }}
+              >
+                <Typography sx={{ fontWeight: 600, color: '#616161', fontSize: '0.95rem' }}>
+                  {statusFilter !== 'all' &&
+                  developerFilter === 'all' &&
+                  priorityFilter === 'all' &&
+                  !dueDateFilter
+                    ? 'No tasks with this status.'
+                    : 'No tasks match the selected filters.'}
+                </Typography>
+              </Box>
+            ) : (
+              <TaskTable
+                items={filteredSprintRows}
+                variant="manager"
+                onRowClick={(row) => {
+                  const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
+                  if (task) setSelectedTaskForDialog(task);
+                }}
+                scrollMaxHeight={420}
+              />
+            )}
           </Grid>
         </Grid>
       </Box>
@@ -661,12 +734,41 @@ export default function SprintsPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={() => setSelectedTaskForDialog(null)}
-        onSaved={(updated) => {
+        onSaved={(updated, meta) => {
           setTasks((prev) => {
-            const next = prev.map((x) => (x.id === updated.id ? updated : x));
+            const next = prev.map((x) =>
+              Number(x.id) === Number(updated.id) ? { ...x, ...updated } : x,
+            );
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });
+          if (meta?.assigneesChanged) {
+            const tid = Number(updated.id);
+            const ids = finiteUserIds(meta.assigneeUserIds);
+            setUserTasks((prev) => {
+              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+              if (ids.length === 0) return rest;
+              const st = updated?.status ?? 'TODO';
+              const added = ids.map((userId) => {
+                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+                const name = String(
+                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+                ).trim();
+                return {
+                  user: { id: userId, name: name || `User ${userId}` },
+                  task: { id: tid },
+                  status: st,
+                };
+              });
+              return [...rest, ...added];
+            });
+          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+            const tid = Number(updated.id);
+            const st = meta.assignmentStatus;
+            setUserTasks((prev) =>
+              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
+            );
+          }
           setSelectedTaskForDialog(null);
           void loadData({ silent: true });
         }}

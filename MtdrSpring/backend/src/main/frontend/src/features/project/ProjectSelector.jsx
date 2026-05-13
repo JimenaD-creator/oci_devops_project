@@ -36,6 +36,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
   const managerAutoSelectedRef = useRef(false);
   const [openModal, setOpenModal] = useState(null);
   const [formData, setFormData] = useState({});
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -132,6 +133,51 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
         alert('ERROR: ' + msg);
       }
     } catch (err) {
+      alert('ERROR DE CONEXIÓN');
+    }
+  };
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, profilePicture: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setFormData({ name: user.name, type: user.role });
+    setOpenModal('editUser');
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('¿Eliminar este usuario?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
+      if (res.ok) fetchData();
+      else alert('ERROR al eliminar');
+    } catch {
+      alert('ERROR DE CONEXIÓN');
+    }
+  };
+
+  const handleEditAction = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (res.ok) {
+        setOpenModal(null);
+        setFormData({});
+        setSelectedUser(null);
+        fetchData();
+      } else {
+        alert('ERROR: ' + (await res.text()));
+      }
+    } catch {
       alert('ERROR DE CONEXIÓN');
     }
   };
@@ -252,6 +298,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                     <TableCell>ID EQUIPO</TableCell>
                     <TableCell>EQUIPO</TableCell>
                     <TableCell>PROYECTO</TableCell>
+                    <TableCell>ACCIONES</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -265,6 +312,22 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                         {(user.teamName || user.managedTeamName || '---').toUpperCase()}
                       </TableCell>
                       <TableCell>{user.projectName || '---'}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          onClick={() => handleEditUser(user)}
+                          sx={{ mr: 1, color: '#000' }}
+                        >
+                          EDITAR
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => handleDeleteUser(user.id)}
+                          sx={{ color: '#E53935' }}
+                        >
+                          ELIMINAR
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -403,6 +466,34 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               <MenuItem value="MANAGER">MANAGER</MenuItem>
               <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
             </TextField>
+
+            {/* ---- FOTO DE PERFIL ---- */}
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
+                FOTO DE PERFIL (opcional)
+              </Typography>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ width: '100%' }}
+              />
+              {formData.profilePicture && (
+                <Box sx={{ mt: 1, textAlign: 'center' }}>
+                  <img
+                    src={formData.profilePicture}
+                    alt="preview"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #E53935',
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
@@ -411,9 +502,78 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </Button>
           </DialogActions>
         </Dialog>
+        <Dialog open={openModal === 'editUser'} onClose={() => setOpenModal(null)}>
+          <DialogTitle>EDITAR USUARIO — {selectedUser?.name?.toUpperCase()}</DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="NOMBRE"
+              margin="dense"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="EMAIL"
+              margin="dense"
+              value={formData.email || ''}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="PASSWORD"
+              type="password"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              select
+              label="TIPO"
+              margin="dense"
+              value={formData.type || ''}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
+            >
+              <MenuItem value="MANAGER">MANAGER</MenuItem>
+              <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
+            </TextField>
+
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
+                FOTO DE PERFIL (opcional)
+              </Typography>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ width: '100%' }}
+              />
+              {formData.profilePicture && (
+                <Box sx={{ mt: 1, textAlign: 'center' }}>
+                  <img
+                    src={formData.profilePicture}
+                    alt="preview"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #E53935',
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={handleEditAction} variant="contained" sx={{ bgcolor: '#000' }}>
+              GUARDAR
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );
 };
-
 export default ProjectSelector;

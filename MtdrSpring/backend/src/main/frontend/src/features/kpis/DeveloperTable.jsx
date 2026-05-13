@@ -70,6 +70,40 @@ function WorkloadBar({ val }) {
   );
 }
 
+// ── Avatar con foto o iniciales ──────────────────────────────────────────────
+function DevAvatar({ name, initials, profilePicture, avatarColors }) {
+  if (profilePicture) {
+    return (
+      <div
+        className="avatar-circle"
+        style={{ background: avatarColors.bg, overflow: 'hidden', padding: 0 }}
+      >
+        <img
+          src={profilePicture}
+          alt={name}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center top',
+            display: 'block',
+          }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="avatar-circle" style={{ background: avatarColors.bg }}>
+      <span style={{ fontSize: '10px', fontWeight: 700, color: avatarColors.color }}>
+        {initials}
+      </span>
+    </div>
+  );
+}
+
 const fullColumns = [
   { key: 'name', label: 'Developer', sortable: true },
   { key: 'assigned', label: 'Tasks Assigned', sortable: true },
@@ -82,221 +116,100 @@ const fullColumns = [
   { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
-/** Dashboard-aligned: DM Sans, #1A1A1A / #666 / Oracle red / soft borders. */
 const SHARED_DEVELOPER_TABLE_CSS = `
-          .table-card {
-            background: #FFFFFF;
-            border-radius: 12px;
-            border: 1px solid #1A1A1A;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-            overflow: hidden;
-            margin-bottom: 24px;
-            font-family: ${APP_FONT_FAMILY};
-            -webkit-font-smoothing: antialiased;
-          }
-          .table-header {
-            padding: 20px;
-            border-bottom: 1px solid #F0F0F0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-          }
-          @media (min-width: 640px) {
-            .table-header { flex-direction: row; align-items: center; justify-content: space-between; }
-          }
-          .table-header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 0;
-          }
-          .table-title-icon-wrap {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: rgba(26, 26, 26, 0.06);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-          }
-          .table-title {
-            font-family: ${APP_FONT_FAMILY};
-            font-size: 1.05rem;
-            font-weight: 800;
-            color: #1A1A1A;
-            letter-spacing: -0.02em;
-            margin: 0;
-            line-height: 1.3;
-          }
-          .search-wrapper { position: relative; }
-          .search-icon {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-            pointer-events: none;
-          }
-          .search-wrapper input.search-input[type="text"] {
-            box-sizing: border-box;
-            font-family: ${APP_FONT_FAMILY};
-            padding: 8px 12px 8px 36px;
-            font-size: 0.8125rem;
-            border: 1px solid #E5E5E5;
-            border-radius: 8px;
-            width: 200px;
-            outline: none;
-            color: #1A1A1A;
-            background: #FAFAFA;
-          }
-          .search-wrapper input.search-input[type="text"]::placeholder { color: #999; }
-          .search-wrapper input.search-input[type="text"]:focus {
-            border-color: #C74634;
-            background: #FFFFFF;
-          }
-          .export-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            font-family: ${APP_FONT_FAMILY};
-            font-size: 0.8125rem;
-            font-weight: 600;
-            border: 1px solid #1A1A1A;
-            color: #1A1A1A;
-            background: transparent;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.2s;
-          }
-          .export-btn:hover { background: rgba(26, 26, 26, 0.06); }
-          .table-scroll { overflow-x: auto; }
-          table { width: 100%; border-collapse: collapse; font-family: ${APP_FONT_FAMILY}; }
-          thead tr { background: #FAFAFA; }
-          th {
-            text-align: left;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #555;
-            padding: 12px 16px;
-            white-space: nowrap;
-            user-select: none;
-            vertical-align: middle;
-          }
-          th.sortable { cursor: pointer; }
-          th.sortable:hover { color: #C74634; }
-          th.th-sprint-compare-group {
-            text-align: center;
-            vertical-align: bottom;
-            color: #1A1A1A;
-            font-size: 0.8125rem;
-          }
-          th.th-sprint-compare-group-bordered { border-left: 1px solid #E8E8E8; }
-          th.th-sprint-compare-sub-bordered { border-left: 1px solid #E8E8E8; }
-          .sprint-range-caption {
-            display: block;
-            font-size: 0.6875rem;
-            color: #666;
-            font-weight: 500;
-            margin-top: 4px;
-          }
-          td {
-            padding: 12px 16px;
-            border-top: 1px solid #F0F0F0;
-            font-size: 0.875rem;
-            color: #1A1A1A;
-          }
-          td.td-sprint-compare-first { border-left: 1px solid #EFEFEF; }
-          .row-odd { background: rgba(250, 250, 250, 0.85); }
-          tbody tr:hover { background: rgba(0, 0, 0, 0.03); }
-          .avatar-circle {
-            width: 28px; height: 28px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-          }
-          .dev-name-text {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #1A1A1A;
-            white-space: nowrap;
-          }
-          .cell-muted { color: #666; font-weight: 500; }
-          .cell-strong { color: #1A1A1A; font-weight: 700; }
-          .badge-base {
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 8px;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            border: 1px solid;
-            font-family: ${APP_FONT_FAMILY};
-          }
-          .badge-tier-high { color: #1B5E20; background: #E8F5E9; border-color: #A5D6A7; }
-          .badge-tier-mid { color: #E65100; background: #FFF3E0; border-color: #FFCC80; }
-          .badge-tier-low { color: #4A148C; background: #F3E5F5; border-color: #CE93D8; }
-          .workload-container { display: flex; align-items: center; gap: 8px; }
-          .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
-          .workload-fill { height: 100%; background: #607D8B; border-radius: 9999px; }
-          .workload-text { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
-          .summary-row { background: #F7F7F7; border-top: 2px solid #ECECEC; }
-          .summary-cell { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
-          .text-center { text-align: center; }
+  .table-card {
+    background: #FFFFFF; border-radius: 12px; border: 1px solid #1A1A1A;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); overflow: hidden; margin-bottom: 24px;
+    font-family: ${APP_FONT_FAMILY}; -webkit-font-smoothing: antialiased;
+  }
+  .table-header {
+    padding: 20px; border-bottom: 1px solid #F0F0F0;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  @media (min-width: 640px) {
+    .table-header { flex-direction: row; align-items: center; justify-content: space-between; }
+  }
+  .table-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .table-title-icon-wrap {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(26,26,26,0.06);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .table-title {
+    font-family: ${APP_FONT_FAMILY}; font-size: 1.05rem; font-weight: 800;
+    color: #1A1A1A; letter-spacing: -0.02em; margin: 0; line-height: 1.3;
+  }
+  .search-wrapper { position: relative; }
+  .search-icon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: #666; pointer-events: none;
+  }
+  .search-wrapper input.search-input[type="text"] {
+    box-sizing: border-box; font-family: ${APP_FONT_FAMILY};
+    padding: 8px 12px 8px 36px; font-size: 0.8125rem;
+    border: 1px solid #E5E5E5; border-radius: 8px; width: 200px;
+    outline: none; color: #1A1A1A; background: #FAFAFA;
+  }
+  .search-wrapper input.search-input[type="text"]::placeholder { color: #999; }
+  .search-wrapper input.search-input[type="text"]:focus { border-color: #C74634; background: #FFFFFF; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-family: ${APP_FONT_FAMILY}; }
+  thead tr { background: #FAFAFA; }
+  th {
+    text-align: left; font-size: 0.75rem; font-weight: 700; color: #555;
+    padding: 12px 16px; white-space: nowrap; user-select: none; vertical-align: middle;
+  }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: #C74634; }
+  th.th-sprint-compare-group { text-align: center; vertical-align: bottom; color: #1A1A1A; font-size: 0.8125rem; }
+  th.th-sprint-compare-group-bordered { border-left: 1px solid #E8E8E8; }
+  th.th-sprint-compare-sub-bordered { border-left: 1px solid #E8E8E8; }
+  .sprint-range-caption { display: block; font-size: 0.6875rem; color: #666; font-weight: 500; margin-top: 4px; }
+  td { padding: 12px 16px; border-top: 1px solid #F0F0F0; font-size: 0.875rem; color: #1A1A1A; }
+  td.td-sprint-compare-first { border-left: 1px solid #EFEFEF; }
+  .row-odd { background: rgba(250,250,250,0.85); }
+  tbody tr:hover { background: rgba(0,0,0,0.03); }
+  .avatar-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .dev-name-text { font-size: 0.875rem; font-weight: 600; color: #1A1A1A; white-space: nowrap; }
+  .cell-muted { color: #666; font-weight: 500; }
+  .cell-strong { color: #1A1A1A; font-weight: 700; }
+  .badge-base {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid;
+    font-family: ${APP_FONT_FAMILY};
+  }
+  .badge-tier-high { color: #1B5E20; background: #E8F5E9; border-color: #A5D6A7; }
+  .badge-tier-mid  { color: #E65100; background: #FFF3E0; border-color: #FFCC80; }
+  .badge-tier-low  { color: #4A148C; background: #F3E5F5; border-color: #CE93D8; }
+  .workload-container { display: flex; align-items: center; gap: 8px; }
+  .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
+  .workload-fill  { height: 100%; background: #607D8B; border-radius: 9999px; }
+  .workload-text  { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
+  .summary-row    { background: #F7F7F7; border-top: 2px solid #ECECEC; }
+  .summary-cell   { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
+  .text-center    { text-align: center; }
 `;
 
-/** Dashboard: “Developer Productivity Breakdown” (SprintMetricsTable) — texto más legible. */
 const SPRINT_METRICS_DASHBOARD_TEXT_CSS = `
-          .dev-productivity-dashboard .table-title {
-            font-size: 1.2rem;
-          }
-          .dev-productivity-dashboard .table-title-icon-wrap {
-            width: 40px;
-            height: 40px;
-          }
-          .dev-productivity-dashboard th {
-            font-size: 0.875rem;
-            padding: 14px 16px;
-          }
-          .dev-productivity-dashboard th.th-sprint-compare-group {
-            font-size: 0.9375rem;
-          }
-          .dev-productivity-dashboard .sprint-range-caption {
-            font-size: 0.75rem;
-            margin-top: 5px;
-          }
-          .dev-productivity-dashboard td {
-            font-size: 1rem;
-            padding: 14px 16px;
-          }
-          .dev-productivity-dashboard .dev-name-text {
-            font-size: 1rem;
-          }
-          .dev-productivity-dashboard .badge-base {
-            font-size: 0.8125rem;
-            padding: 3px 9px;
-          }
-          .dev-productivity-dashboard .workload-text {
-            font-size: 0.875rem;
-          }
-          .dev-productivity-dashboard .workload-track {
-            width: 104px;
-            height: 9px;
-          }
-          .dev-productivity-dashboard .summary-cell {
-            font-size: 0.9375rem;
-          }
-          .dev-productivity-dashboard .search-wrapper input.search-input[type="text"] {
-            font-size: 0.875rem;
-            padding: 9px 12px 9px 36px;
-          }
-          .dev-productivity-dashboard .avatar-circle {
-            width: 32px;
-            height: 32px;
-          }
-          .dev-productivity-dashboard .avatar-circle span {
-            font-size: 11px !important;
-          }
+  .dev-productivity-dashboard .table-title         { font-size: 1.2rem; }
+  .dev-productivity-dashboard .table-title-icon-wrap { width: 40px; height: 40px; }
+  .dev-productivity-dashboard th                   { font-size: 0.875rem; padding: 14px 16px; }
+  .dev-productivity-dashboard th.th-sprint-compare-group { font-size: 0.9375rem; }
+  .dev-productivity-dashboard .sprint-range-caption { font-size: 0.75rem; margin-top: 5px; }
+  .dev-productivity-dashboard td                   { font-size: 1rem; padding: 14px 16px; }
+  .dev-productivity-dashboard .dev-name-text       { font-size: 1rem; }
+  .dev-productivity-dashboard .badge-base          { font-size: 0.8125rem; padding: 3px 9px; }
+  .dev-productivity-dashboard .workload-text       { font-size: 0.875rem; }
+  .dev-productivity-dashboard .workload-track      { width: 104px; height: 9px; }
+  .dev-productivity-dashboard .summary-cell        { font-size: 0.9375rem; }
+  .dev-productivity-dashboard .search-wrapper input.search-input[type="text"] {
+    font-size: 0.875rem; padding: 9px 12px 9px 36px;
+  }
+  .dev-productivity-dashboard .avatar-circle       { width: 32px; height: 32px; }
+  .dev-productivity-dashboard .avatar-circle span  { font-size: 11px !important; }
 `;
 
 function initialsFromName(name) {
@@ -320,15 +233,20 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
     return Array.from(names).map((name) => {
       const row = { name };
       let initials = '';
+      let profilePicture = null;
       selectedSprints.forEach((sp) => {
         const d = (sp.developers || []).find((x) => x.name === name);
-        if (d && !initials) initials = d.initials || initialsFromName(name);
+        if (d) {
+          if (!initials) initials = d.initials || initialsFromName(name);
+          if (!profilePicture) profilePicture = d.profilePicture ?? null;
+        }
         row[`${sp.id}_assigned`] = d ? d.assigned : '—';
         row[`${sp.id}_completed`] = d ? d.completed : '—';
         row[`${sp.id}_hours`] = d ? d.hours : '—';
         row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : '—';
       });
       row.initials = initials || initialsFromName(name);
+      row.profilePicture = profilePicture;
       return row;
     });
   }, [selectedSprints]);
@@ -341,37 +259,34 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   const sorted = useMemo(() => {
     if (!sort.key) {
       return [...filtered].sort((a, b) => {
-        const totalCompletedA = selectedSprints.reduce(
+        const totalA = selectedSprints.reduce(
           (acc, sp) => acc + (Number(a[`${sp.id}_completed`]) || 0),
           0,
         );
-        const totalCompletedB = selectedSprints.reduce(
+        const totalB = selectedSprints.reduce(
           (acc, sp) => acc + (Number(b[`${sp.id}_completed`]) || 0),
           0,
         );
-        const diff = totalCompletedB - totalCompletedA;
-        if (diff !== 0) return diff;
-        return String(a.name).localeCompare(String(b.name));
+        const diff = totalB - totalA;
+        return diff !== 0 ? diff : String(a.name).localeCompare(String(b.name));
       });
     }
     return [...filtered].sort((a, b) => {
       const av = sortValue(a[sort.key]);
       const bv = sortValue(b[sort.key]);
       if (av !== null && bv !== null) return sort.dir === 'asc' ? av - bv : bv - av;
-      if (sort.key === 'name') {
+      if (sort.key === 'name')
         return sort.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      }
       const as = String(a[sort.key] ?? '');
       const bs = String(b[sort.key] ?? '');
       return sort.dir === 'asc' ? as.localeCompare(bs) : bs.localeCompare(as);
     });
-  }, [filtered, sort]);
+  }, [filtered, sort, selectedSprints]);
 
-  const toggleSort = (key) => {
+  const toggleSort = (key) =>
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
     );
-  };
 
   const avgForKey = (key) => {
     const nums = sorted.map((r) => r[key]).filter((v) => typeof v === 'number');
@@ -381,22 +296,19 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   };
 
   const hoursAvgForSprint = (spId) => {
-    const key = `${spId}_hours`;
-    const nums = sorted.map((r) => r[key]).filter((v) => typeof v === 'number');
+    const nums = sorted.map((r) => r[`${spId}_hours`]).filter((v) => typeof v === 'number');
     if (!nums.length) return '—';
     const n = nums.reduce((acc, x) => acc + x, 0) / nums.length;
     return `${Number.isInteger(n) ? n : n.toFixed(1)}h`;
   };
 
   const workloadAvgForSprint = (spId) => {
-    const key = `${spId}_workload`;
-    const nums = sorted.map((r) => r[key]).filter((v) => typeof v === 'number');
+    const nums = sorted.map((r) => r[`${spId}_workload`]).filter((v) => typeof v === 'number');
     if (!nums.length) return null;
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
 
   const renderHours = (v) => (typeof v === 'number' ? `${v}h` : v);
-
   const renderWorkloadCell = (v) =>
     typeof v === 'number' ? <WorkloadBar val={v} /> : <span className="cell-muted">—</span>;
 
@@ -415,18 +327,17 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
     <>
       <style>{SHARED_DEVELOPER_TABLE_CSS}</style>
       <style>{SPRINT_METRICS_DASHBOARD_TEXT_CSS}</style>
-
       <div className="table-card dev-productivity-dashboard">
         <div className="table-header">
           <div className="table-header-left">
-            {!suppressCardTitle ? (
+            {!suppressCardTitle && (
               <>
                 <div className="table-title-icon-wrap">
                   <Users size={22} color="#1A1A1A" strokeWidth={2} />
                 </div>
                 <h3 className="table-title">Developer Productivity Breakdown</h3>
               </>
-            ) : null}
+            )}
           </div>
           <div className="search-wrapper">
             <Search className="search-icon" size={14} />
@@ -448,8 +359,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                   <tr>
                     <th rowSpan={2} className="sortable" onClick={() => toggleSort('name')}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        Developer
-                        {sortIcon('name')}
+                        Developer {sortIcon('name')}
                       </div>
                     </th>
                     {selectedSprints.map((sp, si) => (
@@ -473,8 +383,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                           onClick={() => toggleSort(`${sp.id}_assigned`)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Tasks Assigned
-                            {sortIcon(`${sp.id}_assigned`)}
+                            Tasks Assigned {sortIcon(`${sp.id}_assigned`)}
                           </div>
                         </th>,
                         <th
@@ -483,8 +392,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                           onClick={() => toggleSort(`${sp.id}_completed`)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Tasks Completed
-                            {sortIcon(`${sp.id}_completed`)}
+                            Tasks Completed {sortIcon(`${sp.id}_completed`)}
                           </div>
                         </th>,
                         <th
@@ -493,8 +401,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                           onClick={() => toggleSort(`${sp.id}_hours`)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Total Hours
-                            {sortIcon(`${sp.id}_hours`)}
+                            Total Hours {sortIcon(`${sp.id}_hours`)}
                           </div>
                         </th>,
                         <th key={`${sp.id}-w`}>
@@ -510,8 +417,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                 <tr>
                   <th className="sortable" onClick={() => toggleSort('name')}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Developer
-                      {sortIcon('name')}
+                      Developer {sortIcon('name')}
                     </div>
                   </th>
                   {(() => {
@@ -520,20 +426,17 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                       <>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_assigned`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Tasks Assigned
-                            {sortIcon(`${sp.id}_assigned`)}
+                            Tasks Assigned {sortIcon(`${sp.id}_assigned`)}
                           </div>
                         </th>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_completed`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Tasks Completed
-                            {sortIcon(`${sp.id}_completed`)}
+                            Tasks Completed {sortIcon(`${sp.id}_completed`)}
                           </div>
                         </th>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_hours`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Total Hours
-                            {sortIcon(`${sp.id}_hours`)}
+                            Total Hours {sortIcon(`${sp.id}_hours`)}
                           </div>
                         </th>
                         <th>
@@ -554,11 +457,12 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                   <tr key={r.name} className={i % 2 === 1 ? 'row-odd' : ''}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="avatar-circle" style={{ background: av.bg }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, color: av.color }}>
-                            {r.initials}
-                          </span>
-                        </div>
+                        <DevAvatar
+                          name={r.name}
+                          initials={r.initials}
+                          profilePicture={r.profilePicture}
+                          avatarColors={av}
+                        />
                         <span className="dev-name-text">{r.name}</span>
                       </div>
                     </td>
@@ -685,11 +589,10 @@ function FullAnalyticsTable() {
     });
   }, [filtered, sort]);
 
-  const toggleSort = (key) => {
+  const toggleSort = (key) =>
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
     );
-  };
 
   const avg = (key) => {
     const vals = enriched.map((r) => r[key]).filter((v) => typeof v === 'number');
@@ -699,7 +602,6 @@ function FullAnalyticsTable() {
   return (
     <>
       <style>{SHARED_DEVELOPER_TABLE_CSS}</style>
-
       <div className="table-card">
         <div className="table-header">
           <div className="table-header-left">
@@ -719,7 +621,6 @@ function FullAnalyticsTable() {
             />
           </div>
         </div>
-
         <div className="table-scroll">
           <table>
             <thead>
@@ -754,11 +655,12 @@ function FullAnalyticsTable() {
                   <tr key={r.name} className={i % 2 === 1 ? 'row-odd' : ''}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="avatar-circle" style={{ background: av.bg }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, color: av.color }}>
-                            {r.initials}
-                          </span>
-                        </div>
+                        <DevAvatar
+                          name={r.name}
+                          initials={r.initials}
+                          profilePicture={r.profilePicture ?? null}
+                          avatarColors={av}
+                        />
                         <span className="dev-name-text">{r.name}</span>
                       </div>
                     </td>
@@ -781,7 +683,6 @@ function FullAnalyticsTable() {
                   </tr>
                 );
               })}
-
               <tr className="summary-row">
                 <td className="summary-cell">Team Average</td>
                 <td className="summary-cell text-center">{avg('assigned')}</td>
@@ -809,10 +710,6 @@ function FullAnalyticsTable() {
   );
 }
 
-/**
- * KPI Analytics: omit `selectedSprints` for the full table (demo data).
- * Dashboard: pass `selectedSprints` and `compareMode` for the same visual style plus sprint columns.
- */
 export default function DeveloperTable({
   selectedSprints,
   compareMode,

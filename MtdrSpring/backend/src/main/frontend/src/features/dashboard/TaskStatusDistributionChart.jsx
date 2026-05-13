@@ -41,10 +41,10 @@ function StatusTooltip({ active, payload }) {
         borderColor: fill,
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: fill, lineHeight: 1.2 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', lineHeight: 1.2 }}>
         {row.name}
       </Typography>
-      <Typography sx={{ mt: 0.75, fontSize: '1.05rem', fontWeight: 800, color: fill }}>
+      <Typography sx={{ mt: 0.75, fontSize: '1.05rem', fontWeight: 800, color: '#1A1A1A' }}>
         {row.value} tasks{pct ? ` · ${pct}` : ''}
       </Typography>
     </Box>
@@ -84,40 +84,6 @@ export default function TaskStatusDistributionChart({
         })),
     [distribution],
   );
-
-  const renderSliceLabel = ({
-    cx,
-    cy,
-    midAngle,
-    innerRadius,
-    outerRadius,
-    percent,
-    value,
-    fill,
-    payload,
-  }) => {
-    if (percent < 0.05) return null;
-    const RADIAN = Math.PI / 180;
-    const ir = innerRadius ?? 0;
-    const or = outerRadius ?? 0;
-    const radius = ir + (or - ir) * 0.58;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    const c = fill || payload?.fill || '#1A1A1A';
-    return (
-      <text
-        x={x}
-        y={y}
-        fill={c}
-        textAnchor={x > cx ? 'start' : 'end'}
-        dominantBaseline="central"
-        fontSize={12}
-        fontWeight={800}
-      >
-        {value}
-      </text>
-    );
-  };
 
   return (
     <div
@@ -203,8 +169,7 @@ export default function TaskStatusDistributionChart({
                 innerRadius={0}
                 outerRadius={pieRadius}
                 paddingAngle={2}
-                labelLine={false}
-                label={renderSliceLabel}
+                label={false}
                 animationDuration={PIE_ANIM_MS}
                 animationEasing="ease-out"
               >
@@ -260,7 +225,7 @@ export default function TaskStatusDistributionChart({
               component="span"
               sx={{
                 fontSize: '1rem',
-                color: d.color,
+                color: '#1A1A1A',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 0.75,
