@@ -352,13 +352,13 @@ public class BotActions {
         return Long.parseLong(m.group(1));
     }
 
-    /** Sprint list keyboard (shared by / list command and “back to sprints”). Signed-in users only see sprints where they have assignments. */
+    /** Sprint list keyboard (shared by / list command and “back to sprints”). Developers only see sprints where they have assignments; managers see every sprint. */
     private void sendSelectSprintKeyboard(String optionalNotice) {
         stateManager.setSelectingSprint(chatId);
         List<Sprint> allSprints = sprintService.findAll();
         List<Sprint> sprintsToShow = allSprints;
         Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
-        if (signedInId != null) {
+        if (signedInId != null && !isUserManager(signedInId)) {
             List<Long> sprintIdsWithWork = userTaskService.findSprintIdsWithAssignmentsForUser(signedInId);
             Set<Long> idSet = new HashSet<>(sprintIdsWithWork);
             sprintsToShow = allSprints.stream()
@@ -371,9 +371,12 @@ public class BotActions {
                     .resizeKeyboard(true)
                     .selective(true)
                     .build();
+            String emptyMsg = signedInId != null && isUserManager(signedInId)
+                    ? "📋 No sprints found yet.\n\nCreate sprints in the web app."
+                    : "📋 No sprints with tasks assigned to you yet.\n\nAsk your manager to assign tasks in the web app.";
             BotHelper.sendMessageToTelegram(
                     chatId,
-                    "📋 No sprints with tasks assigned to you yet.\n\nAsk your manager to assign tasks in the web app.",
+                    emptyMsg,
                     telegramClient,
                     emptyKb);
             stateManager.clearPendingState(chatId);
@@ -459,6 +462,26 @@ public class BotActions {
             return u.getEmail().trim();
         }
         return null;
+    }
+
+    private boolean isUserManager(Long userId) {
+        if (userService == null || userId == null) {
+            return false;
+        }
+        Optional<User> opt = userService.getUserById(userId);
+        return opt.map(u -> u.getType() != null && u.getType().equalsIgnoreCase("MANAGER")).orElse(false);
+    }
+
+    /**
+     * Signed-in manager viewing a sprint they opened themselves: full sprint task list (all assignees),
+     * not filtered to their own USER_TASK rows.
+     */
+    private boolean isSignedInManagerFullSprintView(Long assigneeUserId) {
+        Long signed = stateManager.getTelegramSignedInUserId(chatId);
+        return signed != null
+                && assigneeUserId != null
+                && signed.equals(assigneeUserId)
+                && isUserManager(assigneeUserId);
     }
 
     private static String helloMyTodoBotWithDeveloperName(String developerName) {
@@ -587,13 +610,29 @@ public class BotActions {
 
     private void showSprintTasksForAssignee(Long sprintId, Long assigneeUserId) {
         List<ToDoItem> sprintItems = todoService.findByAssignedSprint(Math.toIntExact(sprintId));
-        UserTaskService.UserSprintTaskListIndex sprintIdx =
-                userTaskService.loadUserSprintTaskListIndex(assigneeUserId, sprintId);
-        Set<Long> allowedTaskIds = sprintIdx.assignedTaskIds;
-        Set<Long> myCompletedTaskIds = sprintIdx.myCompletedAssignmentTaskIds;
-        List<ToDoItem> mine = sprintItems.stream()
-                .filter(item -> allowedTaskIds.contains((long) item.getID()))
-                .collect(Collectors.toList());
+        final List<ToDoItem> mine;
+        final List<ToDoItem> activeItems;
+        final List<ToDoItem> doneItems;
+
+        if (isSignedInManagerFullSprintView(assigneeUserId)) {
+            mine = sprintItems;
+            activeItems = mine.stream().filter(item -> !item.isDone()).collect(Collectors.toList());
+            doneItems = mine.stream().filter(ToDoItem::isDone).collect(Collectors.toList());
+        } else {
+            UserTaskService.UserSprintTaskListIndex sprintIdx =
+                    userTaskService.loadUserSprintTaskListIndex(assigneeUserId, sprintId);
+            Set<Long> allowedTaskIds = sprintIdx.assignedTaskIds;
+            Set<Long> myCompletedTaskIds = sprintIdx.myCompletedAssignmentTaskIds;
+            mine = sprintItems.stream()
+                    .filter(item -> allowedTaskIds.contains((long) item.getID()))
+                    .collect(Collectors.toList());
+            activeItems = mine.stream()
+                    .filter(item -> !item.isDone() && !myCompletedTaskIds.contains((long) item.getID()))
+                    .collect(Collectors.toList());
+            doneItems = mine.stream()
+                    .filter(item -> item.isDone() || myCompletedTaskIds.contains((long) item.getID()))
+                    .collect(Collectors.toList());
+        }
 
         Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
         boolean directSessionSprint = signedIn != null && signedIn.equals(assigneeUserId);
@@ -609,9 +648,6 @@ public class BotActions {
             keyboard.add(new KeyboardRow(BotLabels.LOG_OUT.getLabel()));
         }
 
-        List<ToDoItem> activeItems = mine.stream()
-                .filter(item -> !item.isDone() && !myCompletedTaskIds.contains((long) item.getID()))
-                .collect(Collectors.toList());
         for (ToDoItem item : activeItems) {
             KeyboardRow currentRow = new KeyboardRow();
             String taskLabel = keyboardLabelForItem(item);
@@ -622,9 +658,6 @@ public class BotActions {
             keyboard.add(currentRow);
         }
 
-        List<ToDoItem> doneItems = mine.stream()
-                .filter(item -> item.isDone() || myCompletedTaskIds.contains((long) item.getID()))
-                .collect(Collectors.toList());
         for (ToDoItem item : doneItems) {
             KeyboardRow currentRow = new KeyboardRow();
             String taskLabel = keyboardLabelForItem(item);
@@ -641,10 +674,18 @@ public class BotActions {
                 .selective(true)
                 .build();
 
-        String message = mine.isEmpty()
-                ? ("📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to "
-                        + (directSessionSprint ? "sprints." : "users or sprints."))
-                : "📋 *Your tasks (Sprint " + sprintId + "):*\n\nClick on a task to view details and change status.";
+        final String message;
+        if (mine.isEmpty()) {
+            message = isSignedInManagerFullSprintView(assigneeUserId)
+                    ? ("📋 *No tasks in Sprint " + sprintId + " yet.*\n\n⬅️ Go back to sprints.")
+                    : ("📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to "
+                            + (directSessionSprint ? "sprints." : "users or sprints."));
+        } else if (isSignedInManagerFullSprintView(assigneeUserId)) {
+            message = "📋 *Sprint " + sprintId + " — all team tasks (manager)*\n\n"
+                    + "Tap a task for a read-only summary. Assignees update status from their own sign-in.";
+        } else {
+            message = "📋 *Your tasks (Sprint " + sprintId + "):*\n\nClick on a task to view details and change status.";
+        }
 
         BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
     }
@@ -713,7 +754,11 @@ public class BotActions {
             return;
         }
         
-        showTaskDetailsWithStatusOptions(task, sprintId, assigneeUserId);
+        if (isSignedInManagerFullSprintView(assigneeUserId)) {
+            showTaskDetailsReadOnly(task, sprintId, assigneeUserId);
+        } else {
+            showTaskDetailsWithStatusOptions(task, sprintId, assigneeUserId);
+        }
         exit = true;
     }
     
@@ -797,6 +842,44 @@ public class BotActions {
         // Store task selection state
         stateManager.setSelectingTaskStatus(chatId, task.getID(), sprintId, assigneeUserId);
         
+        BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
+    }
+
+    /**
+     * Manager sprint overview: same task fields as the assignee flow, without status actions.
+     */
+    private void showTaskDetailsReadOnly(ToDoItem task, Long sprintId, Long assigneeUserId) {
+        ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
+                .keyboard(List.of(new KeyboardRow("⬅️ Back to tasks")))
+                .resizeKeyboard(true)
+                .selective(true)
+                .build();
+
+        String taskStatus = formatTaskStatusForDisplay(task.getStatus());
+        String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty()
+                ? task.getDescription()
+                : "No description provided";
+        String dueDateLine;
+        if (task.getDueDate() == null) {
+            dueDateLine = "Not set";
+        } else {
+            dueDateLine = task.getDueDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX"));
+        }
+
+        String message = String.format(
+                "📋 *Task Details* _(manager, read-only)_\n\n"
+                        + "*Title:* %s\n\n"
+                        + "*Description:* %s\n\n"
+                        + "*Current Status:* %s\n\n"
+                        + "*Due date:* %s\n\n"
+                        + "Assignees change status after signing in as themselves.",
+                escapeMarkdown(task.getTitle()),
+                escapeMarkdown(taskDescription),
+                escapeMarkdown(taskStatus),
+                escapeMarkdown(dueDateLine)
+        );
+
+        stateManager.setSelectingTaskStatus(chatId, task.getID(), sprintId, assigneeUserId);
         BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
     }
     
@@ -937,6 +1020,17 @@ public class BotActions {
             } else {
                 sendSelectSprintKeyboard(null);
             }
+            exit = true;
+            return;
+        }
+
+        Long assigneeContext = stateManager.getViewingSelectedUserId(chatId);
+        if (isSignedInManagerFullSprintView(assigneeContext)) {
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "Manager overview is read-only. Tap ⬅️ Back to tasks.",
+                    telegramClient,
+                    null);
             exit = true;
             return;
         }
