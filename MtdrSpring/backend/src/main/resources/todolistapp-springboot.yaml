@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         - name: todolistapp-springboot
-          image: %DOCKER_REGISTRY%/todolistapp-springboot:0.1
+          image: docker.io/dockerdiegojules/todolistapp-springboot:0.1
           imagePullPolicy: Always
           env:
             - name: DB_USERNAME
