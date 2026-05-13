@@ -1,7 +1,9 @@
 package com.springboot.MyTodoList.util;
 
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -250,12 +252,13 @@ public class BotActions {
                 exit = true;
                 return;
             }
+            Long sprintId = item.getAssignedSprint() != null ? item.getAssignedSprint().longValue() : null;
             /*
              * Do not set the whole TASK to DONE here — that would mark every assignee complete.
              * Completion is recorded only after hours are entered: USER_TASK for this user → COMPLETED,
              * then TaskAssignmentSyncService updates TASK when all assignees are done.
              */
-            stateManager.setWaitingForHours(chatId, id, actingUserId);
+            stateManager.setWaitingForHours(chatId, id, sprintId, actingUserId);
             BotHelper.sendMessageToTelegram(
                 chatId,
                 "How many hours did you work on this task? (Please enter a whole number)",
@@ -436,6 +439,22 @@ public class BotActions {
             return "⏳ Pending";
         }
         return "📌 " + dbStatus.trim();
+    }
+
+    /**
+     * Due date for Telegram task details: when the DB value is start-of-day in its offset (typical for
+     * "due on this calendar date" from the web app), show only yyyy-MM-dd to avoid noisy "00:00:00 Z".
+     * Otherwise show date, time, and numeric offset (e.g. +00:00) instead of a bare Z.
+     */
+    private static String formatDueDateForTelegram(OffsetDateTime dt) {
+        if (dt == null) {
+            return "Not set";
+        }
+        LocalTime wall = dt.toOffsetTime().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+        if (LocalTime.MIDNIGHT.equals(wall)) {
+            return dt.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        }
+        return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm xxx"));
     }
 
     private static String statusBracketForTaskList(ToDoItem item) {
@@ -819,12 +838,7 @@ public class BotActions {
         String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty() 
                 ? task.getDescription() 
                 : "No description provided";
-        String dueDateLine;
-        if (task.getDueDate() == null) {
-            dueDateLine = "Not set";
-        } else {
-            dueDateLine = task.getDueDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX"));
-        }
+        String dueDateLine = formatDueDateForTelegram(task.getDueDate());
         
         String message = String.format(
                 "📋 *Task Details*\n\n" +
@@ -859,12 +873,7 @@ public class BotActions {
         String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty()
                 ? task.getDescription()
                 : "No description provided";
-        String dueDateLine;
-        if (task.getDueDate() == null) {
-            dueDateLine = "Not set";
-        } else {
-            dueDateLine = task.getDueDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX"));
-        }
+        String dueDateLine = formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
                 "📋 *Task Details* _(manager, read-only)_\n\n"
@@ -1077,7 +1086,8 @@ public class BotActions {
         if ("DONE".equals(newStatus)) {
             logger.debug("fnSelectTaskStatus: Status is DONE, asking for hours");
             Long actingUserId = stateManager.getViewingSelectedUserId(chatId);
-            stateManager.setWaitingForHours(chatId, taskId, actingUserId);
+            Long sprintId = stateManager.getViewingSprintId(chatId);
+            stateManager.setWaitingForHours(chatId, taskId, sprintId, actingUserId);
             BotHelper.sendMessageToTelegram(
                     chatId,
                     "How many hours did you work on this task? (Please enter a whole number)",
@@ -1217,14 +1227,34 @@ public class BotActions {
                         exit = true;
                         return;
                     }
-                    saveWorkedHours(taskId, hours);
+                    Long sprintIdWait = stateManager.getSprintIdWaitingForHours(chatId);
+                    Long assigneeWait = stateManager.getActingUserIdForHours(chatId);
+                    if (!saveWorkedHours(taskId, hours)) {
+                        exit = true;
+                        return;
+                    }
+                    stateManager.clearPendingState(chatId);
                     BotHelper.sendMessageToTelegram(
                         chatId,
                         hours + " hours recorded! ✓",
                         telegramClient,
                         null
                     );
-                    stateManager.clearPendingState(chatId);
+                    Long sid = sprintIdWait;
+                    Long aid = assigneeWait;
+                    if (sid == null) {
+                        ToDoItem t = todoService.getToDoItemById(taskId);
+                        if (t != null && t.getAssignedSprint() != null) {
+                            sid = t.getAssignedSprint().longValue();
+                        }
+                    }
+                    if (aid == null) {
+                        aid = Long.valueOf(telegramUserMappingService.getUserIdByChatId(chatId));
+                    }
+                    if (sid != null && aid != null) {
+                        stateManager.setViewingSprintTasks(chatId, sid, aid);
+                        showSprintTasksForAssignee(sid, aid);
+                    }
                 } catch (NumberFormatException e) {
                     BotHelper.sendMessageToTelegram(
                         chatId,
@@ -1333,8 +1363,9 @@ public class BotActions {
 
     /**
      * Save worked hours for a task (Telegram): updates only this user's USER_TASK, then syncs TASK status.
+     * @return false if persistence failed (error message already sent)
      */
-    private void saveWorkedHours(Integer taskId, Integer hours) {
+    private boolean saveWorkedHours(Integer taskId, Integer hours) {
         try {
             Long uid = stateManager.getActingUserIdForHours(chatId);
             if (uid == null) {
@@ -1342,6 +1373,7 @@ public class BotActions {
             }
             userTaskService.saveWorkedHours(uid, (long) taskId, hours);
             logger.info("Saved {} hours for task {} by user {}", hours, taskId, uid);
+            return true;
         } catch (Exception e) {
             logger.error("Error saving worked hours for task {}: {}", taskId, e.getMessage(), e);
             BotHelper.sendMessageToTelegram(
@@ -1350,6 +1382,7 @@ public class BotActions {
                 telegramClient,
                 null
             );
+            return false;
         }
     }
 

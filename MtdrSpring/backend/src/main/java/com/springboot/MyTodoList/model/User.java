@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -23,6 +24,7 @@ public class User {
     @Column(name = "PHONENUMBER")
     private String phonenumber;
 
+    @JsonIgnore
     @Column(name = "PASSWORD")
     private String userpassword;
 

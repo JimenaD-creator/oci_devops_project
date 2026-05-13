@@ -44,11 +44,12 @@ public class BotStateManager {
      * @param actingUserId DB user id who claimed the task (from sprint user-picker when present); stored in
      *                     {@code selectedUserId} until hours are saved, so it survives the state transition from
      *                     {@code VIEWING_SPRINT_TASKS}.
+     * @param sprintId sprint context for returning to the task list after hours are saved (may be null for legacy tasks)
      */
-    public void setWaitingForHours(Long chatId, Integer taskId, Long actingUserId) {
-        BotUserState state = new BotUserState(chatId, taskId, null, actingUserId, "WAITING_FOR_HOURS");
+    public void setWaitingForHours(Long chatId, Integer taskId, Long sprintId, Long actingUserId) {
+        BotUserState state = new BotUserState(chatId, taskId, sprintId, actingUserId, "WAITING_FOR_HOURS");
         userStates.put(chatId, state);
-        logger.info("Set chat {} to waiting for hours for task {}, actingUserId={}", chatId, taskId, actingUserId);
+        logger.info("Set chat {} to waiting for hours for task {}, sprintId={}, actingUserId={}", chatId, taskId, sprintId, actingUserId);
     }
     
     /**
@@ -148,6 +149,23 @@ public class BotStateManager {
             return null;
         }
         return state.getSelectedUserId();
+    }
+
+    /** Sprint context while waiting for worked-hours input (to restore task list after save). */
+    public Long getSprintIdWaitingForHours(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null) {
+            return null;
+        }
+        if (!"WAITING_FOR_HOURS".equals(state.getState())) {
+            return null;
+        }
+        if (isStateExpired(state)) {
+            logger.info("State for chat {} has timed out, clearing", chatId);
+            clearPendingState(chatId);
+            return null;
+        }
+        return state.getSprintId();
     }
     
     /**

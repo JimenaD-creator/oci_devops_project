@@ -54,10 +54,19 @@ function computeRecommendationList(ins) {
   if (!ins) return [];
   const actionables = [...(ins.actionableRecommendations ?? [])];
   const workloadRows = [...(ins.workloadRecommendations ?? [])];
-  const structuredWorkload = workloadRows.map((r) => ({
-    category: 'workload_redistribution',
-    text: `Move ~${r.tasksToMove} task(s)${r.from ? ` from ${r.from}` : ''}${r.to ? ` to ${r.to}` : ''}. ${r.reason ?? ''}`.trim(),
-  }));
+  const structuredWorkload = workloadRows.map((r) => {
+    const from = r.from ? String(r.from).trim() : '';
+    const to = r.to ? String(r.to).trim() : '';
+    const n = r.tasksToMove;
+    const rs = typeof r.reason === 'string' ? r.reason.trim() : '';
+    const hasMove = from && to && n != null && Number.isFinite(Number(n));
+    const head = hasMove ? `Move ~${n} task(s) from ${from} to ${to}` : `Move ~${n ?? '?'} task(s)`;
+    const text = rs ? `${head}: ${rs}` : `${head}.`;
+    return {
+      category: 'workload_redistribution',
+      text,
+    };
+  });
 
   const dropAiWorkloadDuplicates = structuredWorkload.length > 0;
   const merged = [
