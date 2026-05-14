@@ -1,7 +1,7 @@
 workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A, and Telegram task bot." {
-
+    !adrs doc/arch
     model {
-        developer = person "Developer" "Updates own tasks via Telegram; checks personal KPIs and AI views on the web when needed." "Person"
+        developer = person "Developer" "Manages tasks and views personal KPIs via Telegram or the web application." "Person"
         manager = person "Manager" "Plans team tasks and sprints, monitors KPIs and AI sprint insights, uses manager chat." "Person"
         administrator = person "Administrator" "Creates projects and teams, assigns members, maintains catalog data." "Person"
 
@@ -11,11 +11,11 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         taskManager = softwareSystem "Task Manager" "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows." {
             reactApp = container "React Frontend" "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin." "React 18" "Web Browser, Container, Single-page application"
             apiApp = container "Spring Boot Backend" "Business logic, HTTP APIs, jobs, Telegram bot, and AI orchestration." "Java 17, Spring Boot" "Container, Server-side application" {
-                kpiApi = component "KPI API" "Exposes productivity and delivery metrics; can refresh KPI aggregates." "Spring REST"
-                managerChatApi = component "Manager chat API" "Entry point for contextual manager chat." "Spring REST"
-                insightsApi = component "Sprint insights API" "Starts and reads asynchronous sprint insight generation." "Spring REST"
-                embeddingsApi = component "Embeddings API" "Indexes sprint work for semantic search." "Spring REST"
-                domainApi = component "Domain API" "Tasks, projects, sprints, teams, users, assignments, admin, radar, legacy task list." "Spring REST"
+                kpiApi = component "KPI API" "Spring REST at /api/kpi: aggregate reads (often via KpiRepository) and POST calculate that invokes KpiService to persist sprint KPI fields." "Spring REST"
+                managerChatApi = component "Manager chat API" "Spring REST at /api/chat; entry point for ManagerChatController." "Spring REST"
+                insightsApi = component "Sprint insights API" "Spring REST under /api/insights: InsightsController (async sprint narratives, polling) and DeveloperRadarController (developer radar data)." "Spring REST"
+                embeddingsApi = component "Embeddings API" "Spring REST under /api/embeddings; EmbeddingController for sprint-wide embedding build/search helpers." "Spring REST"
+                domainApi = component "Domain API" "Spring REST for core domain CRUD outside kpi/chat/insights/embeddings: Task, Project, Sprint, Team, User, UserTask, UserProfile, Admin, ToDoItem controllers." "Spring REST"
 
                 telegramBot = component "Telegram bot" "Receives messages and runs bot command flows." "TelegramBots SDK"
                 taskOps = component "Task operations" "Creates and updates tasks from the bot." "Spring Service"
@@ -43,9 +43,9 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
         reactApp -> kpiApi "Fetches KPI snapshots and requests KPI recomputation jobs using" "JSON / HTTPS"
         reactApp -> managerChatApi "Sends chat turns with project and optional sprint scope; receives assistant replies using" "JSON / HTTPS"
-        reactApp -> insightsApi "Starts asynchronous insight jobs and retrieves stored sprint narratives using" "JSON / HTTPS"
+        reactApp -> insightsApi "Starts asynchronous insight jobs, reads sprint narratives, and loads developer radar views using" "JSON / HTTPS"
         reactApp -> embeddingsApi "Requests sprint-wide embedding rebuilds for semantic search using" "JSON / HTTPS"
-        reactApp -> domainApi "Creates, reads, updates, and deletes tasks, projects, sprints, teams, users, assignments, radar, and admin data using" "JSON / HTTPS"
+        reactApp -> domainApi "Creates, reads, updates, and deletes tasks, projects, sprints, teams, users, assignments, profiles, and admin data using" "JSON / HTTPS"
 
         telegram -> telegramBot "Delivers inbound messages, edits, and callback queries to the task bot"
         telegramBot -> taskOps "Runs the parsed task command through the task operations service using"
@@ -61,7 +61,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         telegramIdentity -> dataRepo "Reads and writes links between Telegram accounts and application users using" "JPA / JDBC"
 
         managerChatApi -> chatOrchestration "Routes authenticated browser chat traffic into orchestration using" "Spring"
-        insightsApi -> sprintAi "Starts asynchronous sprint insight work on the insight pipeline using" "Spring"
+        insightsApi -> sprintAi "Narrative insight traffic delegates to GeminiService; developer-radar reads hit repositories directly" "Spring"
 
         embeddingsApi -> semanticRetrieval "Requests sprint-wide embedding build or refresh work using" "Spring"
 
@@ -89,6 +89,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             deploymentNode "Oracle Cloud Infrastructure" {
                 containerInstance database
 
+
                 deploymentNode "Oracle Kubernetes Engine (OKE)" {
                     deploymentNode "Namespace mtdrworkshop" "Logical boundary in the cluster for the product’s workloads." "Kubernetes" {
                         productionLb = infrastructureNode "OCI load balancer" "Public entry point: OCI network load balancer forwards port 80 to the backend service port." "Kubernetes / OCI"
@@ -110,28 +111,43 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
     }
 
     views {
-        systemContext taskManager "SystemContext" {
+        # 1. System landscape — people, Task Manager, and external systems (same scope as course “Landscape” slide)
+        systemLandscape "Landscape" "Developers, managers, and administrators use Task Manager alongside Telegram and Google Gemini." {
             include *
+            autoLayout lr
         }
 
-        container taskManager "Containers" {
+        # 2. System context
+        systemContext taskManager "SystemContext" "Task Manager in its environment: users, Telegram, and Gemini." {
             include *
+            autoLayout lr
         }
 
-        component apiApp "Components" {
+        # 3. Containers
+        container taskManager "Containers" "Web UI, Spring Boot API, Oracle ADB, and external systems." {
             include *
+            autoLayout lr
         }
 
-        deployment taskManager "Production" "Deployment" {
+        # 4. Components (inside Spring Boot)
+        component apiApp "Components" "REST adapters, bot, domain services, AI orchestration, and persistence inside the API container." {
             include *
+            autoLayout lr
         }
 
-        dynamic apiApp "RAG_Manager_Chat" "Manager chat with retrieval then LLM answer." {
-            managerChatApi -> chatOrchestration "Authenticates the caller and forwards the chat message with project and optional sprint scope"
-            chatOrchestration -> semanticRetrieval "Sends the latest manager question to the embedding and retrieval step"
-            semanticRetrieval -> gemini "Obtains embedding vectors for question and task text from the cloud model" "HTTPS"
-            chatOrchestration -> dataRepo "Loads the most similar tasks plus project and sprint context for the answer" "JPA / JDBC"
-            chatOrchestration -> gemini "Sends the composed prompt and receives the assistant’s natural-language reply" "HTTPS"
+        # 5. Deployment
+        deployment taskManager "Production" "Deployment" "OKE pods, load balancer, and Autonomous Database on OCI." {
+            include *
+            autoLayout lr
+        }
+
+        # 6a. Dynamic — RAG / semantic manager chat (course-style numbered steps; component ids match this workspace)
+        dynamic apiApp "RAG_Insight_Flow" "Retrieves context via embeddings before calling the LLM (manager chat)." {
+            managerChatApi -> chatOrchestration "1. REST receives authenticated chat request and forwards to orchestration"
+            chatOrchestration -> semanticRetrieval "2. Orchestration asks semantic retrieval to embed the question and rank tasks"
+            semanticRetrieval -> gemini "3. Calls Gemini embedding API for query (and task chunks when indexing)" "HTTPS"
+            chatOrchestration -> dataRepo "4. Loads top-ranked task excerpts and sprint/project context for the prompt" "JPA / JDBC"
+            chatOrchestration -> gemini "5. Sends context-augmented prompt; receives natural-language reply" "HTTPS"
             autoLayout lr
         }
 
@@ -158,6 +174,13 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             telegramIdentity -> dataRepo "Reads or updates the stored link between Telegram and application accounts" "JPA / JDBC"
             telegramBot -> taskOps "Interprets the command and runs the matching task workflow"
             taskOps -> dataRepo "Reads and writes task records for that user in a single transactional step" "JPA / JDBC"
+            autoLayout lr
+        }
+
+        # KPI recompute: KpiController -> KpiService -> persistence (scheduled job calls same service in code)
+        dynamic apiApp "KPI_Calculation_Flow" "HTTP-triggered or scheduled KPI recompute into Sprint columns (no Gemini on this path)." {
+            kpiApi -> kpiEngine "1. POST /api/kpi/sprint/{sprintId}/calculate or nightly @Scheduled invokes KpiService"
+            kpiEngine -> dataRepo "2. KpiRepository aggregates and Sprint KPI column persistence"
             autoLayout lr
         }
 
@@ -203,3 +226,4 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         }
     }
 }
+
