@@ -4,7 +4,7 @@
 **Status:** Accepted
 
 ## Context
-KPIs (Productivity Score, Completion Rate) need to stay up to date without requiring manual triggers for every single task update.
+KPI fields on each sprint (e.g. completion rate, on-time delivery, team participation, workload balance) need to stay up to date without requiring manual triggers for every single task update.
 
 ## Decision
 We implemented a **Scheduled Batch Processing Strategy**:
