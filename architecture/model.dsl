@@ -8,7 +8,7 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
         gemini = softwareSystem "Google Gemini API" "LLM used for Embeddings and Text Generation." "External System"
 
         taskManager = softwareSystem "Task Manager AI" "Main System" {
-            reactApp = container "React Frontend" "Web Dashboard for KPI visualization." "React 18" "Web Browser"
+            reactApp = container "React Frontend" "Web Dashboard for KPI visualization and AI Semantic Chat." "React 18" "Web Browser"
             
             apiApp = container "Spring Boot Backend" "Processes business logic and AI orchestration." "Java 17, Spring Boot" {
                 kpiController = component "Kpi Controller" "Exposes endpoints for metrics." "Spring REST"
@@ -26,11 +26,14 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
             database = container "Oracle Autonomous DB" "Persistent storage for tasks and embeddings." "Oracle ADB" "Database"
         }
 
-        developer -> reactApp "Uses"
+        # --- Relationships ---
+
+        developer -> reactApp "Uses to manage tasks and view KPIs"
+        manager -> reactApp "Uses to access AI Semantic Chat and team insights"
         manager -> telegram "Uses commands /kpi, /insights"
-        manager -> chatController "Asks semantic questions about the project"
-        
+
         reactApp -> kpiController "API Calls (JSON/HTTPS)"
+        reactApp -> chatController "Sends semantic queries (JSON/HTTPS)"
         telegram -> botLogic "Sends Webhook Updates"
         
         botLogic -> kpiService "Requests data"
@@ -66,26 +69,37 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
     }
 
     views {
+        # 1. System Landscape (NUEVO - requerido por la actividad)
+        systemLandscape "Landscape" {
+            include *
+            autoLayout lr
+        }
+
+        # 2. System Context
         systemContext taskManager "SystemContext" {
             include *
             autoLayout lr
         }
 
+        # 3. Containers
         container taskManager "Containers" {
             include *
             autoLayout lr
         }
 
+        # 4. Components
         component apiApp "Components" {
             include *
             autoLayout lr
         }
 
+        # 5. Deployment
         deployment taskManager "Production" "Deployment" {
             include *
             autoLayout lr
         }
 
+        # 6a. Dynamic - RAG Semantic Chat Flow
         dynamic apiApp "RAG_Insight_Flow" "Shows how the system retrieves context before calling the LLM." {
             chatController -> chatService "1. User query received"
             chatService -> embeddingService "2. Convert query to vector"
@@ -93,6 +107,18 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
             chatService -> dataRepo "4. Semantic search for relevant tasks"
             chatService -> geminiService "5. Call LLM with retrieved context"
             geminiService -> gemini "6. Generate final response"
+            autoLayout lr
+        }
+
+        # 6b. Dynamic - KPI Calculation Flow (segundo use case requerido)
+        dynamic apiApp "KPI_Calculation_Flow" "Shows how KPI metrics are calculated and enriched with AI insights." {
+            kpiController -> kpiService "1. Request KPI calculation for sprint"
+            kpiService -> dataRepo "2. Fetch tasks and user assignments"
+            dataRepo -> kpiService "3. Return raw task data"
+            kpiService -> geminiService "4. Request AI-generated sprint insight"
+            geminiService -> gemini "5. Call Gemini API asynchronously"
+            gemini -> geminiService "6. Return insight text"
+            geminiService -> kpiController "7. Insight stored and ready"
             autoLayout lr
         }
 
