@@ -44,6 +44,15 @@ import com.springboot.MyTodoList.service.UserTaskService;
 @ExtendWith(MockitoExtension.class)
 class BotActionsTest {
 
+    private static final long CHAT_ID_CREATE_TASK = 100L;
+    private static final long CHAT_ID_MANAGER = 200L;
+    private static final long CHAT_ID_DEVELOPER = 300L;
+    private static final long USER_ID_REGULAR = 1L;
+    private static final long USER_ID_MANAGER = 7L;
+    private static final long USER_ID_DEVELOPER = 9L;
+    private static final long SPRINT_ID_MANAGER_VIEW = 5L;
+    private static final long SPRINT_ID_DEVELOPER_VIEW = 8L;
+
     @Mock
     private TelegramClient telegramClient;
     @Mock
@@ -82,8 +91,8 @@ class BotActionsTest {
     // New item from the bot menu: after Add new item, the bot accepts text as the task and clears the wait state.
     @Test
     void createTask() throws Exception {
-        long chatId = 100L;
-        stateManager.setTelegramSignedInUser(chatId, 1L);
+        long chatId = CHAT_ID_CREATE_TASK;
+        stateManager.setTelegramSignedInUser(chatId, USER_ID_REGULAR);
 
         BotActions firstMessage = newBotActions();
         firstMessage.setChatId(chatId);
@@ -105,9 +114,9 @@ class BotActionsTest {
     // Manager: completed tasks for the sprint show on the keyboard with done markers; Back returns the sprint chooser.
     @Test
     void viewCompletedTasksInSprint() throws Exception {
-        long chatId = 200L;
-        Long sprintId = 5L;
-        Long managerId = 7L;
+        long chatId = CHAT_ID_MANAGER;
+        Long sprintId = SPRINT_ID_MANAGER_VIEW;
+        Long managerId = USER_ID_MANAGER;
 
         botActions.setChatId(chatId);
         botActions.setRequestText("pw");
@@ -138,6 +147,9 @@ class BotActionsTest {
 
         verify(userTaskService, never()).loadUserSprintTaskListIndex(anyLong(), anyLong());
 
+        // Outbound replies are assembled in BotHelper.sendMessageToTelegram and sent with bot.execute(SendMessage).
+        // Execute(SendMessage) is only asserted via verify(...) here. Credential verification emits more than one message, so getValue() returns the last SendMessage
+        // (task list body and reply keyboard).
         ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
         verify(telegramClient, atLeast(2)).execute(captor.capture());
         SendMessage taskListMsg = captor.getValue();
@@ -164,6 +176,8 @@ class BotActionsTest {
         backToSprints.setRequestText("⬅️ Back to Sprints");
         backToSprints.fnViewSprintTasks();
 
+        // fnViewSprintTasks sends one more reply through BotHelper, again via execute on the same mock. atLeast(3)
+        // accounts for the two SendMessage calls from credential handling plus this sprint picker.
         ArgumentCaptor<SendMessage> captor2 = ArgumentCaptor.forClass(SendMessage.class);
         verify(telegramClient, atLeast(3)).execute(captor2.capture());
         SendMessage pickerMsg = captor2.getValue();
@@ -175,9 +189,9 @@ class BotActionsTest {
     // Developer: for that sprint, completed tasks on the keyboard are only the ones tied to that user.
     @Test
     void viewCompletedTasksForUserInSprint() throws Exception {
-        long chatId = 300L;
-        Long sprintId = 8L;
-        Long developerId = 9L;
+        long chatId = CHAT_ID_DEVELOPER;
+        Long sprintId = SPRINT_ID_DEVELOPER_VIEW;
+        Long developerId = USER_ID_DEVELOPER;
 
         User developer = new User();
         developer.setId(developerId);
@@ -211,6 +225,9 @@ class BotActionsTest {
 
         verify(userTaskService, times(1)).loadUserSprintTaskListIndex(eq(developerId), eq(sprintId));
 
+        // BotHelper issues execute(SendMessage) with the TelegramClient that BotActions injects.
+        // Credential success triggers a short run of separate sends. The captor records each payload; getValue() exposes
+        // the last SendMessage so the assertions below target the task list rather than an earlier status message.
         ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
         verify(telegramClient, atLeast(2)).execute(captor.capture());
         SendMessage taskList = captor.getValue();
