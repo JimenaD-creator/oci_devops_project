@@ -11,11 +11,11 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         taskManager = softwareSystem "Task Manager" "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows." {
             reactApp = container "React Frontend" "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin." "React 18" "Web Browser, Container, Single-page application"
             apiApp = container "Spring Boot Backend" "Business logic, HTTP APIs, jobs, Telegram bot, and AI orchestration." "Java 17, Spring Boot" "Container, Server-side application" {
-                kpiApi = component "KPI API" "Spring REST at /api/kpi: aggregate reads (often via KpiRepository) and POST calculate that invokes KpiService to persist sprint KPI fields." "Spring REST"
-                managerChatApi = component "Manager chat API" "Spring REST at /api/chat; entry point for ManagerChatController." "Spring REST"
-                insightsApi = component "Sprint insights API" "Spring REST under /api/insights: InsightsController (async sprint narratives, polling) and DeveloperRadarController (developer radar data)." "Spring REST"
-                embeddingsApi = component "Embeddings API" "Spring REST under /api/embeddings; EmbeddingController for sprint-wide embedding build/search helpers." "Spring REST"
-                domainApi = component "Domain API" "Spring REST for core domain CRUD outside kpi/chat/insights/embeddings: Task, Project, Sprint, Team, User, UserTask, UserProfile, Admin, ToDoItem controllers." "Spring REST"
+                kpiApi = component "KPI API" "Exposes productivity and delivery metrics; supports on-demand KPI refresh." "Spring REST"
+                managerChatApi = component "Manager chat API" "Entry point for contextual manager chat over project and sprint data." "Spring REST"
+                insightsApi = component "Sprint insights API" "Starts and reads asynchronous sprint narratives; serves developer radar views." "Spring REST"
+                embeddingsApi = component "Embeddings API" "Builds and refreshes task embeddings for semantic search." "Spring REST"
+                domainApi = component "Domain API" "Tasks, projects, sprints, teams, users, assignments, admin, and legacy task list." "Spring REST"
 
                 telegramBot = component "Telegram bot" "Receives messages and runs bot command flows." "TelegramBots SDK"
                 taskOps = component "Task operations" "Creates and updates tasks from the bot." "Spring Service"
@@ -60,8 +60,8 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         userDirectory -> dataRepo "Reads user directory data for bot menus using" "JPA / JDBC"
         telegramIdentity -> dataRepo "Reads and writes links between Telegram accounts and application users using" "JPA / JDBC"
 
-        managerChatApi -> chatOrchestration "Routes authenticated browser chat traffic into orchestration using" "Spring"
-        insightsApi -> sprintAi "Narrative insight traffic delegates to GeminiService; developer-radar reads hit repositories directly" "Spring"
+        managerChatApi -> chatOrchestration "Routes browser chat traffic into orchestration using" "Spring"
+        insightsApi -> sprintAi "Delegates sprint narrative generation to AI orchestration using" "Spring"
 
         embeddingsApi -> semanticRetrieval "Requests sprint-wide embedding build or refresh work using" "Spring"
 
@@ -141,46 +141,45 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             autoLayout lr
         }
 
-        # 6a. Dynamic — RAG / semantic manager chat (course-style numbered steps; component ids match this workspace)
-        dynamic apiApp "RAG_Insight_Flow" "Retrieves context via embeddings before calling the LLM (manager chat)." {
-            managerChatApi -> chatOrchestration "1. REST receives authenticated chat request and forwards to orchestration"
-            chatOrchestration -> semanticRetrieval "2. Orchestration asks semantic retrieval to embed the question and rank tasks"
-            semanticRetrieval -> gemini "3. Calls Gemini embedding API for query (and task chunks when indexing)" "HTTPS"
-            chatOrchestration -> dataRepo "4. Loads top-ranked task excerpts and sprint/project context for the prompt" "JPA / JDBC"
-            chatOrchestration -> gemini "5. Sends context-augmented prompt; receives natural-language reply" "HTTPS"
+        # 6a. Dynamic — RAG semantic chat
+        dynamic apiApp "RAG_Insight_Flow" "Retrieves context before calling the LLM for manager chat." {
+            managerChatApi -> chatOrchestration "User query received"
+            chatOrchestration -> semanticRetrieval "Embed question and rank similar tasks"
+            semanticRetrieval -> gemini "Call embedding API" "HTTPS"
+            chatOrchestration -> dataRepo "Load top tasks and sprint context" "JPA / JDBC"
+            chatOrchestration -> gemini "Call LLM with retrieved context" "HTTPS"
             autoLayout lr
         }
 
         dynamic apiApp "Sprint_Insights_Generation" "Background job: KPIs, context, LLM, save insight." {
-            insightsApi -> sprintAi "Accepts a browser request to generate a narrative for a chosen sprint"
-            sprintAi -> kpiEngine "Recomputes or reads frozen KPI aggregates for that sprint"
-            sprintAi -> dataRepo "Loads sprint roster, tasks, and recent summaries to build the insight context" "JPA / JDBC"
-            sprintAi -> gemini "Sends the insight prompt and receives generated narrative text" "HTTPS"
-            sprintAi -> dataRepo "Persists the new sprint insight text and audit metadata" "JPA / JDBC"
+            insightsApi -> sprintAi "Accepts generate narrative request"
+            sprintAi -> kpiEngine "Refreshes KPI snapshot for sprint"
+            sprintAi -> dataRepo "Loads sprint roster and task context" "JPA / JDBC"
+            sprintAi -> gemini "Sends insight prompt and receives narrative" "HTTPS"
+            sprintAi -> dataRepo "Persists insight result" "JPA / JDBC"
             autoLayout lr
         }
 
         dynamic apiApp "Embedding_Sprint_Index" "Embed all tasks in one sprint." {
-            embeddingsApi -> semanticRetrieval "Accepts a request to embed or re-embed all tasks in a sprint"
-            semanticRetrieval -> dataRepo "Loads each task’s title and description for that sprint" "JPA / JDBC"
-            semanticRetrieval -> gemini "Sends text batches to the model and receives embedding vectors" "HTTPS"
-            semanticRetrieval -> dataRepo "Stores or replaces stored vectors for search alongside model metadata" "JPA / JDBC"
+            embeddingsApi -> semanticRetrieval "Accepts sprint embedding job"
+            semanticRetrieval -> dataRepo "Loads task text for sprint" "JPA / JDBC"
+            semanticRetrieval -> gemini "Obtains embedding vectors" "HTTPS"
+            semanticRetrieval -> dataRepo "Stores vectors for search" "JPA / JDBC"
             autoLayout lr
         }
 
         dynamic apiApp "Telegram_Task_Command" "Resolve user then update tasks." {
-            telegram -> telegramBot "Delivers inbound chat text and interaction metadata to the bot listener"
-            telegramBot -> telegramIdentity "Asks the identity bridge which application user owns this Telegram chat"
-            telegramIdentity -> dataRepo "Reads or updates the stored link between Telegram and application accounts" "JPA / JDBC"
-            telegramBot -> taskOps "Interprets the command and runs the matching task workflow"
-            taskOps -> dataRepo "Reads and writes task records for that user in a single transactional step" "JPA / JDBC"
+            telegram -> telegramBot "Delivers message to bot"
+            telegramBot -> telegramIdentity "Resolves linked application user"
+            telegramIdentity -> dataRepo "Reads or updates Telegram account link" "JPA / JDBC"
+            telegramBot -> taskOps "Runs task command workflow"
+            taskOps -> dataRepo "Updates task records" "JPA / JDBC"
             autoLayout lr
         }
 
-        # KPI recompute: KpiController -> KpiService -> persistence (scheduled job calls same service in code)
-        dynamic apiApp "KPI_Calculation_Flow" "HTTP-triggered or scheduled KPI recompute into Sprint columns (no Gemini on this path)." {
-            kpiApi -> kpiEngine "1. POST /api/kpi/sprint/{sprintId}/calculate or nightly @Scheduled invokes KpiService"
-            kpiEngine -> dataRepo "2. KpiRepository aggregates and Sprint KPI column persistence"
+        dynamic apiApp "KPI_Calculation_Flow" "KPI recalculation and persistence." {
+            kpiApi -> kpiEngine "Request KPI calculation for sprint"
+            kpiEngine -> dataRepo "Aggregate metrics and update stored KPI values"
             autoLayout lr
         }
 
