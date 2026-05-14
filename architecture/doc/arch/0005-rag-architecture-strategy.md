@@ -9,11 +9,8 @@ The "Manager Chat" feature needs to answer questions about hundreds of tasks. Se
 ## Decision
 We implemented a **RAG (Retrieval-Augmented Generation)** pattern:
 * **Vectorization:** Using `EmbeddingService` with the `gemini-embedding-001` model to transform a compact task text chunk (title, status, priority, type, due date from `buildTaskChunk`) into embedding vectors; dimensionality follows the API response and is stored as a JSON array of doubles per task.
-* **Semantic Retrieval:** Instead of keyword search, we implemented a custom similarity engine using **Cosine Similarity** to find the "Top-K" most relevant tasks for any manager query.
-* **Augmented Prompting:** The `ManagerChatService` acts as an orchestrator that:
-    1. Generates an embedding for the user query.
-    2. Retrieves contextually similar tasks from the `TaskEmbeddingRepository`.
-    3. Constructs a context-aware prompt and calls **`gemini-3.1-flash-lite-preview`** via the Generative Language `generateContent` endpoint (model id may evolve in config; this is the current production string in `ManagerChatService`).
+* **Semantic Retrieval:** Implemented in **`EmbeddingService`**: embeds the manager question, compares it to stored task vectors with **cosine similarity**, and returns the top‑K matches. Persisted vectors and chunks are read through **`TaskEmbeddingRepository`** (and related entities); `ManagerChatService` does not query that repository directly.
+* **Augmented Prompting:** **`ManagerChatService`** orchestrates the HTTP-facing flow: it calls **`EmbeddingService.findRelevantTasks(...)`** for the RAG slice, merges it with structured project/sprint context it builds from other repositories, then calls the Generative Language **`generateContent`** endpoint using **`gemini-3.1-flash-lite-preview`** (model id may evolve in config; this is the current production string in `ManagerChatService`).
 
 ## Alternatives considered
 
