@@ -1,5 +1,5 @@
 workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manager with AI RAG Context" {
-
+    !adrs doc/arch
     model {
         developer = person "Developer" "Manages tasks and views personal KPIs via Telegram." "Person"
         manager = person "Manager" "Monitors team performance via the web dashboard, AI Insights and Semantic Chat." "Person"
