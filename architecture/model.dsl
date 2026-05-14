@@ -1,61 +1,70 @@
 workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manager with AI RAG Context" {
 
     model {
-        developer = person "Developer" "Manages tasks and views personal KPIs." "Person"
-        manager = person "Manager" "Monitors team performance via AI insights and Semantic Chat." "Person"
-        
+        developer = person "Developer" "Manages tasks and views personal KPIs via Telegram." "Person"
+        manager = person "Manager" "Monitors team performance via the web dashboard, AI Insights and Semantic Chat." "Person"
+        admin = person "Admin" "Creates and manages users, teams and projects via the web dashboard." "Person"
+
         telegram = softwareSystem "Telegram" "External interface for bot interactions." "External System"
         gemini = softwareSystem "Google Gemini API" "LLM used for Embeddings and Text Generation." "External System"
 
         taskManager = softwareSystem "Task Manager AI" "Main System" {
-            reactApp = container "React Frontend" "Web Dashboard for KPI visualization and AI Semantic Chat." "React 18" "Web Browser"
-            
+            reactApp = container "React Frontend" "Web Dashboard for team management, KPI visualization and AI Semantic Chat." "React 18" "Web Browser"
+
             apiApp = container "Spring Boot Backend" "Processes business logic and AI orchestration." "Java 17, Spring Boot" {
                 kpiController = component "Kpi Controller" "Exposes endpoints for metrics." "Spring REST"
                 chatController = component "Manager Chat Controller" "Entry point for AI Semantic Chat." "Spring REST"
                 botLogic = component "MyTodoListBot" "Telegram bot event handler." "TelegramBots SDK"
-                
+                adminController = component "Admin Controller" "Exposes endpoints for user, team and project management." "Spring REST"
+
                 kpiService = component "Kpi Service" "Calculates weighted productivity scores." "Spring Service"
                 geminiService = component "Gemini Service" "Orchestrates AI prompts and async calls." "Spring Service"
                 embeddingService = component "Embedding Service" "Generates vector representations." "Spring Service"
                 chatService = component "Manager Chat Service" "Orchestrates RAG flow." "Spring Service"
-                
+                adminService = component "Admin Service" "Handles user, team and project creation logic." "Spring Service"
+
                 dataRepo = component "JPA Repositories" "Data access layer using Spring Data JPA." "Spring Data JPA"
             }
 
-            database = container "Oracle Autonomous DB" "Persistent storage for tasks and embeddings." "Oracle ADB" "Database"
+            database = container "Oracle Autonomous DB" "Persistent storage for tasks, users, teams and embeddings." "Oracle ADB" "Database"
         }
 
         # --- Relationships ---
 
-        developer -> reactApp "Uses to manage tasks and view KPIs"
-        manager -> reactApp "Uses to access AI Semantic Chat and team insights"
-        manager -> telegram "Uses commands /kpi, /insights"
+        developer -> telegram "Uses commands /kpi, /tasks, /insights"
 
+        manager -> reactApp "Views team KPIs, AI Insights and Semantic Chat"
+
+        admin -> reactApp "Creates and manages users, teams and projects"
+
+        telegram -> botLogic "Sends Webhook Updates"
         reactApp -> kpiController "API Calls (JSON/HTTPS)"
         reactApp -> chatController "Sends semantic queries (JSON/HTTPS)"
-        telegram -> botLogic "Sends Webhook Updates"
-        
-        botLogic -> kpiService "Requests data"
+        reactApp -> adminController "Manages users, teams and projects (JSON/HTTPS)"
+
+        botLogic -> kpiService "Requests KPI data for developer"
+
         kpiController -> kpiService "Requests calculations"
-        
+
         chatController -> chatService "Uses"
-        
         chatService -> embeddingService "Requests query embedding"
         embeddingService -> gemini "Generates vector" "HTTPS"
         chatService -> dataRepo "Retrieves top-K similar tasks"
         chatService -> geminiService "Sends context-augmented prompt"
-        
+
         kpiService -> geminiService "Provides context for sprint insights"
         geminiService -> gemini "Async LLM request" "HTTPS"
-        
+
+        adminController -> adminService "Uses"
+        adminService -> dataRepo "Creates and updates users, teams and projects"
+
         dataRepo -> database "SQL/JDBC"
         embeddingService -> dataRepo "Stores and updates Task Embeddings"
-        
+
         deploymentEnvironment "Production" {
             deploymentNode "Oracle Cloud Infrastructure" {
                 containerInstance database
-                
+
                 deploymentNode "Oracle Kubernetes Engine (OKE)" {
                     deploymentNode "Frontend Pod" {
                         containerInstance reactApp
@@ -69,7 +78,7 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
     }
 
     views {
-        # 1. System Landscape (NUEVO - requerido por la actividad)
+        # 1. System Landscape
         systemLandscape "Landscape" {
             include *
             autoLayout lr
@@ -110,7 +119,7 @@ workspace "MtdrSpring - Task Manager AI" "Architecture model for the Task Manage
             autoLayout lr
         }
 
-        # 6b. Dynamic - KPI Calculation Flow (segundo use case requerido)
+        # 6b. Dynamic - KPI Calculation Flow
         dynamic apiApp "KPI_Calculation_Flow" "Shows how KPI metrics are calculated and enriched with AI insights." {
             kpiController -> kpiService "1. Request KPI calculation for sprint"
             kpiService -> dataRepo "2. Fetch tasks and user assignments"
