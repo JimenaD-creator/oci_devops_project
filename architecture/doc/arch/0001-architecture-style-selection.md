@@ -1,0 +1,65 @@
+# ADR-0001: Architecture Style Selection
+
+**Date:** 2026-05-12
+**Status:** Accepted
+
+## Context
+
+The Task Manager is a medium-sized system developed by a team of 4 people. The system must handle the lifecycle of development tasks, real-time interactions via Telegram, per-developer KPI calculations, and LLM-assisted insight generation using Google Gemini.
+
+## Decision
+
+We adopted a **Hybrid Architecture** composed of three complementary styles:
+
+### Adopted Styles
+
+#### 1. Layered Architecture — Core Business Layer
+
+Applied to the Spring Boot Backend:
+- **Presentation:** REST Controllers (`KpiController`, `ManagerChatController`).
+- **Business Logic:** Services (`KpiService`, `GeminiService`, `ManagerChatService`).
+- **Data Access:** Spring Data JPA Repositories (`TaskRepository`, `TaskEmbeddingRepository`).
+
+This style enforces separation of concerns and allows each layer to be tested independently.
+
+#### 2. Event-Driven Architecture — Telegram channel
+
+- **Mediator topology (aligned at this boundary):** Each inbound Telegram **update** is a discrete unit of work. **`ToDoItemBotController`** receives it via **long polling** (`SpringLongPollingBot`); **`BotActions`** acts as a **mediator**: it interprets text, holds per-chat conversational state, and **coordinates** calls into domain collaborators (`ToDoItemService`, `SprintService`, `UserTaskService`, mapping services, etc.) without those collaborators publishing or subscribing to a shared event stream.
+
+#### 3. Pipeline Architecture — Insight Generation and RAG Flow
+
+Applied to two distinct flows:
+
+- **Sprint Insights:** Data is fetched via `SprintRepository` → metrics are calculated in `KpiService` → text is enriched by `GeminiService`.
+- **RAG Flow:** `ManagerChatService` orchestrates manager Q&A: it calls **`EmbeddingService`** to embed the question and rank stored task chunks (cosine similarity over vectors loaded via **`TaskEmbeddingRepository`**), merges that retrieval slice with structured project/sprint context, then invokes the Google Generative Language **`generateContent`** API for the natural-language reply (implemented in `ManagerChatService`, not routed through `GeminiService`, which owns the separate sprint-insight pipeline).
+
+### Alternatives Considered
+
+| Style | Reason for Rejection |
+|---|---|
+| **Microservices** | Unnecessary operational overhead for a 4-person team. It would require service discovery, independent load balancing, and multiple CI/CD pipelines — complexity not justified by the project scope. |
+| **Event-Driven — Broker topology** | Rejected. A broker fits when many independent consumers need the same event stream or when producers and consumers scale separately. We run **one** Spring Boot app: each Telegram/HTTP interaction is handled **once** in-process (via `BotActions`), so a bus would add operational cost without solving a fan-out or scaling problem we actually have. |
+| **Service-Based** | Discarded because our domains (KPI, Chat, Bot) share the same Oracle ADB database and do not require independent deployment. Splitting them into coarse-grained services without a per-service DB provides no real benefit. |
+| **Hexagonal (Clean Architecture)** | Considered for the backend, but the investment in defining formal ports and adapters is not justified given the project size and academic deadlines. The Layered style provides sufficient separation. |
+| **Microkernel** | Not applicable. This style suits systems with runtime-pluggable functionality (e.g. IDEs, editors). The Task Manager does not require that kind of dynamic extensibility. |
+| **Service-Oriented Architecture (SOA)** | Discarded due to its heavy infrastructure requirements (ESB, WSDL/SOAP). The system uses lightweight REST APIs and does not need centralized enterprise orchestration. |
+| **Space-Based** | Discarded because the system has no requirements for massive scalability or distributed in-memory tuple-space / grid processing. Expected load is handled by the Spring Boot API on OKE behind a load balancer, including **horizontal pod replicas** for the API tier, without adopting a space-based architecture. |
+
+### Additional integration and deployment choices
+
+- **Message broker (for example Kafka or RabbitMQ) between Telegram and core APIs:** Rejected as unnecessary for current throughput; long polling plus in-process services is simpler to deploy on OKE.
+- **Telegram webhooks instead of long polling:** Considered for lower latency at scale; not chosen here to avoid public HTTPS ingress and webhook verification complexity for the workshop-style deployment.
+- **Fully synchronous insight generation in the HTTP request:** Rejected because Gemini latency would block Tomcat threads and produce poor UX and timeouts under load.
+
+## Consequences
+
+### Pros
+
+- **High modularity:** The AI logic (RAG, embeddings) is fully decoupled from the KPI calculation logic.
+- **Maintainability:** The Layered style allows any team member to quickly understand the responsibility of each class.
+- **Integration flexibility:** Mediator-style routing in `BotActions` allows new Telegram commands to be added while keeping domain services as collaborators rather than event publishers.
+
+### Cons
+
+- **Asynchronous state complexity:** Long polling, the Telegram SDK’s update handling (observer-style delivery), and Spring’s `@Async` require additional logging and observability to track background task completion.
+- **Gemini vendor coupling:** Without Hexagonal architecture, `GeminiService` is directly coupled to the LLM provider. Switching from Gemini to another model would require modifying the service layer.
