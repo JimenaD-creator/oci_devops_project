@@ -17,6 +17,9 @@ import { appTheme } from './theme';
 import App from './app/App';
 import Login from './features/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { installAuthFetchInterceptor } from './utils/auth';
+
+installAuthFetchInterceptor();
 
 ReactDOM.render(
   <React.StrictMode>
