@@ -73,6 +73,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
           completed,
           completionRate,
           workload,
+          profilePicture: d?.profilePicture || null,
           isOverloaded: Boolean(aiEntry?.overloaded),
           aiReason: aiEntry?.insight ?? '',
         };
@@ -130,16 +131,17 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ position: 'relative', flexShrink: 0 }}>
                   <Avatar
-                    sx={{
-                      bgcolor: palette.bg,
-                      color: palette.color,
-                      fontWeight: 700,
-                      width: 44,
-                      height: 44,
-                    }}
-                  >
-                    {initialsFromName(row.name)}
-                  </Avatar>
+  src={row.profilePicture || undefined}
+  sx={{
+    bgcolor: palette.bg,
+    color: palette.color,
+    fontWeight: 700,
+    width: 44,
+    height: 44,
+  }}
+>
+  {!row.profilePicture && initialsFromName(row.name)}
+</Avatar>
                   {row.isOverloaded && (
                     <Box
                       aria-hidden

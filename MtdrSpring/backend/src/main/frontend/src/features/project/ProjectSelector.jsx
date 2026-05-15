@@ -98,7 +98,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
     }
   }, [mode]);
 
-  /** If the manager has exactly one assigned project, enter the app without an extra click (previous behavior). */
+  /** If the manager has exactly one assigned project, enter the app without an extra click. */
   useEffect(() => {
     if (mode !== 'manager' || loading) return;
     if (projects.length !== 1 || !onSelect || managerAutoSelectedRef.current) return;
@@ -133,9 +133,10 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
         alert('ERROR: ' + msg);
       }
     } catch (err) {
-      alert('ERROR DE CONEXIÓN');
+      alert('CONNECTION ERROR');
     }
   };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -145,20 +146,21 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
     };
     reader.readAsDataURL(file);
   };
+
   const handleEditUser = (user) => {
     setSelectedUser(user);
-    setFormData({ name: user.name, type: user.role });
+    setFormData({ name: user.name, type: user.role, email: user.email });
     setOpenModal('editUser');
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('¿Eliminar este usuario?')) return;
+    if (!window.confirm('Delete this user?')) return;
     try {
       const res = await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
       if (res.ok) fetchData();
-      else alert('ERROR al eliminar');
+      else alert('ERROR deleting user');
     } catch {
-      alert('ERROR DE CONEXIÓN');
+      alert('CONNECTION ERROR');
     }
   };
 
@@ -178,7 +180,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
         alert('ERROR: ' + (await res.text()));
       }
     } catch {
-      alert('ERROR DE CONEXIÓN');
+      alert('CONNECTION ERROR');
     }
   };
 
@@ -199,7 +201,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             }}
           />
           <Typography variant="h5">
-            {mode === 'manager' ? 'Selecciona tu proyecto' : 'System Administration'}
+            {mode === 'manager' ? 'Select your project' : 'System Administration'}
           </Typography>
         </Box>
 
@@ -212,7 +214,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 onClick={() => openAndClear('project')}
                 sx={{ bgcolor: '#000' }}
               >
-                Nuevo Proyecto
+                New Project
               </Button>
             </Grid>
             <Grid item>
@@ -222,7 +224,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 onClick={() => openAndClear('team')}
                 sx={{ color: '#000', borderColor: '#000' }}
               >
-                Nuevo Equipo
+                New Team
               </Button>
             </Grid>
             <Grid item>
@@ -232,7 +234,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 onClick={() => openAndClear('member')}
                 sx={{ color: '#000', borderColor: '#000' }}
               >
-                Asignar Miembro
+                Assign Member
               </Button>
             </Grid>
             <Grid item>
@@ -242,21 +244,21 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 onClick={() => openAndClear('user')}
                 sx={{ bgcolor: '#E53935' }}
               >
-                Registrar Usuario
+                Register User
               </Button>
             </Grid>
           </Grid>
         )}
 
-        <Divider sx={{ mb: 4 }}>PROYECTOS ACTIVOS</Divider>
+        <Divider sx={{ mb: 4 }}>ACTIVE PROJECTS</Divider>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
             <CircularProgress />
           </Box>
         ) : projects.length === 0 && mode === 'manager' ? (
           <Typography sx={{ textAlign: 'center', color: '#666', mb: 6 }}>
-            No hay proyectos registrados. Si acabas de iniciar sesión, recarga la página; si el
-            problema continúa, contacta a un administrador.
+            No registered projects found. If you just logged in, please refresh the page; if the 
+            issue persists, contact an administrator.
           </Typography>
         ) : (
           <Grid container spacing={3} sx={{ mb: 8 }}>
@@ -284,7 +286,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
 
         {mode === 'admin' && (
           <>
-            <Divider sx={{ mb: 4 }}>DETALLES DE USUARIOS</Divider>
+            <Divider sx={{ mb: 4 }}>USER DETAILS</Divider>
             <TableContainer
               component={Paper}
               sx={{ border: '1px solid #EEE', boxShadow: 'none', mb: 4 }}
@@ -293,12 +295,12 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 <TableHead sx={{ bgcolor: '#F5F5F5' }}>
                   <TableRow>
                     <TableCell>ID</TableCell>
-                    <TableCell>USUARIO</TableCell>
-                    <TableCell>ROL</TableCell>
-                    <TableCell>ID EQUIPO</TableCell>
-                    <TableCell>EQUIPO</TableCell>
-                    <TableCell>PROYECTO</TableCell>
-                    <TableCell>ACCIONES</TableCell>
+                    <TableCell>USER</TableCell>
+                    <TableCell>ROLE</TableCell>
+                    <TableCell>TEAM ID</TableCell>
+                    <TableCell>TEAM</TableCell>
+                    <TableCell>PROJECT</TableCell>
+                    <TableCell>ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -306,7 +308,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                     <TableRow key={user.id}>
                       <TableCell>{user.id}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{user.name?.toUpperCase()}</TableCell>
-                      <TableCell>{user.role ? user.role.toUpperCase() : 'SIN ROL'}</TableCell>
+                      <TableCell>{user.role ? user.role.toUpperCase() : 'NO ROLE'}</TableCell>
                       <TableCell>{user.teamId || '---'}</TableCell>
                       <TableCell>
                         {(user.teamName || user.managedTeamName || '---').toUpperCase()}
@@ -318,14 +320,14 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                           onClick={() => handleEditUser(user)}
                           sx={{ mr: 1, color: '#000' }}
                         >
-                          EDITAR
+                          EDIT
                         </Button>
                         <Button
                           size="small"
                           onClick={() => handleDeleteUser(user.id)}
                           sx={{ color: '#E53935' }}
                         >
-                          ELIMINAR
+                          DELETE
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -336,18 +338,20 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
           </>
         )}
 
+        {/* --- MODALS --- */}
+
         <Dialog open={openModal === 'project'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>NUEVO PROYECTO</DialogTitle>
+          <DialogTitle>NEW PROJECT</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="NOMBRE"
+              label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
             <TextField
               fullWidth
-              label="ID EQUIPO"
+              label="TEAM ID"
               type="number"
               margin="dense"
               onChange={(e) => {
@@ -357,25 +361,25 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
             <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
-              CREAR
+              CREATE
             </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={openModal === 'team'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>NUEVO EQUIPO</DialogTitle>
+          <DialogTitle>NEW TEAM</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="NOMBRE"
+              label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
             <TextField
               fullWidth
-              label="ID MANAGER"
+              label="MANAGER ID"
               type="number"
               margin="dense"
               onChange={(e) => {
@@ -385,19 +389,19 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
             <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
-              CREAR
+              CREATE
             </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={openModal === 'member'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>ASIGNAR MIEMBRO</DialogTitle>
+          <DialogTitle>ASSIGN MEMBER</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="ID USUARIO"
+              label="USER ID"
               type="number"
               margin="dense"
               onChange={(e) =>
@@ -406,7 +410,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             />
             <TextField
               fullWidth
-              label="ID EQUIPO"
+              label="TEAM ID"
               type="number"
               margin="dense"
               onChange={(e) =>
@@ -416,7 +420,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             <TextField
               fullWidth
               select
-              label="ROL"
+              label="ROLE"
               margin="dense"
               value={formData.role || ''}
               onChange={(e) => setFormData({ ...formData, role: e.target.value.toUpperCase() })}
@@ -426,19 +430,19 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
             <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
-              ASIGNAR
+              ASSIGN
             </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={openModal === 'user'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>REGISTRAR USUARIO</DialogTitle>
+          <DialogTitle>REGISTER USER</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="NOMBRE"
+              label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -458,7 +462,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             <TextField
               fullWidth
               select
-              label="TIPO"
+              label="TYPE"
               margin="dense"
               value={formData.type || ''}
               onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
@@ -467,10 +471,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
             </TextField>
 
-            {/* ---- FOTO DE PERFIL ---- */}
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
-                FOTO DE PERFIL (opcional)
+                PROFILE PICTURE (optional)
               </Typography>
               <input
                 type="file"
@@ -496,18 +499,19 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
             <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#E53935' }}>
-              REGISTRAR
+              REGISTER
             </Button>
           </DialogActions>
         </Dialog>
+
         <Dialog open={openModal === 'editUser'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>EDITAR USUARIO — {selectedUser?.name?.toUpperCase()}</DialogTitle>
+          <DialogTitle>EDIT USER — {selectedUser?.name?.toUpperCase()}</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="NOMBRE"
+              label="NAME"
               margin="dense"
               value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -529,7 +533,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             <TextField
               fullWidth
               select
-              label="TIPO"
+              label="TYPE"
               margin="dense"
               value={formData.type || ''}
               onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
@@ -540,7 +544,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
 
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
-                FOTO DE PERFIL (opcional)
+                PROFILE PICTURE (optional)
               </Typography>
               <input
                 type="file"
@@ -566,9 +570,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCELAR</Button>
+            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
             <Button onClick={handleEditAction} variant="contained" sx={{ bgcolor: '#000' }}>
-              GUARDAR
+              SAVE
             </Button>
           </DialogActions>
         </Dialog>
@@ -576,4 +580,5 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
     </Box>
   );
 };
+
 export default ProjectSelector;
