@@ -3,90 +3,106 @@
   "description" : "Sprint work, KPIs, AI sprint insights, manager Q&A, and Telegram task bot.",
   "documentation" : { },
   "id" : 1,
-  "lastModifiedAgent" : "structurizr/diagrams/244aec39-9b97-40da-a7a8-0bfa1ca57f30",
-  "lastModifiedDate" : "2026-05-14T02:42:39Z",
-  "lastModifiedUser" : "541190523",
+  "lastModifiedDate" : "2026-05-15T04:25:33Z",
   "model" : {
     "deploymentNodes" : [ {
       "children" : [ {
+        "description" : "Stores built container images for the workshop namespace; cluster nodes authenticate and pull images at deploy and rollout.",
+        "environment" : "Production",
+        "id" : "77",
+        "instances" : "1",
+        "name" : "OCIR (container registry)",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ocirRegistry"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "OCI Artifacts"
+      }, {
         "children" : [ {
           "children" : [ {
             "containerInstances" : [ {
-              "containerId" : "7",
+              "containerId" : "8",
               "deploymentGroups" : [ "Default" ],
               "environment" : "Production",
-              "id" : "78",
+              "id" : "82",
               "instanceId" : 1,
               "properties" : {
                 "structurizr.dsl.identifier" : "productionWeb"
               },
               "relationships" : [ {
                 "description" : "Fetches KPI views and asks the server to recompute KPIs when needed",
-                "destinationId" : "80",
-                "id" : "82",
-                "linkedRelationshipId" : "35",
-                "sourceId" : "78",
+                "destinationId" : "84",
+                "id" : "86",
+                "linkedRelationshipId" : "39",
+                "sourceId" : "82",
                 "technology" : "JSON / HTTPS"
               } ],
               "tags" : "Container Instance"
             } ],
             "environment" : "Production",
-            "id" : "77",
+            "id" : "81",
             "instances" : "1",
             "name" : "Frontend Pod",
             "properties" : {
-              "structurizr.dsl.identifier" : "37018cd7-df87-4095-bfed-e2d2b37ef037"
+              "structurizr.dsl.identifier" : "03423948-128b-4b9a-b26f-f51fd0825e02"
             },
             "tags" : "Element,Deployment Node"
           }, {
             "containerInstances" : [ {
-              "containerId" : "8",
+              "containerId" : "9",
               "deploymentGroups" : [ "Default" ],
               "environment" : "Production",
-              "id" : "80",
+              "id" : "84",
               "instanceId" : 1,
               "properties" : {
                 "structurizr.dsl.identifier" : "productionApi"
               },
               "relationships" : [ {
-                "description" : "Runs queries and maps rows for the application",
-                "destinationId" : "73",
-                "id" : "81",
-                "linkedRelationshipId" : "71",
-                "sourceId" : "80",
-                "technology" : "Oracle / JDBC"
+                "description" : "Reads and writes application data through JDBC",
+                "destinationId" : "76",
+                "id" : "85",
+                "linkedRelationshipId" : "27",
+                "sourceId" : "84",
+                "technology" : "Oracle Net / JDBC, TCP port 1521 (TCPS/mTLS per ADB wallet if enabled)"
               } ],
               "tags" : "Container Instance"
             } ],
             "description" : "Runs the API workload with two replicas for availability.",
             "environment" : "Production",
-            "id" : "79",
+            "id" : "83",
             "instances" : "2",
             "name" : "Backend Pod",
             "properties" : {
-              "structurizr.dsl.identifier" : "d066965a-d0fe-400f-8cf7-a9d99848a423"
+              "structurizr.dsl.identifier" : "9b0bfcfd-ce5f-46b8-9c3e-e935d38255ac"
             },
             "tags" : "Element,Deployment Node",
             "technology" : "Kubernetes"
           } ],
           "description" : "Logical boundary in the cluster for the product’s workloads.",
           "environment" : "Production",
-          "id" : "75",
+          "id" : "79",
           "infrastructureNodes" : [ {
-            "description" : "Receives internet traffic and forwards it to the API tier.",
+            "description" : "Public listener (port 80); forwards to in-cluster Service targets for SPA and API.",
             "environment" : "Production",
-            "id" : "76",
+            "id" : "80",
             "name" : "OCI load balancer",
             "properties" : {
               "structurizr.dsl.identifier" : "productionLb"
             },
             "relationships" : [ {
-              "description" : "Forwards incoming traffic to the API pods",
-              "destinationId" : "80",
-              "id" : "83",
-              "sourceId" : "76",
+              "description" : "Serves static SPA and assets",
+              "destinationId" : "82",
+              "id" : "87",
+              "sourceId" : "80",
               "tags" : "Relationship",
-              "technology" : "HTTP / TCP"
+              "technology" : "HTTP / TCP, listener port 80 → pod/service target port"
+            }, {
+              "description" : "Routes REST traffic to API Service",
+              "destinationId" : "84",
+              "id" : "88",
+              "sourceId" : "80",
+              "tags" : "Relationship",
+              "technology" : "HTTP / TCP, listener port 80 → pod/service target port"
             } ],
             "tags" : "Element,Infrastructure Node",
             "technology" : "Kubernetes / OCI"
@@ -94,37 +110,45 @@
           "instances" : "1",
           "name" : "Namespace mtdrworkshop",
           "properties" : {
-            "structurizr.dsl.identifier" : "41b717ef-0642-4809-a9ee-e090338d20a0"
+            "structurizr.dsl.identifier" : "626559d2-f7f6-48f9-9a28-48f92203841f"
           },
           "tags" : "Element,Deployment Node",
           "technology" : "Kubernetes"
         } ],
         "environment" : "Production",
-        "id" : "74",
+        "id" : "78",
         "instances" : "1",
         "name" : "Oracle Kubernetes Engine (OKE)",
         "properties" : {
-          "structurizr.dsl.identifier" : "deaf6406-7fe4-4037-b26a-a125807e040c"
+          "structurizr.dsl.identifier" : "okeCluster"
         },
+        "relationships" : [ {
+          "description" : "Pulls container images when workloads are scheduled or rolled out",
+          "destinationId" : "77",
+          "id" : "89",
+          "sourceId" : "78",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, port 443"
+        } ],
         "tags" : "Element,Deployment Node"
       } ],
       "containerInstances" : [ {
-        "containerId" : "25",
+        "containerId" : "26",
         "deploymentGroups" : [ "Default" ],
         "environment" : "Production",
-        "id" : "73",
+        "id" : "76",
         "instanceId" : 1,
         "properties" : {
-          "structurizr.dsl.identifier" : "61725acb-38da-4942-aacb-49711546bfcb"
+          "structurizr.dsl.identifier" : "3b036910-ca8e-45aa-98b3-baaa1d36c94c"
         },
         "tags" : "Container Instance"
       } ],
       "environment" : "Production",
-      "id" : "72",
+      "id" : "75",
       "instances" : "1",
       "name" : "Oracle Cloud Infrastructure",
       "properties" : {
-        "structurizr.dsl.identifier" : "f7e04377-ae71-4425-8a1d-da794b4284f4"
+        "structurizr.dsl.identifier" : "4cd106b4-be1f-46ed-9eb0-f94081514a36"
       },
       "tags" : "Element,Deployment Node"
     } ],
@@ -137,20 +161,26 @@
       },
       "relationships" : [ {
         "description" : "Views sprint tasks, personal KPIs, and sprint insight pages",
-        "destinationId" : "7",
-        "id" : "26",
+        "destinationId" : "8",
+        "id" : "28",
         "sourceId" : "1",
         "tags" : "Relationship"
       }, {
         "description" : "Views sprint tasks, personal KPIs, and sprint insight pages",
-        "destinationId" : "6",
-        "id" : "27",
-        "linkedRelationshipId" : "26",
+        "destinationId" : "7",
+        "id" : "29",
+        "linkedRelationshipId" : "28",
         "sourceId" : "1"
       }, {
         "description" : "Lists and completes tasks, sends bot commands, and reads bot replies",
         "destinationId" : "4",
-        "id" : "28",
+        "id" : "30",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Commits code, opens and reviews pull requests, and follows CI results",
+        "destinationId" : "6",
+        "id" : "36",
         "sourceId" : "1",
         "tags" : "Relationship"
       } ],
@@ -164,20 +194,26 @@
       },
       "relationships" : [ {
         "description" : "Manages backlog and sprints, reviews KPIs and narratives, and uses manager chat",
-        "destinationId" : "7",
-        "id" : "29",
+        "destinationId" : "8",
+        "id" : "31",
         "sourceId" : "2",
         "tags" : "Relationship"
       }, {
         "description" : "Manages backlog and sprints, reviews KPIs and narratives, and uses manager chat",
-        "destinationId" : "6",
-        "id" : "30",
-        "linkedRelationshipId" : "29",
+        "destinationId" : "7",
+        "id" : "32",
+        "linkedRelationshipId" : "31",
         "sourceId" : "2"
       }, {
         "description" : "Sends operator commands and reads team bot notifications",
         "destinationId" : "4",
-        "id" : "31",
+        "id" : "33",
+        "sourceId" : "2",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Reviews pull requests and repository activity alongside sprint progress",
+        "destinationId" : "6",
+        "id" : "37",
         "sourceId" : "2",
         "tags" : "Relationship"
       } ],
@@ -191,15 +227,15 @@
       },
       "relationships" : [ {
         "description" : "Creates projects and teams, assigns members, and edits catalog data",
-        "destinationId" : "7",
-        "id" : "32",
+        "destinationId" : "8",
+        "id" : "34",
         "sourceId" : "3",
         "tags" : "Relationship"
       }, {
         "description" : "Creates projects and teams, assigns members, and edits catalog data",
-        "destinationId" : "6",
-        "id" : "33",
-        "linkedRelationshipId" : "32",
+        "destinationId" : "7",
+        "id" : "35",
+        "linkedRelationshipId" : "34",
         "sourceId" : "3"
       } ],
       "tags" : "Element,Person"
@@ -214,23 +250,23 @@
       },
       "relationships" : [ {
         "description" : "Delivers inbound messages, edits, and callback queries to the task bot",
-        "destinationId" : "14",
-        "id" : "40",
+        "destinationId" : "15",
+        "id" : "44",
         "sourceId" : "4",
         "tags" : "Relationship",
         "technology" : "Telegram Bot API"
       }, {
         "description" : "Delivers inbound messages, edits, and callback queries to the task bot",
-        "destinationId" : "8",
-        "id" : "41",
-        "linkedRelationshipId" : "40",
+        "destinationId" : "9",
+        "id" : "45",
+        "linkedRelationshipId" : "44",
         "sourceId" : "4",
         "technology" : "Telegram Bot API"
       }, {
         "description" : "Delivers inbound messages, edits, and callback queries to the task bot",
-        "destinationId" : "6",
-        "id" : "42",
-        "linkedRelationshipId" : "40",
+        "destinationId" : "7",
+        "id" : "46",
+        "linkedRelationshipId" : "44",
         "sourceId" : "4",
         "technology" : "Telegram Bot API"
       } ],
@@ -245,54 +281,63 @@
       },
       "tags" : "Element,Software System,External System"
     }, {
+      "description" : "Source repository, pull requests, and CI workflows for the product codebase.",
+      "documentation" : { },
+      "id" : "6",
+      "name" : "GitHub",
+      "properties" : {
+        "structurizr.dsl.identifier" : "github"
+      },
+      "tags" : "Element,Software System,External System"
+    }, {
       "containers" : [ {
         "description" : "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin.",
         "documentation" : { },
-        "id" : "7",
+        "id" : "8",
         "name" : "React Frontend",
         "properties" : {
           "structurizr.dsl.identifier" : "reactApp"
         },
         "relationships" : [ {
           "description" : "Fetches KPI views and asks the server to recompute KPIs when needed",
-          "destinationId" : "9",
-          "id" : "34",
-          "sourceId" : "7",
+          "destinationId" : "10",
+          "id" : "38",
+          "sourceId" : "8",
           "tags" : "Relationship",
           "technology" : "JSON / HTTPS"
         }, {
           "description" : "Fetches KPI views and asks the server to recompute KPIs when needed",
-          "destinationId" : "8",
-          "id" : "35",
-          "linkedRelationshipId" : "34",
-          "sourceId" : "7",
+          "destinationId" : "9",
+          "id" : "39",
+          "linkedRelationshipId" : "38",
+          "sourceId" : "8",
           "technology" : "JSON / HTTPS"
         }, {
           "description" : "Sends manager questions with optional project and sprint scope; receives assistant answers",
-          "destinationId" : "10",
-          "id" : "36",
-          "sourceId" : "7",
+          "destinationId" : "11",
+          "id" : "40",
+          "sourceId" : "8",
           "tags" : "Relationship",
           "technology" : "JSON / HTTPS"
         }, {
           "description" : "Starts insight jobs, reads sprint narratives, and loads developer radar",
-          "destinationId" : "11",
-          "id" : "37",
-          "sourceId" : "7",
+          "destinationId" : "12",
+          "id" : "41",
+          "sourceId" : "8",
           "tags" : "Relationship",
           "technology" : "JSON / HTTPS"
         }, {
           "description" : "Asks the server to rebuild sprint embeddings for search",
-          "destinationId" : "12",
-          "id" : "38",
-          "sourceId" : "7",
+          "destinationId" : "13",
+          "id" : "42",
+          "sourceId" : "8",
           "tags" : "Relationship",
           "technology" : "JSON / HTTPS"
         }, {
           "description" : "Manages tasks, projects, sprints, teams, users, assignments, profiles, and admin data",
-          "destinationId" : "13",
-          "id" : "39",
-          "sourceId" : "7",
+          "destinationId" : "14",
+          "id" : "43",
+          "sourceId" : "8",
           "tags" : "Relationship",
           "technology" : "JSON / HTTPS"
         } ],
@@ -302,23 +347,23 @@
         "components" : [ {
           "description" : "Exposes productivity and delivery metrics; supports on-demand KPI refresh.",
           "documentation" : { },
-          "id" : "9",
+          "id" : "10",
           "name" : "KPI API",
           "properties" : {
             "structurizr.dsl.identifier" : "kpiApi"
           },
           "relationships" : [ {
             "description" : "Triggers KPI recomputation and aggregate reads",
-            "destinationId" : "20",
-            "id" : "56",
-            "sourceId" : "9",
+            "destinationId" : "21",
+            "id" : "60",
+            "sourceId" : "10",
             "tags" : "Relationship",
             "technology" : "Spring"
           }, {
             "description" : "Runs aggregates and reads stored KPI fields for responses",
-            "destinationId" : "24",
-            "id" : "57",
-            "sourceId" : "9",
+            "destinationId" : "25",
+            "id" : "61",
+            "sourceId" : "10",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -327,16 +372,16 @@
         }, {
           "description" : "Entry point for contextual manager chat over project and sprint data.",
           "documentation" : { },
-          "id" : "10",
+          "id" : "11",
           "name" : "Manager chat API",
           "properties" : {
             "structurizr.dsl.identifier" : "managerChatApi"
           },
           "relationships" : [ {
             "description" : "Hands manager chat requests to orchestration",
-            "destinationId" : "23",
-            "id" : "53",
-            "sourceId" : "10",
+            "destinationId" : "24",
+            "id" : "57",
+            "sourceId" : "11",
             "tags" : "Relationship",
             "technology" : "Spring"
           } ],
@@ -345,16 +390,16 @@
         }, {
           "description" : "Starts and reads asynchronous sprint narratives; serves developer radar views.",
           "documentation" : { },
-          "id" : "11",
+          "id" : "12",
           "name" : "Sprint insights API",
           "properties" : {
             "structurizr.dsl.identifier" : "insightsApi"
           },
           "relationships" : [ {
             "description" : "Hands sprint narrative work to AI orchestration",
-            "destinationId" : "21",
-            "id" : "54",
-            "sourceId" : "11",
+            "destinationId" : "22",
+            "id" : "58",
+            "sourceId" : "12",
             "tags" : "Relationship",
             "technology" : "Spring"
           } ],
@@ -363,16 +408,16 @@
         }, {
           "description" : "Builds and refreshes task embeddings for semantic search.",
           "documentation" : { },
-          "id" : "12",
+          "id" : "13",
           "name" : "Embeddings API",
           "properties" : {
             "structurizr.dsl.identifier" : "embeddingsApi"
           },
           "relationships" : [ {
             "description" : "Asks semantic retrieval to build or refresh sprint embeddings",
-            "destinationId" : "22",
-            "id" : "55",
-            "sourceId" : "12",
+            "destinationId" : "23",
+            "id" : "59",
+            "sourceId" : "13",
             "tags" : "Relationship",
             "technology" : "Spring"
           } ],
@@ -381,16 +426,16 @@
         }, {
           "description" : "Tasks, projects, sprints, teams, users, assignments, admin, and legacy task list.",
           "documentation" : { },
-          "id" : "13",
+          "id" : "14",
           "name" : "Domain API",
           "properties" : {
             "structurizr.dsl.identifier" : "domainApi"
           },
           "relationships" : [ {
             "description" : "Reads and writes domain entities through the repository",
-            "destinationId" : "24",
-            "id" : "69",
-            "sourceId" : "13",
+            "destinationId" : "25",
+            "id" : "73",
+            "sourceId" : "14",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -399,40 +444,40 @@
         }, {
           "description" : "Receives messages and runs bot command flows.",
           "documentation" : { },
-          "id" : "14",
+          "id" : "15",
           "name" : "Telegram bot",
           "properties" : {
             "structurizr.dsl.identifier" : "telegramBot"
           },
           "relationships" : [ {
             "description" : "Runs the parsed task command through the task operations service using",
-            "destinationId" : "15",
-            "id" : "43",
-            "sourceId" : "14",
+            "destinationId" : "16",
+            "id" : "47",
+            "sourceId" : "15",
             "tags" : "Relationship"
           }, {
             "description" : "Reads and stores which sprint this Telegram conversation is working in using",
-            "destinationId" : "16",
-            "id" : "44",
-            "sourceId" : "14",
+            "destinationId" : "17",
+            "id" : "48",
+            "sourceId" : "15",
             "tags" : "Relationship"
           }, {
             "description" : "Loads and updates assigned sprint work for the signed-in bot user using",
-            "destinationId" : "17",
-            "id" : "45",
-            "sourceId" : "14",
+            "destinationId" : "18",
+            "id" : "49",
+            "sourceId" : "15",
             "tags" : "Relationship"
           }, {
             "description" : "Loads directory information to render bot menus and roster pickers using",
-            "destinationId" : "18",
-            "id" : "46",
-            "sourceId" : "14",
+            "destinationId" : "19",
+            "id" : "50",
+            "sourceId" : "15",
             "tags" : "Relationship"
           }, {
             "description" : "Resolves which application account is linked to this Telegram chat using",
-            "destinationId" : "19",
-            "id" : "47",
-            "sourceId" : "14",
+            "destinationId" : "20",
+            "id" : "51",
+            "sourceId" : "15",
             "tags" : "Relationship"
           } ],
           "tags" : "Element,Component",
@@ -440,16 +485,16 @@
         }, {
           "description" : "Creates and updates tasks from the bot.",
           "documentation" : { },
-          "id" : "15",
+          "id" : "16",
           "name" : "Task operations",
           "properties" : {
             "structurizr.dsl.identifier" : "taskOps"
           },
           "relationships" : [ {
             "description" : "Reads and writes task rows affected by the bot command",
-            "destinationId" : "24",
-            "id" : "48",
-            "sourceId" : "15",
+            "destinationId" : "25",
+            "id" : "52",
+            "sourceId" : "16",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -458,16 +503,16 @@
         }, {
           "description" : "Handles sprint selection in bot flows.",
           "documentation" : { },
-          "id" : "16",
+          "id" : "17",
           "name" : "Sprint context",
           "properties" : {
             "structurizr.dsl.identifier" : "sprintContext"
           },
           "relationships" : [ {
             "description" : "Reads and updates sprint selection state for the chat",
-            "destinationId" : "24",
-            "id" : "49",
-            "sourceId" : "16",
+            "destinationId" : "25",
+            "id" : "53",
+            "sourceId" : "17",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -476,16 +521,16 @@
         }, {
           "description" : "Reads and updates user–task and sprint-task data for the bot.",
           "documentation" : { },
-          "id" : "17",
+          "id" : "18",
           "name" : "Assignments",
           "properties" : {
             "structurizr.dsl.identifier" : "assignments"
           },
           "relationships" : [ {
             "description" : "Reads and updates assignment and sprint-task rows for the acting user",
-            "destinationId" : "24",
-            "id" : "50",
-            "sourceId" : "17",
+            "destinationId" : "25",
+            "id" : "54",
+            "sourceId" : "18",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -494,16 +539,16 @@
         }, {
           "description" : "Resolves users for bot menus.",
           "documentation" : { },
-          "id" : "18",
+          "id" : "19",
           "name" : "User directory",
           "properties" : {
             "structurizr.dsl.identifier" : "userDirectory"
           },
           "relationships" : [ {
             "description" : "Reads user directory rows for bot menus",
-            "destinationId" : "24",
-            "id" : "51",
-            "sourceId" : "18",
+            "destinationId" : "25",
+            "id" : "55",
+            "sourceId" : "19",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -512,16 +557,16 @@
         }, {
           "description" : "Links Telegram chats to application users.",
           "documentation" : { },
-          "id" : "19",
+          "id" : "20",
           "name" : "Telegram identity bridge",
           "properties" : {
             "structurizr.dsl.identifier" : "telegramIdentity"
           },
           "relationships" : [ {
             "description" : "Reads and writes links between Telegram accounts and application users",
-            "destinationId" : "24",
-            "id" : "52",
-            "sourceId" : "19",
+            "destinationId" : "25",
+            "id" : "56",
+            "sourceId" : "20",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -530,16 +575,16 @@
         }, {
           "description" : "Computes and stores sprint KPI fields from aggregates.",
           "documentation" : { },
-          "id" : "20",
+          "id" : "21",
           "name" : "KPI engine",
           "properties" : {
             "structurizr.dsl.identifier" : "kpiEngine"
           },
           "relationships" : [ {
             "description" : "Updates KPI fields from aggregate queries",
-            "destinationId" : "24",
-            "id" : "67",
-            "sourceId" : "20",
+            "destinationId" : "25",
+            "id" : "71",
+            "sourceId" : "21",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -548,7 +593,7 @@
         }, {
           "description" : "Builds insight prompts, calls the LLM, stores sprint narratives.",
           "documentation" : { },
-          "id" : "21",
+          "id" : "22",
           "name" : "Sprint AI orchestration",
           "properties" : {
             "structurizr.dsl.identifier" : "sprintAi"
@@ -556,22 +601,22 @@
           "relationships" : [ {
             "description" : "Sends insight prompts and receives generated narrative text",
             "destinationId" : "5",
-            "id" : "64",
-            "sourceId" : "21",
+            "id" : "68",
+            "sourceId" : "22",
             "tags" : "Relationship",
             "technology" : "HTTPS"
           }, {
             "description" : "Refreshes sprint KPI aggregates before building the prompt",
-            "destinationId" : "20",
-            "id" : "65",
-            "sourceId" : "21",
+            "destinationId" : "21",
+            "id" : "69",
+            "sourceId" : "22",
             "tags" : "Relationship",
             "technology" : "Spring"
           }, {
             "description" : "Loads sprint roster and context, then stores generated insight text",
-            "destinationId" : "24",
-            "id" : "66",
-            "sourceId" : "21",
+            "destinationId" : "25",
+            "id" : "70",
+            "sourceId" : "22",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -580,7 +625,7 @@
         }, {
           "description" : "Embeds text and finds similar stored tasks.",
           "documentation" : { },
-          "id" : "22",
+          "id" : "23",
           "name" : "Semantic retrieval",
           "properties" : {
             "structurizr.dsl.identifier" : "semanticRetrieval"
@@ -588,15 +633,15 @@
           "relationships" : [ {
             "description" : "Requests embeddings for text and receives vectors",
             "destinationId" : "5",
-            "id" : "59",
-            "sourceId" : "22",
+            "id" : "63",
+            "sourceId" : "23",
             "tags" : "Relationship",
             "technology" : "HTTPS"
           }, {
             "description" : "Reads task text and stores embedding vectors for search",
-            "destinationId" : "24",
-            "id" : "68",
-            "sourceId" : "22",
+            "destinationId" : "25",
+            "id" : "72",
+            "sourceId" : "23",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           } ],
@@ -605,30 +650,30 @@
         }, {
           "description" : "Builds retrieval context and calls the LLM for manager chat.",
           "documentation" : { },
-          "id" : "23",
+          "id" : "24",
           "name" : "Chat orchestration",
           "properties" : {
             "structurizr.dsl.identifier" : "chatOrchestration"
           },
           "relationships" : [ {
             "description" : "Embeds the question and finds similar tasks",
-            "destinationId" : "22",
-            "id" : "58",
-            "sourceId" : "23",
+            "destinationId" : "23",
+            "id" : "62",
+            "sourceId" : "24",
             "tags" : "Relationship",
             "technology" : "Spring"
           }, {
             "description" : "Loads project, sprint, and top task excerpts for the prompt",
-            "destinationId" : "24",
-            "id" : "62",
-            "sourceId" : "23",
+            "destinationId" : "25",
+            "id" : "66",
+            "sourceId" : "24",
             "tags" : "Relationship",
             "technology" : "JPA / JDBC"
           }, {
             "description" : "Sends the composed prompt and receives the answer text",
             "destinationId" : "5",
-            "id" : "63",
-            "sourceId" : "23",
+            "id" : "67",
+            "sourceId" : "24",
             "tags" : "Relationship",
             "technology" : "HTTPS"
           } ],
@@ -637,16 +682,16 @@
         }, {
           "description" : "Persists domain data, such as projects, tasks, and sprint KPI snapshots.",
           "documentation" : { },
-          "id" : "24",
+          "id" : "25",
           "name" : "Data Repository",
           "properties" : {
             "structurizr.dsl.identifier" : "dataRepo"
           },
           "relationships" : [ {
             "description" : "Runs queries and maps rows for the application",
-            "destinationId" : "25",
-            "id" : "70",
-            "sourceId" : "24",
+            "destinationId" : "26",
+            "id" : "74",
+            "sourceId" : "25",
             "tags" : "Relationship",
             "technology" : "Oracle / JDBC"
           } ],
@@ -655,32 +700,32 @@
         } ],
         "description" : "Runs business rules, exposes APIs, runs scheduled jobs, handles the Telegram bot, and coordinates AI features.",
         "documentation" : { },
-        "id" : "8",
+        "id" : "9",
         "name" : "Spring Boot Backend",
         "properties" : {
           "structurizr.dsl.identifier" : "apiApp"
         },
         "relationships" : [ {
+          "description" : "Reads and writes application data through JDBC",
+          "destinationId" : "26",
+          "id" : "27",
+          "sourceId" : "9",
+          "tags" : "Relationship",
+          "technology" : "Oracle Net / JDBC, TCP port 1521 (TCPS/mTLS per ADB wallet if enabled)"
+        }, {
           "description" : "Requests embeddings for text and receives vectors",
           "destinationId" : "5",
-          "id" : "60",
-          "linkedRelationshipId" : "59",
-          "sourceId" : "8",
+          "id" : "64",
+          "linkedRelationshipId" : "63",
+          "sourceId" : "9",
           "technology" : "HTTPS"
-        }, {
-          "description" : "Runs queries and maps rows for the application",
-          "destinationId" : "25",
-          "id" : "71",
-          "linkedRelationshipId" : "70",
-          "sourceId" : "8",
-          "technology" : "Oracle / JDBC"
         } ],
         "tags" : "Element,Container,Server-side application",
         "technology" : "Java 17, Spring Boot"
       }, {
         "description" : "Stores application data, KPIs, AI insights, and task search vectors.",
         "documentation" : { },
-        "id" : "25",
+        "id" : "26",
         "name" : "Oracle Autonomous DB",
         "properties" : {
           "structurizr.dsl.identifier" : "database"
@@ -690,7 +735,7 @@
       } ],
       "description" : "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows.",
       "documentation" : { },
-      "id" : "6",
+      "id" : "7",
       "name" : "Task Manager",
       "properties" : {
         "structurizr.dsl.identifier" : "taskManager"
@@ -698,9 +743,9 @@
       "relationships" : [ {
         "description" : "Requests embeddings for text and receives vectors",
         "destinationId" : "5",
-        "id" : "61",
-        "linkedRelationshipId" : "59",
-        "sourceId" : "6",
+        "id" : "65",
+        "linkedRelationshipId" : "63",
+        "sourceId" : "7",
         "technology" : "HTTPS"
       } ],
       "tags" : "Element,Software System"
@@ -708,15 +753,15 @@
   },
   "name" : "Project Manager",
   "properties" : {
+    "structurizr.inspection.error" : "26",
+    "structurizr.dsl" : "d29ya3NwYWNlICJQcm9qZWN0IE1hbmFnZXIiICJTcHJpbnQgd29yaywgS1BJcywgQUkgc3ByaW50IGluc2lnaHRzLCBtYW5hZ2VyIFEmQSwgYW5kIFRlbGVncmFtIHRhc2sgYm90LiIgewogICAgbW9kZWwgewogICAgICAgIGRldmVsb3BlciA9IHBlcnNvbiAiRGV2ZWxvcGVyIiAiTWFuYWdlcyB0YXNrcyBhbmQgdmlld3MgcGVyc29uYWwgS1BJcyB2aWEgVGVsZWdyYW0gb3IgdGhlIHdlYiBhcHBsaWNhdGlvbi4iICJQZXJzb24iCiAgICAgICAgbWFuYWdlciA9IHBlcnNvbiAiTWFuYWdlciIgIlBsYW5zIHRlYW0gdGFza3MgYW5kIHNwcmludHMsIG1vbml0b3JzIEtQSXMgYW5kIEFJIHNwcmludCBpbnNpZ2h0cywgdXNlcyBtYW5hZ2VyIGNoYXQuIiAiUGVyc29uIgogICAgICAgIGFkbWluaXN0cmF0b3IgPSBwZXJzb24gIkFkbWluaXN0cmF0b3IiICJDcmVhdGVzIHByb2plY3RzIGFuZCB0ZWFtcywgYXNzaWducyBtZW1iZXJzLCBtYWludGFpbnMgY2F0YWxvZyBkYXRhLiIgIlBlcnNvbiIKCiAgICAgICAgdGVsZWdyYW0gPSBzb2Z0d2FyZVN5c3RlbSAiVGVsZWdyYW0iICJNZXNzYWdpbmcgYXBwIGZvciB0YXNrLWJvdCBjb21tYW5kcyBhbmQgcmVwbGllcy4iICJFeHRlcm5hbCBTeXN0ZW0iCiAgICAgICAgZ2VtaW5pID0gc29mdHdhcmVTeXN0ZW0gIkdvb2dsZSBHZW1pbmkgQVBJIiAiU3VwcGxpZXMgZW1iZWRkaW5ncyBhbmQgZ2VuZXJhdGVkIHRleHQgZm9yIGluc2lnaHRzIGFuZCBtYW5hZ2VyIGNoYXQuIiAiRXh0ZXJuYWwgU3lzdGVtIgogICAgICAgIGdpdGh1YiA9IHNvZnR3YXJlU3lzdGVtICJHaXRIdWIiICJTb3VyY2UgcmVwb3NpdG9yeSwgcHVsbCByZXF1ZXN0cywgYW5kIENJIHdvcmtmbG93cyBmb3IgdGhlIHByb2R1Y3QgY29kZWJhc2UuIiAiRXh0ZXJuYWwgU3lzdGVtIgoKICAgICAgICB0YXNrTWFuYWdlciA9IHNvZnR3YXJlU3lzdGVtICJUYXNrIE1hbmFnZXIiICJQbGFucyBhbmQgdHJhY2tzIHdvcmssIEtQSXMsIEFJIHNwcmludCBuYXJyYXRpdmVzLCBtYW5hZ2VyIGNoYXQgb3ZlciB0YXNrIGRhdGEsIGFuZCBUZWxlZ3JhbSBib3QgZmxvd3MuIiB7CiAgICAgICAgICAgIHJlYWN0QXBwID0gY29udGFpbmVyICJSZWFjdCBGcm9udGVuZCIgIldlYiBVSSBmb3IgdGFza3MsIEtQSXMsIEFJIGluc2lnaHRzLCBtYW5hZ2VyIGNoYXQsIHJhZGFyLCBhbmQgYWRtaW4uIiAiUmVhY3QgMTgiICJXZWIgQnJvd3NlciwgQ29udGFpbmVyLCBTaW5nbGUtcGFnZSBhcHBsaWNhdGlvbiIKICAgICAgICAgICAgYXBpQXBwID0gY29udGFpbmVyICJTcHJpbmcgQm9vdCBCYWNrZW5kIiAiUnVucyBidXNpbmVzcyBydWxlcywgZXhwb3NlcyBBUElzLCBydW5zIHNjaGVkdWxlZCBqb2JzLCBoYW5kbGVzIHRoZSBUZWxlZ3JhbSBib3QsIGFuZCBjb29yZGluYXRlcyBBSSBmZWF0dXJlcy4iICJKYXZhIDE3LCBTcHJpbmcgQm9vdCIgIkNvbnRhaW5lciwgU2VydmVyLXNpZGUgYXBwbGljYXRpb24iIHsKICAgICAgICAgICAgICAgIGtwaUFwaSA9IGNvbXBvbmVudCAiS1BJIEFQSSIgIkV4cG9zZXMgcHJvZHVjdGl2aXR5IGFuZCBkZWxpdmVyeSBtZXRyaWNzOyBzdXBwb3J0cyBvbi1kZW1hbmQgS1BJIHJlZnJlc2guIiAiU3ByaW5nIFJFU1QiCiAgICAgICAgICAgICAgICBtYW5hZ2VyQ2hhdEFwaSA9IGNvbXBvbmVudCAiTWFuYWdlciBjaGF0IEFQSSIgIkVudHJ5IHBvaW50IGZvciBjb250ZXh0dWFsIG1hbmFnZXIgY2hhdCBvdmVyIHByb2plY3QgYW5kIHNwcmludCBkYXRhLiIgIlNwcmluZyBSRVNUIgogICAgICAgICAgICAgICAgaW5zaWdodHNBcGkgPSBjb21wb25lbnQgIlNwcmludCBpbnNpZ2h0cyBBUEkiICJTdGFydHMgYW5kIHJlYWRzIGFzeW5jaHJvbm91cyBzcHJpbnQgbmFycmF0aXZlczsgc2VydmVzIGRldmVsb3BlciByYWRhciB2aWV3cy4iICJTcHJpbmcgUkVTVCIKICAgICAgICAgICAgICAgIGVtYmVkZGluZ3NBcGkgPSBjb21wb25lbnQgIkVtYmVkZGluZ3MgQVBJIiAiQnVpbGRzIGFuZCByZWZyZXNoZXMgdGFzayBlbWJlZGRpbmdzIGZvciBzZW1hbnRpYyBzZWFyY2guIiAiU3ByaW5nIFJFU1QiCiAgICAgICAgICAgICAgICBkb21haW5BcGkgPSBjb21wb25lbnQgIkRvbWFpbiBBUEkiICJUYXNrcywgcHJvamVjdHMsIHNwcmludHMsIHRlYW1zLCB1c2VycywgYXNzaWdubWVudHMsIGFkbWluLCBhbmQgbGVnYWN5IHRhc2sgbGlzdC4iICJTcHJpbmcgUkVTVCIKCiAgICAgICAgICAgICAgICB0ZWxlZ3JhbUJvdCA9IGNvbXBvbmVudCAiVGVsZWdyYW0gYm90IiAiUmVjZWl2ZXMgbWVzc2FnZXMgYW5kIHJ1bnMgYm90IGNvbW1hbmQgZmxvd3MuIiAiVGVsZWdyYW1Cb3RzIFNESyIKICAgICAgICAgICAgICAgIHRhc2tPcHMgPSBjb21wb25lbnQgIlRhc2sgb3BlcmF0aW9ucyIgIkNyZWF0ZXMgYW5kIHVwZGF0ZXMgdGFza3MgZnJvbSB0aGUgYm90LiIgIlNwcmluZyBTZXJ2aWNlIgogICAgICAgICAgICAgICAgc3ByaW50Q29udGV4dCA9IGNvbXBvbmVudCAiU3ByaW50IGNvbnRleHQiICJIYW5kbGVzIHNwcmludCBzZWxlY3Rpb24gaW4gYm90IGZsb3dzLiIgIlNwcmluZyBTZXJ2aWNlIgogICAgICAgICAgICAgICAgYXNzaWdubWVudHMgPSBjb21wb25lbnQgIkFzc2lnbm1lbnRzIiAiUmVhZHMgYW5kIHVwZGF0ZXMgdXNlcuKAk3Rhc2sgYW5kIHNwcmludC10YXNrIGRhdGEgZm9yIHRoZSBib3QuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICB1c2VyRGlyZWN0b3J5ID0gY29tcG9uZW50ICJVc2VyIGRpcmVjdG9yeSIgIlJlc29sdmVzIHVzZXJzIGZvciBib3QgbWVudXMuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICB0ZWxlZ3JhbUlkZW50aXR5ID0gY29tcG9uZW50ICJUZWxlZ3JhbSBpZGVudGl0eSBicmlkZ2UiICJMaW5rcyBUZWxlZ3JhbSBjaGF0cyB0byBhcHBsaWNhdGlvbiB1c2Vycy4iICJTcHJpbmcgU2VydmljZSIKCiAgICAgICAgICAgICAgICBrcGlFbmdpbmUgPSBjb21wb25lbnQgIktQSSBlbmdpbmUiICJDb21wdXRlcyBhbmQgc3RvcmVzIHNwcmludCBLUEkgZmllbGRzIGZyb20gYWdncmVnYXRlcy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIHNwcmludEFpID0gY29tcG9uZW50ICJTcHJpbnQgQUkgb3JjaGVzdHJhdGlvbiIgIkJ1aWxkcyBpbnNpZ2h0IHByb21wdHMsIGNhbGxzIHRoZSBMTE0sIHN0b3JlcyBzcHJpbnQgbmFycmF0aXZlcy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIHNlbWFudGljUmV0cmlldmFsID0gY29tcG9uZW50ICJTZW1hbnRpYyByZXRyaWV2YWwiICJFbWJlZHMgdGV4dCBhbmQgZmluZHMgc2ltaWxhciBzdG9yZWQgdGFza3MuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICBjaGF0T3JjaGVzdHJhdGlvbiA9IGNvbXBvbmVudCAiQ2hhdCBvcmNoZXN0cmF0aW9uIiAiQnVpbGRzIHJldHJpZXZhbCBjb250ZXh0IGFuZCBjYWxscyB0aGUgTExNIGZvciBtYW5hZ2VyIGNoYXQuIiAiU3ByaW5nIFNlcnZpY2UiCgogICAgICAgICAgICAgICAgZGF0YVJlcG8gPSBjb21wb25lbnQgIkRhdGEgUmVwb3NpdG9yeSIgIlBlcnNpc3RzIGRvbWFpbiBkYXRhLCBzdWNoIGFzIHByb2plY3RzLCB0YXNrcywgYW5kIHNwcmludCBLUEkgc25hcHNob3RzLiIgIlNwcmluZyBEYXRhIEpQQSAvIEpEQkMiCiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGRhdGFiYXNlID0gY29udGFpbmVyICJPcmFjbGUgQXV0b25vbW91cyBEQiIgIlN0b3JlcyBhcHBsaWNhdGlvbiBkYXRhLCBLUElzLCBBSSBpbnNpZ2h0cywgYW5kIHRhc2sgc2VhcmNoIHZlY3RvcnMuIiAiT3JhY2xlIEFEQiIgIkRhdGFiYXNlIgoKICAgICAgICAgICAgYXBpQXBwIC0+IGRhdGFiYXNlICJSZWFkcyBhbmQgd3JpdGVzIGFwcGxpY2F0aW9uIGRhdGEgdGhyb3VnaCBKREJDIiAiT3JhY2xlIE5ldCAvIEpEQkMsIFRDUCBwb3J0IDE1MjEgKFRDUFMvbVRMUyBwZXIgQURCIHdhbGxldCBpZiBlbmFibGVkKSIKICAgICAgICB9CgogICAgICAgIGRldmVsb3BlciAtPiByZWFjdEFwcCAiVmlld3Mgc3ByaW50IHRhc2tzLCBwZXJzb25hbCBLUElzLCBhbmQgc3ByaW50IGluc2lnaHQgcGFnZXMiCiAgICAgICAgZGV2ZWxvcGVyIC0+IHRlbGVncmFtICJMaXN0cyBhbmQgY29tcGxldGVzIHRhc2tzLCBzZW5kcyBib3QgY29tbWFuZHMsIGFuZCByZWFkcyBib3QgcmVwbGllcyIKICAgICAgICBtYW5hZ2VyIC0+IHJlYWN0QXBwICJNYW5hZ2VzIGJhY2tsb2cgYW5kIHNwcmludHMsIHJldmlld3MgS1BJcyBhbmQgbmFycmF0aXZlcywgYW5kIHVzZXMgbWFuYWdlciBjaGF0IgogICAgICAgIG1hbmFnZXIgLT4gdGVsZWdyYW0gIlNlbmRzIG9wZXJhdG9yIGNvbW1hbmRzIGFuZCByZWFkcyB0ZWFtIGJvdCBub3RpZmljYXRpb25zIgogICAgICAgIGFkbWluaXN0cmF0b3IgLT4gcmVhY3RBcHAgIkNyZWF0ZXMgcHJvamVjdHMgYW5kIHRlYW1zLCBhc3NpZ25zIG1lbWJlcnMsIGFuZCBlZGl0cyBjYXRhbG9nIGRhdGEiCgogICAgICAgIGRldmVsb3BlciAtPiBnaXRodWIgIkNvbW1pdHMgY29kZSwgb3BlbnMgYW5kIHJldmlld3MgcHVsbCByZXF1ZXN0cywgYW5kIGZvbGxvd3MgQ0kgcmVzdWx0cyIKICAgICAgICBtYW5hZ2VyIC0+IGdpdGh1YiAiUmV2aWV3cyBwdWxsIHJlcXVlc3RzIGFuZCByZXBvc2l0b3J5IGFjdGl2aXR5IGFsb25nc2lkZSBzcHJpbnQgcHJvZ3Jlc3MiCgogICAgICAgIHJlYWN0QXBwIC0+IGtwaUFwaSAiRmV0Y2hlcyBLUEkgdmlld3MgYW5kIGFza3MgdGhlIHNlcnZlciB0byByZWNvbXB1dGUgS1BJcyB3aGVuIG5lZWRlZCIgIkpTT04gLyBIVFRQUyIKICAgICAgICByZWFjdEFwcCAtPiBtYW5hZ2VyQ2hhdEFwaSAiU2VuZHMgbWFuYWdlciBxdWVzdGlvbnMgd2l0aCBvcHRpb25hbCBwcm9qZWN0IGFuZCBzcHJpbnQgc2NvcGU7IHJlY2VpdmVzIGFzc2lzdGFudCBhbnN3ZXJzIiAiSlNPTiAvIEhUVFBTIgogICAgICAgIHJlYWN0QXBwIC0+IGluc2lnaHRzQXBpICJTdGFydHMgaW5zaWdodCBqb2JzLCByZWFkcyBzcHJpbnQgbmFycmF0aXZlcywgYW5kIGxvYWRzIGRldmVsb3BlciByYWRhciIgIkpTT04gLyBIVFRQUyIKICAgICAgICByZWFjdEFwcCAtPiBlbWJlZGRpbmdzQXBpICJBc2tzIHRoZSBzZXJ2ZXIgdG8gcmVidWlsZCBzcHJpbnQgZW1iZWRkaW5ncyBmb3Igc2VhcmNoIiAiSlNPTiAvIEhUVFBTIgogICAgICAgIHJlYWN0QXBwIC0+IGRvbWFpbkFwaSAiTWFuYWdlcyB0YXNrcywgcHJvamVjdHMsIHNwcmludHMsIHRlYW1zLCB1c2VycywgYXNzaWdubWVudHMsIHByb2ZpbGVzLCBhbmQgYWRtaW4gZGF0YSIgIkpTT04gLyBIVFRQUyIKCiAgICAgICAgdGVsZWdyYW0gLT4gdGVsZWdyYW1Cb3QgIkRlbGl2ZXJzIGluYm91bmQgbWVzc2FnZXMsIGVkaXRzLCBhbmQgY2FsbGJhY2sgcXVlcmllcyB0byB0aGUgdGFzayBib3QiICJUZWxlZ3JhbSBCb3QgQVBJIgogICAgICAgIHRlbGVncmFtQm90IC0+IHRhc2tPcHMgIlJ1bnMgdGhlIHBhcnNlZCB0YXNrIGNvbW1hbmQgdGhyb3VnaCB0aGUgdGFzayBvcGVyYXRpb25zIHNlcnZpY2UgdXNpbmciCiAgICAgICAgdGVsZWdyYW1Cb3QgLT4gc3ByaW50Q29udGV4dCAiUmVhZHMgYW5kIHN0b3JlcyB3aGljaCBzcHJpbnQgdGhpcyBUZWxlZ3JhbSBjb252ZXJzYXRpb24gaXMgd29ya2luZyBpbiB1c2luZyIKICAgICAgICB0ZWxlZ3JhbUJvdCAtPiBhc3NpZ25tZW50cyAiTG9hZHMgYW5kIHVwZGF0ZXMgYXNzaWduZWQgc3ByaW50IHdvcmsgZm9yIHRoZSBzaWduZWQtaW4gYm90IHVzZXIgdXNpbmciCiAgICAgICAgdGVsZWdyYW1Cb3QgLT4gdXNlckRpcmVjdG9yeSAiTG9hZHMgZGlyZWN0b3J5IGluZm9ybWF0aW9uIHRvIHJlbmRlciBib3QgbWVudXMgYW5kIHJvc3RlciBwaWNrZXJzIHVzaW5nIgogICAgICAgIHRlbGVncmFtQm90IC0+IHRlbGVncmFtSWRlbnRpdHkgIlJlc29sdmVzIHdoaWNoIGFwcGxpY2F0aW9uIGFjY291bnQgaXMgbGlua2VkIHRvIHRoaXMgVGVsZWdyYW0gY2hhdCB1c2luZyIKCiAgICAgICAgdGFza09wcyAtPiBkYXRhUmVwbyAiUmVhZHMgYW5kIHdyaXRlcyB0YXNrIHJvd3MgYWZmZWN0ZWQgYnkgdGhlIGJvdCBjb21tYW5kIiAiSlBBIC8gSkRCQyIKICAgICAgICBzcHJpbnRDb250ZXh0IC0+IGRhdGFSZXBvICJSZWFkcyBhbmQgdXBkYXRlcyBzcHJpbnQgc2VsZWN0aW9uIHN0YXRlIGZvciB0aGUgY2hhdCIgIkpQQSAvIEpEQkMiCiAgICAgICAgYXNzaWdubWVudHMgLT4gZGF0YVJlcG8gIlJlYWRzIGFuZCB1cGRhdGVzIGFzc2lnbm1lbnQgYW5kIHNwcmludC10YXNrIHJvd3MgZm9yIHRoZSBhY3RpbmcgdXNlciIgIkpQQSAvIEpEQkMiCiAgICAgICAgdXNlckRpcmVjdG9yeSAtPiBkYXRhUmVwbyAiUmVhZHMgdXNlciBkaXJlY3Rvcnkgcm93cyBmb3IgYm90IG1lbnVzIiAiSlBBIC8gSkRCQyIKICAgICAgICB0ZWxlZ3JhbUlkZW50aXR5IC0+IGRhdGFSZXBvICJSZWFkcyBhbmQgd3JpdGVzIGxpbmtzIGJldHdlZW4gVGVsZWdyYW0gYWNjb3VudHMgYW5kIGFwcGxpY2F0aW9uIHVzZXJzIiAiSlBBIC8gSkRCQyIKCiAgICAgICAgbWFuYWdlckNoYXRBcGkgLT4gY2hhdE9yY2hlc3RyYXRpb24gIkhhbmRzIG1hbmFnZXIgY2hhdCByZXF1ZXN0cyB0byBvcmNoZXN0cmF0aW9uIiAiU3ByaW5nIgogICAgICAgIGluc2lnaHRzQXBpIC0+IHNwcmludEFpICJIYW5kcyBzcHJpbnQgbmFycmF0aXZlIHdvcmsgdG8gQUkgb3JjaGVzdHJhdGlvbiIgIlNwcmluZyIKCiAgICAgICAgZW1iZWRkaW5nc0FwaSAtPiBzZW1hbnRpY1JldHJpZXZhbCAiQXNrcyBzZW1hbnRpYyByZXRyaWV2YWwgdG8gYnVpbGQgb3IgcmVmcmVzaCBzcHJpbnQgZW1iZWRkaW5ncyIgIlNwcmluZyIKCiAgICAgICAga3BpQXBpIC0+IGtwaUVuZ2luZSAiVHJpZ2dlcnMgS1BJIHJlY29tcHV0YXRpb24gYW5kIGFnZ3JlZ2F0ZSByZWFkcyIgIlNwcmluZyIKICAgICAgICBrcGlBcGkgLT4gZGF0YVJlcG8gIlJ1bnMgYWdncmVnYXRlcyBhbmQgcmVhZHMgc3RvcmVkIEtQSSBmaWVsZHMgZm9yIHJlc3BvbnNlcyIgIkpQQSAvIEpEQkMiCgogICAgICAgIGNoYXRPcmNoZXN0cmF0aW9uIC0+IHNlbWFudGljUmV0cmlldmFsICJFbWJlZHMgdGhlIHF1ZXN0aW9uIGFuZCBmaW5kcyBzaW1pbGFyIHRhc2tzIiAiU3ByaW5nIgogICAgICAgIHNlbWFudGljUmV0cmlldmFsIC0+IGdlbWluaSAiUmVxdWVzdHMgZW1iZWRkaW5ncyBmb3IgdGV4dCBhbmQgcmVjZWl2ZXMgdmVjdG9ycyIgIkhUVFBTIgogICAgICAgIGNoYXRPcmNoZXN0cmF0aW9uIC0+IGRhdGFSZXBvICJMb2FkcyBwcm9qZWN0LCBzcHJpbnQsIGFuZCB0b3AgdGFzayBleGNlcnB0cyBmb3IgdGhlIHByb21wdCIgIkpQQSAvIEpEQkMiCiAgICAgICAgY2hhdE9yY2hlc3RyYXRpb24gLT4gZ2VtaW5pICJTZW5kcyB0aGUgY29tcG9zZWQgcHJvbXB0IGFuZCByZWNlaXZlcyB0aGUgYW5zd2VyIHRleHQiICJIVFRQUyIKCiAgICAgICAgc3ByaW50QWkgLT4gZ2VtaW5pICJTZW5kcyBpbnNpZ2h0IHByb21wdHMgYW5kIHJlY2VpdmVzIGdlbmVyYXRlZCBuYXJyYXRpdmUgdGV4dCIgIkhUVFBTIgogICAgICAgIHNwcmludEFpIC0+IGtwaUVuZ2luZSAiUmVmcmVzaGVzIHNwcmludCBLUEkgYWdncmVnYXRlcyBiZWZvcmUgYnVpbGRpbmcgdGhlIHByb21wdCIgIlNwcmluZyIKICAgICAgICBzcHJpbnRBaSAtPiBkYXRhUmVwbyAiTG9hZHMgc3ByaW50IHJvc3RlciBhbmQgY29udGV4dCwgdGhlbiBzdG9yZXMgZ2VuZXJhdGVkIGluc2lnaHQgdGV4dCIgIkpQQSAvIEpEQkMiCgogICAgICAgIGtwaUVuZ2luZSAtPiBkYXRhUmVwbyAiVXBkYXRlcyBLUEkgZmllbGRzIGZyb20gYWdncmVnYXRlIHF1ZXJpZXMiICJKUEEgLyBKREJDIgoKICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBkYXRhUmVwbyAiUmVhZHMgdGFzayB0ZXh0IGFuZCBzdG9yZXMgZW1iZWRkaW5nIHZlY3RvcnMgZm9yIHNlYXJjaCIgIkpQQSAvIEpEQkMiCgogICAgICAgIGRvbWFpbkFwaSAtPiBkYXRhUmVwbyAiUmVhZHMgYW5kIHdyaXRlcyBkb21haW4gZW50aXRpZXMgdGhyb3VnaCB0aGUgcmVwb3NpdG9yeSIgIkpQQSAvIEpEQkMiCgogICAgICAgIGRhdGFSZXBvIC0+IGRhdGFiYXNlICJSdW5zIHF1ZXJpZXMgYW5kIG1hcHMgcm93cyBmb3IgdGhlIGFwcGxpY2F0aW9uIiAiT3JhY2xlIC8gSkRCQyIKCiAgICAgICAgZGVwbG95bWVudEVudmlyb25tZW50ICJQcm9kdWN0aW9uIiB7CiAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJPcmFjbGUgQ2xvdWQgSW5mcmFzdHJ1Y3R1cmUiIHsKICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRhdGFiYXNlCgogICAgICAgICAgICAgICAgb2NpclJlZ2lzdHJ5ID0gZGVwbG95bWVudE5vZGUgIk9DSVIgKGNvbnRhaW5lciByZWdpc3RyeSkiICJTdG9yZXMgYnVpbHQgY29udGFpbmVyIGltYWdlcyBmb3IgdGhlIHdvcmtzaG9wIG5hbWVzcGFjZTsgY2x1c3RlciBub2RlcyBhdXRoZW50aWNhdGUgYW5kIHB1bGwgaW1hZ2VzIGF0IGRlcGxveSBhbmQgcm9sbG91dC4iICJPQ0kgQXJ0aWZhY3RzIgoKICAgICAgICAgICAgICAgIG9rZUNsdXN0ZXIgPSBkZXBsb3ltZW50Tm9kZSAiT3JhY2xlIEt1YmVybmV0ZXMgRW5naW5lIChPS0UpIiB7CiAgICAgICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIk5hbWVzcGFjZSBtdGRyd29ya3Nob3AiICJMb2dpY2FsIGJvdW5kYXJ5IGluIHRoZSBjbHVzdGVyIGZvciB0aGUgcHJvZHVjdOKAmXMgd29ya2xvYWRzLiIgIkt1YmVybmV0ZXMiIHsKICAgICAgICAgICAgICAgICAgICAgICAgcHJvZHVjdGlvbkxiID0gaW5mcmFzdHJ1Y3R1cmVOb2RlICJPQ0kgbG9hZCBiYWxhbmNlciIgIlB1YmxpYyBsaXN0ZW5lciAocG9ydCA4MCk7IGZvcndhcmRzIHRvIGluLWNsdXN0ZXIgU2VydmljZSB0YXJnZXRzIGZvciBTUEEgYW5kIEFQSS4iICJLdWJlcm5ldGVzIC8gT0NJIgoKICAgICAgICAgICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIkZyb250ZW5kIFBvZCIgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcHJvZHVjdGlvbldlYiA9IGNvbnRhaW5lckluc3RhbmNlIHJlYWN0QXBwCiAgICAgICAgICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJCYWNrZW5kIFBvZCIgIlJ1bnMgdGhlIEFQSSB3b3JrbG9hZCB3aXRoIHR3byByZXBsaWNhcyBmb3IgYXZhaWxhYmlsaXR5LiIgIkt1YmVybmV0ZXMiIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGluc3RhbmNlcyAiMiIKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHByb2R1Y3Rpb25BcGkgPSBjb250YWluZXJJbnN0YW5jZSBhcGlBcHAKICAgICAgICAgICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgICAgICAgICAgcHJvZHVjdGlvbkxiIC0+IHByb2R1Y3Rpb25XZWIgIlNlcnZlcyBzdGF0aWMgU1BBIGFuZCBhc3NldHMiICJIVFRQIC8gVENQLCBsaXN0ZW5lciBwb3J0IDgwIOKGkiBwb2Qvc2VydmljZSB0YXJnZXQgcG9ydCIKICAgICAgICAgICAgICAgICAgICAgICAgcHJvZHVjdGlvbkxiIC0+IHByb2R1Y3Rpb25BcGkgIlJvdXRlcyBSRVNUIHRyYWZmaWMgdG8gQVBJIFNlcnZpY2UiICJIVFRQIC8gVENQLCBsaXN0ZW5lciBwb3J0IDgwIOKGkiBwb2Qvc2VydmljZSB0YXJnZXQgcG9ydCIKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9CgogICAgICAgICAgICAgICAgb2tlQ2x1c3RlciAtPiBvY2lyUmVnaXN0cnkgIlB1bGxzIGNvbnRhaW5lciBpbWFnZXMgd2hlbiB3b3JrbG9hZHMgYXJlIHNjaGVkdWxlZCBvciByb2xsZWQgb3V0IiAiSFRUUFMsIHBvcnQgNDQzIgogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICAjIExhbmRzY2FwZQogICAgICAgIHN5c3RlbUxhbmRzY2FwZSAiTGFuZHNjYXBlIiAiVGFzayBNYW5hZ2VyLCBHaXRIdWIsIFRlbGVncmFtLCBHZW1pbmksIGFuZCB0aGUgcGVvcGxlIHdobyB1c2UgdGhlbS4iIHsKICAgICAgICAgICAgaW5jbHVkZSBkZXZlbG9wZXIgbWFuYWdlciBhZG1pbmlzdHJhdG9yIHRhc2tNYW5hZ2VyIGdpdGh1YiB0ZWxlZ3JhbSBnZW1pbmkKICAgICAgICAgICAgaW5jbHVkZSBkZXZlbG9wZXItPmdpdGh1YgogICAgICAgICAgICBpbmNsdWRlIG1hbmFnZXItPmdpdGh1YgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIFN5c3RlbSBjb250ZXh0CiAgICAgICAgc3lzdGVtQ29udGV4dCB0YXNrTWFuYWdlciAiU3lzdGVtQ29udGV4dCIgIlRhc2sgTWFuYWdlciBpbiBpdHMgZW52aXJvbm1lbnQ6IHVzZXJzLCBUZWxlZ3JhbSwgYW5kIEdlbWluaS4iIHsKICAgICAgICAgICAgaW5jbHVkZSBkZXZlbG9wZXIgbWFuYWdlciBhZG1pbmlzdHJhdG9yIHRlbGVncmFtIGdlbWluaQogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIENvbnRhaW5lcnMKICAgICAgICBjb250YWluZXIgdGFza01hbmFnZXIgIkNvbnRhaW5lcnMiICJTcGxpdHMgdGhlIHByb2R1Y3QgaW50byB0aGUgd2ViIGFwcCwgdGhlIHNlcnZlciB0aGF0IHJ1bnMgcnVsZXMgYW5kIGludGVncmF0aW9ucywgdGhlIGRhdGFiYXNlLCBhbmQgdGhlIGV4dGVybmFsIGFzc2lzdGFudHMgdGhlIHNlcnZlciBjYWxscy4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgICMgQ29tcG9uZW50cwogICAgICAgIGNvbXBvbmVudCBhcGlBcHAgIkNvbXBvbmVudHMiICJTaG93cyBSRVNUIGVudHJ5IHBvaW50cywgdGhlIFRlbGVncmFtIGJvdCwgZG9tYWluIGFuZCBLUEkgc2VydmljZXMsIEFJIG9yY2hlc3RyYXRpb24sIHNlbWFudGljIHJldHJpZXZhbCwgYW5kIGhvdyBldmVyeXRoaW5nIHJlYWNoZXMgc3RvcmVkIGRhdGEuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgIH0KCiAgICAgICAgIyBEZXBsb3ltZW50CiAgICAgICAgZGVwbG95bWVudCB0YXNrTWFuYWdlciAiUHJvZHVjdGlvbiIgIkRlcGxveW1lbnQiICJUYXNrIE1hbmFnZXIgcnVucyBpbiBwcm9kdWN0aW9uIG9uIE9yYWNsZSBDbG91ZDogT0tFIGNsdXN0ZXIsIGxvYWQtYmFsYW5jZWQgYXBwIHBvZHMsIE9DSVIgZm9yIGltYWdlcywgYW5kIEF1dG9ub21vdXMgRGF0YWJhc2UuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgIH0KCiAgICAgICAgIyBEeW5hbWljOiBSQUcKICAgICAgICBkeW5hbWljIGFwaUFwcCAiUkFHX0luc2lnaHRfRmxvdyIgIlJlY2VpdmVzIGEgbWFuYWdlciBxdWVzdGlvbiwgZmluZHMgcmVsZXZhbnQgdGFza3MsIGxvYWRzIHN1cHBvcnRpbmcgY29udGV4dCwgYW5kIHJldHVybnMgYSBncm91bmRlZCBhbnN3ZXIuIiB7CiAgICAgICAgICAgIG1hbmFnZXJDaGF0QXBpIC0+IGNoYXRPcmNoZXN0cmF0aW9uICJVc2VyIHF1ZXJ5IHJlY2VpdmVkIgogICAgICAgICAgICBjaGF0T3JjaGVzdHJhdGlvbiAtPiBzZW1hbnRpY1JldHJpZXZhbCAiRW1iZWQgcXVlc3Rpb24gYW5kIHJhbmsgc2ltaWxhciB0YXNrcyIKICAgICAgICAgICAgc2VtYW50aWNSZXRyaWV2YWwgLT4gZ2VtaW5pICJDYWxsIGVtYmVkZGluZyBBUEkiICJIVFRQUyIKICAgICAgICAgICAgY2hhdE9yY2hlc3RyYXRpb24gLT4gZGF0YVJlcG8gIkxvYWQgdG9wIHRhc2tzIGFuZCBzcHJpbnQgY29udGV4dCIgIkpQQSAvIEpEQkMiCiAgICAgICAgICAgIGNoYXRPcmNoZXN0cmF0aW9uIC0+IGdlbWluaSAiQ2FsbCBMTE0gd2l0aCByZXRyaWV2ZWQgY29udGV4dCIgIkhUVFBTIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIER5bmFtaWM6IFNwcmludCBpbnNpZ2h0cwogICAgICAgIGR5bmFtaWMgYXBpQXBwICJTcHJpbnRfSW5zaWdodHNfR2VuZXJhdGlvbiIgIlJlZnJlc2hlcyBzcHJpbnQgbWV0cmljcywgZ2F0aGVycyB0ZWFtIGNvbnRleHQsIGFza3MgdGhlIGV4dGVybmFsIG1vZGVsIGZvciBhIG5hcnJhdGl2ZSwgYW5kIHNhdmVzIHRoZSByZXN1bHQuIiB7CiAgICAgICAgICAgIGluc2lnaHRzQXBpIC0+IHNwcmludEFpICJBY2NlcHRzIGdlbmVyYXRlIG5hcnJhdGl2ZSByZXF1ZXN0IgogICAgICAgICAgICBzcHJpbnRBaSAtPiBrcGlFbmdpbmUgIlJlZnJlc2hlcyBLUEkgc25hcHNob3QgZm9yIHNwcmludCIKICAgICAgICAgICAgc3ByaW50QWkgLT4gZGF0YVJlcG8gIkxvYWRzIHNwcmludCByb3N0ZXIgYW5kIHRhc2sgY29udGV4dCIgIkpQQSAvIEpEQkMiCiAgICAgICAgICAgIHNwcmludEFpIC0+IGdlbWluaSAiU2VuZHMgaW5zaWdodCBwcm9tcHQgYW5kIHJlY2VpdmVzIG5hcnJhdGl2ZSIgIkhUVFBTIgogICAgICAgICAgICBzcHJpbnRBaSAtPiBkYXRhUmVwbyAiUGVyc2lzdHMgaW5zaWdodCByZXN1bHQiICJKUEEgLyBKREJDIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIER5bmFtaWM6IEVtYmVkZGluZ3MKICAgICAgICBkeW5hbWljIGFwaUFwcCAiRW1iZWRkaW5nX1NwcmludF9JbmRleCIgIlJlYWRzIGV2ZXJ5IHRhc2sgaW4gYSBzcHJpbnQsIG9idGFpbnMgZW1iZWRkaW5ncywgYW5kIHN0b3JlcyB2ZWN0b3JzIHNvIHNpbWlsYXJpdHkgc2VhcmNoIHN0YXlzIGFjY3VyYXRlLiIgewogICAgICAgICAgICBlbWJlZGRpbmdzQXBpIC0+IHNlbWFudGljUmV0cmlldmFsICJBY2NlcHRzIHNwcmludCBlbWJlZGRpbmcgam9iIgogICAgICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBkYXRhUmVwbyAiTG9hZHMgdGFzayB0ZXh0IGZvciBzcHJpbnQiICJKUEEgLyBKREJDIgogICAgICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBnZW1pbmkgIk9idGFpbnMgZW1iZWRkaW5nIHZlY3RvcnMiICJIVFRQUyIKICAgICAgICAgICAgc2VtYW50aWNSZXRyaWV2YWwgLT4gZGF0YVJlcG8gIlN0b3JlcyB2ZWN0b3JzIGZvciBzZWFyY2giICJKUEEgLyBKREJDIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIER5bmFtaWM6IFRlbGVncmFtCiAgICAgICAgZHluYW1pYyBhcGlBcHAgIlRlbGVncmFtX1Rhc2tfQ29tbWFuZCIgIlR1cm5zIGFuIGluYm91bmQgY2hhdCBtZXNzYWdlIGludG8gYSByZXNvbHZlZCB1c2VyIGFuZCB1cGRhdGVzIHRhc2tzIGFjY29yZGluZyB0byB0aGUgY29tbWFuZC4iIHsKICAgICAgICAgICAgdGVsZWdyYW0gLT4gdGVsZWdyYW1Cb3QgIkRlbGl2ZXJzIGluYm91bmQgbWVzc2FnZXMsIGVkaXRzLCBhbmQgY2FsbGJhY2sgcXVlcmllcyB0byB0aGUgdGFzayBib3QiICJUZWxlZ3JhbSBCb3QgQVBJIgogICAgICAgICAgICB0ZWxlZ3JhbUJvdCAtPiB0ZWxlZ3JhbUlkZW50aXR5ICJSZXNvbHZlcyBsaW5rZWQgYXBwbGljYXRpb24gdXNlciIKICAgICAgICAgICAgdGVsZWdyYW1JZGVudGl0eSAtPiBkYXRhUmVwbyAiUmVhZHMgb3IgdXBkYXRlcyBUZWxlZ3JhbSBhY2NvdW50IGxpbmsiICJKUEEgLyBKREJDIgogICAgICAgICAgICB0ZWxlZ3JhbUJvdCAtPiB0YXNrT3BzICJSdW5zIHRhc2sgY29tbWFuZCB3b3JrZmxvdyIKICAgICAgICAgICAgdGFza09wcyAtPiBkYXRhUmVwbyAiVXBkYXRlcyB0YXNrIHJlY29yZHMiICJKUEEgLyBKREJDIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIER5bmFtaWM6IEtQSQogICAgICAgIGR5bmFtaWMgYXBpQXBwICJLUElfQ2FsY3VsYXRpb25fRmxvdyIgIlJlY29tcHV0ZXMgc3ByaW50IEtQSSBhZ2dyZWdhdGVzIGZyb20gc3RvcmVkIHdvcmsgYW5kIHdyaXRlcyB0aGUgdXBkYXRlZCB2YWx1ZXMgYmFjay4iIHsKICAgICAgICAgICAga3BpQXBpIC0+IGtwaUVuZ2luZSAiUmVxdWVzdCBLUEkgY2FsY3VsYXRpb24gZm9yIHNwcmludCIgIlNwcmluZyIKICAgICAgICAgICAga3BpRW5naW5lIC0+IGRhdGFSZXBvICJBZ2dyZWdhdGUgbWV0cmljcyBhbmQgdXBkYXRlIHN0b3JlZCBLUEkgdmFsdWVzIiAiSlBBIC8gSkRCQyIKICAgICAgICAgICAgYXV0b0xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgc3R5bGVzIHsKICAgICAgICAgICAgcmVsYXRpb25zaGlwICJSZWxhdGlvbnNoaXAiIHsKICAgICAgICAgICAgICAgIHdpZHRoIDUyMAogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJFeHRlcm5hbCBTeXN0ZW0iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFJvdW5kZWRCb3gKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzk5OTk5OQogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICAgICAgaGVpZ2h0IDIyMAogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJTb2Z0d2FyZSBTeXN0ZW0iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFJvdW5kZWRCb3gKICAgICAgICAgICAgICAgIGhlaWdodCAzMjAKICAgICAgICAgICAgfQoKICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBSb3VuZGVkQm94CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGVsZW1lbnQgIkNvbXBvbmVudCIgewogICAgICAgICAgICAgICAgc2hhcGUgQ29tcG9uZW50CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGVsZW1lbnQgIkRhdGFiYXNlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDeWxpbmRlcgogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJXZWIgQnJvd3NlciIgewogICAgICAgICAgICAgICAgc2hhcGUgV2ViQnJvd3NlcgogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFBlcnNvbgogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjMDg0MjdiCiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgICAgICBoZWlnaHQgMjYwCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0=",
     "structurizr.inspection.info" : "0",
     "structurizr.inspection.ignore" : "0",
-    "structurizr.inspection.error" : "22",
-    "structurizr.inspection.warning" : "0",
-    "structurizr.dsl" : "d29ya3NwYWNlICJQcm9qZWN0IE1hbmFnZXIiICJTcHJpbnQgd29yaywgS1BJcywgQUkgc3ByaW50IGluc2lnaHRzLCBtYW5hZ2VyIFEmQSwgYW5kIFRlbGVncmFtIHRhc2sgYm90LiIgewogICAgbW9kZWwgewogICAgICAgIGRldmVsb3BlciA9IHBlcnNvbiAiRGV2ZWxvcGVyIiAiTWFuYWdlcyB0YXNrcyBhbmQgdmlld3MgcGVyc29uYWwgS1BJcyB2aWEgVGVsZWdyYW0gb3IgdGhlIHdlYiBhcHBsaWNhdGlvbi4iICJQZXJzb24iCiAgICAgICAgbWFuYWdlciA9IHBlcnNvbiAiTWFuYWdlciIgIlBsYW5zIHRlYW0gdGFza3MgYW5kIHNwcmludHMsIG1vbml0b3JzIEtQSXMgYW5kIEFJIHNwcmludCBpbnNpZ2h0cywgdXNlcyBtYW5hZ2VyIGNoYXQuIiAiUGVyc29uIgogICAgICAgIGFkbWluaXN0cmF0b3IgPSBwZXJzb24gIkFkbWluaXN0cmF0b3IiICJDcmVhdGVzIHByb2plY3RzIGFuZCB0ZWFtcywgYXNzaWducyBtZW1iZXJzLCBtYWludGFpbnMgY2F0YWxvZyBkYXRhLiIgIlBlcnNvbiIKCiAgICAgICAgdGVsZWdyYW0gPSBzb2Z0d2FyZVN5c3RlbSAiVGVsZWdyYW0iICJNZXNzYWdpbmcgYXBwIGZvciB0YXNrLWJvdCBjb21tYW5kcyBhbmQgcmVwbGllcy4iICJFeHRlcm5hbCBTeXN0ZW0iCiAgICAgICAgZ2VtaW5pID0gc29mdHdhcmVTeXN0ZW0gIkdvb2dsZSBHZW1pbmkgQVBJIiAiU3VwcGxpZXMgZW1iZWRkaW5ncyBhbmQgZ2VuZXJhdGVkIHRleHQgZm9yIGluc2lnaHRzIGFuZCBtYW5hZ2VyIGNoYXQuIiAiRXh0ZXJuYWwgU3lzdGVtIgoKICAgICAgICB0YXNrTWFuYWdlciA9IHNvZnR3YXJlU3lzdGVtICJUYXNrIE1hbmFnZXIiICJQbGFucyBhbmQgdHJhY2tzIHdvcmssIEtQSXMsIEFJIHNwcmludCBuYXJyYXRpdmVzLCBtYW5hZ2VyIGNoYXQgb3ZlciB0YXNrIGRhdGEsIGFuZCBUZWxlZ3JhbSBib3QgZmxvd3MuIiB7CiAgICAgICAgICAgIHJlYWN0QXBwID0gY29udGFpbmVyICJSZWFjdCBGcm9udGVuZCIgIldlYiBVSSBmb3IgdGFza3MsIEtQSXMsIEFJIGluc2lnaHRzLCBtYW5hZ2VyIGNoYXQsIHJhZGFyLCBhbmQgYWRtaW4uIiAiUmVhY3QgMTgiICJXZWIgQnJvd3NlciwgQ29udGFpbmVyLCBTaW5nbGUtcGFnZSBhcHBsaWNhdGlvbiIKICAgICAgICAgICAgYXBpQXBwID0gY29udGFpbmVyICJTcHJpbmcgQm9vdCBCYWNrZW5kIiAiUnVucyBidXNpbmVzcyBydWxlcywgZXhwb3NlcyBBUElzLCBydW5zIHNjaGVkdWxlZCBqb2JzLCBoYW5kbGVzIHRoZSBUZWxlZ3JhbSBib3QsIGFuZCBjb29yZGluYXRlcyBBSSBmZWF0dXJlcy4iICJKYXZhIDE3LCBTcHJpbmcgQm9vdCIgIkNvbnRhaW5lciwgU2VydmVyLXNpZGUgYXBwbGljYXRpb24iIHsKICAgICAgICAgICAgICAgIGtwaUFwaSA9IGNvbXBvbmVudCAiS1BJIEFQSSIgIkV4cG9zZXMgcHJvZHVjdGl2aXR5IGFuZCBkZWxpdmVyeSBtZXRyaWNzOyBzdXBwb3J0cyBvbi1kZW1hbmQgS1BJIHJlZnJlc2guIiAiU3ByaW5nIFJFU1QiCiAgICAgICAgICAgICAgICBtYW5hZ2VyQ2hhdEFwaSA9IGNvbXBvbmVudCAiTWFuYWdlciBjaGF0IEFQSSIgIkVudHJ5IHBvaW50IGZvciBjb250ZXh0dWFsIG1hbmFnZXIgY2hhdCBvdmVyIHByb2plY3QgYW5kIHNwcmludCBkYXRhLiIgIlNwcmluZyBSRVNUIgogICAgICAgICAgICAgICAgaW5zaWdodHNBcGkgPSBjb21wb25lbnQgIlNwcmludCBpbnNpZ2h0cyBBUEkiICJTdGFydHMgYW5kIHJlYWRzIGFzeW5jaHJvbm91cyBzcHJpbnQgbmFycmF0aXZlczsgc2VydmVzIGRldmVsb3BlciByYWRhciB2aWV3cy4iICJTcHJpbmcgUkVTVCIKICAgICAgICAgICAgICAgIGVtYmVkZGluZ3NBcGkgPSBjb21wb25lbnQgIkVtYmVkZGluZ3MgQVBJIiAiQnVpbGRzIGFuZCByZWZyZXNoZXMgdGFzayBlbWJlZGRpbmdzIGZvciBzZW1hbnRpYyBzZWFyY2guIiAiU3ByaW5nIFJFU1QiCiAgICAgICAgICAgICAgICBkb21haW5BcGkgPSBjb21wb25lbnQgIkRvbWFpbiBBUEkiICJUYXNrcywgcHJvamVjdHMsIHNwcmludHMsIHRlYW1zLCB1c2VycywgYXNzaWdubWVudHMsIGFkbWluLCBhbmQgbGVnYWN5IHRhc2sgbGlzdC4iICJTcHJpbmcgUkVTVCIKCiAgICAgICAgICAgICAgICB0ZWxlZ3JhbUJvdCA9IGNvbXBvbmVudCAiVGVsZWdyYW0gYm90IiAiUmVjZWl2ZXMgbWVzc2FnZXMgYW5kIHJ1bnMgYm90IGNvbW1hbmQgZmxvd3MuIiAiVGVsZWdyYW1Cb3RzIFNESyIKICAgICAgICAgICAgICAgIHRhc2tPcHMgPSBjb21wb25lbnQgIlRhc2sgb3BlcmF0aW9ucyIgIkNyZWF0ZXMgYW5kIHVwZGF0ZXMgdGFza3MgZnJvbSB0aGUgYm90LiIgIlNwcmluZyBTZXJ2aWNlIgogICAgICAgICAgICAgICAgc3ByaW50Q29udGV4dCA9IGNvbXBvbmVudCAiU3ByaW50IGNvbnRleHQiICJIYW5kbGVzIHNwcmludCBzZWxlY3Rpb24gaW4gYm90IGZsb3dzLiIgIlNwcmluZyBTZXJ2aWNlIgogICAgICAgICAgICAgICAgYXNzaWdubWVudHMgPSBjb21wb25lbnQgIkFzc2lnbm1lbnRzIiAiUmVhZHMgYW5kIHVwZGF0ZXMgdXNlcuKAk3Rhc2sgYW5kIHNwcmludC10YXNrIGRhdGEgZm9yIHRoZSBib3QuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICB1c2VyRGlyZWN0b3J5ID0gY29tcG9uZW50ICJVc2VyIGRpcmVjdG9yeSIgIlJlc29sdmVzIHVzZXJzIGZvciBib3QgbWVudXMuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICB0ZWxlZ3JhbUlkZW50aXR5ID0gY29tcG9uZW50ICJUZWxlZ3JhbSBpZGVudGl0eSBicmlkZ2UiICJMaW5rcyBUZWxlZ3JhbSBjaGF0cyB0byBhcHBsaWNhdGlvbiB1c2Vycy4iICJTcHJpbmcgU2VydmljZSIKCiAgICAgICAgICAgICAgICBrcGlFbmdpbmUgPSBjb21wb25lbnQgIktQSSBlbmdpbmUiICJDb21wdXRlcyBhbmQgc3RvcmVzIHNwcmludCBLUEkgZmllbGRzIGZyb20gYWdncmVnYXRlcy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIHNwcmludEFpID0gY29tcG9uZW50ICJTcHJpbnQgQUkgb3JjaGVzdHJhdGlvbiIgIkJ1aWxkcyBpbnNpZ2h0IHByb21wdHMsIGNhbGxzIHRoZSBMTE0sIHN0b3JlcyBzcHJpbnQgbmFycmF0aXZlcy4iICJTcHJpbmcgU2VydmljZSIKICAgICAgICAgICAgICAgIHNlbWFudGljUmV0cmlldmFsID0gY29tcG9uZW50ICJTZW1hbnRpYyByZXRyaWV2YWwiICJFbWJlZHMgdGV4dCBhbmQgZmluZHMgc2ltaWxhciBzdG9yZWQgdGFza3MuIiAiU3ByaW5nIFNlcnZpY2UiCiAgICAgICAgICAgICAgICBjaGF0T3JjaGVzdHJhdGlvbiA9IGNvbXBvbmVudCAiQ2hhdCBvcmNoZXN0cmF0aW9uIiAiQnVpbGRzIHJldHJpZXZhbCBjb250ZXh0IGFuZCBjYWxscyB0aGUgTExNIGZvciBtYW5hZ2VyIGNoYXQuIiAiU3ByaW5nIFNlcnZpY2UiCgogICAgICAgICAgICAgICAgZGF0YVJlcG8gPSBjb21wb25lbnQgIkRhdGEgUmVwb3NpdG9yeSIgIlBlcnNpc3RzIGRvbWFpbiBkYXRhLCBzdWNoIGFzIHByb2plY3RzLCB0YXNrcywgYW5kIHNwcmludCBLUEkgc25hcHNob3RzLiIgIlNwcmluZyBEYXRhIEpQQSAvIEpEQkMiCiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGRhdGFiYXNlID0gY29udGFpbmVyICJPcmFjbGUgQXV0b25vbW91cyBEQiIgIlN0b3JlcyBhcHBsaWNhdGlvbiBkYXRhLCBLUElzLCBBSSBpbnNpZ2h0cywgYW5kIHRhc2sgc2VhcmNoIHZlY3RvcnMuIiAiT3JhY2xlIEFEQiIgIkRhdGFiYXNlIgogICAgICAgIH0KCiAgICAgICAgZGV2ZWxvcGVyIC0+IHJlYWN0QXBwICJWaWV3cyBzcHJpbnQgdGFza3MsIHBlcnNvbmFsIEtQSXMsIGFuZCBzcHJpbnQgaW5zaWdodCBwYWdlcyIKICAgICAgICBkZXZlbG9wZXIgLT4gdGVsZWdyYW0gIkxpc3RzIGFuZCBjb21wbGV0ZXMgdGFza3MsIHNlbmRzIGJvdCBjb21tYW5kcywgYW5kIHJlYWRzIGJvdCByZXBsaWVzIgogICAgICAgIG1hbmFnZXIgLT4gcmVhY3RBcHAgIk1hbmFnZXMgYmFja2xvZyBhbmQgc3ByaW50cywgcmV2aWV3cyBLUElzIGFuZCBuYXJyYXRpdmVzLCBhbmQgdXNlcyBtYW5hZ2VyIGNoYXQiCiAgICAgICAgbWFuYWdlciAtPiB0ZWxlZ3JhbSAiU2VuZHMgb3BlcmF0b3IgY29tbWFuZHMgYW5kIHJlYWRzIHRlYW0gYm90IG5vdGlmaWNhdGlvbnMiCiAgICAgICAgYWRtaW5pc3RyYXRvciAtPiByZWFjdEFwcCAiQ3JlYXRlcyBwcm9qZWN0cyBhbmQgdGVhbXMsIGFzc2lnbnMgbWVtYmVycywgYW5kIGVkaXRzIGNhdGFsb2cgZGF0YSIKCiAgICAgICAgcmVhY3RBcHAgLT4ga3BpQXBpICJGZXRjaGVzIEtQSSB2aWV3cyBhbmQgYXNrcyB0aGUgc2VydmVyIHRvIHJlY29tcHV0ZSBLUElzIHdoZW4gbmVlZGVkIiAiSlNPTiAvIEhUVFBTIgogICAgICAgIHJlYWN0QXBwIC0+IG1hbmFnZXJDaGF0QXBpICJTZW5kcyBtYW5hZ2VyIHF1ZXN0aW9ucyB3aXRoIG9wdGlvbmFsIHByb2plY3QgYW5kIHNwcmludCBzY29wZTsgcmVjZWl2ZXMgYXNzaXN0YW50IGFuc3dlcnMiICJKU09OIC8gSFRUUFMiCiAgICAgICAgcmVhY3RBcHAgLT4gaW5zaWdodHNBcGkgIlN0YXJ0cyBpbnNpZ2h0IGpvYnMsIHJlYWRzIHNwcmludCBuYXJyYXRpdmVzLCBhbmQgbG9hZHMgZGV2ZWxvcGVyIHJhZGFyIiAiSlNPTiAvIEhUVFBTIgogICAgICAgIHJlYWN0QXBwIC0+IGVtYmVkZGluZ3NBcGkgIkFza3MgdGhlIHNlcnZlciB0byByZWJ1aWxkIHNwcmludCBlbWJlZGRpbmdzIGZvciBzZWFyY2giICJKU09OIC8gSFRUUFMiCiAgICAgICAgcmVhY3RBcHAgLT4gZG9tYWluQXBpICJNYW5hZ2VzIHRhc2tzLCBwcm9qZWN0cywgc3ByaW50cywgdGVhbXMsIHVzZXJzLCBhc3NpZ25tZW50cywgcHJvZmlsZXMsIGFuZCBhZG1pbiBkYXRhIiAiSlNPTiAvIEhUVFBTIgoKICAgICAgICB0ZWxlZ3JhbSAtPiB0ZWxlZ3JhbUJvdCAiRGVsaXZlcnMgaW5ib3VuZCBtZXNzYWdlcywgZWRpdHMsIGFuZCBjYWxsYmFjayBxdWVyaWVzIHRvIHRoZSB0YXNrIGJvdCIgIlRlbGVncmFtIEJvdCBBUEkiCiAgICAgICAgdGVsZWdyYW1Cb3QgLT4gdGFza09wcyAiUnVucyB0aGUgcGFyc2VkIHRhc2sgY29tbWFuZCB0aHJvdWdoIHRoZSB0YXNrIG9wZXJhdGlvbnMgc2VydmljZSB1c2luZyIKICAgICAgICB0ZWxlZ3JhbUJvdCAtPiBzcHJpbnRDb250ZXh0ICJSZWFkcyBhbmQgc3RvcmVzIHdoaWNoIHNwcmludCB0aGlzIFRlbGVncmFtIGNvbnZlcnNhdGlvbiBpcyB3b3JraW5nIGluIHVzaW5nIgogICAgICAgIHRlbGVncmFtQm90IC0+IGFzc2lnbm1lbnRzICJMb2FkcyBhbmQgdXBkYXRlcyBhc3NpZ25lZCBzcHJpbnQgd29yayBmb3IgdGhlIHNpZ25lZC1pbiBib3QgdXNlciB1c2luZyIKICAgICAgICB0ZWxlZ3JhbUJvdCAtPiB1c2VyRGlyZWN0b3J5ICJMb2FkcyBkaXJlY3RvcnkgaW5mb3JtYXRpb24gdG8gcmVuZGVyIGJvdCBtZW51cyBhbmQgcm9zdGVyIHBpY2tlcnMgdXNpbmciCiAgICAgICAgdGVsZWdyYW1Cb3QgLT4gdGVsZWdyYW1JZGVudGl0eSAiUmVzb2x2ZXMgd2hpY2ggYXBwbGljYXRpb24gYWNjb3VudCBpcyBsaW5rZWQgdG8gdGhpcyBUZWxlZ3JhbSBjaGF0IHVzaW5nIgoKICAgICAgICB0YXNrT3BzIC0+IGRhdGFSZXBvICJSZWFkcyBhbmQgd3JpdGVzIHRhc2sgcm93cyBhZmZlY3RlZCBieSB0aGUgYm90IGNvbW1hbmQiICJKUEEgLyBKREJDIgogICAgICAgIHNwcmludENvbnRleHQgLT4gZGF0YVJlcG8gIlJlYWRzIGFuZCB1cGRhdGVzIHNwcmludCBzZWxlY3Rpb24gc3RhdGUgZm9yIHRoZSBjaGF0IiAiSlBBIC8gSkRCQyIKICAgICAgICBhc3NpZ25tZW50cyAtPiBkYXRhUmVwbyAiUmVhZHMgYW5kIHVwZGF0ZXMgYXNzaWdubWVudCBhbmQgc3ByaW50LXRhc2sgcm93cyBmb3IgdGhlIGFjdGluZyB1c2VyIiAiSlBBIC8gSkRCQyIKICAgICAgICB1c2VyRGlyZWN0b3J5IC0+IGRhdGFSZXBvICJSZWFkcyB1c2VyIGRpcmVjdG9yeSByb3dzIGZvciBib3QgbWVudXMiICJKUEEgLyBKREJDIgogICAgICAgIHRlbGVncmFtSWRlbnRpdHkgLT4gZGF0YVJlcG8gIlJlYWRzIGFuZCB3cml0ZXMgbGlua3MgYmV0d2VlbiBUZWxlZ3JhbSBhY2NvdW50cyBhbmQgYXBwbGljYXRpb24gdXNlcnMiICJKUEEgLyBKREJDIgoKICAgICAgICBtYW5hZ2VyQ2hhdEFwaSAtPiBjaGF0T3JjaGVzdHJhdGlvbiAiSGFuZHMgbWFuYWdlciBjaGF0IHJlcXVlc3RzIHRvIG9yY2hlc3RyYXRpb24iICJTcHJpbmciCiAgICAgICAgaW5zaWdodHNBcGkgLT4gc3ByaW50QWkgIkhhbmRzIHNwcmludCBuYXJyYXRpdmUgd29yayB0byBBSSBvcmNoZXN0cmF0aW9uIiAiU3ByaW5nIgoKICAgICAgICBlbWJlZGRpbmdzQXBpIC0+IHNlbWFudGljUmV0cmlldmFsICJBc2tzIHNlbWFudGljIHJldHJpZXZhbCB0byBidWlsZCBvciByZWZyZXNoIHNwcmludCBlbWJlZGRpbmdzIiAiU3ByaW5nIgoKICAgICAgICBrcGlBcGkgLT4ga3BpRW5naW5lICJUcmlnZ2VycyBLUEkgcmVjb21wdXRhdGlvbiBhbmQgYWdncmVnYXRlIHJlYWRzIiAiU3ByaW5nIgogICAgICAgIGtwaUFwaSAtPiBkYXRhUmVwbyAiUnVucyBhZ2dyZWdhdGVzIGFuZCByZWFkcyBzdG9yZWQgS1BJIGZpZWxkcyBmb3IgcmVzcG9uc2VzIiAiSlBBIC8gSkRCQyIKCiAgICAgICAgY2hhdE9yY2hlc3RyYXRpb24gLT4gc2VtYW50aWNSZXRyaWV2YWwgIkVtYmVkcyB0aGUgcXVlc3Rpb24gYW5kIGZpbmRzIHNpbWlsYXIgdGFza3MiICJTcHJpbmciCiAgICAgICAgc2VtYW50aWNSZXRyaWV2YWwgLT4gZ2VtaW5pICJSZXF1ZXN0cyBlbWJlZGRpbmdzIGZvciB0ZXh0IGFuZCByZWNlaXZlcyB2ZWN0b3JzIiAiSFRUUFMiCiAgICAgICAgY2hhdE9yY2hlc3RyYXRpb24gLT4gZGF0YVJlcG8gIkxvYWRzIHByb2plY3QsIHNwcmludCwgYW5kIHRvcCB0YXNrIGV4Y2VycHRzIGZvciB0aGUgcHJvbXB0IiAiSlBBIC8gSkRCQyIKICAgICAgICBjaGF0T3JjaGVzdHJhdGlvbiAtPiBnZW1pbmkgIlNlbmRzIHRoZSBjb21wb3NlZCBwcm9tcHQgYW5kIHJlY2VpdmVzIHRoZSBhbnN3ZXIgdGV4dCIgIkhUVFBTIgoKICAgICAgICBzcHJpbnRBaSAtPiBnZW1pbmkgIlNlbmRzIGluc2lnaHQgcHJvbXB0cyBhbmQgcmVjZWl2ZXMgZ2VuZXJhdGVkIG5hcnJhdGl2ZSB0ZXh0IiAiSFRUUFMiCiAgICAgICAgc3ByaW50QWkgLT4ga3BpRW5naW5lICJSZWZyZXNoZXMgc3ByaW50IEtQSSBhZ2dyZWdhdGVzIGJlZm9yZSBidWlsZGluZyB0aGUgcHJvbXB0IiAiU3ByaW5nIgogICAgICAgIHNwcmludEFpIC0+IGRhdGFSZXBvICJMb2FkcyBzcHJpbnQgcm9zdGVyIGFuZCBjb250ZXh0LCB0aGVuIHN0b3JlcyBnZW5lcmF0ZWQgaW5zaWdodCB0ZXh0IiAiSlBBIC8gSkRCQyIKCiAgICAgICAga3BpRW5naW5lIC0+IGRhdGFSZXBvICJVcGRhdGVzIEtQSSBmaWVsZHMgZnJvbSBhZ2dyZWdhdGUgcXVlcmllcyIgIkpQQSAvIEpEQkMiCgogICAgICAgIHNlbWFudGljUmV0cmlldmFsIC0+IGRhdGFSZXBvICJSZWFkcyB0YXNrIHRleHQgYW5kIHN0b3JlcyBlbWJlZGRpbmcgdmVjdG9ycyBmb3Igc2VhcmNoIiAiSlBBIC8gSkRCQyIKCiAgICAgICAgZG9tYWluQXBpIC0+IGRhdGFSZXBvICJSZWFkcyBhbmQgd3JpdGVzIGRvbWFpbiBlbnRpdGllcyB0aHJvdWdoIHRoZSByZXBvc2l0b3J5IiAiSlBBIC8gSkRCQyIKCiAgICAgICAgZGF0YVJlcG8gLT4gZGF0YWJhc2UgIlJ1bnMgcXVlcmllcyBhbmQgbWFwcyByb3dzIGZvciB0aGUgYXBwbGljYXRpb24iICJPcmFjbGUgLyBKREJDIgoKICAgICAgICBkZXBsb3ltZW50RW52aXJvbm1lbnQgIlByb2R1Y3Rpb24iIHsKICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIk9yYWNsZSBDbG91ZCBJbmZyYXN0cnVjdHVyZSIgewogICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGF0YWJhc2UKCgogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIk9yYWNsZSBLdWJlcm5ldGVzIEVuZ2luZSAoT0tFKSIgewogICAgICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJOYW1lc3BhY2UgbXRkcndvcmtzaG9wIiAiTG9naWNhbCBib3VuZGFyeSBpbiB0aGUgY2x1c3RlciBmb3IgdGhlIHByb2R1Y3TigJlzIHdvcmtsb2Fkcy4iICJLdWJlcm5ldGVzIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIHByb2R1Y3Rpb25MYiA9IGluZnJhc3RydWN0dXJlTm9kZSAiT0NJIGxvYWQgYmFsYW5jZXIiICJSZWNlaXZlcyBpbnRlcm5ldCB0cmFmZmljIGFuZCBmb3J3YXJkcyBpdCB0byB0aGUgQVBJIHRpZXIuIiAiS3ViZXJuZXRlcyAvIE9DSSIKCiAgICAgICAgICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJGcm9udGVuZCBQb2QiIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHByb2R1Y3Rpb25XZWIgPSBjb250YWluZXJJbnN0YW5jZSByZWFjdEFwcAogICAgICAgICAgICAgICAgICAgICAgICB9CgogICAgICAgICAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiQmFja2VuZCBQb2QiICJSdW5zIHRoZSBBUEkgd29ya2xvYWQgd2l0aCB0d28gcmVwbGljYXMgZm9yIGF2YWlsYWJpbGl0eS4iICJLdWJlcm5ldGVzIiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpbnN0YW5jZXMgIjIiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwcm9kdWN0aW9uQXBpID0gY29udGFpbmVySW5zdGFuY2UgYXBpQXBwCiAgICAgICAgICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICAgICAgICAgIHByb2R1Y3Rpb25MYiAtPiBwcm9kdWN0aW9uQXBpICJGb3J3YXJkcyBpbmNvbWluZyB0cmFmZmljIHRvIHRoZSBBUEkgcG9kcyIgIkhUVFAgLyBUQ1AiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICAjIDEuIFN5c3RlbSBsYW5kc2NhcGUg4oCUIHBlb3BsZSwgVGFzayBNYW5hZ2VyLCBhbmQgZXh0ZXJuYWwgc3lzdGVtcwogICAgICAgIHN5c3RlbUxhbmRzY2FwZSAiTGFuZHNjYXBlIiAiRGV2ZWxvcGVycywgbWFuYWdlcnMsIGFuZCBhZG1pbmlzdHJhdG9ycyB1c2UgVGFzayBNYW5hZ2VyIGFsb25nc2lkZSBUZWxlZ3JhbSBhbmQgR29vZ2xlIEdlbWluaS4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgICMgMi4gU3lzdGVtIGNvbnRleHQKICAgICAgICBzeXN0ZW1Db250ZXh0IHRhc2tNYW5hZ2VyICJTeXN0ZW1Db250ZXh0IiAiVGFzayBNYW5hZ2VyIGluIGl0cyBlbnZpcm9ubWVudDogdXNlcnMsIFRlbGVncmFtLCBhbmQgR2VtaW5pLiIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b0xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgIyAzLiBDb250YWluZXJzIOKAlCBtYWpvciBwYXJ0cyBvZiBUYXNrIE1hbmFnZXIgYW5kIGhvdyB0aGV5IGludGVyYWN0CiAgICAgICAgY29udGFpbmVyIHRhc2tNYW5hZ2VyICJDb250YWluZXJzIiAiU3BsaXRzIHRoZSBwcm9kdWN0IGludG8gdGhlIHdlYiBhcHAsIHRoZSBzZXJ2ZXIgdGhhdCBydW5zIHJ1bGVzIGFuZCBpbnRlZ3JhdGlvbnMsIHRoZSBkYXRhYmFzZSwgYW5kIHRoZSBleHRlcm5hbCBhc3Npc3RhbnRzIHRoZSBzZXJ2ZXIgY2FsbHMuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIDQuIENvbXBvbmVudHMg4oCUIHdoYXQgbGl2ZXMgaW5zaWRlIHRoZSBBUEkgY29udGFpbmVyCiAgICAgICAgY29tcG9uZW50IGFwaUFwcCAiQ29tcG9uZW50cyIgIlNob3dzIFJFU1QgZW50cnkgcG9pbnRzLCB0aGUgVGVsZWdyYW0gYm90LCBkb21haW4gYW5kIEtQSSBzZXJ2aWNlcywgQUkgb3JjaGVzdHJhdGlvbiwgc2VtYW50aWMgcmV0cmlldmFsLCBhbmQgaG93IGV2ZXJ5dGhpbmcgcmVhY2hlcyBzdG9yZWQgZGF0YS4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgfQoKICAgICAgICAjIDUuIERlcGxveW1lbnQg4oCUIHdoZXJlIGVhY2ggcGFydCBydW5zIGluIHByb2R1Y3Rpb24KICAgICAgICBkZXBsb3ltZW50IHRhc2tNYW5hZ2VyICJQcm9kdWN0aW9uIiAiRGVwbG95bWVudCIgIlBsYWNlcyB0aGUgU1BBIGFuZCBBUEkgb24gdGhlIGNsdXN0ZXIgYmVoaW5kIGEgbG9hZCBiYWxhbmNlciwga2VlcHMgQVBJIHJlcGxpY2FzIGZvciBhdmFpbGFiaWxpdHksIGFuZCBob3N0cyB0aGUgZGF0YWJhc2UgYXMgYSBtYW5hZ2VkIHNlcnZpY2UgYWxvbmdzaWRlIG91dGJvdW5kIGNhbGxzIHRvIGFzc2lzdGFudHMuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICAjIDZhLiBEeW5hbWljIOKAlCBtYW5hZ2VyIGNoYXQgd2l0aCByZXRyaWV2YWwgYmVmb3JlIGFuc3dlcmluZwogICAgICAgIGR5bmFtaWMgYXBpQXBwICJSQUdfSW5zaWdodF9GbG93IiAiUmVjZWl2ZXMgYSBtYW5hZ2VyIHF1ZXN0aW9uLCBmaW5kcyByZWxldmFudCB0YXNrcywgbG9hZHMgc3VwcG9ydGluZyBjb250ZXh0LCBhbmQgcmV0dXJucyBhIGdyb3VuZGVkIGFuc3dlci4iIHsKICAgICAgICAgICAgbWFuYWdlckNoYXRBcGkgLT4gY2hhdE9yY2hlc3RyYXRpb24gIlVzZXIgcXVlcnkgcmVjZWl2ZWQiCiAgICAgICAgICAgIGNoYXRPcmNoZXN0cmF0aW9uIC0+IHNlbWFudGljUmV0cmlldmFsICJFbWJlZCBxdWVzdGlvbiBhbmQgcmFuayBzaW1pbGFyIHRhc2tzIgogICAgICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBnZW1pbmkgIkNhbGwgZW1iZWRkaW5nIEFQSSIgIkhUVFBTIgogICAgICAgICAgICBjaGF0T3JjaGVzdHJhdGlvbiAtPiBkYXRhUmVwbyAiTG9hZCB0b3AgdGFza3MgYW5kIHNwcmludCBjb250ZXh0IiAiSlBBIC8gSkRCQyIKICAgICAgICAgICAgY2hhdE9yY2hlc3RyYXRpb24gLT4gZ2VtaW5pICJDYWxsIExMTSB3aXRoIHJldHJpZXZlZCBjb250ZXh0IiAiSFRUUFMiCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGR5bmFtaWMgYXBpQXBwICJTcHJpbnRfSW5zaWdodHNfR2VuZXJhdGlvbiIgIlJlZnJlc2hlcyBzcHJpbnQgbWV0cmljcywgZ2F0aGVycyB0ZWFtIGNvbnRleHQsIGFza3MgdGhlIGV4dGVybmFsIG1vZGVsIGZvciBhIG5hcnJhdGl2ZSwgYW5kIHNhdmVzIHRoZSByZXN1bHQuIiB7CiAgICAgICAgICAgIGluc2lnaHRzQXBpIC0+IHNwcmludEFpICJBY2NlcHRzIGdlbmVyYXRlIG5hcnJhdGl2ZSByZXF1ZXN0IgogICAgICAgICAgICBzcHJpbnRBaSAtPiBrcGlFbmdpbmUgIlJlZnJlc2hlcyBLUEkgc25hcHNob3QgZm9yIHNwcmludCIKICAgICAgICAgICAgc3ByaW50QWkgLT4gZGF0YVJlcG8gIkxvYWRzIHNwcmludCByb3N0ZXIgYW5kIHRhc2sgY29udGV4dCIgIkpQQSAvIEpEQkMiCiAgICAgICAgICAgIHNwcmludEFpIC0+IGdlbWluaSAiU2VuZHMgaW5zaWdodCBwcm9tcHQgYW5kIHJlY2VpdmVzIG5hcnJhdGl2ZSIgIkhUVFBTIgogICAgICAgICAgICBzcHJpbnRBaSAtPiBkYXRhUmVwbyAiUGVyc2lzdHMgaW5zaWdodCByZXN1bHQiICJKUEEgLyBKREJDIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkeW5hbWljIGFwaUFwcCAiRW1iZWRkaW5nX1NwcmludF9JbmRleCIgIlJlYWRzIGV2ZXJ5IHRhc2sgaW4gYSBzcHJpbnQsIG9idGFpbnMgZW1iZWRkaW5ncywgYW5kIHN0b3JlcyB2ZWN0b3JzIHNvIHNpbWlsYXJpdHkgc2VhcmNoIHN0YXlzIGFjY3VyYXRlLiIgewogICAgICAgICAgICBlbWJlZGRpbmdzQXBpIC0+IHNlbWFudGljUmV0cmlldmFsICJBY2NlcHRzIHNwcmludCBlbWJlZGRpbmcgam9iIgogICAgICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBkYXRhUmVwbyAiTG9hZHMgdGFzayB0ZXh0IGZvciBzcHJpbnQiICJKUEEgLyBKREJDIgogICAgICAgICAgICBzZW1hbnRpY1JldHJpZXZhbCAtPiBnZW1pbmkgIk9idGFpbnMgZW1iZWRkaW5nIHZlY3RvcnMiICJIVFRQUyIKICAgICAgICAgICAgc2VtYW50aWNSZXRyaWV2YWwgLT4gZGF0YVJlcG8gIlN0b3JlcyB2ZWN0b3JzIGZvciBzZWFyY2giICJKUEEgLyBKREJDIgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkeW5hbWljIGFwaUFwcCAiVGVsZWdyYW1fVGFza19Db21tYW5kIiAiVHVybnMgYW4gaW5ib3VuZCBjaGF0IG1lc3NhZ2UgaW50byBhIHJlc29sdmVkIHVzZXIgYW5kIHVwZGF0ZXMgdGFza3MgYWNjb3JkaW5nIHRvIHRoZSBjb21tYW5kLiIgewogICAgICAgICAgICB0ZWxlZ3JhbSAtPiB0ZWxlZ3JhbUJvdCAiRGVsaXZlcnMgaW5ib3VuZCBtZXNzYWdlcywgZWRpdHMsIGFuZCBjYWxsYmFjayBxdWVyaWVzIHRvIHRoZSB0YXNrIGJvdCIgIlRlbGVncmFtIEJvdCBBUEkiCiAgICAgICAgICAgIHRlbGVncmFtQm90IC0+IHRlbGVncmFtSWRlbnRpdHkgIlJlc29sdmVzIGxpbmtlZCBhcHBsaWNhdGlvbiB1c2VyIgogICAgICAgICAgICB0ZWxlZ3JhbUlkZW50aXR5IC0+IGRhdGFSZXBvICJSZWFkcyBvciB1cGRhdGVzIFRlbGVncmFtIGFjY291bnQgbGluayIgIkpQQSAvIEpEQkMiCiAgICAgICAgICAgIHRlbGVncmFtQm90IC0+IHRhc2tPcHMgIlJ1bnMgdGFzayBjb21tYW5kIHdvcmtmbG93IgogICAgICAgICAgICB0YXNrT3BzIC0+IGRhdGFSZXBvICJVcGRhdGVzIHRhc2sgcmVjb3JkcyIgIkpQQSAvIEpEQkMiCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGR5bmFtaWMgYXBpQXBwICJLUElfQ2FsY3VsYXRpb25fRmxvdyIgIlJlY29tcHV0ZXMgc3ByaW50IEtQSSBhZ2dyZWdhdGVzIGZyb20gc3RvcmVkIHdvcmsgYW5kIHdyaXRlcyB0aGUgdXBkYXRlZCB2YWx1ZXMgYmFjay4iIHsKICAgICAgICAgICAga3BpQXBpIC0+IGtwaUVuZ2luZSAiUmVxdWVzdCBLUEkgY2FsY3VsYXRpb24gZm9yIHNwcmludCIgIlNwcmluZyIKICAgICAgICAgICAga3BpRW5naW5lIC0+IGRhdGFSZXBvICJBZ2dyZWdhdGUgbWV0cmljcyBhbmQgdXBkYXRlIHN0b3JlZCBLUEkgdmFsdWVzIiAiSlBBIC8gSkRCQyIKICAgICAgICAgICAgYXV0b0xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgc3R5bGVzIHsKICAgICAgICAgICAgcmVsYXRpb25zaGlwICJSZWxhdGlvbnNoaXAiIHsKICAgICAgICAgICAgICAgIHdpZHRoIDUyMAogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJFeHRlcm5hbCBTeXN0ZW0iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFJvdW5kZWRCb3gKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzk5OTk5OQogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICAgICAgaGVpZ2h0IDIyMAogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJTb2Z0d2FyZSBTeXN0ZW0iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFJvdW5kZWRCb3gKICAgICAgICAgICAgICAgIGhlaWdodCAzMjAKICAgICAgICAgICAgfQoKICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBSb3VuZGVkQm94CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGVsZW1lbnQgIkNvbXBvbmVudCIgewogICAgICAgICAgICAgICAgc2hhcGUgQ29tcG9uZW50CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGVsZW1lbnQgIkRhdGFiYXNlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDeWxpbmRlcgogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJXZWIgQnJvd3NlciIgewogICAgICAgICAgICAgICAgc2hhcGUgV2ViQnJvd3NlcgogICAgICAgICAgICB9CgogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFBlcnNvbgogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjMDg0MjdiCiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgICAgICBoZWlnaHQgMjYwCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0="
+    "structurizr.inspection.warning" : "0"
   },
   "views" : {
     "componentViews" : [ {
-      "containerId" : "8",
+      "containerId" : "9",
       "description" : "Shows REST entry points, the Telegram bot, domain and KPI services, AI orchestration, semantic retrieval, and how everything reaches stored data.",
       "dimensions" : {
         "height" : 4891,
@@ -731,75 +776,75 @@
         "x" : 5344,
         "y" : 143
       }, {
-        "id" : "7",
+        "id" : "8",
         "x" : 250,
         "y" : 1382
       }, {
-        "id" : "9",
+        "id" : "10",
         "x" : 2822,
         "y" : 2165
       }, {
-        "id" : "10",
+        "id" : "11",
         "x" : 1561,
         "y" : 950
       }, {
-        "id" : "11",
+        "id" : "12",
         "x" : 1561,
         "y" : 1795
       }, {
-        "id" : "12",
+        "id" : "13",
         "x" : 2822,
         "y" : 600
       }, {
-        "id" : "13",
+        "id" : "14",
         "x" : 4083,
         "y" : 1382
       }, {
-        "id" : "14",
+        "id" : "15",
         "x" : 2822,
         "y" : 3264
-      }, {
-        "id" : "15",
-        "x" : 4083,
-        "y" : 3964
       }, {
         "id" : "16",
         "x" : 4083,
-        "y" : 3614
+        "y" : 3964
       }, {
         "id" : "17",
         "x" : 4083,
-        "y" : 3264
+        "y" : 3614
       }, {
         "id" : "18",
         "x" : 4083,
-        "y" : 2914
+        "y" : 3264
       }, {
         "id" : "19",
         "x" : 4083,
-        "y" : 2564
+        "y" : 2914
       }, {
         "id" : "20",
         "x" : 4083,
-        "y" : 1732
+        "y" : 2564
       }, {
         "id" : "21",
+        "x" : 4083,
+        "y" : 1732
+      }, {
+        "id" : "22",
         "x" : 2822,
         "y" : 1795
       }, {
-        "id" : "22",
+        "id" : "23",
         "x" : 4083,
         "y" : 875
       }, {
-        "id" : "23",
+        "id" : "24",
         "x" : 2822,
         "y" : 950
       }, {
-        "id" : "24",
+        "id" : "25",
         "x" : 5344,
         "y" : 2332
       }, {
-        "id" : "25",
+        "id" : "26",
         "x" : 6568,
         "y" : 2332
       } ],
@@ -808,197 +853,196 @@
       "name" : "Component View: Task Manager - Spring Boot Backend",
       "order" : 4,
       "relationships" : [ {
-        "id" : "34",
+        "id" : "38",
         "vertices" : [ {
           "x" : 1062,
           "y" : 2315
         } ]
       }, {
-        "id" : "36",
+        "id" : "40",
         "vertices" : [ {
           "x" : 1062,
           "y" : 1100
         } ]
       }, {
-        "id" : "37",
+        "id" : "41",
         "vertices" : [ {
           "x" : 1062,
           "y" : 1945
         } ]
       }, {
-        "id" : "38",
+        "id" : "42",
         "vertices" : [ {
           "x" : 1062,
           "y" : 750
         } ]
       }, {
-        "id" : "39"
+        "id" : "43"
       }, {
-        "id" : "40",
+        "id" : "44",
         "vertices" : [ {
           "x" : 2460,
           "y" : 3414
         } ]
       }, {
-        "id" : "43",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 4114
-        } ]
-      }, {
-        "id" : "44",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 3764
-        } ]
-      }, {
-        "id" : "45"
-      }, {
-        "id" : "46",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 3064
-        } ]
-      }, {
         "id" : "47",
         "vertices" : [ {
           "x" : 3634,
-          "y" : 2714
+          "y" : 4114
         } ]
       }, {
         "id" : "48",
         "vertices" : [ {
-          "x" : 4982,
-          "y" : 4114
-        } ]
-      }, {
-        "id" : "49",
-        "vertices" : [ {
-          "x" : 4982,
+          "x" : 3634,
           "y" : 3764
         } ]
       }, {
+        "id" : "49"
+      }, {
         "id" : "50",
         "vertices" : [ {
-          "x" : 4982,
-          "y" : 3414
+          "x" : 3634,
+          "y" : 3064
         } ]
       }, {
         "id" : "51",
         "vertices" : [ {
-          "x" : 4982,
-          "y" : 3064
+          "x" : 3634,
+          "y" : 2714
         } ]
       }, {
         "id" : "52",
         "vertices" : [ {
           "x" : 4982,
+          "y" : 4114
+        } ]
+      }, {
+        "id" : "53",
+        "vertices" : [ {
+          "x" : 4982,
+          "y" : 3764
+        } ]
+      }, {
+        "id" : "54",
+        "vertices" : [ {
+          "x" : 4982,
+          "y" : 3414
+        } ]
+      }, {
+        "id" : "55",
+        "vertices" : [ {
+          "x" : 4982,
+          "y" : 3064
+        } ]
+      }, {
+        "id" : "56",
+        "vertices" : [ {
+          "x" : 4982,
           "y" : 2714
         } ]
       }, {
-        "id" : "53"
+        "id" : "57"
       }, {
-        "id" : "54"
+        "id" : "58"
       }, {
-        "id" : "55",
+        "id" : "59",
         "vertices" : [ {
           "x" : 3634,
           "y" : 1082
         } ]
       }, {
-        "id" : "56",
+        "id" : "60",
         "vertices" : [ {
           "x" : 3634,
           "y" : 2057
         } ]
       }, {
-        "id" : "57",
+        "id" : "61",
         "vertices" : [ {
           "x" : 3634,
           "y" : 2474
         }, {
           "x" : 4982,
           "y" : 2474
-        } ]
-      }, {
-        "id" : "58",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 967
-        } ]
-      }, {
-        "id" : "59",
-        "vertices" : [ {
-          "x" : 4982,
-          "y" : 1025
         } ]
       }, {
         "id" : "62",
         "vertices" : [ {
           "x" : 3634,
-          "y" : 2345
-        }, {
-          "x" : 4982,
-          "y" : 2345
+          "y" : 967
         } ]
       }, {
         "id" : "63",
         "vertices" : [ {
-          "x" : 3634,
-          "y" : 682
-        }, {
           "x" : 4982,
-          "y" : 682
-        } ]
-      }, {
-        "id" : "64",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 552
-        }, {
-          "x" : 4982,
-          "y" : 552
-        } ]
-      }, {
-        "id" : "65",
-        "vertices" : [ {
-          "x" : 3634,
-          "y" : 1807
+          "y" : 1025
         } ]
       }, {
         "id" : "66",
         "vertices" : [ {
           "x" : 3634,
+          "y" : 2345
+        }, {
+          "x" : 4982,
+          "y" : 2345
+        } ]
+      }, {
+        "id" : "67",
+        "vertices" : [ {
+          "x" : 3634,
+          "y" : 682
+        }, {
+          "x" : 4982,
+          "y" : 682
+        } ]
+      }, {
+        "id" : "68",
+        "vertices" : [ {
+          "x" : 3634,
+          "y" : 552
+        }, {
+          "x" : 4982,
+          "y" : 552
+        } ]
+      }, {
+        "id" : "69",
+        "vertices" : [ {
+          "x" : 3634,
+          "y" : 1807
+        } ]
+      }, {
+        "id" : "70",
+        "vertices" : [ {
+          "x" : 3634,
           "y" : 2215
         }, {
           "x" : 4982,
           "y" : 2215
         } ]
       }, {
-        "id" : "67",
+        "id" : "71",
         "vertices" : [ {
           "x" : 4982,
           "y" : 1882
         } ]
       }, {
-        "id" : "68",
+        "id" : "72",
         "vertices" : [ {
           "x" : 4982,
           "y" : 1715
         } ]
       }, {
-        "id" : "69",
+        "id" : "73",
         "vertices" : [ {
           "x" : 5330,
           "y" : 1532
         } ]
       }, {
-        "id" : "70"
+        "id" : "74"
       } ]
     } ],
     "configuration" : {
-      "lastSavedView" : "Components",
-      "metadataSymbols" : "SquareBrackets",
+      "lastSavedView" : "Deployment",
       "styles" : {
         "elements" : [ {
           "shape" : "Component",
@@ -1066,15 +1110,15 @@
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "7",
-        "x" : 0,
-        "y" : 0
-      }, {
         "id" : "8",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "25",
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "26",
         "x" : 0,
         "y" : 0
       } ],
@@ -1083,59 +1127,40 @@
       "name" : "Container View: Task Manager",
       "order" : 3,
       "relationships" : [ {
-        "id" : "26"
+        "id" : "27"
       }, {
         "id" : "28"
       }, {
-        "id" : "29"
+        "id" : "30"
       }, {
         "id" : "31"
       }, {
-        "id" : "32"
+        "id" : "33"
       }, {
-        "id" : "35"
+        "id" : "34"
       }, {
-        "id" : "41"
+        "id" : "39"
       }, {
-        "id" : "60"
+        "id" : "45"
       }, {
-        "id" : "71"
+        "id" : "64"
       } ],
-      "softwareSystemId" : "6"
+      "softwareSystemId" : "7"
     } ],
     "deploymentViews" : [ {
-      "automaticLayout" : {
-        "edgeSeparation" : 50,
-        "nodeSeparation" : 50,
-        "rankDirection" : "LeftRight",
-        "rankSeparation" : 100,
-        "vertices" : true
+      "description" : "Task Manager runs in production on Oracle Cloud: OKE cluster, load-balanced app pods, OCIR for images, and Autonomous Database.",
+      "dimensions" : {
+        "height" : 1687,
+        "width" : 3698
       },
-      "description" : "Places the SPA and API on the cluster behind a load balancer, keeps API replicas for availability, and hosts the database as a managed service alongside outbound calls to assistants.",
       "elements" : [ {
-        "id" : "72",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "73",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "74",
-        "x" : 0,
-        "y" : 0
-      }, {
         "id" : "75",
         "x" : 0,
         "y" : 0
       }, {
         "id" : "76",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "77",
-        "x" : 0,
-        "y" : 0
+        "x" : 2998,
+        "y" : 543
       }, {
         "id" : "78",
         "x" : 0,
@@ -1146,21 +1171,47 @@
         "y" : 0
       }, {
         "id" : "80",
+        "x" : 395,
+        "y" : 870
+      }, {
+        "id" : "81",
         "x" : 0,
         "y" : 0
+      }, {
+        "id" : "82",
+        "x" : 400,
+        "y" : 205
+      }, {
+        "id" : "83",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "84",
+        "x" : 1674,
+        "y" : 543
       } ],
       "environment" : "Production",
       "key" : "Deployment",
       "name" : "Deployment View: Task Manager - Production",
       "order" : 5,
       "relationships" : [ {
-        "id" : "81"
+        "id" : "85"
       }, {
-        "id" : "82"
+        "id" : "86",
+        "vertices" : [ {
+          "x" : 1624,
+          "y" : 493
+        } ]
       }, {
-        "id" : "83"
+        "id" : "87",
+        "vertices" : [ {
+          "x" : 620,
+          "y" : 715
+        } ]
+      }, {
+        "id" : "88"
       } ],
-      "softwareSystemId" : "6"
+      "softwareSystemId" : "7"
     } ],
     "dynamicViews" : [ {
       "automaticLayout" : {
@@ -1171,17 +1222,13 @@
         "vertices" : true
       },
       "description" : "Receives a manager question, finds relevant tasks, loads supporting context, and returns a grounded answer.",
-      "elementId" : "8",
+      "elementId" : "9",
       "elements" : [ {
         "id" : "5",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "10",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "22",
+        "id" : "11",
         "x" : 0,
         "y" : 0
       }, {
@@ -1192,6 +1239,10 @@
         "id" : "24",
         "x" : 0,
         "y" : 0
+      }, {
+        "id" : "25",
+        "x" : 0,
+        "y" : 0
       } ],
       "externalBoundariesVisible" : false,
       "key" : "RAG_Insight_Flow",
@@ -1199,27 +1250,27 @@
       "order" : 6,
       "relationships" : [ {
         "description" : "User query received",
-        "id" : "53",
+        "id" : "57",
         "order" : "1",
         "response" : false
       }, {
         "description" : "Embed question and rank similar tasks",
-        "id" : "58",
+        "id" : "62",
         "order" : "2",
         "response" : false
       }, {
         "description" : "Call embedding API",
-        "id" : "59",
+        "id" : "63",
         "order" : "3",
         "response" : false
       }, {
         "description" : "Load top tasks and sprint context",
-        "id" : "62",
+        "id" : "66",
         "order" : "4",
         "response" : false
       }, {
         "description" : "Call LLM with retrieved context",
-        "id" : "63",
+        "id" : "67",
         "order" : "5",
         "response" : false
       } ]
@@ -1232,17 +1283,13 @@
         "vertices" : true
       },
       "description" : "Refreshes sprint metrics, gathers team context, asks the external model for a narrative, and saves the result.",
-      "elementId" : "8",
+      "elementId" : "9",
       "elements" : [ {
         "id" : "5",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "11",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "20",
+        "id" : "12",
         "x" : 0,
         "y" : 0
       }, {
@@ -1250,7 +1297,11 @@
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "24",
+        "id" : "22",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
         "x" : 0,
         "y" : 0
       } ],
@@ -1260,27 +1311,27 @@
       "order" : 7,
       "relationships" : [ {
         "description" : "Accepts generate narrative request",
-        "id" : "54",
+        "id" : "58",
         "order" : "1",
         "response" : false
       }, {
         "description" : "Refreshes KPI snapshot for sprint",
-        "id" : "65",
+        "id" : "69",
         "order" : "2",
         "response" : false
       }, {
         "description" : "Loads sprint roster and task context",
-        "id" : "66",
+        "id" : "70",
         "order" : "3",
         "response" : false
       }, {
         "description" : "Sends insight prompt and receives narrative",
-        "id" : "64",
+        "id" : "68",
         "order" : "4",
         "response" : false
       }, {
         "description" : "Persists insight result",
-        "id" : "66",
+        "id" : "70",
         "order" : "5",
         "response" : false
       } ]
@@ -1293,21 +1344,21 @@
         "vertices" : true
       },
       "description" : "Reads every task in a sprint, obtains embeddings, and stores vectors so similarity search stays accurate.",
-      "elementId" : "8",
+      "elementId" : "9",
       "elements" : [ {
         "id" : "5",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "12",
+        "id" : "13",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "22",
+        "id" : "23",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "24",
+        "id" : "25",
         "x" : 0,
         "y" : 0
       } ],
@@ -1317,22 +1368,22 @@
       "order" : 8,
       "relationships" : [ {
         "description" : "Accepts sprint embedding job",
-        "id" : "55",
+        "id" : "59",
         "order" : "1",
         "response" : false
       }, {
         "description" : "Loads task text for sprint",
-        "id" : "68",
+        "id" : "72",
         "order" : "2",
         "response" : false
       }, {
         "description" : "Obtains embedding vectors",
-        "id" : "59",
+        "id" : "63",
         "order" : "3",
         "response" : false
       }, {
         "description" : "Stores vectors for search",
-        "id" : "68",
+        "id" : "72",
         "order" : "4",
         "response" : false
       } ]
@@ -1345,13 +1396,9 @@
         "vertices" : true
       },
       "description" : "Turns an inbound chat message into a resolved user and updates tasks according to the command.",
-      "elementId" : "8",
+      "elementId" : "9",
       "elements" : [ {
         "id" : "4",
-        "x" : 0,
-        "y" : 0
-      }, {
-        "id" : "14",
         "x" : 0,
         "y" : 0
       }, {
@@ -1359,11 +1406,15 @@
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "19",
+        "id" : "16",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "24",
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
         "x" : 0,
         "y" : 0
       } ],
@@ -1373,27 +1424,27 @@
       "order" : 9,
       "relationships" : [ {
         "description" : "Delivers inbound messages, edits, and callback queries to the task bot",
-        "id" : "40",
+        "id" : "44",
         "order" : "1",
         "response" : false
       }, {
         "description" : "Resolves linked application user",
-        "id" : "47",
+        "id" : "51",
         "order" : "2",
         "response" : false
       }, {
         "description" : "Reads or updates Telegram account link",
-        "id" : "52",
+        "id" : "56",
         "order" : "3",
         "response" : false
       }, {
         "description" : "Runs task command workflow",
-        "id" : "43",
+        "id" : "47",
         "order" : "4",
         "response" : false
       }, {
         "description" : "Updates task records",
-        "id" : "48",
+        "id" : "52",
         "order" : "5",
         "response" : false
       } ]
@@ -1406,17 +1457,17 @@
         "vertices" : true
       },
       "description" : "Recomputes sprint KPI aggregates from stored work and writes the updated values back.",
-      "elementId" : "8",
+      "elementId" : "9",
       "elements" : [ {
-        "id" : "9",
+        "id" : "10",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "20",
+        "id" : "21",
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "24",
+        "id" : "25",
         "x" : 0,
         "y" : 0
       } ],
@@ -1426,12 +1477,12 @@
       "order" : 10,
       "relationships" : [ {
         "description" : "Request KPI calculation for sprint",
-        "id" : "56",
+        "id" : "60",
         "order" : "1",
         "response" : false
       }, {
         "description" : "Aggregate metrics and update stored KPI values",
-        "id" : "67",
+        "id" : "71",
         "order" : "2",
         "response" : false
       } ]
@@ -1466,7 +1517,7 @@
         "x" : 0,
         "y" : 0
       }, {
-        "id" : "6",
+        "id" : "7",
         "x" : 0,
         "y" : 0
       } ],
@@ -1475,21 +1526,21 @@
       "name" : "System Context View: Task Manager",
       "order" : 2,
       "relationships" : [ {
-        "id" : "27"
-      }, {
-        "id" : "28"
+        "id" : "29"
       }, {
         "id" : "30"
       }, {
-        "id" : "31"
+        "id" : "32"
       }, {
         "id" : "33"
       }, {
-        "id" : "42"
+        "id" : "35"
       }, {
-        "id" : "61"
+        "id" : "46"
+      }, {
+        "id" : "65"
       } ],
-      "softwareSystemId" : "6"
+      "softwareSystemId" : "7"
     } ],
     "systemLandscapeViews" : [ {
       "automaticLayout" : {
@@ -1499,7 +1550,7 @@
         "rankSeparation" : 100,
         "vertices" : true
       },
-      "description" : "Developers, managers, and administrators use Task Manager alongside Telegram and Google Gemini.",
+      "description" : "Task Manager, GitHub, Telegram, Gemini, and the people who use them.",
       "elements" : [ {
         "id" : "1",
         "x" : 0,
@@ -1524,25 +1575,33 @@
         "id" : "6",
         "x" : 0,
         "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
       } ],
       "enterpriseBoundaryVisible" : true,
       "key" : "Landscape",
       "name" : "System Landscape View",
       "order" : 1,
       "relationships" : [ {
-        "id" : "27"
-      }, {
-        "id" : "28"
+        "id" : "29"
       }, {
         "id" : "30"
       }, {
-        "id" : "31"
+        "id" : "32"
       }, {
         "id" : "33"
       }, {
-        "id" : "42"
+        "id" : "35"
       }, {
-        "id" : "61"
+        "id" : "36"
+      }, {
+        "id" : "37"
+      }, {
+        "id" : "46"
+      }, {
+        "id" : "65"
       } ]
     } ]
   }

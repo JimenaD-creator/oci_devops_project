@@ -7,6 +7,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
         telegram = softwareSystem "Telegram" "Messaging app for task-bot commands and replies." "External System"
         gemini = softwareSystem "Google Gemini API" "Supplies embeddings and generated text for insights and manager chat." "External System"
+        github = softwareSystem "GitHub" "Source repository, pull requests, and CI workflows for the product codebase." "External System"
 
         taskManager = softwareSystem "Task Manager" "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows." {
             reactApp = container "React Frontend" "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin." "React 18" "Web Browser, Container, Single-page application"
@@ -33,6 +34,8 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             }
 
             database = container "Oracle Autonomous DB" "Stores application data, KPIs, AI insights, and task search vectors." "Oracle ADB" "Database"
+
+            apiApp -> database "Reads and writes application data through JDBC" "Oracle Net / JDBC, TCP port 1521 (TCPS/mTLS per ADB wallet if enabled)"
         }
 
         developer -> reactApp "Views sprint tasks, personal KPIs, and sprint insight pages"
@@ -40,6 +43,9 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         manager -> reactApp "Manages backlog and sprints, reviews KPIs and narratives, and uses manager chat"
         manager -> telegram "Sends operator commands and reads team bot notifications"
         administrator -> reactApp "Creates projects and teams, assigns members, and edits catalog data"
+
+        developer -> github "Commits code, opens and reviews pull requests, and follows CI results"
+        manager -> github "Reviews pull requests and repository activity alongside sprint progress"
 
         reactApp -> kpiApi "Fetches KPI views and asks the server to recompute KPIs when needed" "JSON / HTTPS"
         reactApp -> managerChatApi "Sends manager questions with optional project and sprint scope; receives assistant answers" "JSON / HTTPS"
@@ -89,10 +95,11 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             deploymentNode "Oracle Cloud Infrastructure" {
                 containerInstance database
 
+                ocirRegistry = deploymentNode "OCIR (container registry)" "Stores built container images for the workshop namespace; cluster nodes authenticate and pull images at deploy and rollout." "OCI Artifacts"
 
-                deploymentNode "Oracle Kubernetes Engine (OKE)" {
+                okeCluster = deploymentNode "Oracle Kubernetes Engine (OKE)" {
                     deploymentNode "Namespace mtdrworkshop" "Logical boundary in the cluster for the product’s workloads." "Kubernetes" {
-                        productionLb = infrastructureNode "OCI load balancer" "Receives internet traffic and forwards it to the API tier." "Kubernetes / OCI"
+                        productionLb = infrastructureNode "OCI load balancer" "Public listener (port 80); forwards to in-cluster Service targets for SPA and API." "Kubernetes / OCI"
 
                         deploymentNode "Frontend Pod" {
                             productionWeb = containerInstance reactApp
@@ -103,44 +110,48 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
                             productionApi = containerInstance apiApp
                         }
 
-                        productionLb -> productionApi "Forwards incoming traffic to the API pods" "HTTP / TCP"
+                        productionLb -> productionWeb "Serves static SPA and assets" "HTTP / TCP, listener port 80 → pod/service target port"
+                        productionLb -> productionApi "Routes REST traffic to API Service" "HTTP / TCP, listener port 80 → pod/service target port"
                     }
                 }
+
+                okeCluster -> ocirRegistry "Pulls container images when workloads are scheduled or rolled out" "HTTPS, port 443"
             }
         }
     }
 
     views {
-        # 1. System landscape — people, Task Manager, and external systems
-        systemLandscape "Landscape" "Developers, managers, and administrators use Task Manager alongside Telegram and Google Gemini." {
-            include *
+        # Landscape
+        systemLandscape "Landscape" "Task Manager, GitHub, Telegram, Gemini, and the people who use them." {
+            include developer manager administrator taskManager github telegram gemini
+            include developer->github
+            include manager->github
             autoLayout lr
         }
 
-        # 2. System context
+        # System context
         systemContext taskManager "SystemContext" "Task Manager in its environment: users, Telegram, and Gemini." {
-            include *
+            include developer manager administrator telegram gemini
             autoLayout lr
         }
 
-        # 3. Containers — major parts of Task Manager and how they interact
+        # Containers
         container taskManager "Containers" "Splits the product into the web app, the server that runs rules and integrations, the database, and the external assistants the server calls." {
             include *
             autoLayout lr
         }
 
-        # 4. Components — what lives inside the API container
+        # Components
         component apiApp "Components" "Shows REST entry points, the Telegram bot, domain and KPI services, AI orchestration, semantic retrieval, and how everything reaches stored data." {
             include *
         }
 
-        # 5. Deployment — where each part runs in production
-        deployment taskManager "Production" "Deployment" "Places the SPA and API on the cluster behind a load balancer, keeps API replicas for availability, and hosts the database as a managed service alongside outbound calls to assistants." {
+        # Deployment
+        deployment taskManager "Production" "Deployment" "Task Manager runs in production on Oracle Cloud: OKE cluster, load-balanced app pods, OCIR for images, and Autonomous Database." {
             include *
-            autoLayout lr
         }
 
-        # 6a. Dynamic — manager chat with retrieval before answering
+        # Dynamic: RAG
         dynamic apiApp "RAG_Insight_Flow" "Receives a manager question, finds relevant tasks, loads supporting context, and returns a grounded answer." {
             managerChatApi -> chatOrchestration "User query received"
             chatOrchestration -> semanticRetrieval "Embed question and rank similar tasks"
@@ -150,6 +161,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             autoLayout lr
         }
 
+        # Dynamic: Sprint insights
         dynamic apiApp "Sprint_Insights_Generation" "Refreshes sprint metrics, gathers team context, asks the external model for a narrative, and saves the result." {
             insightsApi -> sprintAi "Accepts generate narrative request"
             sprintAi -> kpiEngine "Refreshes KPI snapshot for sprint"
@@ -159,6 +171,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             autoLayout lr
         }
 
+        # Dynamic: Embeddings
         dynamic apiApp "Embedding_Sprint_Index" "Reads every task in a sprint, obtains embeddings, and stores vectors so similarity search stays accurate." {
             embeddingsApi -> semanticRetrieval "Accepts sprint embedding job"
             semanticRetrieval -> dataRepo "Loads task text for sprint" "JPA / JDBC"
@@ -167,6 +180,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             autoLayout lr
         }
 
+        # Dynamic: Telegram
         dynamic apiApp "Telegram_Task_Command" "Turns an inbound chat message into a resolved user and updates tasks according to the command." {
             telegram -> telegramBot "Delivers inbound messages, edits, and callback queries to the task bot" "Telegram Bot API"
             telegramBot -> telegramIdentity "Resolves linked application user"
@@ -176,6 +190,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
             autoLayout lr
         }
 
+        # Dynamic: KPI
         dynamic apiApp "KPI_Calculation_Flow" "Recomputes sprint KPI aggregates from stored work and writes the updated values back." {
             kpiApi -> kpiEngine "Request KPI calculation for sprint" "Spring"
             kpiEngine -> dataRepo "Aggregate metrics and update stored KPI values" "JPA / JDBC"
