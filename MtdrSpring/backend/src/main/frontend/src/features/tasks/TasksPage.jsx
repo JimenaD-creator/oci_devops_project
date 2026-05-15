@@ -28,13 +28,19 @@ import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
-import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
+import {
+  API_BASE,
+  DELETE_TASK_CONFIRM_MESSAGE,
+  ORACLE_RED,
+  pageEase,
+} from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
   resolveActiveProjectId,
   sprintProjectIdFromJson,
   mapTaskToKanban,
   isUserTaskAssigneeComplete,
+  normalizeTaskStatus,
   pageFormFieldOutline,
   userTaskRowTaskId,
 } from './utils/taskUtils';
@@ -59,23 +65,26 @@ export default function TasksPage({ projectId }) {
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
 
-  const loadData = useCallback(async (opts = {}) => {
-    const silent = opts.silent === true;
-    if (!silent) setIsLoading(true);
-    try {
-      const { tasksData, sprintsData, userTasksData } =
-        await fetchTasksPageBundle(effectiveProjectId);
-      setRawTasks(tasksData);
-      setSprints(sprintsData);
-      setUserTasks(userTasksData);
-    } catch (error) {
-      console.error('Error loading tasks data:', error);
-      setRawTasks([]);
-      setSprints([]);
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, [effectiveProjectId]);
+  const loadData = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      if (!silent) setIsLoading(true);
+      try {
+        const { tasksData, sprintsData, userTasksData } =
+          await fetchTasksPageBundle(effectiveProjectId);
+        setRawTasks(tasksData);
+        setSprints(sprintsData);
+        setUserTasks(userTasksData);
+      } catch (error) {
+        console.error('Error loading tasks data:', error);
+        setRawTasks([]);
+        setSprints([]);
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [effectiveProjectId],
+  );
 
   useEffect(() => {
     loadData();
@@ -182,6 +191,16 @@ export default function TasksPage({ projectId }) {
       if (res.ok) {
         const updated = await res.json();
         setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+        if (assignees.length > 1 && ns !== 'DONE') {
+          const canonicalUt = normalizeTaskStatus(newStatus);
+          setUserTasks((prev) =>
+            prev.map((row) => {
+              const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+              if (rowTaskId !== Number(taskId)) return row;
+              return { ...row, status: canonicalUt };
+            }),
+          );
+        }
       }
     };
 
@@ -248,11 +267,7 @@ export default function TasksPage({ projectId }) {
   }, []);
 
   const handleDeleteTask = async (taskId) => {
-    if (
-      !window.confirm(
-        'Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.',
-      )
-    ) {
+    if (!window.confirm(DELETE_TASK_CONFIRM_MESSAGE)) {
       return;
     }
     try {
@@ -344,10 +359,28 @@ export default function TasksPage({ projectId }) {
     return map;
   }, [userTasks, resolveUserTaskDeveloperName]);
 
+  const assignmentsByTaskId = useMemo(() => {
+    const map = new Map();
+    userTasks.forEach((ut) => {
+      const tid = userTaskRowTaskId(ut);
+      if (!Number.isFinite(tid)) return;
+      const key = String(tid);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ut);
+    });
+    return map;
+  }, [userTasks]);
+
   const items = useMemo(
     () =>
-      rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [])),
-    [rawTasks, developersByTaskId],
+      rawTasks.map((task) =>
+        mapTaskToKanban(
+          task,
+          developersByTaskId.get(String(task.id)) ?? [],
+          assignmentsByTaskId.get(String(task.id)) ?? [],
+        ),
+      ),
+    [rawTasks, developersByTaskId, assignmentsByTaskId],
   );
 
   const filteredItems = useMemo(() => {

@@ -54,6 +54,12 @@ export const TASK_STATUS_LABEL = {
 
 export const EASE_OUT = [0.25, 0.1, 0.25, 1];
 
+/** Shown in window.confirm before deleting a sprint (no DB/table jargon). */
+export function deleteSprintConfirmMessage(sprintId) {
+  const label = sprintId != null ? `Sprint ${sprintId}` : 'this sprint';
+  return `Delete ${label} permanently? All tasks in this sprint and each developer's progress on those tasks will be removed. This cannot be undone.`;
+}
+
 export const sprintsOverviewVariants = {
   page: {
     hidden: { opacity: 0 },

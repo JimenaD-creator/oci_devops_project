@@ -12,14 +12,10 @@ import {
   IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import {
-  newSprintDialogFieldOutline,
-  oracleRgba,
-  sprintKpiNumber,
-  toInputDate,
-} from './utils/sprintUtils';
+import { sprintKpiNumber, toInputDate } from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const [startDate, setStartDate] = useState('');
@@ -60,7 +56,6 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
       setError('Sprint project is missing. Please refresh and try again.');
       return;
     }
-
     setSaving(true);
     setError('');
     try {
@@ -107,6 +102,22 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
 
   const canSave = Boolean(startDate && dueDate && sprintId != null);
 
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      fontSize: 13,
+      '& input, & textarea, & .MuiSelect-select': { fontSize: 13 },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#C74126',
+        boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
+      },
+    },
+    '& .MuiInputLabel-root': { fontSize: 13 },
+    '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
+    '& .MuiFormHelperText-root': { fontSize: 12 },
+  };
+
   return (
     <Dialog
       open={open}
@@ -117,62 +128,48 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
       PaperProps={{
         elevation: 0,
         sx: {
-          borderRadius: 3,
+          borderRadius: '16px',
           border: '1px solid #ECECEC',
-          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
           bgcolor: '#FFFFFF',
-          boxShadow: `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
           overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 24px)', sm: 640 },
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 560 },
         },
       }}
     >
+      {/* Header */}
       <DialogTitle sx={{ p: 0 }}>
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 2,
+            bgcolor: ORACLE_RED_ACTION,
             px: 2.5,
-            pt: 2.5,
-            pb: 2,
-            borderBottom: `1px solid ${oracleRgba(0.12)}`,
-            backgroundColor: '#FFFFFF',
+            pt: 2,
+            pb: 1.75,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1.5,
           }}
         >
-          <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2,
-                bgcolor: oracleRgba(0.12),
-                border: `1px solid ${oracleRgba(0.2)}`,
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                bgcolor: 'rgba(255,255,255,0.18)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <EditIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
+              <SpeedOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  color: '#1A1A1A',
-                  lineHeight: 1.25,
-                  fontSize: '1.3rem',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Edit sprint{sprint?.id != null ? ` #${sprint.id}` : ''}
+            <Box>
+              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 15, lineHeight: 1.2 }}>
+                Edit sprint{sprintId != null ? ` #${sprintId}` : ''}
               </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}
-              >
+              <Typography sx={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
                 Dates & goal
               </Typography>
             </Box>
@@ -182,49 +179,59 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             onClick={handleClose}
             disabled={saving}
             size="small"
-            sx={{ color: '#616161', '&:hover': { bgcolor: oracleRgba(0.08) } }}
+            sx={{
+              color: 'rgba(255,255,255,0.85)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
           >
-            <CloseIcon />
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent
-        sx={{
-          px: 2.5,
-          pt: 2.25,
-          pb: 1.5,
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        <Typography
-          variant="body2"
-          sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}
-        >
+      {/* Body */}
+      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
+        <Typography sx={{ fontSize: 13, color: '#424242', mb: 2.5, lineHeight: 1.5 }}>
           Update the sprint window and optional goal. KPI metrics stored in the database are kept
           as-is.
         </Typography>
+
+        {error && (
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: ORACLE_RED_ACTION,
+              fontWeight: 600,
+              display: 'block',
+              mb: 1.5,
+            }}
+          >
+            {error}
+          </Typography>
+        )}
+
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <TextField
-              label="Start date"
+              label="Start date *"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
             <TextField
-              label="End date"
+              label="End date *"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
           </Stack>
           <TextField
@@ -238,55 +245,71 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             inputProps={{ maxLength: 2000 }}
             helperText={`${goal.length} / 2000 characters`}
             sx={{
-              ...newSprintDialogFieldOutline(),
-              '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
+              ...fieldSx,
+              '& .MuiOutlinedInput-root': {
+                ...fieldSx['& .MuiOutlinedInput-root'],
+                alignItems: 'flex-start',
+              },
             }}
           />
         </Stack>
-        {error ? (
-          <Typography
-            variant="caption"
-            sx={{ color: ORACLE_RED_ACTION, fontWeight: 600, mt: 1.5, display: 'block' }}
-          >
-            {error}
-          </Typography>
-        ) : null}
       </DialogContent>
 
+      {/* Footer */}
       <DialogActions
         sx={{
-          px: 2.5,
-          py: 2,
+          px: 3,
+          py: 1.5,
           gap: 1,
-          borderTop: `1px solid ${oracleRgba(0.12)}`,
-          backgroundColor: '#FFFFFF',
-          justifyContent: 'flex-end',
+          borderTop: '1px solid #F0F0F0',
+          bgcolor: '#FAFAFA',
+          justifyContent: 'space-between',
         }}
       >
-        <Button
-          onClick={handleClose}
-          disabled={saving}
-          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          variant="contained"
-          disableElevation
-          sx={{
-            bgcolor: ORACLE_RED_ACTION,
-            textTransform: 'none',
-            fontWeight: 700,
-            px: 2.5,
-            borderRadius: 2,
-            '&:hover': { bgcolor: '#A83B2D' },
-            '&.Mui-disabled': { bgcolor: '#E0E0E0', color: '#9E9E9E' },
-          }}
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </Button>
+        <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>
+          Fields marked with{' '}
+          <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>
+            *
+          </Box>{' '}
+          are required
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            onClick={handleClose}
+            disabled={saving}
+            sx={{
+              fontSize: 13,
+              color: 'text.secondary',
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              border: '1px solid #E0E0E0',
+              px: 2,
+              '&:hover': { bgcolor: '#F5F5F5' },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            variant="contained"
+            disableElevation
+            startIcon={<CheckIcon sx={{ fontSize: '16px !important' }} />}
+            sx={{
+              fontSize: 13,
+              bgcolor: ORACLE_RED_ACTION,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              px: 2.5,
+              '&:hover': { bgcolor: '#A83B2D' },
+              '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' },
+            }}
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

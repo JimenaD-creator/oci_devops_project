@@ -17,6 +17,8 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
     
     List<UserTask> findByUser_Id(Long userId);
 
+    java.util.Optional<UserTask> findByUser_IdAndTask_Id(Long userId, Long taskId);
+
     /** One query for Telegram: this user's rows only, tasks in the given sprint (avoids loading all sprint USER_TASK). */
     List<UserTask> findByUser_IdAndTask_AssignedSprint_Id(Long userId, Long sprintId);
     

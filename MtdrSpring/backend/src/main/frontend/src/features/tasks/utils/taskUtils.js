@@ -21,6 +21,11 @@ export function userTaskRowTaskId(ut) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+/** STATUS on a USER_TASK row (API field names vary). */
+export function userTaskRowStatus(ut) {
+  return ut?.status ?? ut?.STATUS ?? ut?.assignmentStatus ?? '';
+}
+
 /** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
 export function pageFormFieldOutline() {
   return {
@@ -69,14 +74,48 @@ export function normalizeTaskStatus(value) {
   return 'TODO';
 }
 
-export function mapTaskToKanban(task, developerNames = []) {
+/** Mirrors TaskAssignmentSyncService: aggregate TASK status from USER_TASK rows. */
+export function deriveTaskStatusFromAssignments(taskStatus, assignmentRows = []) {
+  const rows = Array.isArray(assignmentRows) ? assignmentRows : [];
+  if (rows.length === 0) return normalizeTaskStatus(taskStatus);
+  const statuses = rows.map((ut) => normalizeTaskStatus(ut?.status ?? ut?.STATUS));
+  if (statuses.every((s) => s === 'DONE')) return 'DONE';
+  if (statuses.some((s) => s === 'IN_PROGRESS')) return 'IN_PROGRESS';
+  if (statuses.some((s) => s === 'IN_REVIEW')) return 'IN_REVIEW';
+  if (statuses.some((s) => s === 'DONE')) return 'IN_REVIEW';
+  return 'TODO';
+}
+
+export function assigneeStatusLabel(statusKey) {
+  const key = normalizeTaskStatus(statusKey);
+  const labels = {
+    TODO: 'To Do',
+    IN_PROGRESS: 'In Progress',
+    IN_REVIEW: 'In Review',
+    DONE: 'Done',
+  };
+  return labels[key] ?? 'To Do';
+}
+
+export function assigneeStatusChipStyle(statusKey) {
+  const key = normalizeTaskStatus(statusKey);
+  const styles = {
+    TODO: { bg: '#F1EFE8', color: '#5F5E5A', border: '#D3D1C7' },
+    IN_PROGRESS: { bg: '#FAEEDA', color: '#633806', border: '#FAC775' },
+    IN_REVIEW: { bg: '#E6F1FB', color: '#0C447C', border: '#85B7EB' },
+    DONE: { bg: '#EAF3DE', color: '#27500A', border: '#97C459' },
+  };
+  return styles[key] ?? styles.TODO;
+}
+
+export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) {
   const statusMap = {
     DONE: 'done',
     IN_PROGRESS: 'in_progress',
     IN_REVIEW: 'in_review',
     TODO: 'todo',
   };
-  const normalizedStatus = normalizeTaskStatus(task?.status);
+  const normalizedStatus = deriveTaskStatusFromAssignments(task?.status, assignmentRows);
   const list = Array.isArray(developerNames)
     ? [...new Set(developerNames.filter(Boolean))]
     : developerNames

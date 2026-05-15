@@ -18,6 +18,7 @@ import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
 } from './utils/assigneeIdentityPalette';
+import { assigneeStatusChipStyle, assigneeStatusLabel } from './utils/taskUtils';
 import { DeleteIcon } from 'lucide-react';
 import { UndoIcon } from 'lucide-react';
 import { DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
@@ -144,14 +145,13 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView }
           const key =
             row.userId != null && Number.isFinite(row.userId) ? `u-${row.userId}` : row.name;
           const pal = ASSIGNEE_IDENTITY_PALETTE[assigneeIdentityPaletteIndex(row)];
+          const statusKey = row.status ?? (row.completed ? 'DONE' : 'TODO');
+          const statusChip = assigneeStatusChipStyle(statusKey);
+          const statusLabel = assigneeStatusLabel(statusKey);
           return (
             <Box
               key={key}
-              title={
-                row.completed
-                  ? 'This developer marked their part complete'
-                  : 'Waiting on this developer'
-              }
+              title={`${row.name}: ${statusLabel}`}
               sx={{
                 display: 'flex',
                 alignItems: 'stretch',
@@ -193,17 +193,13 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView }
                   justifyContent: 'center',
                   fontSize: '0.58rem',
                   fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  writingMode: 'horizontal-tb',
-                  color: '#fff',
-                  bgcolor: row.completed ? '#1B5E20' : '#E65100',
-                  borderLeft: row.completed
-                    ? '1px solid rgba(255,255,255,0.25)'
-                    : '1px solid rgba(0,0,0,0.08)',
+                  letterSpacing: '0.03em',
+                  color: statusChip.color,
+                  bgcolor: statusChip.bg,
+                  borderLeft: `2px solid ${statusChip.border}`,
                 }}
               >
-                {row.completed ? 'Done' : 'Pending'}
+                {statusLabel}
               </Box>
             </Box>
           );

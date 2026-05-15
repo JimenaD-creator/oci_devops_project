@@ -46,13 +46,9 @@ public class TelegramUserMappingService {
      */
     public Integer getUserIdByChatId(Long chatId) {
         Integer userId = chatIdToUserIdMap.get(chatId);
-        
         if (userId == null) {
             logger.warn("No user mapping found for chatId {}", chatId);
-            // For now, default to user 1 (TODO: handle proper user onboarding)
-            return 1;
         }
-        
         return userId;
     }
     
