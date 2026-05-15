@@ -11,6 +11,39 @@ const METRICS = [
   { key: 'deliveryVolume', label: 'Volume' },
 ];
 
+const METRIC_DESCRIPTIONS = {
+  completionRate: {
+    label: 'Completion',
+    description: 'Percentage of assigned tasks marked as done during this sprint.',
+    formula: 'Tasks Done / Tasks Assigned × 100',
+  },
+  onTimeRate: {
+    label: 'On-time',
+    description: 'Percentage of completed tasks delivered before or on their due date.',
+    formula: 'On-time Tasks / Tasks Done × 100',
+  },
+  participation: {
+    label: 'Participation',
+    description: 'How active the developer was in logging work and updating task status.',
+    formula: 'Task Logs Submitted / Expected Logs × 100',
+  },
+  hoursLogged: {
+    label: 'Hours',
+    description: 'Total hours logged in this sprint, normalized relative to the team average.',
+    formula: 'Dev Hours / Max Team Hours × 100',
+  },
+  efficiency: {
+    label: 'Efficiency',
+    description: 'Quality of delivery: tasks completed without rework or reopening.',
+    formula: 'Clean Deliveries / Tasks Done × 100',
+  },
+  deliveryVolume: {
+    label: 'Volume',
+    description: 'Workload handled relative to the team member with the most tasks.',
+    formula: 'Dev Tasks / Max Team Tasks × 100',
+  },
+};
+
 function overall(dev) {
   const sum = METRICS.reduce((s, m) => s + (dev[m.key] ?? 1), 0);
   return Math.round(sum / METRICS.length);
@@ -25,6 +58,7 @@ function getColor(score) {
 function RadarChart({ dev }) {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
+  const [tooltip, setTooltip] = React.useState(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -45,13 +79,17 @@ function RadarChart({ dev }) {
             borderWidth: 2.5,
             pointBackgroundColor: color,
             pointRadius: 4,
+            pointHoverRadius: 7,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
         scales: {
           r: {
             min: 0,
@@ -67,6 +105,47 @@ function RadarChart({ dev }) {
             pointLabels: { font: { size: 13 }, color: '#546E7A' },
           },
         },
+        onHover: (event, elements) => {
+          if (!canvasRef.current) return;
+          if (elements.length > 0) {
+            canvasRef.current.style.cursor = 'pointer';
+            const idx = elements[0].index;
+            const metricKey = METRICS[idx].key;
+            const info = METRIC_DESCRIPTIONS[metricKey];
+            const rect = canvasRef.current.getBoundingClientRect();
+            setTooltip({
+              label: info.label,
+              description: info.description,
+              formula: info.formula,
+              value: dev[metricKey] ?? 1,
+              x: event.native.clientX - rect.left,
+              y: event.native.clientY - rect.top,
+            });
+          } else {
+            canvasRef.current.style.cursor = 'default';
+            setTooltip(null);
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const metricKey = METRICS[idx].key;
+            const info = METRIC_DESCRIPTIONS[metricKey];
+            const rect = canvasRef.current.getBoundingClientRect();
+            setTooltip((prev) =>
+              prev?.label === info.label
+                ? null
+                : {
+                    label: info.label,
+                    description: info.description,
+                    formula: info.formula,
+                    value: dev[metricKey] ?? 1,
+                    x: event.native.clientX - rect.left,
+                    y: event.native.clientY - rect.top,
+                  },
+            );
+          }
+        },
       },
     });
     return () => {
@@ -76,7 +155,50 @@ function RadarChart({ dev }) {
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: 260 }}>
-      <canvas ref={canvasRef} role="img" aria-label={`Radar de métricas de ${dev.developerName}`} />
+      <canvas
+        ref={canvasRef}
+        role="img"
+        aria-label={`Radar de métricas de ${dev.developerName}`}
+      />
+      {tooltip && (
+        <Box
+          sx={{
+            position: 'absolute',
+            left: Math.min(tooltip.x + 10, 200),
+            top: Math.max(tooltip.y - 80, 0),
+            bgcolor: '#FFFFFF',
+            border: '1px solid rgba(0,0,0,0.12)',
+            borderRadius: 2,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            p: 1.5,
+            zIndex: 10,
+            maxWidth: 220,
+            pointerEvents: 'none',
+          }}
+        >
+          <Typography sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#1A1A1A', mb: 0.5 }}>
+            {tooltip.label}
+            <Box component="span" sx={{ ml: 1, fontWeight: 700, color: '#2E7D32' }}>
+              {tooltip.value}
+            </Box>
+          </Typography>
+          <Typography sx={{ fontSize: '0.78rem', color: '#546E7A', mb: 0.75 }}>
+            {tooltip.description}
+          </Typography>
+          <Box
+            sx={{
+              bgcolor: '#F5F5F5',
+              borderRadius: 1,
+              px: 1,
+              py: 0.5,
+            }}
+          >
+            <Typography sx={{ fontSize: '0.72rem', color: '#78909C', fontFamily: 'monospace' }}>
+              {tooltip.formula}
+            </Typography>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
