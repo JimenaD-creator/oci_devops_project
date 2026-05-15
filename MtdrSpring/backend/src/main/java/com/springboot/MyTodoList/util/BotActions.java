@@ -731,15 +731,8 @@ public class BotActions {
             message = "📋 *Sprint " + sprintId + " — all team tasks (manager)*\n\n"
                     + "Tap a task for a read-only summary. Assignees update status from their own sign-in.";
         } else {
-            long myDoneCount = myCompletedIds.size();
-            String baseMessage = "📋 *Your tasks (Sprint " + sprintId + "):*\n\n"
+            message = "📋 *Your tasks (Sprint " + sprintId + "):*\n\n"
                     + "Tap a task to view details or change status.";
-            if (myDoneCount > 0) {
-                message = baseMessage + "\n\n✅ Tasks marked *✅ Your part done* are completed on your side; "
-                        + "the team task may stay open until everyone finishes.";
-            } else {
-                message = baseMessage;
-            }
         }
 
         BotHelper.sendMessageToTelegram(chatId, message, telegramClient, keyboardMarkup);
