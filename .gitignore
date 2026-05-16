@@ -62,3 +62,6 @@ docker-compose.*.yml
 # Environment (secrets) — all .env files in the repo
 .env
 **/.env
+
+# Structurizr Lite local index
+architecture/.structurizr/

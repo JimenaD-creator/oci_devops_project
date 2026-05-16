@@ -8,7 +8,7 @@ KPI fields on each sprint (e.g. completion rate, on-time delivery, team particip
 
 ## Decision
 We implemented a **Scheduled Batch Processing Strategy**:
-* **Cron Jobs:** Using `@Scheduled(cron = "0 0 2 * * *")`, the system automatically recalculates KPIs for all active sprints during low-traffic hours (2:00 AM).
+* **Cron Jobs:** Using `@Scheduled(cron = "0 0 2 * * *")`, the system automatically recalculates KPIs for every sprint returned by `SprintRepository.findAll()` during low-traffic hours (2:00 AM).
 * **On-demand Refresh:** We also provide an on-demand recalculation trigger via the `KpiController` for immediate updates.
 
 ## Alternatives considered
