@@ -70,6 +70,9 @@ function ProductivityScoreCard({
   /** Stretch to full height of the grid cell (pair with chart column). */
   fillColumnHeight = false,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const score = Math.round(
     completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1,
   );
@@ -89,7 +92,8 @@ function ProductivityScoreCard({
         borderRadius: 2,
         border: `1px solid ${sectionRgba(0.22)}`,
         borderLeft: '4px solid #2E7D32',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
+        bgcolor: 'background.paper',
         mb: fillColumnHeight ? 0 : 4,
         width: fillColumnHeight ? '100%' : undefined,
         flex: fillColumnHeight ? 1 : undefined,
@@ -115,7 +119,7 @@ function ProductivityScoreCard({
             <Typography
               component="span"
               variant="caption"
-              sx={{ color: '#455A64', fontWeight: 700, lineHeight: 1.3 }}
+              sx={{ color: isDark ? '#9A9A9A' : '#455A64', fontWeight: 700, lineHeight: 1.3 }}
             >
               Productivity Score
             </Typography>
@@ -127,7 +131,7 @@ function ProductivityScoreCard({
             />
           </Box>
           <Typography
-            sx={{ fontSize: '2.2rem', fontWeight: 800, color: '#1A1A1A', lineHeight: 1.1 }}
+            sx={{ fontSize: '2.2rem', fontWeight: 800, color: 'text.primary', lineHeight: 1.1 }}
           >
             {score}
             <span style={{ fontSize: '1rem', fontWeight: 500, color: '#607D8B' }}>%</span>
@@ -147,7 +151,7 @@ function ProductivityScoreCard({
         />
       </Box>
 
-      <Box sx={{ height: 8, bgcolor: '#F0F0F0', borderRadius: 99, mb: 2, overflow: 'hidden' }}>
+      <Box sx={{ height: 8, bgcolor: isDark ? '#2A2C32' : '#F0F0F0', borderRadius: 99, mb: 2, overflow: 'hidden' }}>
         <Box
           sx={{
             height: '100%',
@@ -166,9 +170,9 @@ function ProductivityScoreCard({
       >
         {components.map(({ label, value, weight, color }) => (
           <Grid item xs={6} key={label}>
-            <Box sx={{ bgcolor: '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
+            <Box sx={{ bgcolor: isDark ? '#16181C' : '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                <Typography sx={{ fontSize: '0.7rem', color: '#607D8B', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
                   {label}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: '#90A4AE' }}>{weight}</Typography>
@@ -178,7 +182,7 @@ function ProductivityScoreCard({
                   sx={{
                     flex: 1,
                     height: 5,
-                    bgcolor: '#E0E0E0',
+                    bgcolor: isDark ? '#2A2C32' : '#E0E0E0',
                     borderRadius: 99,
                     overflow: 'hidden',
                   }}
@@ -196,7 +200,7 @@ function ProductivityScoreCard({
                   sx={{
                     fontSize: '0.75rem',
                     fontWeight: 700,
-                    color: '#1A1A1A',
+                    color: 'text.primary',
                     minWidth: 30,
                     textAlign: 'right',
                   }}
@@ -214,6 +218,7 @@ function ProductivityScoreCard({
 
 export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -489,7 +494,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                   minWidth: { xs: '100%', sm: 220 },
                   ...pageFormFieldOutline(),
                   '& .MuiSelect-select': {
-                    color: '#1A1A1A',
+                    color: isDark ? '#F0F0F0' : '#1A1A1A',
                     fontWeight: 600,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -586,7 +591,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                   borderRadius: 2,
                   border: `1px solid ${sectionRgba(0.22)}`,
                   borderLeft: `4px solid ${borderColor}`,
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
+                  bgcolor: 'background.paper',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -602,7 +608,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 />
                 <Typography
                   variant="caption"
-                  sx={{ color: '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}
+                  sx={{ color: isDark ? '#9A9A9A' : '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}
                 >
                   {label}
                 </Typography>

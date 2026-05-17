@@ -2,6 +2,8 @@
  * Shared dashboard typography (inherits app font, usually DM Sans from index.css).
  * Use these sizes everywhere on the dashboard for consistency.
  */
+import { useTheme } from '@mui/material/styles';
+
 export const FONT = 'inherit';
 
 /** Section headings (e.g. Project status, Developer performance) */
@@ -17,7 +19,6 @@ export const SECTION_TITLE_SX = {
 export const SECTION_DESC_SX = {
   fontSize: '0.875rem',
   fontWeight: 600,
-  color: '#263238',
   lineHeight: 1.55,
   fontFamily: FONT,
 };
@@ -28,7 +29,6 @@ export const SCORECARDS_LABEL_SX = {
   fontWeight: 800,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: '#1565C0',
   textAlign: 'left',
   fontFamily: FONT,
   lineHeight: 1.4,
@@ -48,7 +48,6 @@ export const METRIC_LABEL_SX = {
 export const METRIC_VALUE_SX = {
   fontSize: { xs: '1.75rem', sm: '1.875rem' },
   fontWeight: 800,
-  color: '#1A1A1A',
   lineHeight: 1.15,
   fontFamily: FONT,
 };
@@ -57,7 +56,6 @@ export const METRIC_VALUE_SX = {
 export const METRIC_HELPER_SX = {
   fontSize: '0.875rem',
   fontWeight: 500,
-  color: '#263238',
   lineHeight: 1.5,
   fontFamily: FONT,
 };
@@ -75,23 +73,28 @@ export const CHART_TITLE_SX = {
 export const CHART_DESC_SX = {
   fontSize: '0.875rem',
   fontWeight: 500,
-  color: '#263238',
   lineHeight: 1.55,
   fontFamily: FONT,
 };
 
 /** Recharts axis tick (single size; SVG text may not apply webfont uniformly) */
-export const CHART_TICK = { fontSize: 15, fill: '#1A1A1A', fontWeight: 600 };
+export const CHART_TICK = (isDark) => ({ 
+  fontSize: 15, 
+  fill: isDark ? '#9A9A9A' : '#1A1A1A', 
+  fontWeight: 600 
+});
 
 /** Axis titles (Hours, Tasks, etc.) — slightly larger than ticks */
 export const CHART_AXIS_LABEL = { fontSize: 16, fontWeight: 700 };
 
-export const CHART_TOOLTIP_SX = {
+export const CHART_TOOLTIP_SX = (isDark) => ({
   borderRadius: 8,
-  border: '1px solid #90CAF9',
+  border: `1px solid ${isDark ? '#2A2C32' : '#90CAF9'}`,
   fontSize: 15,
   padding: '11px 15px',
-};
+  backgroundColor: isDark ? '#1C1E22' : '#FFFFFF',
+  color: isDark ? '#F0F0F0' : '#1A1A1A',
+});
 
 /** Recharts Tooltip — avoid clipping; flip near chart edges (not always on the same side). */
 export const RECHARTS_TOOLTIP_PROPS = {

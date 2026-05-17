@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Chip } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 
 /** When a sprint has no accent color yet, cycle these (aligned with chart sprint colors). */
 const COMPARE_FALLBACK_ACCENTS = ['#1565C0', '#FB8C00', '#26A69A', '#8E24AA', '#5E35B1', '#0277BD'];
@@ -16,6 +16,9 @@ export default function DashboardCompletedTasksPills({
   compareBySprint,
   pillTestId = 'dashboard-tasks-completed-pill',
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const defaultAccent = accent ?? '#3949AB';
   const nCompare = compareBySprint?.length ?? 0;
   if (compareBySprint?.length) {
@@ -62,7 +65,7 @@ export default function DashboardCompletedTasksPills({
                   },
                   borderColor: chipAccent,
                   color: chipAccent,
-                  bgcolor: alpha(chipAccent, 0.08),
+                  bgcolor: alpha(chipAccent, isDark ? 0.15 : 0.08),
                 }}
                 variant="outlined"
               />
@@ -83,7 +86,7 @@ export default function DashboardCompletedTasksPills({
         height: 30,
         borderColor: defaultAccent,
         color: defaultAccent,
-        bgcolor: alpha(defaultAccent, 0.08),
+        bgcolor: alpha(defaultAccent, isDark ? 0.15 : 0.08),
       }}
       variant="outlined"
     />

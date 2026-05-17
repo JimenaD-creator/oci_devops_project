@@ -22,6 +22,7 @@ import {
   Chip,
   LinearProgress,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
@@ -143,15 +144,22 @@ const PRIORITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical', bg: '#FCEBEB', border: '#F09595', color: '#791F1F' },
 ];
 
-const CHIP_PALETTES = [
+const CHIP_PALETTES_LIGHT = [
   { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
   { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
   { bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
   { bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
 ];
 
-// Shared fieldSx
-const fieldSx = {
+const CHIP_PALETTES_DARK = [
+  { bg: '#2D2A4A', border: '#6A5ACD', color: '#B39DDB' },
+  { bg: '#1A4A3A', border: '#4DB6AC', color: '#80CBC4' },
+  { bg: '#4A2A1A', border: '#FFB74D', color: '#FFCC80' },
+  { bg: '#4A1A1A', border: '#EF9A9A', color: '#FFAB91' },
+];
+
+// Shared fieldSx - ahora función
+const getFieldSx = (isDark) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: '8px',
     fontSize: 13,
@@ -162,13 +170,15 @@ const fieldSx = {
       boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
     },
   },
-  '& .MuiInputLabel-root': { fontSize: 13 },
+  '& .MuiInputLabel-root': { fontSize: 13, color: isDark ? '#9A9A9A' : undefined },
   '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
-};
+});
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
       <Typography
@@ -189,12 +199,14 @@ function SectionLabel({ children }) {
 }
 
 function FieldLabel({ children, color = '#1565C0' }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Typography
       sx={{
         fontSize: 11,
         fontWeight: 600,
-        color,
+        color: isDark ? '#90CAF9' : color,
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
         mb: 0.5,
@@ -206,14 +218,17 @@ function FieldLabel({ children, color = '#1565C0' }) {
 }
 
 function InfoCard({ children, accentColor = ORACLE_RED_ACTION, sx = {} }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Paper
       elevation={0}
       sx={{
         p: 2.25,
         borderRadius: '12px',
-        border: '0.5px solid #E8E8E8',
+        border: `0.5px solid ${isDark ? '#2A2C32' : '#E8E8E8'}`,
         borderTop: `3px solid ${accentColor}`,
+        bgcolor: 'background.paper',
         ...sx,
       }}
     >
@@ -223,6 +238,8 @@ function InfoCard({ children, accentColor = ORACLE_RED_ACTION, sx = {} }) {
 }
 
 function SegmentedButtons({ options, value, onChange }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'flex', gap: 0.75 }}>
       {options.map((opt) => {
@@ -237,9 +254,9 @@ function SegmentedButtons({ options, value, onChange }) {
               py: 0.875,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : 'text.secondary',
+              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
               fontSize: 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -248,7 +265,7 @@ function SegmentedButtons({ options, value, onChange }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 0.5,
-              '&:hover': { bgcolor: active ? opt.bg : 'action.hover', borderColor: opt.border },
+              '&:hover': { bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'), borderColor: opt.border },
             }}
           >
             {opt.dot && (
@@ -257,7 +274,7 @@ function SegmentedButtons({ options, value, onChange }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  bgcolor: active ? opt.dot : '#BDBDBD',
+                  bgcolor: active ? opt.dot : (isDark ? '#5A5A5A' : '#BDBDBD'),
                   flexShrink: 0,
                 }}
               />
@@ -271,6 +288,8 @@ function SegmentedButtons({ options, value, onChange }) {
 }
 
 function TypeGrid({ value, onChange }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0.75 }}>
       {TYPE_OPTIONS.map((opt) => {
@@ -284,9 +303,9 @@ function TypeGrid({ value, onChange }) {
               py: 1,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : 'text.secondary',
+              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
               fontSize: 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -295,7 +314,7 @@ function TypeGrid({ value, onChange }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 0.5,
-              '&:hover': { bgcolor: active ? opt.bg : 'action.hover', borderColor: opt.border },
+              '&:hover': { bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'), borderColor: opt.border },
             }}
           >
             <Box sx={{ fontSize: 16, lineHeight: 1 }}>{opt.icon}</Box>
@@ -319,6 +338,11 @@ export function TaskDetailDialog({
   onSaved,
   onDeleted,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const fieldSx = getFieldSx(isDark);
+  const CHIP_PALETTES = isDark ? CHIP_PALETTES_DARK : CHIP_PALETTES_LIGHT;
+
   const [task, setTask] = useState(null);
   const [loadedAssigneeUserIds, setLoadedAssigneeUserIds] = useState([]);
   const [assigneeNamesByUserId, setAssigneeNamesByUserId] = useState({});
@@ -642,8 +666,8 @@ export function TaskDetailDialog({
         elevation: 0,
         sx: {
           borderRadius: '16px',
-          border: '1px solid #ECECEC',
-          bgcolor: '#FFFFFF',
+          border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+          bgcolor: 'background.paper',
           overflow: 'hidden',
           maxWidth: { xs: 'calc(100% - 24px)', sm: 720 },
         },
@@ -749,7 +773,7 @@ export function TaskDetailDialog({
 
       {/* ── Body ── */}
       <DialogContent
-        sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: '#FAFAFA' }}
+        sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : '#FAFAFA' }}
       >
         {loading && !task && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -765,12 +789,12 @@ export function TaskDetailDialog({
               <SectionLabel>Overview</SectionLabel>
 
               <FieldLabel>Title</FieldLabel>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', mb: 2 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary', mb: 2 }}>
                 {taskDisplayName(task)}
               </Typography>
 
               <FieldLabel>Description</FieldLabel>
-              <Typography sx={{ fontSize: 13, color: '#424242', mb: 2, whiteSpace: 'pre-wrap' }}>
+              <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2, whiteSpace: 'pre-wrap' }}>
                 {(task.description && String(task.description).trim()) || '—'}
               </Typography>
 
@@ -835,9 +859,9 @@ export function TaskDetailDialog({
                       px: 1.25,
                       py: 0.5,
                       borderRadius: '20px',
-                      bgcolor: '#E1F5EE',
-                      border: '1px solid #5DCAA5',
-                      color: '#085041',
+                      bgcolor: isDark ? '#1A4A3A' : '#E1F5EE',
+                      border: `1px solid ${isDark ? '#4DB6AC' : '#5DCAA5'}`,
+                      color: isDark ? '#80CBC4' : '#085041',
                       fontSize: 12,
                       fontWeight: 600,
                     }}
@@ -854,13 +878,13 @@ export function TaskDetailDialog({
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
                 <Box>
-                  <FieldLabel color="#3949AB">Sprint</FieldLabel>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                  <FieldLabel color="#5C6BC0">Sprint</FieldLabel>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
                     {task.assignedSprint?.id != null ? `Sprint ${task.assignedSprint.id}` : '—'}
                   </Typography>
                 </Box>
                 <Box>
-                  <FieldLabel color="#3949AB">Assigned to</FieldLabel>
+                  <FieldLabel color="#5C6BC0">Assigned to</FieldLabel>
                   {viewAssigneeIds.length ? (
                     <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mt: 0.25 }}>
                       {viewAssigneeIds.map((uidRaw, i) => {
@@ -898,22 +922,22 @@ export function TaskDetailDialog({
                   sx={{
                     p: 1.5,
                     borderRadius: '10px',
-                    bgcolor: '#FAEEDA',
-                    border: '1px solid #FAC775',
+                    bgcolor: isDark ? '#4A2A1A' : '#FAEEDA',
+                    border: `1px solid ${isDark ? '#FFB74D' : '#FAC775'}`,
                   }}
                 >
                   <Typography
                     sx={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#854F0B',
+                      color: isDark ? '#FFCC80' : '#854F0B',
                       letterSpacing: '0.04em',
                       textTransform: 'uppercase',
                     }}
                   >
                     Start date
                   </Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#412402', mt: 0.5 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: isDark ? '#FFE0B2' : '#412402', mt: 0.5 }}>
                     {formatDate(task.startDate)}
                   </Typography>
                 </Box>
@@ -921,22 +945,22 @@ export function TaskDetailDialog({
                   sx={{
                     p: 1.5,
                     borderRadius: '10px',
-                    bgcolor: '#E6F1FB',
-                    border: '1px solid #85B7EB',
+                    bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
+                    border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
                   }}
                 >
                   <Typography
                     sx={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#185FA5',
+                      color: isDark ? '#90CAF9' : '#185FA5',
                       letterSpacing: '0.04em',
                       textTransform: 'uppercase',
                     }}
                   >
                     Due date
                   </Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#042C53', mt: 0.5 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: isDark ? '#BBDEFB' : '#042C53', mt: 0.5 }}>
                     {formatDate(task.dueDate)}
                   </Typography>
                 </Box>
@@ -975,7 +999,7 @@ export function TaskDetailDialog({
                             alignItems: 'center',
                             gap: 1,
                             py: 0.5,
-                            borderBottom: '0.5px solid #EEEEEE',
+                            borderBottom: `0.5px solid ${isDark ? '#2A2C32' : '#EEEEEE'}`,
                             '&:last-of-type': { borderBottom: 'none' },
                           }}
                         >
@@ -987,7 +1011,7 @@ export function TaskDetailDialog({
                               alignItems: 'center',
                               borderRadius: '8px',
                               overflow: 'hidden',
-                              border: '0.5px solid rgba(0,0,0,0.08)',
+                              border: `0.5px solid ${isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)'}`,
                             }}
                           >
                             <Box
@@ -1031,9 +1055,9 @@ export function TaskDetailDialog({
                                 px: 1,
                                 py: 0.4,
                                 borderRadius: '20px',
-                                bgcolor: '#E6F1FB',
-                                border: '1px solid #85B7EB',
-                                color: '#0C447C',
+                                bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
+                                border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
+                                color: isDark ? '#90CAF9' : '#0C447C',
                                 fontSize: 12,
                                 fontWeight: 600,
                                 flexShrink: 0,
@@ -1192,7 +1216,7 @@ export function TaskDetailDialog({
                           />
                           <ListItemText
                             primary={u.name}
-                            primaryTypographyProps={{ sx: { fontSize: 13 } }}
+                            primaryTypographyProps={{ sx: { fontSize: 13, color: isDark ? '#F0F0F0' : '#1A1A1A' } }}
                           />
                         </MenuItem>
                       );
@@ -1274,8 +1298,8 @@ export function TaskDetailDialog({
           px: 3,
           py: 1.5,
           gap: 1,
-          borderTop: '1px solid #F0F0F0',
-          bgcolor: '#FAFAFA',
+          borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+          bgcolor: isDark ? '#111214' : '#FAFAFA',
           justifyContent: editMode ? 'space-between' : 'flex-end',
         }}
       >
@@ -1294,9 +1318,9 @@ export function TaskDetailDialog({
                   textTransform: 'none',
                   fontWeight: 600,
                   borderRadius: '8px',
-                  border: '1px solid #E0E0E0',
+                  border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
                   px: 2,
-                  '&:hover': { bgcolor: '#F5F5F5' },
+                  '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
                 }}
               >
                 Cancel
@@ -1331,9 +1355,9 @@ export function TaskDetailDialog({
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: '8px',
-              border: '1px solid #E0E0E0',
+              border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
               px: 2,
-              '&:hover': { bgcolor: '#F5F5F5' },
+              '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
             }}
           >
             Close

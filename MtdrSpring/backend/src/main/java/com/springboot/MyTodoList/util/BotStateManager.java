@@ -6,8 +6,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.springboot.MyTodoList.model.Sprint;
 
 /**
  * Manages the state of all users in the bot.
@@ -37,6 +41,38 @@ public class BotStateManager {
     
     // Timeout in minutes: If state is older than this, it's considered expired
     private static final long STATE_TIMEOUT_MINUTES = 30;
+    
+    // ========================================================================
+    // MY PERFORMANCE
+    // ========================================================================
+
+    private final Map<Long, Long> myPerformanceUserId = new ConcurrentHashMap<>();
+    private final Map<Long, List<Sprint>> myPerformanceSprints = new ConcurrentHashMap<>();
+    private final Set<Long> selectingMyPerformanceScope = ConcurrentHashMap.newKeySet();
+
+    public void setMyPerformanceUserId(long chatId, Long userId) {
+        myPerformanceUserId.put(chatId, userId);
+    }
+
+    public Long getMyPerformanceUserId(long chatId) {
+        return myPerformanceUserId.get(chatId);
+    }
+
+    public void setMyPerformanceSprints(long chatId, List<Sprint> sprints) {
+        myPerformanceSprints.put(chatId, sprints);
+    }
+
+    public List<Sprint> getMyPerformanceSprints(long chatId) {
+        return myPerformanceSprints.get(chatId);
+    }
+
+    public void setSelectingMyPerformanceScope(long chatId) {
+        selectingMyPerformanceScope.add(chatId);
+    }
+
+    public boolean isSelectingMyPerformanceScope(long chatId) {
+        return selectingMyPerformanceScope.contains(chatId);
+    }
     
     /**
      * Set user state to "waiting for hours".
@@ -324,6 +360,9 @@ public class BotStateManager {
      */
     public void clearPendingState(Long chatId) {
         userStates.remove(chatId);
+        myPerformanceUserId.remove(chatId);
+        myPerformanceSprints.remove(chatId);
+        selectingMyPerformanceScope.remove(chatId);
         logger.info("Cleared state for chat {}", chatId);
     }
     
@@ -549,4 +588,3 @@ public class BotStateManager {
         return state.getSelectedUserId();
     }
 }
-

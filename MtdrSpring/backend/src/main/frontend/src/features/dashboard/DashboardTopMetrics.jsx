@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
@@ -45,6 +46,9 @@ export default function DashboardTopMetrics({
   avgHoursTrend = null,
   avgTrendSeries = [],
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const trendLabel = (trend, unit = '') => {
     if (!trend || !Number.isFinite(Number(trend.delta))) return '';
     const d = Number(trend.delta);
@@ -74,8 +78,8 @@ export default function DashboardTopMetrics({
       value: String(totalTasks),
       subtitle: help.tasks,
       accent: '#1565C0',
-      tint: 'rgba(21, 101, 192, 0.08)',
-      iconBg: 'rgba(21, 101, 192, 0.14)',
+      tint: isDark ? 'rgba(21, 101, 192, 0.12)' : 'rgba(21, 101, 192, 0.08)',
+      iconBg: isDark ? 'rgba(21, 101, 192, 0.2)' : 'rgba(21, 101, 192, 0.14)',
     },
     {
       icon: ScheduleOutlinedIcon,
@@ -83,8 +87,8 @@ export default function DashboardTopMetrics({
       value: Number(totalHours).toFixed(1),
       subtitle: help.hours,
       accent: '#F57C00',
-      tint: 'rgba(245, 124, 0, 0.08)',
-      iconBg: 'rgba(245, 124, 0, 0.14)',
+      tint: isDark ? 'rgba(245, 124, 0, 0.12)' : 'rgba(245, 124, 0, 0.08)',
+      iconBg: isDark ? 'rgba(245, 124, 0, 0.2)' : 'rgba(245, 124, 0, 0.14)',
     },
     {
       icon: GroupsOutlinedIcon,
@@ -92,8 +96,8 @@ export default function DashboardTopMetrics({
       value: formatAverage(avgTasksPerDev, uniqueDevCount),
       subtitle: multiSprint ? trendLabel(avgTasksTrend) || help.avgTasks : help.avgTasks,
       accent: '#5C6BC0',
-      tint: 'rgba(92, 107, 192, 0.08)',
-      iconBg: 'rgba(92, 107, 192, 0.14)',
+      tint: isDark ? 'rgba(92, 107, 192, 0.12)' : 'rgba(92, 107, 192, 0.08)',
+      iconBg: isDark ? 'rgba(92, 107, 192, 0.2)' : 'rgba(92, 107, 192, 0.14)',
     },
     {
       icon: TrendingFlatOutlinedIcon,
@@ -101,8 +105,8 @@ export default function DashboardTopMetrics({
       value: formatAverage(avgHoursPerDev, uniqueDevCount),
       subtitle: multiSprint ? trendLabel(avgHoursTrend, 'h') || help.avgHours : help.avgHours,
       accent: '#00897B',
-      tint: 'rgba(0, 137, 123, 0.07)',
-      iconBg: 'rgba(0, 137, 123, 0.12)',
+      tint: isDark ? 'rgba(0, 137, 123, 0.11)' : 'rgba(0, 137, 123, 0.07)',
+      iconBg: isDark ? 'rgba(0, 137, 123, 0.18)' : 'rgba(0, 137, 123, 0.12)',
     },
   ];
 
@@ -113,7 +117,7 @@ export default function DashboardTopMetrics({
       {showSectionHeader ? (
         <Typography
           component="h2"
-          sx={{ ...SECTION_TITLE_SX, color: '#1A1A1A', mb: 1, textAlign: 'left' }}
+          sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 1, textAlign: 'left' }}
         >
           Scorecards
         </Typography>
@@ -159,9 +163,10 @@ export default function DashboardTopMetrics({
                     : { xs: 1.1, sm: 1.3 }
                   : { xs: scorecardsFourColumn ? 1.75 : 2.25, sm: 2.25 },
                 borderRadius: 3,
-                border: '1px solid #E8EAF0',
+                border: '1px solid',
+                borderColor: isDark ? '#2A2C32' : '#E8EAF0',
                 borderTop: `4px solid ${item.accent}`,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.06)',
                 minHeight: showTrendCharts
                   ? item.title === 'Average tasks per developer' ||
                     item.title === 'Average hours per developer'
@@ -172,8 +177,10 @@ export default function DashboardTopMetrics({
                 flexDirection: 'column',
                 alignItems: 'center',
                 textAlign: 'center',
-                bgcolor: '#FFFFFF',
-                background: `linear-gradient(185deg, ${item.tint} 0%, #FFFFFF 52%)`,
+                bgcolor: 'background.paper',
+                background: isDark 
+                  ? `linear-gradient(185deg, ${item.tint} 0%, #1C1E22 52%)`
+                  : `linear-gradient(185deg, ${item.tint} 0%, #FFFFFF 52%)`,
                 justifyContent: 'flex-start',
                 boxSizing: 'border-box',
               }}
@@ -215,7 +222,7 @@ export default function DashboardTopMetrics({
                     <Typography
                       sx={{
                         ...METRIC_LABEL_SX,
-                        color: '#000000',
+                        color: 'text.primary',
                         mb: {
                           xs: isTrendMetric ? 0.6 : scorecardsFourColumn ? 0.75 : 1.25,
                           sm: isTrendMetric ? 0.75 : 1.25,
@@ -235,19 +242,19 @@ export default function DashboardTopMetrics({
                             <LineChart data={avgTrendSeries}>
                               <CartesianGrid
                                 strokeDasharray="3 3"
-                                stroke="#CFD8DC"
+                                stroke={isDark ? '#2A2C32' : '#CFD8DC'}
                                 vertical={false}
                               />
                               <XAxis
                                 dataKey="sprintLabel"
-                                tick={{ fontSize: 10, fill: '#000000' }}
-                                axisLine={{ stroke: '#000000' }}
+                                tick={{ fontSize: 10, fill: isDark ? '#9A9A9A' : '#000000' }}
+                                axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                                 tickLine={false}
                               />
                               <YAxis
                                 width={28}
-                                tick={{ fontSize: 10, fill: '#000000' }}
-                                axisLine={{ stroke: '#000000' }}
+                                tick={{ fontSize: 10, fill: isDark ? '#9A9A9A' : '#000000' }}
+                                axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                                 tickLine={false}
                                 domain={['dataMin - 0.5', 'dataMax + 0.5']}
                               />
@@ -257,7 +264,12 @@ export default function DashboardTopMetrics({
                                   item.title.includes('hours') ? 'Avg hours/dev' : 'Avg tasks/dev',
                                 ]}
                                 labelFormatter={(label) => `${label}`}
-                                contentStyle={{ borderRadius: 8, borderColor: '#E0E0E0' }}
+                                contentStyle={{ 
+                                  borderRadius: 8, 
+                                  borderColor: isDark ? '#2A2C32' : '#E0E0E0',
+                                  backgroundColor: isDark ? '#1C1E22' : '#FFFFFF',
+                                  color: isDark ? '#F0F0F0' : '#1A1A1A',
+                                }}
                               />
                               <Line
                                 type="monotone"
@@ -283,7 +295,7 @@ export default function DashboardTopMetrics({
                               sm: '0.8125rem',
                             },
                             lineHeight: 1.35,
-                            color: '#000000',
+                            color: 'text.secondary',
                             fontWeight: 700,
                           }}
                         >
@@ -295,6 +307,7 @@ export default function DashboardTopMetrics({
                         <Typography
                           sx={{
                             ...METRIC_VALUE_SX,
+                            color: 'text.primary',
                             mb: 0.5,
                             ...(scorecardsFourColumn
                               ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
@@ -316,7 +329,7 @@ export default function DashboardTopMetrics({
                               sm: '0.8125rem',
                             },
                             lineHeight: 1.35,
-                            color: '#000000',
+                            color: 'text.secondary',
                             fontWeight: 700,
                           }}
                         >

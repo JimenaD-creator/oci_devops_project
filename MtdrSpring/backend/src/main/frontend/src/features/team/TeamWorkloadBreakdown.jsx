@@ -9,12 +9,15 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { developerAvatarColors } from '../../utils/developerColors';
 
 const HEALTHY_COLOR = '#2E7D32';
-const HEALTHY_TRACK = 'rgba(46, 125, 50, 0.18)';
+const HEALTHY_TRACK_LIGHT = 'rgba(46, 125, 50, 0.18)';
+const HEALTHY_TRACK_DARK = 'rgba(46, 125, 50, 0.25)';
 const OVERLOAD_COLOR = '#C62828';
-const OVERLOAD_TRACK = 'rgba(198, 40, 40, 0.18)';
+const OVERLOAD_TRACK_LIGHT = 'rgba(198, 40, 40, 0.18)';
+const OVERLOAD_TRACK_DARK = 'rgba(198, 40, 40, 0.25)';
 const OVERLOAD_BORDER = '#F9A825';
 
 function initialsFromName(name) {
@@ -51,6 +54,9 @@ function buildAiOverloadMap(aiRows) {
 }
 
 export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = null }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const aiOverloadMap = useMemo(
     () => buildAiOverloadMap(aiDeveloperInsights),
     [aiDeveloperInsights],
@@ -83,28 +89,35 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
 
   if (rows.length === 0) return null;
 
+  const trackColor = (isOverloaded) => {
+    if (isOverloaded) return isDark ? OVERLOAD_TRACK_DARK : OVERLOAD_TRACK_LIGHT;
+    return isDark ? HEALTHY_TRACK_DARK : HEALTHY_TRACK_LIGHT;
+  };
+
   return (
     <Paper
       sx={{
         mb: 3,
         borderRadius: 2,
-        border: '1px solid rgba(0,0,0,0.08)',
+        border: '1px solid',
+        borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)',
         overflow: 'hidden',
-        bgcolor: '#FFFFFF',
+        bgcolor: 'background.paper',
       }}
     >
       <Box
         sx={{
           px: 2,
           py: 1.25,
-          bgcolor: 'rgba(46, 125, 50, 0.08)',
-          borderBottom: '1px solid rgba(46, 125, 50, 0.2)',
+          bgcolor: isDark ? 'rgba(46, 125, 50, 0.12)' : 'rgba(46, 125, 50, 0.08)',
+          borderBottom: '1px solid',
+          borderBottomColor: isDark ? 'rgba(46, 125, 50, 0.3)' : 'rgba(46, 125, 50, 0.2)',
         }}
       >
-        <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#1A1A1A' }}>
+        <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary' }}>
           Workload breakdown
         </Typography>
-        <Typography sx={{ fontSize: '0.8rem', color: '#546E7A', mt: 0.25 }}>
+        <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mt: 0.25 }}>
           {aiAvailable
             ? 'Overload is flagged by AI Insights based on this sprint’s workload.'
             : 'Generate AI Insights for this sprint to flag overloaded developers.'}
@@ -114,7 +127,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
         {rows.map((row) => {
           const palette = developerAvatarColors(row.name);
           const barColor = row.isOverloaded ? OVERLOAD_COLOR : HEALTHY_COLOR;
-          const trackColor = row.isOverloaded ? OVERLOAD_TRACK : HEALTHY_TRACK;
+          const trackBgColor = trackColor(row.isOverloaded);
           return (
             <Box
               key={row.name}
@@ -124,24 +137,24 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                 borderRadius: 2,
                 border: row.isOverloaded
                   ? `1.5px solid ${OVERLOAD_BORDER}`
-                  : '1px solid rgba(0,0,0,0.08)',
-                bgcolor: '#FFFFFF',
+                  : `1px solid ${isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)'}`,
+                bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ position: 'relative', flexShrink: 0 }}>
                   <Avatar
-  src={row.profilePicture || undefined}
-  sx={{
-    bgcolor: palette.bg,
-    color: palette.color,
-    fontWeight: 700,
-    width: 44,
-    height: 44,
-  }}
->
-  {!row.profilePicture && initialsFromName(row.name)}
-</Avatar>
+                    src={row.profilePicture || undefined}
+                    sx={{
+                      bgcolor: palette.bg,
+                      color: palette.color,
+                      fontWeight: 700,
+                      width: 44,
+                      height: 44,
+                    }}
+                  >
+                    {!row.profilePicture && initialsFromName(row.name)}
+                  </Avatar>
                   {row.isOverloaded && (
                     <Box
                       aria-hidden
@@ -159,7 +172,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border: '2px solid #FFFFFF',
+                        border: `2px solid ${isDark ? '#1C1E22' : '#FFFFFF'}`,
                       }}
                     >
                       !
@@ -180,7 +193,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                     <Typography
                       sx={{
                         fontWeight: 700,
-                        color: '#1A1A1A',
+                        color: 'text.primary',
                         fontSize: { xs: '0.95rem', sm: '1rem' },
                       }}
                     >
@@ -189,12 +202,12 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                     <Typography
                       sx={{
                         fontWeight: 700,
-                        color: '#37474F',
+                        color: isDark ? '#9A9A9A' : '#37474F',
                         fontSize: { xs: '0.85rem', sm: '0.9rem' },
                       }}
                     >
                       {row.assigned} task{row.assigned === 1 ? '' : 's'}
-                      <Box component="span" sx={{ color: '#78909C', fontWeight: 600, ml: 1 }}>
+                      <Box component="span" sx={{ color: isDark ? '#78909C' : '#78909C', fontWeight: 600, ml: 1 }}>
                         Completion: {row.completionRate}%
                       </Box>
                     </Typography>
@@ -207,7 +220,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                         flex: 1,
                         height: 8,
                         borderRadius: 4,
-                        bgcolor: trackColor,
+                        bgcolor: trackBgColor,
                         '& .MuiLinearProgress-bar': { bgcolor: barColor },
                       }}
                     />
@@ -232,7 +245,7 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                           label="Overload"
                           size="small"
                           sx={{
-                            bgcolor: '#FFF3E0',
+                            bgcolor: isDark ? '#3B2A1A' : '#FFF3E0',
                             color: '#E65100',
                             fontWeight: 700,
                             border: `1px solid ${OVERLOAD_BORDER}`,

@@ -12,7 +12,7 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -44,6 +44,9 @@ import {
 } from './sprintsPageApi';
 
 export default function SprintsPage({ projectId }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
@@ -346,14 +349,14 @@ export default function SprintsPage({ projectId }) {
             variant="h4"
             sx={{
               fontWeight: 800,
-              color: '#1A1A1A',
+              color: 'text.primary',
               letterSpacing: '-0.5px',
               fontSize: { xs: '1.65rem', sm: '1.85rem' },
             }}
           >
             Sprints
           </Typography>
-          <Typography variant="body1" sx={{ color: '#757575', mt: 0.75 }}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', mt: 0.75 }}>
             {subtitleProjectName}
             {subtitleProjectId != null && <> · ID {subtitleProjectId}</>} · {sprints.length} total
             sprints
@@ -368,8 +371,8 @@ export default function SprintsPage({ projectId }) {
             size="small"
             sx={{
               textTransform: 'none',
-              borderColor: '#DDD',
-              color: '#555',
+              borderColor: isDark ? '#2A2C32' : '#DDD',
+              color: isDark ? '#9A9A9A' : '#555',
               borderRadius: 2,
               mr: 1,
             }}
@@ -384,7 +387,7 @@ export default function SprintsPage({ projectId }) {
             size="small"
             sx={{
               textTransform: 'none',
-              borderColor: '#E0B4AF',
+              borderColor: isDark ? '#7F3030' : '#E0B4AF',
               color: '#B64536',
               borderRadius: 2,
               mr: 1,
@@ -415,7 +418,7 @@ export default function SprintsPage({ projectId }) {
             <Typography
               sx={{
                 fontWeight: 800,
-                color: '#333',
+                color: 'text.primary',
                 mb: 1.5,
                 fontSize: '1.15rem',
                 letterSpacing: '-0.02em',
@@ -461,7 +464,7 @@ export default function SprintsPage({ projectId }) {
             <Typography
               sx={{
                 fontWeight: 800,
-                color: '#333',
+                color: 'text.primary',
                 fontSize: '1.02rem',
                 mb: 1.25,
                 display: 'block',
@@ -640,13 +643,13 @@ export default function SprintsPage({ projectId }) {
                   py: 3.5,
                   px: 2,
                   textAlign: 'center',
-                  border: '1px dashed #E0E0E0',
+                  border: `1px dashed ${isDark ? '#2A2C32' : '#E0E0E0'}`,
                   borderRadius: 2,
-                  bgcolor: '#FAFAFA',
+                  bgcolor: isDark ? '#16181C' : '#FAFAFA',
                   mt: 0.5,
                 }}
               >
-                <Typography sx={{ fontWeight: 600, color: '#616161', fontSize: '0.95rem' }}>
+                <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.95rem' }}>
                   {statusFilter !== 'all' &&
                   developerFilter === 'all' &&
                   priorityFilter === 'all' &&

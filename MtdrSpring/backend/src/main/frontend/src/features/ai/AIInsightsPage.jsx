@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -18,6 +19,9 @@ import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
 
 export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -197,7 +201,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
               variant="h4"
               sx={{
                 fontWeight: 800,
-                color: '#1A1A1A',
+                color: 'text.primary',
                 letterSpacing: '-0.5px',
                 fontSize: { xs: '1.65rem', md: '2rem' },
               }}
@@ -205,7 +209,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
               AI Insights
             </Typography>
           </Box>
-          <Typography variant="body1" sx={{ color: '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
+          <Typography variant="body1" sx={{ color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
             Gemini-powered sprint analysis: alerts, recommendations, summary, and predictions.
           </Typography>
         </Box>
@@ -222,16 +226,16 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
               size="small"
               sx={{
                 minWidth: { xs: '100%', sm: 220 },
-                '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
+                '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: isDark ? '#1C1E22' : '#FFFFFF' },
                 '& .MuiSelect-select': {
-                  color: '#1A1A1A',
+                  color: 'text.primary',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   pr: 4,
                 },
-                '& .MuiSelect-icon': { color: '#546E7A' },
+                '& .MuiSelect-icon': { color: isDark ? '#9A9A9A' : '#546E7A' },
                 '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
                   borderColor: sectionRgba(0.32),
                 },
@@ -242,7 +246,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
                   borderWidth: 2,
                   borderColor: SECTION_ACCENT,
                 },
-                '& .MuiInputLabel-root': { color: '#607D8B' },
+                '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : '#607D8B' },
                 '& .MuiInputLabel-root.Mui-focused': { color: SECTION_ACCENT },
               }}
             >
@@ -271,8 +275,8 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
         )}
       </Box>
       {sprints.length === 0 && (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-          <Typography color="textSecondary">No sprints found for this project.</Typography>
+        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2, bgcolor: 'background.paper', border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}` }}>
+          <Typography color="text.secondary">No sprints found for this project.</Typography>
         </Paper>
       )}
       {selectedSprint && (

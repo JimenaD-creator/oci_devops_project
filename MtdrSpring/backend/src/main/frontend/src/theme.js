@@ -1,34 +1,34 @@
 import { createTheme } from '@mui/material/styles';
 
-/** Same stack as index.css (DM Sans is loaded via Google Fonts). */
 export const APP_FONT_FAMILY =
   "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Helvetica Neue', sans-serif";
 
-export const appTheme = createTheme({
-  typography: {
-    fontFamily: APP_FONT_FAMILY,
+const baseComponents = {
+  MuiInputBase:  { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
+  MuiInputLabel: { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
+  MuiMenuItem:   { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
+  MuiPaper:      { styleOverrides: { root: { backgroundImage: 'none' } } },
+};
+
+export const lightTheme = createTheme({
+  palette: {
+    mode: 'light',
+    background: { default: '#F7F8FA', paper: '#FFFFFF' },
+    text: { primary: '#1A1A1A', secondary: '#757575' },
   },
-  components: {
-    MuiInputBase: {
-      styleOverrides: {
-        root: {
-          fontFamily: APP_FONT_FAMILY,
-        },
-      },
-    },
-    MuiInputLabel: {
-      styleOverrides: {
-        root: {
-          fontFamily: APP_FONT_FAMILY,
-        },
-      },
-    },
-    MuiMenuItem: {
-      styleOverrides: {
-        root: {
-          fontFamily: APP_FONT_FAMILY,
-        },
-      },
-    },
-  },
+  typography: { fontFamily: APP_FONT_FAMILY },
+  components: baseComponents,
 });
+
+export const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    background: { default: '#111214', paper: '#1C1E22' },
+    text: { primary: '#F0F0F0', secondary: '#9A9A9A' },
+  },
+  typography: { fontFamily: APP_FONT_FAMILY },
+  components: baseComponents,
+});
+
+// Compatibilidad con imports viejos
+export const appTheme = lightTheme;

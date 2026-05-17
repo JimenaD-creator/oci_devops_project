@@ -205,6 +205,37 @@ public class GeminiService {
             return CompletableFuture.failedFuture(e);
         }
     }
+        /**
+     * Generates a plain-text personal performance summary for a developer (Telegram /myperformance).
+     * Returns the AI text directly — not JSON.
+     */
+    public String generateDeveloperPerformanceSummary(String prompt) throws Exception {
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            throw new IllegalStateException("Gemini API key not configured.");
+        }
+
+        String requestBody = "{\"contents\":[{\"parts\":[{\"text\":"
+            + mapper.writeValueAsString(prompt)
+            + "}]}],\"generationConfig\":{\"temperature\":0.5,\"maxOutputTokens\":512}}";
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiKey))
+            .header("Content-Type", "application/json")
+            .timeout(Duration.ofSeconds(30))
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Gemini HTTP " + response.statusCode() + " - " + response.body());
+        }
+
+        JsonNode root = mapper.readTree(response.body());
+        return root.path("candidates").get(0)
+                   .path("content").path("parts").get(0)
+                   .path("text").asText("Could not generate summary.");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ERROR PERSISTENCE

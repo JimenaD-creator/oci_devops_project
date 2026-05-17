@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Paper, Stack, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import {
@@ -16,19 +17,35 @@ import { shortDevName } from '../dashboard/dashboardSprintData';
 import { CHART_LEGEND_STYLE, CHART_LEGEND_ITEM_SX } from '../dashboard/dashboardTypography';
 
 const FALLBACK_SPRINT_COLOR = '#546E7A';
-const CHART_ACCENT_ICON_BG = 'rgba(199, 70, 52, 0.09)';
 
 const CHART_H = 300;
 
-const AXIS_TICK = { fontSize: 14, fill: '#424242' };
-const AXIS_LINE = { stroke: '#BDBDBD' };
-const GRID_STROKE = '#E0E0E0';
-const TOOLTIP_CONTENT = {
-  borderRadius: 8,
-  border: '1px solid #E0E0E0',
-  fontSize: 14,
-  padding: '10px 12px',
-};
+function getAxisTick(isDark) {
+  return { fontSize: 14, fill: isDark ? '#9A9A9A' : '#424242' };
+}
+
+function getAxisLine(isDark) {
+  return { stroke: isDark ? '#2A2C32' : '#BDBDBD' };
+}
+
+function getGridStroke(isDark) {
+  return isDark ? '#2A2C32' : '#E0E0E0';
+}
+
+function getTooltipContent(isDark) {
+  return {
+    borderRadius: 8,
+    border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+    fontSize: 14,
+    padding: '10px 12px',
+    backgroundColor: isDark ? '#1C1E22' : '#FFFFFF',
+    color: isDark ? '#F0F0F0' : '#1A1A1A',
+  };
+}
+
+function getChartAccentIconBg(isDark) {
+  return isDark ? 'rgba(199, 70, 52, 0.15)' : 'rgba(199, 70, 52, 0.09)';
+}
 
 /** Recharts 3: use rgba fill for “light” bars — `fillOpacity` on `<Bar>` often renders like solid. */
 function hexToRgba(hex, alpha) {
@@ -53,13 +70,17 @@ function ChartPlot({ children, height = CHART_H }) {
 }
 
 function ChartCard({ title, subtitle, iconElement, children }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   return (
     <Paper
       sx={{
         p: 2.5,
         borderRadius: 3,
-        border: '1px solid #EFEFEF',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+        boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
+        bgcolor: 'background.paper',
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
@@ -73,7 +94,7 @@ function ChartCard({ title, subtitle, iconElement, children }) {
             width: 40,
             height: 40,
             borderRadius: 2,
-            bgcolor: CHART_ACCENT_ICON_BG,
+            bgcolor: getChartAccentIconBg(isDark),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -83,14 +104,14 @@ function ChartCard({ title, subtitle, iconElement, children }) {
         </Box>
         <Box>
           <Typography
-            sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.12rem', lineHeight: 1.3 }}
+            sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1.12rem', lineHeight: 1.3 }}
           >
             {title}
           </Typography>
           {subtitle ? (
             <Typography
               sx={{
-                color: '#666',
+                color: 'text.secondary',
                 display: 'block',
                 fontSize: '0.95rem',
                 mt: 0.35,
@@ -177,12 +198,15 @@ function buildAssignedCompletedRows(selectedSprints, uniqueTeamTotalsBySprintId)
 }
 
 function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   return (
     <Box sx={{ mb: 1, width: '100%' }}>
       <Typography
         sx={{
           ...CHART_LEGEND_ITEM_SX,
-          color: '#455A64',
+          color: isDark ? '#9A9A9A' : '#455A64',
           fontWeight: 600,
           fontSize: '0.82rem',
           lineHeight: 1.45,
@@ -200,7 +224,7 @@ function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
           gap: 1.5,
           alignItems: 'center',
           ...CHART_LEGEND_ITEM_SX,
-          color: '#555',
+          color: isDark ? '#9A9A9A' : '#555',
         }}
       >
         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
@@ -224,7 +248,7 @@ function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
                   bgcolor: sp.accentColor ?? FALLBACK_SPRINT_COLOR,
                 }}
               />
-              <Box component="span" sx={{ fontWeight: 700 }}>
+              <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
                 {sp.shortLabel}
               </Box>
             </Box>
@@ -251,6 +275,9 @@ export default function DeveloperWorkloadCharts({
   /** When true, removes bottom margin on the root so a sibling card can align height in a grid row. */
   suppressOuterMargin = false,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const { combinedAssignedCompletedRows, workedEstimatedRows, hasData } = useMemo(() => {
     if (!selectedSprints?.length) {
       return {
@@ -312,8 +339,9 @@ export default function DeveloperWorkloadCharts({
         sx={{
           p: 4,
           textAlign: 'center',
-          border: '1px dashed #ccc',
+          border: `1px dashed ${isDark ? '#2A2C32' : '#ccc'}`,
           borderRadius: 2,
+          bgcolor: isDark ? 'rgba(0,0,0,0.2)' : 'transparent',
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
@@ -326,8 +354,10 @@ export default function DeveloperWorkloadCharts({
     );
   }
 
-  const tooltipStyle = TOOLTIP_CONTENT;
-
+  const tooltipStyle = getTooltipContent(isDark);
+  const axisTick = getAxisTick(isDark);
+  const axisLine = getAxisLine(isDark);
+  const gridStroke = getGridStroke(isDark);
   const showAssignedCompleted = combinedAssignedCompletedRows.length > 0;
 
   return (
@@ -362,9 +392,9 @@ export default function DeveloperWorkloadCharts({
                       barGap={2}
                       barCategoryGap="22%"
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                      <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
-                      <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} width={40} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} interval={0} />
+                      <YAxis allowDecimals={false} tick={axisTick} axisLine={false} width={40} />
                       <Tooltip
                         contentStyle={tooltipStyle}
                         formatter={(v, name) => {
@@ -372,7 +402,7 @@ export default function DeveloperWorkloadCharts({
                           return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
                         }}
                       />
-                      <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
+                      <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, color: isDark ? '#F0F0F0' : '#1A1A1A' }} />
                       {selectedSprints.map((sp) => {
                         const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
                         return (
@@ -416,10 +446,10 @@ export default function DeveloperWorkloadCharts({
                 barGap={2}
                 barCategoryGap="22%"
               >
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} interval={0} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} interval={0} />
                 <YAxis
-                  tick={AXIS_TICK}
+                  tick={axisTick}
                   axisLine={false}
                   width={48}
                   label={{
@@ -427,20 +457,20 @@ export default function DeveloperWorkloadCharts({
                     angle: -90,
                     position: 'insideLeft',
                     fontSize: 12,
-                    fill: '#555',
+                    fill: isDark ? '#9A9A9A' : '#555',
                   }}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
                   formatter={(v, name) => {
-                    const isPlanned = String(name).includes('Planned');
+                    const isPlanned = String(name).includes('Planned') || String(name).includes('Estimated');
                     return [
                       `${Number(v).toFixed(1)} h`,
                       isPlanned ? 'Estimated hours' : 'Hours worked',
                     ];
                   }}
                 />
-                <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE }} />
+                <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, color: isDark ? '#F0F0F0' : '#1A1A1A' }} />
                 {selectedSprints.map((sp) => {
                   const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
                   return (

@@ -12,6 +12,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   AlertTriangle,
   AlertCircle,
@@ -33,26 +34,37 @@ import {
   alignKpiMetricsInText,
 } from './aiInsightsConstants';
 
-const SEVERITY = {
-  critical: {
-    color: '#C62828',
-    bg: '#FFEBEE',
-    border: '#EF9A9A',
-    label: 'Critical',
-    Icon: AlertCircle,
-  },
-  warning: {
-    color: '#E65100',
-    bg: '#FFF3E0',
-    border: '#FFCC80',
-    label: 'Warning',
-    Icon: AlertTriangle,
-  },
-  info: { color: '#01579B', bg: '#E3F2FD', border: '#90CAF9', label: 'Info', Icon: Info },
+const getSeverity = (severityKey, isDark) => {
+  const severities = {
+    critical: {
+      color: '#C62828',
+      bg: isDark ? '#4A1A1A' : '#FFEBEE',
+      border: isDark ? '#7F3030' : '#EF9A9A',
+      label: 'Critical',
+      Icon: AlertCircle,
+    },
+    warning: {
+      color: '#E65100',
+      bg: isDark ? '#4A2A1A' : '#FFF3E0',
+      border: isDark ? '#7F4A1A' : '#FFCC80',
+      label: 'Warning',
+      Icon: AlertTriangle,
+    },
+    info: { 
+      color: '#01579B', 
+      bg: isDark ? '#1A3A5C' : '#E3F2FD', 
+      border: isDark ? '#1A4A6C' : '#90CAF9', 
+      label: 'Info', 
+      Icon: Info 
+    },
+  };
+  return severities[severityKey] ?? severities.info;
 };
 
 export function AlertCard({ alert, currentSprintMetrics = null }) {
-  const cfg = SEVERITY[alert.severity] ?? SEVERITY.info;
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const cfg = getSeverity(alert.severity, isDark);
   const { Icon } = cfg;
   const kpiKey = typeof alert.kpi === 'string' ? alert.kpi : '';
   const normalizedKpiMetric =
@@ -90,7 +102,7 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
           />
           {alert.kpi && (
             <Typography
-              sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: '#607D8B', fontWeight: 600 }}
+              sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}
             >
               {KPI_LABELS[alert.kpi] ?? alert.kpi}
               {effectiveAlertValue != null
@@ -102,7 +114,7 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
           )}
         </Box>
         <Typography
-          sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#37474F', lineHeight: 1.5 }}
+          sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: isDark ? '#E0E0E0' : '#37474F', lineHeight: 1.5 }}
         >
           {messageText}
         </Typography>
@@ -112,13 +124,15 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
 }
 
 export function WorkloadCard({ rec }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box
       sx={{
         p: 1.5,
         borderRadius: 1.5,
-        bgcolor: '#F3E5F5',
-        border: '1px solid #CE93D8',
+        bgcolor: isDark ? '#2A1A3D' : '#F3E5F5',
+        border: `1px solid ${isDark ? '#7B1FA2' : '#CE93D8'}`,
         mb: 1,
         display: 'flex',
         gap: 1.5,
@@ -126,12 +140,12 @@ export function WorkloadCard({ rec }) {
     >
       <Users size={16} color="#7B1FA2" style={{ marginTop: 2, flexShrink: 0 }} />
       <Box>
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#4A148C', mb: 0.25 }}>
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#CE93D8' : '#4A148C', mb: 0.25 }}>
           Move ~{rec.tasksToMove} task{rec.tasksToMove !== 1 ? 's' : ''}
           {rec.from ? ` from ${rec.from}` : ''}
           {rec.to ? ` → ${rec.to}` : ''}
         </Typography>
-        <Typography sx={{ fontSize: '0.76rem', color: '#6A1B9A', lineHeight: 1.4 }}>
+        <Typography sx={{ fontSize: '0.76rem', color: isDark ? '#CE93D8' : '#6A1B9A', lineHeight: 1.4 }}>
           {rec.reason}
         </Typography>
       </Box>
@@ -140,14 +154,16 @@ export function WorkloadCard({ rec }) {
 }
 
 export function SectionHeading({ icon: Icon, children }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-      {Icon && <Icon size={22} color="#607D8B" aria-hidden />}
+      {Icon && <Icon size={22} color={isDark ? '#9A9A9A' : '#607D8B'} aria-hidden />}
       <Typography
         sx={{
           fontSize: { xs: '1.1rem', md: '1.25rem' },
           fontWeight: 800,
-          color: '#1A1A1A',
+          color: 'text.primary',
           letterSpacing: '-0.02em',
         }}
       >
@@ -161,31 +177,33 @@ export function SectionHeading({ icon: Icon, children }) {
  * Live blocked assignments merged into enriched sprint insights (GET). Assignee = developer who reported the block.
  */
 export function BlockedAssignmentsSnapshot({ rows }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const list = Array.isArray(rows) ? rows : [];
   if (list.length === 0) return null;
   return (
     <Box
       sx={{
         mb: { xs: 2.5, md: 3.5 },
-        border: '1px solid rgba(198, 40, 40, 0.35)',
+        border: `1px solid ${isDark ? 'rgba(198, 40, 40, 0.5)' : 'rgba(198, 40, 40, 0.35)'}`,
         borderRadius: 2,
         overflow: 'hidden',
-        bgcolor: '#FFFFFF',
+        bgcolor: 'background.paper',
       }}
     >
       <Box
-        sx={{ px: 2, py: 1.25, bgcolor: '#FFEBEE', borderBottom: '1px solid rgba(198,40,40,0.2)' }}
+        sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#4A1A1A' : '#FFEBEE', borderBottom: `1px solid ${isDark ? 'rgba(198,40,40,0.3)' : 'rgba(198,40,40,0.2)'}` }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
           <AlertTriangle size={22} color="#C62828" aria-hidden style={{ flexShrink: 0 }} />
           <Typography
-            sx={{ fontSize: { xs: '1.05rem', md: '1.2rem' }, fontWeight: 800, color: '#1A1A1A' }}
+            sx={{ fontSize: { xs: '1.05rem', md: '1.2rem' }, fontWeight: 800, color: 'text.primary' }}
           >
             Blocked assignments
           </Typography>
         </Box>
         <Typography
-          sx={{ fontSize: '0.8rem', color: '#546E7A', fontWeight: 600, lineHeight: 1.45 }}
+          sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#546E7A', fontWeight: 600, lineHeight: 1.45 }}
         >
           Assignments currently flagged as blocked (each assignee reported the block on their own
           work). Updates when you refresh or regenerate insights.
@@ -204,8 +222,8 @@ export function BlockedAssignmentsSnapshot({ rows }) {
               sx={{
                 p: 1.5,
                 borderRadius: 1.5,
-                border: '1px solid #FFCDD2',
-                bgcolor: '#FFF8F8',
+                border: `1px solid ${isDark ? '#7F3030' : '#FFCDD2'}`,
+                bgcolor: isDark ? '#2A1A1A' : '#FFF8F8',
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
@@ -215,7 +233,7 @@ export function BlockedAssignmentsSnapshot({ rows }) {
                     {name}
                   </Typography>
                   <Typography
-                    sx={{ fontWeight: 700, fontSize: '0.88rem', color: '#1A1A1A', mt: 0.35 }}
+                    sx={{ fontWeight: 700, fontSize: '0.88rem', color: 'text.primary', mt: 0.35 }}
                   >
                     {title || (tid != null ? `Task #${tid}` : 'Task')}
                   </Typography>
@@ -238,22 +256,24 @@ export function BlockedAssignmentsSnapshot({ rows }) {
 
 /** Reference for what Critical / Warning / Info mean in the AI panel (no sample quotes). */
 export function AlertTypesLegend() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const rows = [
     {
       Icon: AlertCircle,
-      color: SEVERITY.critical.color,
+      color: getSeverity('critical', isDark).color,
       label: 'Critical',
       desc: 'Severe issues that require immediate action.',
     },
     {
       Icon: AlertTriangle,
-      color: SEVERITY.warning.color,
+      color: getSeverity('warning', isDark).color,
       label: 'Warning',
       desc: 'Situations that need attention.',
     },
     {
       Icon: Info,
-      color: SEVERITY.info.color,
+      color: getSeverity('info', isDark).color,
       label: 'Info',
       desc: 'Useful context without urgency.',
     },
@@ -262,15 +282,15 @@ export function AlertTypesLegend() {
     <TableContainer
       component={Paper}
       variant="outlined"
-      sx={{ mb: 2, borderRadius: 2, borderColor: 'rgba(0,0,0,0.08)', width: '100%' }}
+      sx={{ mb: 2, borderRadius: 2, borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)', width: '100%', bgcolor: 'background.paper' }}
     >
       <Table
         sx={{ '& td, & th': { fontSize: { xs: '0.88rem', md: '0.95rem' }, py: 1.25, px: 1.5 } }}
       >
-        <TableHead sx={{ bgcolor: 'rgba(103,58,183,0.06)' }}>
+        <TableHead sx={{ bgcolor: isDark ? 'rgba(103,58,183,0.12)' : 'rgba(103,58,183,0.06)' }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 700, width: { xs: 120, md: 140 } }}>Type</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Description</TableCell>
+            <TableCell sx={{ fontWeight: 700, width: { xs: 120, md: 140 }, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Type</TableCell>
+            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Description</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -278,13 +298,13 @@ export function AlertTypesLegend() {
             const RowIcon = r.Icon;
             return (
               <TableRow key={r.label}>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
                   <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                     <RowIcon size={18} color={r.color} aria-hidden />
                     {r.label}
                   </Box>
                 </TableCell>
-                <TableCell sx={{ color: '#455A64' }}>{r.desc}</TableCell>
+                <TableCell sx={{ color: isDark ? '#9A9A9A' : '#455A64' }}>{r.desc}</TableCell>
               </TableRow>
             );
           })}
@@ -296,6 +316,8 @@ export function AlertTypesLegend() {
 
 /** Bulleted list of actionable recommendations (category + text) */
 export function ActionableRecommendationsList({ items }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   if (!items?.length) return null;
   return (
     <Box
@@ -328,7 +350,7 @@ export function ActionableRecommendationsList({ items }) {
                 component="span"
                 sx={{
                   fontSize: { xs: '0.95rem', md: '1.05rem' },
-                  color: '#37474F',
+                  color: isDark ? '#E0E0E0' : '#37474F',
                   lineHeight: 1.55,
                 }}
               >
@@ -349,6 +371,8 @@ export function ExecutiveSummaryBlock({
   currentSprintActualScore = null,
   currentSprintMetrics = null,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const es = executiveSummary;
   const trendsText = alignKpiMetricsInText(
     alignTrendsProductivityScore(
@@ -374,7 +398,7 @@ export function ExecutiveSummaryBlock({
 
   const statusChips = hasBreakdown ? (
     <Box sx={{ mb: hasEsContent || fallbackSummary ? 2 : 0 }}>
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 1 }}>
+      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 1 }}>
         Task status
       </Typography>
       <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
@@ -393,14 +417,14 @@ export function ExecutiveSummaryBlock({
             label={`${label}: ${value}`}
             sx={{
               fontWeight: 700,
-              bgcolor: 'rgba(57, 73, 171, 0.1)',
-              color: '#283593',
-              border: '1px solid rgba(57, 73, 171, 0.25)',
+              bgcolor: isDark ? 'rgba(57, 73, 171, 0.2)' : 'rgba(57, 73, 171, 0.1)',
+              color: isDark ? '#90CAF9' : '#283593',
+              border: `1px solid ${isDark ? 'rgba(57, 73, 171, 0.4)' : 'rgba(57, 73, 171, 0.25)'}`,
             }}
           />
         ))}
       </Stack>
-      <Typography sx={{ fontSize: '0.75rem', color: '#90A4AE', mt: 0.75 }}>
+      <Typography sx={{ fontSize: '0.75rem', color: isDark ? '#9A9A9A' : '#90A4AE', mt: 0.75 }}>
         Total tasks in sprint: {Number(taskStatusBreakdown.total) || 0}
       </Typography>
     </Box>
@@ -412,20 +436,20 @@ export function ExecutiveSummaryBlock({
         sx={{
           p: { xs: 2, md: 2.75 },
           borderRadius: 2,
-          bgcolor: '#E8EAF6',
-          border: '1px solid #9FA8DA',
+          bgcolor: isDark ? '#1A1C2E' : '#E8EAF6',
+          border: `1px solid ${isDark ? '#3949AB' : '#9FA8DA'}`,
         }}
       >
         {statusChips}
         {overviewText && (
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Overview
             </Typography>
             <Typography
               sx={{
                 fontSize: { xs: '0.95rem', md: '1.05rem' },
-                color: '#37474F',
+                color: isDark ? '#E0E0E0' : '#37474F',
                 lineHeight: 1.55,
               }}
             >
@@ -435,13 +459,13 @@ export function ExecutiveSummaryBlock({
         )}
         {trendsText && (
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Trends
             </Typography>
             <Typography
               sx={{
                 fontSize: { xs: '0.95rem', md: '1.05rem' },
-                color: '#37474F',
+                color: isDark ? '#E0E0E0' : '#37474F',
                 lineHeight: 1.55,
               }}
             >
@@ -451,13 +475,13 @@ export function ExecutiveSummaryBlock({
         )}
         {improvementAreasText && (
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Improvement areas
             </Typography>
             <Typography
               sx={{
                 fontSize: { xs: '0.95rem', md: '1.05rem' },
-                color: '#37474F',
+                color: isDark ? '#E0E0E0' : '#37474F',
                 lineHeight: 1.55,
               }}
             >
@@ -467,13 +491,13 @@ export function ExecutiveSummaryBlock({
         )}
         {nextStepsText && (
           <Box>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#78909C', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Next steps
             </Typography>
             <Typography
               sx={{
                 fontSize: { xs: '0.95rem', md: '1.05rem' },
-                color: '#37474F',
+                color: isDark ? '#E0E0E0' : '#37474F',
                 lineHeight: 1.55,
               }}
             >
@@ -490,8 +514,8 @@ export function ExecutiveSummaryBlock({
         sx={{
           p: { xs: 2, md: 2.75 },
           borderRadius: 2,
-          bgcolor: '#E8EAF6',
-          border: '1px solid #9FA8DA',
+          bgcolor: isDark ? '#1A1C2E' : '#E8EAF6',
+          border: `1px solid ${isDark ? '#3949AB' : '#9FA8DA'}`,
         }}
       >
         {statusChips}
@@ -499,7 +523,7 @@ export function ExecutiveSummaryBlock({
           <Typography
             sx={{
               fontSize: { xs: '0.95rem', md: '1.05rem' },
-              color: '#37474F',
+              color: isDark ? '#E0E0E0' : '#37474F',
               lineHeight: 1.55,
               fontStyle: 'italic',
             }}
@@ -516,14 +540,14 @@ export function ExecutiveSummaryBlock({
       sx={{
         p: { xs: 2, md: 2.5 },
         borderRadius: 2,
-        bgcolor: '#EDE7F6',
-        border: '1px solid #CE93D8',
+        bgcolor: isDark ? '#2A1A3D' : '#EDE7F6',
+        border: `1px solid ${isDark ? '#7B1FA2' : '#CE93D8'}`,
       }}
     >
       <Typography
         sx={{
           fontSize: { xs: '0.95rem', md: '1.05rem' },
-          color: '#37474F',
+          color: isDark ? '#E0E0E0' : '#37474F',
           lineHeight: 1.55,
           fontStyle: 'italic',
         }}
@@ -535,12 +559,14 @@ export function ExecutiveSummaryBlock({
 }
 
 export function DeveloperInsightsTable({ rows }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   if (!rows?.length) return null;
   return (
     <TableContainer
       component={Paper}
       variant="outlined"
-      sx={{ borderRadius: 2, borderColor: 'rgba(0,0,0,0.08)', overflow: 'auto', width: '100%' }}
+      sx={{ borderRadius: 2, borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)', overflow: 'auto', width: '100%', bgcolor: 'background.paper' }}
     >
       <Table
         sx={{
@@ -548,19 +574,19 @@ export function DeveloperInsightsTable({ rows }) {
           '& td': { fontSize: { xs: '0.9rem', md: '1rem' }, verticalAlign: 'top', py: 1.5 },
         }}
       >
-        <TableHead sx={{ bgcolor: 'rgba(92,107,192,0.08)' }}>
+        <TableHead sx={{ bgcolor: isDark ? 'rgba(92,107,192,0.15)' : 'rgba(92,107,192,0.08)' }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 700, width: { xs: '28%', md: '22%' } }}>
+            <TableCell sx={{ fontWeight: 700, width: { xs: '28%', md: '22%' }, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
               Developer
             </TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Insight</TableCell>
+            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Insight</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row, i) => (
             <TableRow key={i}>
-              <TableCell sx={{ fontWeight: 700, color: '#3949AB' }}>{row.developerName}</TableCell>
-              <TableCell sx={{ color: '#455A64', lineHeight: 1.55 }}>{row.insight}</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: isDark ? '#90CAF9' : '#3949AB' }}>{row.developerName}</TableCell>
+              <TableCell sx={{ color: isDark ? '#E0E0E0' : '#455A64', lineHeight: 1.55 }}>{row.insight}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -573,7 +599,11 @@ export function PredictionsBlock({
   predictions,
   productivityPrediction,
   showNextSprintForecast = true,
+  nextSprintLabel = null,
+  nextSprintActualScore = null,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const hasExtended =
     predictions &&
     (predictions.productivityOutlook || predictions.risks || predictions.deliveryEstimate);
@@ -582,7 +612,7 @@ export function PredictionsBlock({
   if (!hasExtended && productivityPrediction && !showNextSprintForecast) {
     return (
       <Typography
-        sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: '#78909C', fontStyle: 'italic' }}
+        sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: isDark ? '#9A9A9A' : '#78909C', fontStyle: 'italic' }}
       >
         The next sprint score forecast is hidden for this sprint.
       </Typography>
@@ -595,8 +625,8 @@ export function PredictionsBlock({
           sx={{
             p: { xs: 2, md: 2.5 },
             borderRadius: 2,
-            bgcolor: '#E0F7FA',
-            border: '1px solid #4DD0E1',
+            bgcolor: isDark ? '#1A3A4A' : '#E0F7FA',
+            border: `1px solid ${isDark ? '#4DD0E1' : '#4DD0E1'}`,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.75 }}>
@@ -615,7 +645,7 @@ export function PredictionsBlock({
               <Typography
                 sx={{
                   fontSize: { xs: '0.95rem', md: '1.05rem' },
-                  color: '#37474F',
+                  color: isDark ? '#E0E0E0' : '#37474F',
                   lineHeight: 1.55,
                 }}
               >
@@ -631,7 +661,7 @@ export function PredictionsBlock({
               <Typography
                 sx={{
                   fontSize: { xs: '0.95rem', md: '1.05rem' },
-                  color: '#37474F',
+                  color: isDark ? '#E0E0E0' : '#37474F',
                   lineHeight: 1.55,
                 }}
               >
@@ -647,7 +677,7 @@ export function PredictionsBlock({
               <Typography
                 sx={{
                   fontSize: { xs: '0.95rem', md: '1.05rem' },
-                  color: '#37474F',
+                  color: isDark ? '#E0E0E0' : '#37474F',
                   lineHeight: 1.55,
                 }}
               >
@@ -657,12 +687,20 @@ export function PredictionsBlock({
           )}
         </Box>
       )}
-      {showScoreCard && <PredictionCard prediction={productivityPrediction} />}
+      {showScoreCard && (
+        <PredictionCard 
+          prediction={productivityPrediction} 
+          nextSprintLabel={nextSprintLabel}
+          nextSprintActualScore={nextSprintActualScore}
+        />
+      )}
     </Box>
   );
 }
 
-export function PredictionCard({ prediction }) {
+export function PredictionCard({ prediction, nextSprintLabel = null, nextSprintActualScore = null }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const rawScore = Number(prediction?.predictedScore);
   const clampedScore = Number.isFinite(rawScore)
     ? Math.max(0, Math.min(100, Math.round(rawScore)))
@@ -671,16 +709,21 @@ export function PredictionCard({ prediction }) {
     prediction.trend === 'up' ? TrendingUp : prediction.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
     prediction.trend === 'up' ? '#2E7D32' : prediction.trend === 'down' ? '#C62828' : '#607D8B';
+  
+  // Mostrar comparación si tenemos el score real del siguiente sprint
+  const showComparison = nextSprintActualScore != null && Number.isFinite(nextSprintActualScore);
+  
   return (
     <Box
       sx={{
         p: { xs: 2, md: 2.5 },
         borderRadius: 2,
-        bgcolor: '#F1F8E9',
-        border: '1px solid #A5D6A7',
+        bgcolor: isDark ? '#1A4A2A' : '#F1F8E9',
+        border: `1px solid ${isDark ? '#2E7D32' : '#A5D6A7'}`,
         display: 'flex',
         gap: { xs: 2, md: 3 },
         alignItems: 'flex-start',
+        flexDirection: { xs: 'column', sm: 'row' },
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
@@ -694,7 +737,7 @@ export function PredictionCard({ prediction }) {
         >
           {clampedScore}
         </Typography>
-        <Typography sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600 }}>
+        <Typography sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
           % predicted
         </Typography>
         <TrendIcon size={24} color={trendColor} style={{ marginTop: 6 }} />
@@ -704,22 +747,29 @@ export function PredictionCard({ prediction }) {
           sx={{
             fontSize: { xs: '0.95rem', md: '1.05rem' },
             fontWeight: 700,
-            color: '#1B5E20',
+            color: isDark ? '#81C784' : '#1B5E20',
             mb: 0.5,
           }}
         >
           Next sprint forecast
           {prediction.confidence && (
-            <span style={{ fontWeight: 400, color: '#607D8B', marginLeft: 8 }}>
+            <span style={{ fontWeight: 400, color: isDark ? '#9A9A9A' : '#607D8B', marginLeft: 8 }}>
               ({prediction.confidence} confidence)
             </span>
           )}
         </Typography>
         <Typography
-          sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: '#37474F', lineHeight: 1.55 }}
+          sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: isDark ? '#E0E0E0' : '#37474F', lineHeight: 1.55 }}
         >
           {prediction.reasoning}
         </Typography>
+        {showComparison && (
+          <Box sx={{ mt: 1.5, pt: 1, borderTop: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}` }}>
+            <Typography sx={{ fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
+              Actual score for {nextSprintLabel || 'next sprint'}: {Math.round(nextSprintActualScore)}%
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );

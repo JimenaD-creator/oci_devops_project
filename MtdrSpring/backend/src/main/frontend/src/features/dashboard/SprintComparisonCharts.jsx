@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Paper, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import {
   BarChart,
@@ -17,9 +18,14 @@ import { RECHARTS_BAR_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography
 
 const CHART_H_BASE = 228;
 
-const Y_AXIS_TICK = { fontSize: 12, fill: '#1A1A1A', fontWeight: 500 };
-const X_AXIS_LINE = { stroke: '#BDBDBD' };
-const GRID_STROKE = '#E1BEE7';
+const Y_AXIS_TICK = (isDark) => ({ 
+  fontSize: 12, 
+  fill: isDark ? '#9A9A9A' : '#1A1A1A', 
+  fontWeight: 500 
+});
+
+const X_AXIS_LINE = (isDark) => ({ stroke: isDark ? '#2A2C32' : '#BDBDBD' });
+const GRID_STROKE = (isDark) => isDark ? '#2A2C32' : '#E1BEE7';
 const FALLBACK_SPRINT_COLOR = '#26A69A';
 
 /** Planned hours on TASK rows (assigned_hours). */
@@ -27,16 +33,21 @@ const HOURS_PLANNED_TASK_FILL = '#5C6BC0';
 /** Logged hours summed from USER_TASK.worked_hours. */
 const HOURS_WORKED_USER_TASK_FILL = '#FB8C00';
 
-const tooltipPaper = {
+const tooltipPaper = (isDark) => ({
   borderRadius: 8,
-  border: '1px solid #90CAF9',
+  border: `1px solid ${isDark ? '#2A2C32' : '#90CAF9'}`,
   fontSize: 14,
   padding: '10px 12px',
-  background: '#fff',
-  boxShadow: '0 2px 10px rgba(21,101,192,0.15)',
-};
+  background: isDark ? '#1C1E22' : '#fff',
+  boxShadow: isDark 
+    ? '0 2px 10px rgba(0,0,0,0.3)' 
+    : '0 2px 10px rgba(21,101,192,0.15)',
+});
 
 function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const sprintColor = row.accentColor ?? FALLBACK_SPRINT_COLOR;
@@ -53,7 +64,7 @@ function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
           : 'Average';
 
   return (
-    <Box sx={{ ...tooltipPaper, border: `1px solid ${sprintColor}66` }}>
+    <Box sx={{ ...tooltipPaper(isDark), border: `1px solid ${sprintColor}66` }}>
       <Typography
         sx={{ fontWeight: 700, color: sprintColor, display: 'block', fontSize: '0.95rem' }}
       >
@@ -83,6 +94,9 @@ function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
 }
 
 function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatter }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const n = data?.length ?? 0;
   const chartH = Math.min(340, CHART_H_BASE + Math.max(0, n - 4) * 16);
   const marginBottom = Math.min(64, 40 + Math.max(0, n - 4) * 6);
@@ -113,27 +127,27 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <Typography
-        sx={{ fontWeight: 800, color: '#1A1A1A', mb: description ? 0.35 : 1, fontSize: '1.02rem' }}
+        sx={{ fontWeight: 800, color: 'text.primary', mb: description ? 0.35 : 1, fontSize: '1.02rem' }}
       >
         {title}
       </Typography>
-      {description ? <Typography sx={{ ...CHART_DESC_SX, mb: 1 }}>{description}</Typography> : null}
+      {description ? <Typography sx={{ ...CHART_DESC_SX, mb: 1, color: 'text.secondary' }}>{description}</Typography> : null}
       <ResponsiveContainer width="100%" height={chartH}>
         <BarChart
           data={data}
           margin={{ top: 8, right: 10, left: 4, bottom: marginBottom }}
           barCategoryGap={barCategoryGap}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE(isDark)} vertical={false} />
           <XAxis
             dataKey="shortLabel"
             tick={renderSprintXTick}
-            axisLine={X_AXIS_LINE}
-            tickLine={{ stroke: '#BDBDBD' }}
+            axisLine={X_AXIS_LINE(isDark)}
+            tickLine={{ stroke: isDark ? '#2A2C32' : '#BDBDBD' }}
             interval={0}
             height={48}
           />
-          <YAxis tick={Y_AXIS_TICK} axisLine={false} width={48} />
+          <YAxis tick={Y_AXIS_TICK(isDark)} axisLine={false} width={48} />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             shared={false}
@@ -151,6 +165,9 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
 }
 
 function HoursPlannedVsWorkedTooltip({ active, payload }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const sprintColor = row.accentColor ?? FALLBACK_SPRINT_COLOR;
@@ -158,7 +175,7 @@ function HoursPlannedVsWorkedTooltip({ active, payload }) {
   const worked = Number(row.workedHoursUserTask ?? 0);
   const pending = row.pending ?? 0;
   return (
-    <Box sx={{ ...tooltipPaper, border: `1px solid ${sprintColor}66` }}>
+    <Box sx={{ ...tooltipPaper(isDark), border: `1px solid ${sprintColor}66` }}>
       <Typography
         sx={{ fontWeight: 700, color: sprintColor, display: 'block', fontSize: '0.95rem' }}
       >
@@ -203,6 +220,9 @@ function HoursPlannedVsWorkedTooltip({ active, payload }) {
 }
 
 function SprintHoursCompareBlock({ data }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const n = data?.length ?? 0;
   const chartH = Math.min(360, CHART_H_BASE + Math.max(0, n - 4) * 16);
   const marginBottom = Math.min(72, 48 + Math.max(0, n - 4) * 6);
@@ -232,10 +252,10 @@ function SprintHoursCompareBlock({ data }) {
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography sx={{ fontWeight: 800, color: '#1A1A1A', mb: 0.35, fontSize: '1.02rem' }}>
+      <Typography sx={{ fontWeight: 800, color: 'text.primary', mb: 0.35, fontSize: '1.02rem' }}>
         Hours: planned vs worked
       </Typography>
-      <Typography sx={{ ...CHART_DESC_SX, mb: 1 }}>
+      <Typography sx={{ ...CHART_DESC_SX, mb: 1, color: 'text.secondary' }}>
         Planned = sum of task assigned hours; worked = sum of USER_TASK worked hours per sprint.
       </Typography>
       <ResponsiveContainer width="100%" height={chartH}>
@@ -244,16 +264,16 @@ function SprintHoursCompareBlock({ data }) {
           margin={{ top: 4, right: 10, left: 4, bottom: marginBottom }}
           barCategoryGap={barCategoryGap}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE(isDark)} vertical={false} />
           <XAxis
             dataKey="shortLabel"
             tick={renderSprintXTick}
-            axisLine={X_AXIS_LINE}
-            tickLine={{ stroke: '#BDBDBD' }}
+            axisLine={X_AXIS_LINE(isDark)}
+            tickLine={{ stroke: isDark ? '#2A2C32' : '#BDBDBD' }}
             interval={0}
             height={48}
           />
-          <YAxis tick={Y_AXIS_TICK} axisLine={false} width={48} />
+          <YAxis tick={Y_AXIS_TICK(isDark)} axisLine={false} width={48} />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             shared
@@ -261,7 +281,12 @@ function SprintHoursCompareBlock({ data }) {
           />
           <Legend
             verticalAlign="top"
-            wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 4 }}
+            wrapperStyle={{ 
+              fontSize: 12, 
+              fontWeight: 600, 
+              paddingBottom: 4,
+              color: isDark ? '#F0F0F0' : '#1A1A1A'
+            }}
           />
           <Bar
             dataKey="assignedHoursTasks"
@@ -287,6 +312,9 @@ function SprintHoursCompareBlock({ data }) {
  * Bar charts per metric when two or more sprints are selected (chronological order on X).
  */
 export default function SprintComparisonCharts({ selectedSprints = [] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const data = useMemo(() => {
     if (!selectedSprints?.length || selectedSprints.length < 2) return [];
     return [...selectedSprints]
@@ -318,8 +346,9 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
         p: 2.5,
         mb: 3,
         borderRadius: 3,
-        border: '1px solid #EFEFEF',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+        boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
+        bgcolor: 'background.paper',
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
@@ -331,7 +360,7 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
             width: 36,
             height: 36,
             borderRadius: 2,
-            bgcolor: 'rgba(21, 101, 192, 0.09)',
+            bgcolor: isDark ? 'rgba(21, 101, 192, 0.15)' : 'rgba(21, 101, 192, 0.09)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -340,10 +369,10 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
           <CompareArrowsIcon sx={{ color: '#1565C0', fontSize: 26 }} />
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, color: '#1A1A1A', fontSize: '1.12rem' }}>
+          <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1.12rem' }}>
             Sprint comparison
           </Typography>
-          <Typography sx={{ ...CHART_DESC_SX, mt: 0.5, display: 'block' }}>
+          <Typography sx={{ ...CHART_DESC_SX, mt: 0.5, display: 'block', color: 'text.secondary' }}>
             Side-by-side bars for each selected sprint (chronological on the X axis).
           </Typography>
         </Box>

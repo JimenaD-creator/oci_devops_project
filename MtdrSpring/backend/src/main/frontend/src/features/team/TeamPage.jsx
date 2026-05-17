@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Users, UserCircle } from 'lucide-react';
 import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -27,6 +28,9 @@ export default function TeamPage({
   onLandingConsumed,
   onOpenAiInsights,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -154,7 +158,7 @@ export default function TeamPage({
               variant="h4"
               sx={{
                 fontWeight: 800,
-                color: '#1A1A1A',
+                color: 'text.primary',
                 letterSpacing: '-0.5px',
                 fontSize: { xs: '1.65rem', md: '2rem' },
               }}
@@ -178,7 +182,7 @@ export default function TeamPage({
                 minWidth: { xs: '100%', sm: 220 },
                 ...pageFormFieldOutline(),
                 '& .MuiSelect-select': {
-                  color: '#1A1A1A',
+                  color: 'text.primary',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -213,7 +217,14 @@ export default function TeamPage({
       </Box>
 
       {sprints.length === 0 && (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
+        <Paper sx={{ 
+          p: 4, 
+          textAlign: 'center', 
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+        }}>
           <Typography color="textSecondary">No sprints found for this project.</Typography>
         </Paper>
       )}
@@ -231,24 +242,26 @@ export default function TeamPage({
             sx={{
               mb: 3,
               borderRadius: 2,
-              border: '1px solid rgba(0,0,0,0.08)',
+              border: '1px solid',
+              borderColor: 'divider',
               overflow: 'hidden',
-              bgcolor: '#FFFFFF',
+              bgcolor: 'background.paper',
             }}
           >
             <Box
               sx={{
                 px: 2,
                 py: 1.25,
-                bgcolor: 'rgba(92, 107, 192, 0.1)',
-                borderBottom: '1px solid rgba(57, 73, 171, 0.2)',
+                bgcolor: isDark ? 'rgba(92, 107, 192, 0.15)' : 'rgba(92, 107, 192, 0.1)',
+                borderBottom: '1px solid',
+                borderBottomColor: isDark ? 'rgba(57, 73, 171, 0.3)' : 'rgba(57, 73, 171, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
               }}
             >
               <UserCircle size={22} color="#3949AB" aria-hidden />
-              <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#1A1A1A' }}>
+              <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary' }}>
                 AI per-developer analysis
               </Typography>
             </Box>
@@ -263,7 +276,7 @@ export default function TeamPage({
                 <Typography
                   sx={{
                     fontSize: { xs: '0.95rem', md: '1rem' },
-                    color: '#78909C',
+                    color: 'text.secondary',
                     fontStyle: 'italic',
                   }}
                 >
@@ -310,11 +323,12 @@ export default function TeamPage({
             sx={{
               p: { xs: 2, sm: 2.5 },
               borderRadius: 2,
-              border: '1px solid rgba(0,0,0,0.08)',
-              bgcolor: '#FFFFFF',
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
             }}
           >
-            <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#1A1A1A', mb: 2 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Developer radar
             </Typography>
             <DeveloperRadarCards sprintId={selectedSprint.id} />

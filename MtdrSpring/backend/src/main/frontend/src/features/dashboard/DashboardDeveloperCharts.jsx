@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   BarChart,
   Bar,
@@ -70,13 +70,17 @@ function HorizontalBarEndLabel({
   fill = '#1A1A1A',
   formatter = (v) => String(v ?? ''),
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const textColor = isDark ? '#F0F0F0' : fill;
+  
   const n = Number(value ?? 0);
   if (!Number.isFinite(n) || n <= 0) return null;
   return (
     <text
       x={Number(x) + Number(width) + 6}
       y={Number(y) + Number(height) / 2}
-      fill={fill}
+      fill={textColor}
       fontSize={11}
       fontWeight={700}
       dominantBaseline="middle"
@@ -109,6 +113,8 @@ function resolveLabelRow(value, index, rows) {
 }
 
 function SingleWorkloadCompletedOutsideLabel(props) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const {
     x,
     y,
@@ -120,7 +126,6 @@ function SingleWorkloadCompletedOutsideLabel(props) {
     fill = '#3949AB',
     rows,
   } = props || {};
-  /** Prefer `value` = row when using `valueAccessor`; else `rows[index]` (index can diverge from data when bars are filtered). */
   const row = resolveLabelRow(value, index, rows);
   const pending = Number(row?.pending ?? 0);
   const completed = Number(
@@ -133,12 +138,12 @@ function SingleWorkloadCompletedOutsideLabel(props) {
     <text
       x={Number(x) + Number(width) + 10}
       y={Number(y) + Number(height) / 2}
-      fill={fill}
+      fill={isDark ? '#F0F0F0' : fill}
       fontSize={14}
       fontWeight={800}
       dominantBaseline="middle"
       textAnchor="start"
-      stroke="#fff"
+      stroke={isDark ? '#1C1E22' : '#fff'}
       strokeWidth={2}
       paintOrder="stroke"
     >
@@ -148,6 +153,8 @@ function SingleWorkloadCompletedOutsideLabel(props) {
 }
 
 function CompareWorkloadCompletedOutsideLabel(props) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const {
     x,
     y,
@@ -173,22 +180,18 @@ function CompareWorkloadCompletedOutsideLabel(props) {
   const px = Number(x);
   const py = Number(y);
   const pw = Number(width);
-  /**
-   * Compare chart: vertical columns (X = developer, Y = tasks). Completed + pending share the same `x` and `width`;
-   * only `height` differs per segment. Center the label on the column, slightly above the top of the segment.
-   */
   const centerX = px + pw / 2;
   const labelY = Math.max(10, py - Math.max(14, 12 + Math.min(8, Number(height) || 0)));
   return (
     <text
       x={centerX}
       y={labelY}
-      fill={fill}
+      fill={isDark ? '#F0F0F0' : fill}
       fontSize={14}
       fontWeight={800}
       dominantBaseline="middle"
       textAnchor="middle"
-      stroke="#fff"
+      stroke={isDark ? '#1C1E22' : '#fff'}
       strokeWidth={2}
       paintOrder="stroke"
     >
@@ -202,6 +205,9 @@ function CompareWorkloadCompletedOutsideLabel(props) {
 // ---------------------------------------------------------------------------
 
 function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length || !sprintDefs?.length) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
@@ -209,13 +215,13 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
     <Box
       sx={{
         ...CHART_TOOLTIP_SX,
-        bgcolor: '#fff',
-        border: '1px solid #B0BEC5',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        bgcolor: 'background.paper',
+        border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
+        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
         minWidth: 200,
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: '#37474F', fontSize: '0.95rem', lineHeight: 1.3 }}>
+      <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem', lineHeight: 1.3 }}>
         {row.name}
       </Typography>
       {sprintDefs.map((sp, idx) => {
@@ -228,14 +234,14 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
             sx={{
               mt: idx === 0 ? 1 : 0,
               pt: idx === 0 ? 0 : 1.25,
-              borderTop: idx === 0 ? 'none' : '1px solid #ECEFF1',
+              borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
             }}
           >
             <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
               {sp.shortLabel}
             </Typography>
             <Typography
-              sx={{ color: sp.accentColor, fontSize: '0.84rem', mt: 0.35, fontWeight: 600 }}
+              sx={{ color: isDark ? '#9A9A9A' : sp.accentColor, fontSize: '0.84rem', mt: 0.35, fontWeight: 600 }}
             >
               Completed: {completed} · Pending: {pending} · Assigned: {assigned}
             </Typography>
@@ -247,6 +253,9 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
 }
 
 function CompareHoursTooltip({ active, payload, sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length || !sprintDefs?.length) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
@@ -254,13 +263,13 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
     <Box
       sx={{
         ...CHART_TOOLTIP_SX,
-        bgcolor: '#fff',
-        border: '1px solid #B0BEC5',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        bgcolor: 'background.paper',
+        border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
+        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
         minWidth: 220,
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: '#37474F', fontSize: '0.95rem', lineHeight: 1.3 }}>
+      <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem', lineHeight: 1.3 }}>
         {row.name}
       </Typography>
       {sprintDefs.map((sp, idx) => {
@@ -271,7 +280,7 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
             sx={{
               mt: idx === 0 ? 1 : 0,
               pt: idx === 0 ? 0 : 1,
-              borderTop: idx === 0 ? 'none' : '1px solid #ECEFF1',
+              borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
               display: 'flex',
               flexDirection: 'column',
               gap: 0.35,
@@ -280,7 +289,7 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
             <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
               {sp.shortLabel}
             </Typography>
-            <Typography sx={{ color: '#1A1A1A', fontSize: '0.82rem', fontWeight: 600 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.82rem', fontWeight: 600 }}>
               Hours worked: {worked.toFixed(1)} h
             </Typography>
           </Box>
@@ -291,6 +300,9 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
 }
 
 function CompareComboTooltip({ active, payload, sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length || !sprintDefs?.length) return null;
   const p = payload[0];
   const row = p.payload;
@@ -303,13 +315,13 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
     <Box
       sx={{
         ...CHART_TOOLTIP_SX,
-        bgcolor: '#fff',
-        border: '1px solid #B0BEC5',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        bgcolor: 'background.paper',
+        border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
+        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
         minWidth: 230,
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: '#37474F', fontSize: '0.95rem', lineHeight: 1.3 }}>
+      <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem', lineHeight: 1.3 }}>
         {row.name}
       </Typography>
       {sprintDefs.map((sp, idx) => {
@@ -322,7 +334,7 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
             sx={{
               mt: idx === 0 ? 1 : 0,
               pt: idx === 0 ? 0 : 1,
-              borderTop: idx === 0 ? 'none' : '1px solid #ECEFF1',
+              borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
             }}
           >
             <Typography
@@ -339,7 +351,7 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
               <Typography
                 sx={{
                   fontSize: '0.82rem',
-                  color: '#1A1A1A',
+                  color: 'text.primary',
                   fontWeight: focused ? 700 : 600,
                   lineHeight: 1.45,
                 }}
@@ -349,7 +361,7 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
               <Typography
                 sx={{
                   fontSize: '0.82rem',
-                  color: '#1A1A1A',
+                  color: 'text.primary',
                   fontWeight: focused ? 700 : 600,
                   lineHeight: 1.45,
                 }}
@@ -369,6 +381,8 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
 // ---------------------------------------------------------------------------
 
 function CompareHoursBarLegend({ sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const multiSprint = (sprintDefs?.length ?? 0) > 1;
   return (
     <Box
@@ -396,7 +410,7 @@ function CompareHoursBarLegend({ sprintDefs }) {
               component="span"
               sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }}
             />
-            <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Hours worked</Typography>
+            <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Hours worked</Typography>
           </Box>
         </Box>
       ) : null}
@@ -406,6 +420,8 @@ function CompareHoursBarLegend({ sprintDefs }) {
 }
 
 function CompareSprintLegend({ sprintDefs, dense, manySprints }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const n = sprintDefs?.length ?? 0;
   const squeeze = Boolean(manySprints) || (dense && n >= 6);
   const chip = squeeze ? 14 : 16;
@@ -437,7 +453,7 @@ function CompareSprintLegend({ sprintDefs, dense, manySprints }) {
             component="span"
             sx={{
               ...CHART_LEGEND_ITEM_SX,
-              color: '#1A1A1A',
+              color: 'text.primary',
               fontSize: squeeze ? { xs: '0.75rem', sm: '0.8125rem' } : undefined,
               lineHeight: 1.25,
             }}
@@ -451,9 +467,11 @@ function CompareSprintLegend({ sprintDefs, dense, manySprints }) {
 }
 
 function CompareWorkloadSymbolLegend({ sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const n = sprintDefs?.length ?? 0;
   const c = sprintDefs[0]?.accentColor ?? '#3949AB';
-  const pendingTint = alpha(c, 0.42);
+  const pendingTint = alpha(c, isDark ? 0.35 : 0.42);
   const donePendingFont = { xs: '0.9rem', sm: '0.97rem' };
   return (
     <Box
@@ -490,13 +508,13 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
               borderRadius: 0.5,
               bgcolor: c,
               flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+              boxShadow: `0 0 0 1px ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
             }}
           />
           <Typography
             sx={{
               ...CHART_LEGEND_ITEM_SX,
-              color: '#1A1A1A',
+              color: 'text.primary',
               fontWeight: 700,
               fontSize: donePendingFont,
             }}
@@ -505,7 +523,7 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
           </Typography>
         </Box>
         <Typography
-          sx={{ color: '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}
+          sx={{ color: isDark ? '#2A2C32' : '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}
         >
           ·
         </Typography>
@@ -518,13 +536,13 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
               borderRadius: 0.5,
               bgcolor: pendingTint,
               flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+              boxShadow: `0 0 0 1px ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
             }}
           />
           <Typography
             sx={{
               ...CHART_LEGEND_ITEM_SX,
-              color: '#1A1A1A',
+              color: 'text.primary',
               fontWeight: 700,
               fontSize: donePendingFont,
             }}
@@ -541,6 +559,8 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
 }
 
 function CompareComboLegend({ sprintDefs }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const n = sprintDefs?.length ?? 0;
   const splitRows = n >= 5;
   const many = n >= 6;
@@ -566,11 +586,11 @@ function CompareComboLegend({ sprintDefs }) {
             borderRadius: 0.75,
             bgcolor: COMPLETED_FILL,
             flexShrink: 0,
-            boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+            boxShadow: `0 0 0 1px ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
           }}
         />
         <Typography
-          sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A', fontWeight: 700, fontSize: labelSize }}
+          sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary', fontWeight: 700, fontSize: labelSize }}
         >
           Bars = completed tasks (left)
         </Typography>
@@ -603,7 +623,7 @@ function CompareComboLegend({ sprintDefs }) {
           />
         </Box>
         <Typography
-          sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A', fontWeight: 700, fontSize: labelSize }}
+          sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary', fontWeight: 700, fontSize: labelSize }}
         >
           Line = hours (right)
         </Typography>
@@ -617,7 +637,7 @@ function CompareComboLegend({ sprintDefs }) {
         display: { xs: 'none', sm: 'block' },
         width: 1,
         height: 22,
-        bgcolor: '#DCE3EA',
+        bgcolor: isDark ? '#2A2C32' : '#DCE3EA',
         flexShrink: 0,
         alignSelf: 'center',
       }}
@@ -635,7 +655,7 @@ function CompareComboLegend({ sprintDefs }) {
         <Box
           sx={{
             width: '100%',
-            borderTop: '1px solid rgba(15, 23, 42, 0.1)',
+            borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15, 23, 42, 0.1)'}`,
             pt: { xs: 1, sm: 1.25 },
           }}
         >
@@ -662,7 +682,7 @@ function CompareComboLegend({ sprintDefs }) {
       <Typography
         sx={{
           display: { xs: 'inline', sm: 'none' },
-          color: '#B0BEC5',
+          color: isDark ? '#2A2C32' : '#B0BEC5',
           fontWeight: 800,
           lineHeight: 1,
           px: 0.25,
@@ -676,6 +696,8 @@ function CompareComboLegend({ sprintDefs }) {
 }
 
 function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = STACK_PENDING }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box
       sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 3, pb: 1, pt: 0.5 }}
@@ -685,20 +707,22 @@ function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = 
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: completedFill, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Completed tasks</Typography>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Completed tasks</Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: pendingFill, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>Pending tasks</Typography>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Pending tasks</Typography>
       </Box>
     </Box>
   );
 }
 
 function SingleHoursSymbolLegend() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box
       sx={{
@@ -715,7 +739,7 @@ function SingleHoursSymbolLegend() {
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>
           Hours worked (solid bar)
         </Typography>
       </Box>
@@ -724,7 +748,7 @@ function SingleHoursSymbolLegend() {
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_ASSIGNED, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: '#1A1A1A' }}>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>
           Estimated hours (lighter bar)
         </Typography>
       </Box>
@@ -741,44 +765,47 @@ function SingleHoursSymbolLegend() {
  * Se renderiza como `footer` dentro de ChartShell, debajo de la gráfica.
  */
 function AIDeveloperVariationGrid({ rows, emptyText, loading, tone = 'default' }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const palette =
     tone === 'workload'
-      ? { bg: '#FFF8F2', border: '#FFE2CC', name: '#8A3A08', text: '#263238' }
+      ? { bg: isDark ? '#2D1F12' : '#FFF8F2', border: isDark ? '#4A2E1A' : '#FFE2CC', name: '#FFB74D', text: isDark ? '#E0E0E0' : '#263238' }
       : tone === 'hours'
-        ? { bg: '#F3F8FF', border: '#DCEAFF', name: '#0D47A1', text: '#1A1A1A' }
+        ? { bg: isDark ? '#0D2137' : '#F3F8FF', border: isDark ? '#1A3A5C' : '#DCEAFF', name: '#64B5F6', text: isDark ? '#E0E0E0' : '#1A1A1A' }
         : tone === 'productivity'
-          ? { bg: '#F4FBF7', border: '#D7F0E1', name: '#1B5E20', text: '#1A1A1A' }
-          : { bg: '#F8FCFF', border: '#E6EEF5', name: '#1A1A1A', text: '#1A1A1A' };
+          ? { bg: isDark ? '#0D2616' : '#F4FBF7', border: isDark ? '#1A4A2A' : '#D7F0E1', name: '#81C784', text: isDark ? '#E0E0E0' : '#1A1A1A' }
+          : { bg: isDark ? '#1A1C20' : '#F8FCFF', border: isDark ? '#2A2C32' : '#E6EEF5', name: isDark ? '#F0F0F0' : '#1A1A1A', text: isDark ? '#E0E0E0' : '#1A1A1A' };
   const cardPalettes =
     tone === 'workload'
       ? [
-          { bg: '#FFF1E8', border: '#FFB98E', stripe: '#00897B' },
-          { bg: '#F3E5F5', border: '#CE93D8', stripe: '#7B1FA2' },
-          { bg: '#EEF3FF', border: '#9DB6FF', stripe: '#3949AB' },
-          { bg: '#ECFAF6', border: '#89DCC1', stripe: '#00796B' },
-          { bg: '#F9F5FF', border: '#BFA2FF', stripe: '#6A1B9A' },
+          { bg: isDark ? '#2D1F12' : '#FFF1E8', border: isDark ? '#4A2E1A' : '#FFB98E', stripe: '#00897B' },
+          { bg: isDark ? '#1F1626' : '#F3E5F5', border: isDark ? '#3A2A4A' : '#CE93D8', stripe: '#7B1FA2' },
+          { bg: isDark ? '#161C26' : '#EEF3FF', border: isDark ? '#2A3A5C' : '#9DB6FF', stripe: '#3949AB' },
+          { bg: isDark ? '#0D1F1A' : '#ECFAF6', border: isDark ? '#1A4A3A' : '#89DCC1', stripe: '#00796B' },
+          { bg: isDark ? '#1A1426' : '#F9F5FF', border: isDark ? '#3A2A5C' : '#BFA2FF', stripe: '#6A1B9A' },
         ]
       : tone === 'hours'
         ? [
-            { bg: '#ECF5FF', border: '#9CCDFF', stripe: '#1565C0' },
-            { bg: '#EFF2FF', border: '#A8B5FF', stripe: '#303F9F' },
-            { bg: '#EAF8FF', border: '#8EDCFF', stripe: '#0277BD' },
-            { bg: '#F0FAF7', border: '#96E1CC', stripe: '#00695C' },
-            { bg: '#F7F1FF', border: '#C8A7FF', stripe: '#7B1FA2' },
+            { bg: isDark ? '#0D2137' : '#ECF5FF', border: isDark ? '#1A3A5C' : '#9CCDFF', stripe: '#1565C0' },
+            { bg: isDark ? '#161C2E' : '#EFF2FF', border: isDark ? '#2A3A6C' : '#A8B5FF', stripe: '#303F9F' },
+            { bg: isDark ? '#0D1F2E' : '#EAF8FF', border: isDark ? '#1A4A6C' : '#8EDCFF', stripe: '#0277BD' },
+            { bg: isDark ? '#0D1F1A' : '#F0FAF7', border: isDark ? '#1A4A3A' : '#96E1CC', stripe: '#00695C' },
+            { bg: isDark ? '#1A142E' : '#F7F1FF', border: isDark ? '#3A2A6C' : '#C8A7FF', stripe: '#7B1FA2' },
           ]
         : tone === 'productivity'
           ? [
-              { bg: '#EEF9F2', border: '#9EDCB6', stripe: '#2E7D32' },
-              { bg: '#F3FAEE', border: '#B7DB88', stripe: '#558B2F' },
-              { bg: '#EAF8F5', border: '#93D8C6', stripe: '#00796B' },
-              { bg: '#F6F8EC', border: '#CFD992', stripe: '#827717' },
-              { bg: '#EFF4FF', border: '#AFC4FF', stripe: '#3949AB' },
+              { bg: isDark ? '#0D2616' : '#EEF9F2', border: isDark ? '#1A4A2A' : '#9EDCB6', stripe: '#2E7D32' },
+              { bg: isDark ? '#1A2610' : '#F3FAEE', border: isDark ? '#3A4A1A' : '#B7DB88', stripe: '#558B2F' },
+              { bg: isDark ? '#0D1F1A' : '#EAF8F5', border: isDark ? '#1A4A3A' : '#93D8C6', stripe: '#00796B' },
+              { bg: isDark ? '#1A1A0D' : '#F6F8EC', border: isDark ? '#3A3A1A' : '#CFD992', stripe: '#827717' },
+              { bg: isDark ? '#161C2E' : '#EFF4FF', border: isDark ? '#2A3A6C' : '#AFC4FF', stripe: '#3949AB' },
             ]
           : [
-              { bg: '#F8FCFF', border: '#BCD7EC', stripe: '#1976D2' },
-              { bg: '#F7FAFF', border: '#C5D1E8', stripe: '#5C6BC0' },
-              { bg: '#F6FBFA', border: '#BFE0D8', stripe: '#00897B' },
-              { bg: '#FBF9FF', border: '#D2C3EA', stripe: '#8E24AA' },
+              { bg: isDark ? '#1A1C20' : '#F8FCFF', border: isDark ? '#2A2C32' : '#BCD7EC', stripe: '#1976D2' },
+              { bg: isDark ? '#1A1C26' : '#F7FAFF', border: isDark ? '#2A2C4A' : '#C5D1E8', stripe: '#5C6BC0' },
+              { bg: isDark ? '#0D1F1A' : '#F6FBFA', border: isDark ? '#1A4A3A' : '#BFE0D8', stripe: '#00897B' },
+              { bg: isDark ? '#1A1426' : '#FBF9FF', border: isDark ? '#3A2A5C' : '#D2C3EA', stripe: '#8E24AA' },
             ];
 
   if (!rows?.length) {
@@ -845,6 +872,8 @@ function ChartShell({
   footer,
   footerTitle,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const chartRef = useRef(null);
   const chartVisible = useInView(chartRef, {
     once: true,
@@ -852,7 +881,7 @@ function ChartShell({
     amount: 0.12,
   });
   const a = accent ?? '#5C6BC0';
-  const bg = tint ?? 'rgba(92, 107, 192, 0.06)';
+  const bg = tint ?? (isDark ? 'rgba(92, 107, 192, 0.1)' : 'rgba(92, 107, 192, 0.06)');
   const chartBoxSx =
     typeof height === 'object' && height !== null
       ? { width: '100%', minWidth: 0, overflow: 'visible', height }
@@ -878,13 +907,15 @@ function ChartShell({
           ? { p: { xs: 1.5, sm: 1.75 }, pt: 1.75, pb: 1.25 }
           : { p: { xs: 2, sm: 2.5 }, pt: 2.5, pb: 2 }),
         borderRadius: 3,
-        border: '1px solid #E4E7ED',
+        border: `1px solid ${isDark ? '#2A2C32' : '#E4E7ED'}`,
         borderLeft: `5px solid ${a}`,
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        background: `linear-gradient(135deg, ${bg} 0%, #FFFFFF 48%)`,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        background: isDark 
+          ? `linear-gradient(135deg, ${bg} 0%, #1C1E22 48%)`
+          : `linear-gradient(135deg, ${bg} 0%, #FFFFFF 48%)`,
+        boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
         overflow: 'visible',
       }}
     >
@@ -920,7 +951,7 @@ function ChartShell({
       </Box>
 
       {description ? (
-        <Typography sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch' }}>
+        <Typography sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch', color: 'text.secondary' }}>
           {description}
         </Typography>
       ) : null}
@@ -934,8 +965,8 @@ function ChartShell({
             px: { xs: 1.25, sm: 1.75 },
             py: { xs: 1.25, sm: 1.5 },
             borderRadius: 2,
-            bgcolor: 'rgba(15, 23, 42, 0.035)',
-            border: '1px solid rgba(15, 23, 42, 0.08)',
+            bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15, 23, 42, 0.035)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.08)'}`,
             boxSizing: 'border-box',
           }}
         >
@@ -958,7 +989,7 @@ function ChartShell({
           sx={{
             mt: 0.35,
             pt: 0.25,
-            borderTop: `1px solid rgba(15, 23, 42, 0.08)`,
+            borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15, 23, 42, 0.08)'}`,
           }}
         >
           <Typography
@@ -994,6 +1025,9 @@ export default function DashboardDeveloperCharts({
   selectedSprints = [],
   compareMode = false,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiProductivityRows, setAiProductivityRows] = useState([]);
@@ -1005,7 +1039,6 @@ export default function DashboardDeveloperCharts({
 
   useEffect(() => {
     if (!orderedSelectedSprints?.length) return;
-    // Usar console.log: en Chrome/Edge "Debug" suele estar oculto en niveles de consola.
     console.log(
       '[DashboardDeveloperCharts] orderedSelectedSprints (compare usa este orden):',
       orderedSelectedSprints.map((sp) => ({
@@ -1292,13 +1325,13 @@ export default function DashboardDeveloperCharts({
         sx={{
           p: 4,
           borderRadius: 3,
-          border: '1px dashed #B0BEC5',
+          border: `1px dashed ${isDark ? '#2A2C32' : '#B0BEC5'}`,
           textAlign: 'center',
-          bgcolor: 'rgba(21, 101, 192, 0.04)',
+          bgcolor: isDark ? 'rgba(21, 101, 192, 0.08)' : 'rgba(21, 101, 192, 0.04)',
         }}
       >
         <Typography
-          sx={{ color: '#1A1A1A', fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.55 }}
+          sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.55 }}
         >
           No developer data for the selected sprint(s).
         </Typography>
@@ -1374,7 +1407,7 @@ export default function DashboardDeveloperCharts({
           description={CHART_DESC.compare.workload}
           height={hWorkload}
           accent={firstAccent}
-          tint={alpha(firstAccent, 0.08)}
+          tint={alpha(firstAccent, isDark ? 0.12 : 0.08)}
         >
           <BarChart
             data={workloadRowsWithTotals}
@@ -1385,7 +1418,7 @@ export default function DashboardDeveloperCharts({
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
               dataKey="shortName"
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               interval={0}
               angle={-32}
               textAnchor="end"
@@ -1395,7 +1428,7 @@ export default function DashboardDeveloperCharts({
                 value: 'Developer',
                 position: 'insideBottom',
                 offset: -4,
-                fill: '#1A1A1A',
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...CHART_AXIS_LABEL,
                 fontSize: 15,
               }}
@@ -1405,14 +1438,14 @@ export default function DashboardDeveloperCharts({
               allowDecimals={false}
               domain={compareWorkloadTaskAxis.domain}
               ticks={compareWorkloadTaskAxis.ticks}
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               tickMargin={8}
               width={52}
               label={{
                 value: 'Tasks',
                 angle: -90,
                 position: 'insideLeft',
-                fill: '#1A1A1A',
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...CHART_AXIS_LABEL,
                 fontSize: 15,
               }}
@@ -1467,7 +1500,7 @@ export default function DashboardDeveloperCharts({
                   stackId={`sp-${sp.id}`}
                   dataKey={`wo_${sp.id}`}
                   name={`${sp.shortLabel} · pending`}
-                  fill={alpha(sp.accentColor, 0.42)}
+                  fill={alpha(sp.accentColor, isDark ? 0.35 : 0.42)}
                   radius={[6, 6, 0, 0]}
                   maxBarSize={maxBarWorkloadCompare}
                   animationDuration={CHART_BAR_ANIM_MS}
@@ -1498,7 +1531,7 @@ export default function DashboardDeveloperCharts({
           description={sprintDefs.length > 1 ? undefined : CHART_DESC.compare.hours}
           height={hHours}
           accent="#FB8C00"
-          tint="rgba(251, 140, 0, 0.1)"
+          tint={isDark ? 'rgba(251, 140, 0, 0.15)' : 'rgba(251, 140, 0, 0.1)'}
         >
           <BarChart
             data={hoursRows}
@@ -1508,7 +1541,7 @@ export default function DashboardDeveloperCharts({
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
               dataKey="shortName"
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               interval={0}
               angle={-32}
               textAnchor="end"
@@ -1518,7 +1551,7 @@ export default function DashboardDeveloperCharts({
                 value: 'Developer',
                 position: 'insideBottom',
                 offset: -4,
-                fill: '#1A1A1A',
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...CHART_AXIS_LABEL,
                 fontSize: 15,
               }}
@@ -1527,7 +1560,7 @@ export default function DashboardDeveloperCharts({
               type="number"
               domain={compareHoursAxis.domain}
               ticks={compareHoursAxis.ticks}
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               width={56}
               tickMargin={8}
               label={{
@@ -1584,7 +1617,7 @@ export default function DashboardDeveloperCharts({
           belowDescription={<CompareComboLegend sprintDefs={sprintDefs} />}
           height={hCombo}
           accent={comboAccent}
-          tint={alpha(comboAccent, 0.08)}
+          tint={alpha(comboAccent, isDark ? 0.12 : 0.08)}
           footerTitle="AI summary: productivity (tasks vs hours) by developer"
           footer={
             <AIDeveloperVariationGrid
@@ -1603,7 +1636,7 @@ export default function DashboardDeveloperCharts({
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
               dataKey="shortName"
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               interval={0}
               angle={-32}
               textAnchor="end"
@@ -1612,7 +1645,7 @@ export default function DashboardDeveloperCharts({
             />
             <YAxis
               yAxisId="tasks"
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               width={56}
               tickMargin={8}
               allowDecimals={false}
@@ -1627,7 +1660,7 @@ export default function DashboardDeveloperCharts({
             <YAxis
               yAxisId="hrs"
               orientation="right"
-              tick={CHART_TICK}
+              tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
               width={58}
               tickMargin={8}
               label={{
@@ -1678,7 +1711,7 @@ export default function DashboardDeveloperCharts({
 
   // ---- modo single sprint ----
 
-  const workloadPendingTint = alpha(singleSelectedSprintAccent, 0.42);
+  const workloadPendingTint = alpha(singleSelectedSprintAccent, isDark ? 0.35 : 0.42);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', minWidth: 0 }}>
@@ -1687,7 +1720,7 @@ export default function DashboardDeveloperCharts({
         description={CHART_DESC.single.workload}
         height={hWorkload}
         accent={singleSelectedSprintAccent}
-        tint={alpha(singleSelectedSprintAccent, 0.08)}
+        tint={alpha(singleSelectedSprintAccent, isDark ? 0.12 : 0.08)}
       >
         <BarChart
           layout="vertical"
@@ -1701,13 +1734,13 @@ export default function DashboardDeveloperCharts({
             allowDecimals={false}
             domain={singleWorkloadTaskAxis.domain}
             ticks={singleWorkloadTaskAxis.ticks}
-            tick={CHART_TICK}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={10}
             label={{
               value: 'Tasks',
               position: 'bottom',
               offset: 8,
-              fill: '#1A1A1A',
+              fill: isDark ? '#9A9A9A' : '#1A1A1A',
               ...CHART_AXIS_LABEL,
               fontSize: 15,
             }}
@@ -1716,13 +1749,13 @@ export default function DashboardDeveloperCharts({
             type="category"
             dataKey="name"
             width={168}
-            tick={{ ...CHART_TICK }}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={CHART_TOOLTIP_SX}
+            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
             formatter={(value) => [`${value} tasks`, '']}
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload;
@@ -1796,7 +1829,7 @@ export default function DashboardDeveloperCharts({
         description={CHART_DESC.single.hours}
         height={hHours}
         accent="#FB8C00"
-        tint="rgba(251, 140, 0, 0.1)"
+        tint={isDark ? 'rgba(251, 140, 0, 0.15)' : 'rgba(251, 140, 0, 0.1)'}
       >
         <BarChart
           layout="vertical"
@@ -1809,13 +1842,13 @@ export default function DashboardDeveloperCharts({
             type="number"
             domain={singleHoursAxis.domain}
             ticks={singleHoursAxis.ticks}
-            tick={CHART_TICK}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={10}
             label={{
               value: Y_AXIS_HOURS,
               position: 'bottom',
               offset: 8,
-              fill: '#1A1A1A',
+              fill: isDark ? '#9A9A9A' : '#1A1A1A',
               ...CHART_AXIS_LABEL,
               fontSize: 15,
             }}
@@ -1824,13 +1857,13 @@ export default function DashboardDeveloperCharts({
             type="category"
             dataKey="name"
             width={168}
-            tick={{ ...CHART_TICK }}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={CHART_TOOLTIP_SX}
+            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
             formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name]}
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload;
@@ -1887,13 +1920,13 @@ export default function DashboardDeveloperCharts({
         description={CHART_DESC.single.combo}
         height={hCombo}
         accent="#7E57C2"
-        tint="rgba(126, 87, 194, 0.08)"
+        tint={isDark ? 'rgba(126, 87, 194, 0.12)' : 'rgba(126, 87, 194, 0.08)'}
       >
         <ComposedChart data={forCombo} margin={{ top: 12, right: 22, left: 10, bottom: 82 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis
             dataKey="shortName"
-            tick={CHART_TICK}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             interval={0}
             angle={-32}
             textAnchor="end"
@@ -1902,7 +1935,7 @@ export default function DashboardDeveloperCharts({
           />
           <YAxis
             yAxisId="tasks"
-            tick={CHART_TICK}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             width={56}
             tickMargin={8}
             allowDecimals={false}
@@ -1917,7 +1950,7 @@ export default function DashboardDeveloperCharts({
           <YAxis
             yAxisId="hrs"
             orientation="right"
-            tick={CHART_TICK}
+            tick={{ ...CHART_TICK, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             width={58}
             tickMargin={8}
             label={{
@@ -1930,7 +1963,7 @@ export default function DashboardDeveloperCharts({
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={CHART_TOOLTIP_SX}
+            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
             formatter={(value, name) => {
               if (name === 'Tasks completed') return [`${value}`, 'Tasks completed'];
               if (name === Y_AXIS_HOURS) return [`${Number(value).toFixed(1)} h`, Y_AXIS_HOURS];

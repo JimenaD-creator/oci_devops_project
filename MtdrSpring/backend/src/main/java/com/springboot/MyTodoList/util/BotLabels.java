@@ -11,7 +11,9 @@ public enum BotLabels {
 	UNDO("UNDO"),
 	DELETE("DELETE"),
 	MY_TODO_LIST("MY TODO LIST"),
+	MY_PERFORMANCE("📊 My Performance"),
 	DASH("-");
+	
 
 	private String label;
 

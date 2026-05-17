@@ -11,6 +11,7 @@ import {
   Tooltip,
   Chip,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   Sparkles,
   AlertCircle,
@@ -102,6 +103,9 @@ export default function InsightCard({
   refreshToken = 0,
   onOpenTeam = null,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [status, setStatus] = useState('idle');
   const [insights, setInsights] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -271,9 +275,10 @@ export default function InsightCard({
         boxSizing: 'border-box',
         p: { xs: 2.5, sm: 3.5, md: 4.5 },
         borderRadius: 2,
-        border: '1px solid rgba(103,58,183,0.18)',
+        border: `1px solid ${isDark ? 'rgba(103,58,183,0.3)' : 'rgba(103,58,183,0.18)'}`,
         borderLeft: '4px solid #673AB7',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
+        bgcolor: 'background.paper',
       }}
     >
       {/* Header */}
@@ -288,7 +293,7 @@ export default function InsightCard({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Sparkles size={22} color="#673AB7" />
           <Typography
-            sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: '#1A1A1A' }}
+            sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: 'text.primary' }}
           >
             {sprintLabel}
           </Typography>
@@ -339,13 +344,13 @@ export default function InsightCard({
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
           {status === 'loaded' && (
             <Tooltip title="Regenerate">
-              <IconButton onClick={handleGenerate} sx={{ color: '#607D8B', p: 1 }}>
+              <IconButton onClick={handleGenerate} sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}>
                 <RefreshCw size={20} />
               </IconButton>
             </Tooltip>
           )}
           {status === 'loaded' && (
-            <IconButton onClick={() => setExpanded((v) => !v)} sx={{ color: '#607D8B', p: 1 }}>
+            <IconButton onClick={() => setExpanded((v) => !v)} sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}>
               {expanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
             </IconButton>
           )}
@@ -355,7 +360,7 @@ export default function InsightCard({
       {/* Idle / Error */}
       {(status === 'idle' || status === 'error') && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
-          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#607D8B' }}>
+          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
             {status === 'idle'
               ? 'No insights generated yet for this sprint.'
               : 'Could not generate insights for this sprint.'}
@@ -367,9 +372,9 @@ export default function InsightCard({
                 alignItems: 'flex-start',
                 gap: 1,
                 p: 1.25,
-                bgcolor: '#FFEBEE',
+                bgcolor: isDark ? '#4A1A1A' : '#FFEBEE',
                 borderRadius: 1.5,
-                border: '1px solid #EF9A9A',
+                border: `1px solid ${isDark ? '#7F3030' : '#EF9A9A'}`,
               }}
             >
               <AlertCircle size={14} color="#C62828" style={{ marginTop: 1, flexShrink: 0 }} />
@@ -409,7 +414,7 @@ export default function InsightCard({
       {(status === 'generating' || status === 'polling') && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.5 }}>
           <CircularProgress size={24} sx={{ color: '#C74634' }} />
-          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: '#607D8B' }}>
+          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
             {status === 'generating'
               ? 'Sending to Gemini…'
               : `Waiting for response${pollCount > 0 ? ` (${pollCount * 2}s elapsed)` : ''}…`}
@@ -434,22 +439,22 @@ export default function InsightCard({
                 label: 'Critical alerts',
                 value: alertCounts?.critical ?? 0,
                 color: '#B71C1C',
-                bg: '#FFEBEE',
-                border: '#FFCDD2',
+                bg: isDark ? '#4A1A1A' : '#FFEBEE',
+                border: isDark ? '#7F3030' : '#FFCDD2',
               },
               {
                 label: 'Warnings',
                 value: alertCounts?.warning ?? 0,
                 color: '#E65100',
-                bg: '#FFF3E0',
-                border: '#FFE0B2',
+                bg: isDark ? '#4A2A1A' : '#FFF3E0',
+                border: isDark ? '#7F4A1A' : '#FFE0B2',
               },
               {
                 label: 'Recommendations',
                 value: recommendationList.length,
                 color: '#2E7D32',
-                bg: '#E8F5E9',
-                border: '#C8E6C9',
+                bg: isDark ? '#1A4A2A' : '#E8F5E9',
+                border: isDark ? '#2E7D32' : '#C8E6C9',
               },
             ].map((s) => (
               <Box
@@ -469,7 +474,7 @@ export default function InsightCard({
                   {s.value}
                 </Typography>
                 <Typography
-                  sx={{ fontSize: '0.8rem', color: '#607D8B', fontWeight: 600, mt: 0.25 }}
+                  sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, mt: 0.25 }}
                 >
                   {s.label}
                 </Typography>
@@ -492,18 +497,18 @@ export default function InsightCard({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box
                 sx={{
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
                   borderRadius: 2,
                   overflow: 'hidden',
-                  bgcolor: '#FFFFFF',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
                   sx={{
                     px: 2,
                     py: 1.25,
-                    bgcolor: '#F3E5F5',
-                    borderBottom: '1px solid rgba(156,39,176,0.18)',
+                    bgcolor: isDark ? '#2A1A3D' : '#F3E5F5',
+                    borderBottom: `1px solid ${isDark ? 'rgba(156,39,176,0.3)' : 'rgba(156,39,176,0.18)'}`,
                   }}
                 >
                   <SectionHeading icon={BarChart2}>Automatic alerts</SectionHeading>
@@ -521,9 +526,9 @@ export default function InsightCard({
                         alignItems: 'center',
                         gap: 1.5,
                         p: { xs: 2, md: 2.5 },
-                        bgcolor: '#E8F5E9',
+                        bgcolor: isDark ? '#1A4A2A' : '#E8F5E9',
                         borderRadius: 1.5,
-                        border: '1px solid #A5D6A7',
+                        border: `1px solid ${isDark ? '#2E7D32' : '#A5D6A7'}`,
                       }}
                     >
                       <CheckCircle size={20} color="#2E7D32" />
@@ -543,14 +548,14 @@ export default function InsightCard({
 
               <Box
                 sx={{
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
                   borderRadius: 2,
                   overflow: 'hidden',
-                  bgcolor: '#FFFFFF',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
-                  sx={{ px: 2, py: 1.25, bgcolor: '#E3F2FD', borderBottom: '1px solid #BBDEFB' }}
+                  sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#1A3A5C' : '#E3F2FD', borderBottom: `1px solid ${isDark ? '#1A3A5C' : '#BBDEFB'}` }}
                 >
                   <SectionHeading icon={FileText}>Sprint summary</SectionHeading>
                 </Box>
@@ -578,7 +583,7 @@ export default function InsightCard({
                       <Typography
                         sx={{
                           fontSize: { xs: '0.95rem', md: '1rem' },
-                          color: '#78909C',
+                          color: 'text.secondary',
                           fontStyle: 'italic',
                         }}
                       >
@@ -594,14 +599,14 @@ export default function InsightCard({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box
                 sx={{
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
                   borderRadius: 2,
                   overflow: 'hidden',
-                  bgcolor: '#FFFFFF',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
-                  sx={{ px: 2, py: 1.25, bgcolor: '#E8F5E9', borderBottom: '1px solid #C8E6C9' }}
+                  sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', borderBottom: `1px solid ${isDark ? '#2E7D32' : '#C8E6C9'}` }}
                 >
                   <SectionHeading icon={Lightbulb}>Actionable recommendations</SectionHeading>
                 </Box>
@@ -612,7 +617,7 @@ export default function InsightCard({
                     <Typography
                       sx={{
                         fontSize: { xs: '0.95rem', md: '1rem' },
-                        color: '#78909C',
+                        color: 'text.secondary',
                         fontStyle: 'italic',
                       }}
                     >
@@ -625,14 +630,14 @@ export default function InsightCard({
               {showPredictionsSection && (
                 <Box
                   sx={{
-                    border: '1px solid rgba(0,0,0,0.08)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
                     borderRadius: 2,
                     overflow: 'hidden',
-                    bgcolor: '#FFFFFF',
+                    bgcolor: 'background.paper',
                   }}
                 >
                   <Box
-                    sx={{ px: 2, py: 1.25, bgcolor: '#FFF8E1', borderBottom: '1px solid #FFECB3' }}
+                    sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#4A3A1A' : '#FFF8E1', borderBottom: `1px solid ${isDark ? '#7F6A1A' : '#FFECB3'}` }}
                   >
                     <SectionHeading icon={Sparkles}>Predictions</SectionHeading>
                   </Box>
@@ -649,7 +654,7 @@ export default function InsightCard({
                       <Typography
                         sx={{
                           fontSize: { xs: '0.95rem', md: '1rem' },
-                          color: '#78909C',
+                          color: 'text.secondary',
                           fontStyle: 'italic',
                         }}
                       >
@@ -671,7 +676,7 @@ export default function InsightCard({
           {/* Link to Team (metrics & radars) */}
           {typeof onOpenTeam === 'function' && (
             <Box sx={{ mb: { xs: 2, md: 3 } }}>
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ mb: 2, borderColor: isDark ? '#2A2C32' : '#E0E0E0' }} />
               <Button
                 variant="contained"
                 size="medium"
@@ -687,17 +692,17 @@ export default function InsightCard({
                   borderRadius: 2,
                   bgcolor: '#E53935',
                   color: '#fff',
-                  boxShadow: '0 2px 8px rgba(229, 57, 53, 0.45)',
+                  boxShadow: isDark ? '0 2px 8px rgba(229, 57, 53, 0.35)' : '0 2px 8px rgba(229, 57, 53, 0.45)',
                   transition:
                     'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
                   '&:hover': {
                     bgcolor: '#C62828',
-                    boxShadow: '0 4px 14px rgba(198, 40, 40, 0.55)',
+                    boxShadow: isDark ? '0 4px 14px rgba(198, 40, 40, 0.45)' : '0 4px 14px rgba(198, 40, 40, 0.55)',
                     transform: 'translateY(-1px)',
                   },
                   '&:active': {
                     transform: 'translateY(0)',
-                    boxShadow: '0 2px 6px rgba(198, 40, 40, 0.5)',
+                    boxShadow: isDark ? '0 2px 6px rgba(198, 40, 40, 0.4)' : '0 2px 6px rgba(198, 40, 40, 0.5)',
                   },
                   '& .MuiButton-startIcon': { color: '#fff', mr: 1 },
                 }}

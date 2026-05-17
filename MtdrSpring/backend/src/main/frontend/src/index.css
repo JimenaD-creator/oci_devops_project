@@ -492,3 +492,79 @@ body.login-route #root {
   color: #ccc;
   font-size: 12px;
 }
+
+
+/* ══════════════════════════════════════════════
+   DARK MODE — Login page
+   Agregar al final de index.css
+   ══════════════════════════════════════════════ */
+
+[data-mui-color-scheme='dark'] body {
+  background-color: #111214 !important;
+}
+
+[data-mui-color-scheme='dark'] body.login-route,
+[data-mui-color-scheme='dark'] body.login-route #root {
+  background: #111214 !important;
+}
+
+[data-mui-color-scheme='dark'] .login-page {
+  background: #111214;
+}
+
+[data-mui-color-scheme='dark'] .login-card {
+  background: #1C1E22;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
+}
+
+[data-mui-color-scheme='dark'] .login-title {
+  color: #F0F0F0;
+}
+
+[data-mui-color-scheme='dark'] .login-subtitle {
+  color: #6A6A6A;
+}
+
+[data-mui-color-scheme='dark'] .login-label {
+  color: #9A9A9A;
+}
+
+[data-mui-color-scheme='dark'] .login-input-wrapper {
+  background: #26282E;
+  border-color: #2E3138;
+}
+
+[data-mui-color-scheme='dark'] .login-input-wrapper--focused {
+  border-color: #c0392b;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15);
+  background: #2E3038;
+}
+
+[data-mui-color-scheme='dark'] .login-input-icon {
+  color: #5A5A5A;
+}
+
+[data-mui-color-scheme='dark'] .login-input {
+  color: #F0F0F0;
+  background: transparent;
+}
+
+[data-mui-color-scheme='dark'] .login-input::placeholder {
+  color: #4A4A4A;
+}
+
+[data-mui-color-scheme='dark'] .login-eye-btn {
+  color: #5A5A5A;
+}
+
+[data-mui-color-scheme='dark'] .login-remember-text {
+  color: #7A7A7A;
+}
+
+[data-mui-color-scheme='dark'] .login-footer {
+  border-top-color: #2A2A2A;
+}
+
+[data-mui-color-scheme='dark'] .login-footer-text {
+  color: #4A4A4A;
+}

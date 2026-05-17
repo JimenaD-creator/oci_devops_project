@@ -11,6 +11,7 @@ import {
   Button,
   IconButton,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
@@ -22,6 +23,9 @@ import {
 } from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [goal, setGoal] = useState('');
@@ -107,6 +111,12 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
 
   const canSave = Boolean(startDate && dueDate && sprintId != null);
 
+  // Función para obtener el color RGBA dinámico según el tema
+  const getOracleRgba = (opacity) => {
+    if (isDark) return `rgba(199, 70, 52, ${opacity * 0.8})`;
+    return oracleRgba(opacity);
+  };
+
   return (
     <Dialog
       open={open}
@@ -118,10 +128,12 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
         elevation: 0,
         sx: {
           borderRadius: 3,
-          border: '1px solid #ECECEC',
+          border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
           borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
-          bgcolor: '#FFFFFF',
-          boxShadow: `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
+          bgcolor: 'background.paper',
+          boxShadow: isDark 
+            ? `0 16px 40px rgba(0,0,0,0.3)`
+            : `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
           overflow: 'hidden',
           maxWidth: { xs: 'calc(100% - 24px)', sm: 640 },
         },
@@ -137,8 +149,8 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             px: 2.5,
             pt: 2.5,
             pb: 2,
-            borderBottom: `1px solid ${oracleRgba(0.12)}`,
-            backgroundColor: '#FFFFFF',
+            borderBottom: `1px solid ${getOracleRgba(0.12)}`,
+            backgroundColor: 'background.paper',
           }}
         >
           <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
@@ -147,8 +159,8 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
                 width: 48,
                 height: 48,
                 borderRadius: 2,
-                bgcolor: oracleRgba(0.12),
-                border: `1px solid ${oracleRgba(0.2)}`,
+                bgcolor: getOracleRgba(0.12),
+                border: `1px solid ${getOracleRgba(0.2)}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -161,7 +173,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
               <Typography
                 sx={{
                   fontWeight: 800,
-                  color: '#1A1A1A',
+                  color: 'text.primary',
                   lineHeight: 1.25,
                   fontSize: '1.3rem',
                   letterSpacing: '-0.02em',
@@ -171,7 +183,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
               </Typography>
               <Typography
                 variant="caption"
-                sx={{ color: '#616161', fontWeight: 600, display: 'block', mt: 0.35 }}
+                sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mt: 0.35 }}
               >
                 Dates & goal
               </Typography>
@@ -182,7 +194,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             onClick={handleClose}
             disabled={saving}
             size="small"
-            sx={{ color: '#616161', '&:hover': { bgcolor: oracleRgba(0.08) } }}
+            sx={{ color: 'text.secondary', '&:hover': { bgcolor: getOracleRgba(0.08) } }}
           >
             <CloseIcon />
           </IconButton>
@@ -194,12 +206,12 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           px: 2.5,
           pt: 2.25,
           pb: 1.5,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'background.paper',
         }}
       >
         <Typography
           variant="body2"
-          sx={{ color: '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}
+          sx={{ color: isDark ? '#9A9A9A' : '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}
         >
           Update the sprint window and optional goal. KPI metrics stored in the database are kept
           as-is.
@@ -258,15 +270,15 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           px: 2.5,
           py: 2,
           gap: 1,
-          borderTop: `1px solid ${oracleRgba(0.12)}`,
-          backgroundColor: '#FFFFFF',
+          borderTop: `1px solid ${getOracleRgba(0.12)}`,
+          backgroundColor: 'background.paper',
           justifyContent: 'flex-end',
         }}
       >
         <Button
           onClick={handleClose}
           disabled={saving}
-          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600, px: 2 }}
+          sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600, px: 2 }}
         >
           Cancel
         </Button>
@@ -282,7 +294,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             px: 2.5,
             borderRadius: 2,
             '&:hover': { bgcolor: '#A83B2D' },
-            '&.Mui-disabled': { bgcolor: '#E0E0E0', color: '#9E9E9E' },
+            '&.Mui-disabled': { bgcolor: isDark ? '#2A2C32' : '#E0E0E0', color: isDark ? '#5A5A5A' : '#9E9E9E' },
           }}
         >
           {saving ? 'Saving…' : 'Save changes'}

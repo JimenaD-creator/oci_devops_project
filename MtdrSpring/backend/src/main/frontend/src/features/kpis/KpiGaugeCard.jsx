@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Box, Paper, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { KpiInfoCornerButton } from './KpiTooltipParts';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import KpiDonutChart from './KpiDonutChart';
@@ -44,7 +45,7 @@ function goalLabel(key) {
   return `Goal: ${g}%`;
 }
 
-function TrendIcon({ trend }) {
+function TrendIcon({ trend, isDark }) {
   const wrap = {
     display: 'flex',
     alignItems: 'center',
@@ -72,7 +73,7 @@ function TrendIcon({ trend }) {
   return <Box sx={{ width: 22, flexShrink: 0 }} aria-hidden />;
 }
 
-function CompareKpiRows({ def, orderedSprints }) {
+function CompareKpiRows({ def, orderedSprints, isDark }) {
   return (
     <Box
       sx={{
@@ -83,7 +84,7 @@ function CompareKpiRows({ def, orderedSprints }) {
         pt: 1.5,
         px: 0.25,
         pr: 1,
-        borderTop: '1px solid #F0F0F0',
+        borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
         overflow: 'visible',
         minWidth: 0,
       }}
@@ -125,7 +126,7 @@ function CompareKpiRows({ def, orderedSprints }) {
               sx={{
                 flex: 1,
                 minWidth: 0,
-                color: '#555',
+                color: isDark ? '#9A9A9A' : '#555',
                 fontWeight: 600,
                 fontSize: '0.8rem',
                 overflow: 'hidden',
@@ -139,7 +140,7 @@ function CompareKpiRows({ def, orderedSprints }) {
               variant="body2"
               sx={{
                 fontWeight: 800,
-                color: '#1A1A1A',
+                color: 'text.primary',
                 fontSize: '0.9rem',
                 minWidth: 36,
                 flexShrink: 0,
@@ -148,7 +149,7 @@ function CompareKpiRows({ def, orderedSprints }) {
             >
               {display}
             </Typography>
-            <TrendIcon trend={trend} />
+            <TrendIcon trend={trend} isDark={isDark} />
           </Box>
         );
       })}
@@ -163,6 +164,9 @@ function CompareKpiRows({ def, orderedSprints }) {
  * @param {object[]} ordered — sprints sorted by id for compare rows
  */
 export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordered }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const { avg, chartPct } = useMemo(
     () => aggregateGaugeScore(def, selectedSprints, compareMode),
     [def, selectedSprints, compareMode],
@@ -184,8 +188,9 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
         position: 'relative',
         p: { xs: 2, sm: 2.25 },
         borderRadius: 3,
-        border: '1px solid #EFEFEF',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+        boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
+        bgcolor: 'background.paper',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -216,7 +221,7 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
               width: 36,
               height: 36,
               borderRadius: 2,
-              bgcolor: 'rgba(21, 101, 192, 0.1)',
+              bgcolor: isDark ? 'rgba(21, 101, 192, 0.15)' : 'rgba(21, 101, 192, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -227,7 +232,7 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
           </Box>
           <Typography
             variant="subtitle1"
-            sx={{ fontWeight: 700, color: '#1A1A1A', lineHeight: 1.25 }}
+            sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.25 }}
           >
             {def.title}
           </Typography>
@@ -259,7 +264,7 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
             textAlign: { xs: 'center', sm: 'left' },
           }}
         >
-          <Typography variant="body2" sx={{ color: '#888', fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}>
             {goalLabel(def.key)}
           </Typography>
           <Box
@@ -287,7 +292,7 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
         </Box>
       </Box>
 
-      {showCompareRows ? <CompareKpiRows def={def} orderedSprints={ordered} /> : null}
+      {showCompareRows ? <CompareKpiRows def={def} orderedSprints={ordered} isDark={isDark} /> : null}
     </Paper>
   );
 }
