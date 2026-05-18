@@ -108,7 +108,7 @@ function App() {
     if (user && user.role === 'DEVELOPER') {
       logout();
       localStorage.clear();
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { message: 'Developers cannot use the web app. Use Telegram.' } });
     }
   }, [user, navigate]);
 

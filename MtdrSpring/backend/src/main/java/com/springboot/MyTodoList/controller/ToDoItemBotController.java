@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.service.TelegramUserMappingService;
 import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.service.UserTaskService;
 import com.springboot.MyTodoList.util.BotActions;
+import com.springboot.MyTodoList.util.BotHelper;
 import com.springboot.MyTodoList.util.BotStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,74 +75,103 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
     public void consume(Update update) {
         if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
-        String messageTextFromTelegram = update.getMessage().getText();
+        String rawText = update.getMessage().getText();
+        String messageTextFromTelegram = normalizeIncomingText(rawText);
         long chatId = update.getMessage().getChatId();
 
         logger.info("=== BOT MESSAGE RECEIVED ===");
-        logger.info("ChatId: {}, Message: '{}'", chatId, messageTextFromTelegram);
+        logger.info("ChatId: {}, Raw: '{}', Normalized: '{}'", chatId, rawText, messageTextFromTelegram);
         logger.info("Current State: {}", stateManager.getState(chatId));
 
-        BotActions actions = new BotActions(
-                telegramClient,
-                toDoItemService,
-                deepSeekService,
-                stateManager,
-                telegramUserMappingService,
-                userTaskService,
-                sprintService,
-                userService,
-                geminiService
-        );
-        actions.setRequestText(messageTextFromTelegram);
-        actions.setChatId(chatId);
+        try {
+            BotActions actions = new BotActions(
+                    telegramClient,
+                    toDoItemService,
+                    deepSeekService,
+                    stateManager,
+                    telegramUserMappingService,
+                    userTaskService,
+                    sprintService,
+                    userService,
+                    geminiService
+            );
+            actions.setRequestText(messageTextFromTelegram);
+            actions.setChatId(chatId);
 
-        if (actions.getTodoService() == null) {
-            logger.info("todosvc error");
-            actions.setTodoService(toDoItemService);
+            if (actions.getTodoService() == null) {
+                logger.info("todosvc error");
+                actions.setTodoService(toDoItemService);
+            }
+
+            actions.fnStart();
+            actions.fnSessionLogin();
+            actions.fnLogOut();
+            actions.fnMyPerformance();
+            actions.fnSelectMyPerformanceScope();
+            actions.fnListAll();
+            actions.fnSelectSprint();
+            actions.fnSelectUserInSprint();
+            actions.fnVerifyCredentialsPhoneEmail();
+            actions.fnVerifyCredentialsPassword();
+            actions.fnViewSprintTasks();
+            actions.fnSelectTaskStatus();
+            actions.fnDone();
+            actions.fnUndo();
+            actions.fnDelete();
+            actions.fnAddItem();
+            actions.fnHide();
+            actions.fnLLM();
+            actions.fnElse();
+
+            boolean handled = actions.wasHandled();
+            logger.info("=== BOT HANDLERS COMPLETE (handled={}) ===", handled);
+            if (!handled) {
+                logger.warn("No handler matched message '{}' for chatId={}", messageTextFromTelegram, chatId);
+                BotHelper.sendMessageToTelegram(
+                        chatId,
+                        "I did not understand that message. Tap /start or send /start to sign in.",
+                        telegramClient,
+                        null);
+            }
+        } catch (Exception e) {
+            logger.error("Bot handler error for chatId={}: {}", chatId, e.getMessage(), e);
+            BotHelper.sendMessageToTelegram(
+                    chatId,
+                    "Something went wrong. Please try /start again.",
+                    telegramClient,
+                    null);
         }
-
-        // ========================================================================
-        // ORDEN CORRECTO DE HANDLERS
-        // ========================================================================
-        
-        // 1. Comandos de autenticación y navegación principal
-        actions.fnStart();
-        actions.fnSessionLogin();
-        actions.fnLogOut();
-        
-        // 2. MY PERFORMANCE (DEBE IR ANTES que fnElse y fnAddItem)
-        actions.fnMyPerformance();
-        actions.fnSelectMyPerformanceScope();
-        
-        // 3. Sprint y tareas
-        actions.fnListAll();
-        actions.fnSelectSprint();
-        actions.fnSelectUserInSprint();
-        actions.fnVerifyCredentialsPhoneEmail();
-        actions.fnVerifyCredentialsPassword();
-        actions.fnViewSprintTasks();
-        actions.fnSelectTaskStatus();
-        
-        // 4. Acciones de tareas individuales
-        actions.fnDone();
-        actions.fnUndo();
-        actions.fnDelete();
-        actions.fnAddItem();
-        
-        // 5. Otros comandos
-        actions.fnHide();
-        actions.fnLLM();
-        
-        // 6. AL FINAL: fnElse (captura texto libre para crear nuevas tareas)
-        //    Este handler debe ser el ÚLTIMO porque cualquier texto no reconocido
-        //    por los handlers anteriores creará una nueva tarea.
-        actions.fnElse();
-
-        logger.info("=== BOT HANDLERS COMPLETE ===");
     }
 
     @AfterBotRegistration
     public void afterRegistration(BotSession botSession) {
-        System.out.println("Registered bot running state is: " + botSession.isRunning());
+        String token = botProps.getToken();
+        boolean tokenConfigured = token != null && !token.isBlank();
+        logger.info(
+                "Telegram long-polling session running: {}, tokenConfigured: {}, botUsername: {}",
+                botSession.isRunning(),
+                tokenConfigured,
+                botProps.getUsername());
+        if (!tokenConfigured) {
+            logger.error("TELEGRAM_BOT_TOKEN is empty. Set telegram.bot.token or env TELEGRAM_BOT_TOKEN.");
+        }
+    }
+
+    /** Strips {@code @BotName} from commands (e.g. {@code /start@MyBot} → {@code /start}). */
+    private static String normalizeIncomingText(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.startsWith("/")) {
+            return trimmed;
+        }
+        int spaceIdx = trimmed.indexOf(' ');
+        String commandPart = spaceIdx >= 0 ? trimmed.substring(0, spaceIdx) : trimmed;
+        int atIdx = commandPart.indexOf('@');
+        if (atIdx > 0) {
+            commandPart = commandPart.substring(0, atIdx);
+        }
+        return spaceIdx >= 0 ? commandPart + trimmed.substring(spaceIdx) : commandPart;
     }
 }

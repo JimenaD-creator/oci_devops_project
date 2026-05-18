@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -42,6 +42,7 @@ import {
   isUserTaskAssigneeComplete,
   normalizeTaskStatus,
   pageFormFieldOutline,
+  taskEntityId,
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
@@ -66,15 +67,23 @@ export default function TasksPage({ projectId }) {
   const [multiDoneTaskId, setMultiDoneTaskId] = useState(null);
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
+  const recentlyDeletedTaskIdsRef = useRef(new Set());
 
   const loadData = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
     if (!silent) setIsLoading(true);
     try {
       const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
-      setRawTasks(tasksData);
+      const deleted = recentlyDeletedTaskIdsRef.current;
+      const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
+        (t) => !deleted.has(taskEntityId(t)),
+      );
+      const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
+        (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+      );
+      setRawTasks(visibleTasks);
       setSprints(sprintsData);
-      setUserTasks(userTasksData);
+      setUserTasks(visibleUserTasks);
     } catch (error) {
       console.error('Error loading tasks data:', error);
       setRawTasks([]);
@@ -210,14 +219,37 @@ export default function TasksPage({ projectId }) {
 
   const closeTaskDetailDialog = useCallback(() => { setTaskDetailOpen(false); setTaskForDetailDialog(null); }, []);
 
+  const removeTaskFromState = useCallback((taskId) => {
+    const tid = String(taskId);
+    recentlyDeletedTaskIdsRef.current.add(tid);
+    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+    setRawTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
+    setUserTasks((prev) =>
+      prev.filter((ut) => {
+        const utTid = userTaskRowTaskId(ut);
+        return !Number.isFinite(utTid) || String(utTid) !== tid;
+      }),
+    );
+    const tidNum = Number(taskId);
+    if (Number(multiDoneTaskId) === tidNum) setMultiDoneTaskId(null);
+    if (taskForDetailDialog && taskEntityId(taskForDetailDialog) === tid) {
+      closeTaskDetailDialog();
+    }
+  }, [multiDoneTaskId, taskForDetailDialog, closeTaskDetailDialog]);
+
   const handleDeleteTask = async (taskId) => {
-    if (!window.confirm('Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.')) return;
+    if (!window.confirm(DELETE_TASK_CONFIRM_MESSAGE)) return;
+    const tid = Number(taskId);
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, { method: 'DELETE' });
-      if (!res.ok) { console.error('Delete task failed:', res.status); return; }
-      if (multiDoneTaskId === taskId) setMultiDoneTaskId(null);
-      await loadData();
-    } catch (e) { console.error('Error deleting task:', e); }
+      const res = await fetch(`${API_BASE}/api/tasks/${tid}`, { method: 'DELETE' });
+      if (!res.ok) {
+        console.error('Delete task failed:', res.status);
+        return;
+      }
+      removeTaskFromState(tid);
+    } catch (e) {
+      console.error('Error deleting task:', e);
+    }
   };
 
   useEffect(() => {
@@ -491,12 +523,10 @@ export default function TasksPage({ projectId }) {
             setUserTasks((prev) => prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)));
           }
           closeTaskDetailDialog();
-          void loadData({ silent: true });
         }}
         onDeleted={(taskId) => {
-          setRawTasks((prev) => prev.filter((t) => Number(t.id) !== Number(taskId)));
+          removeTaskFromState(taskId);
           closeTaskDetailDialog();
-          loadData();
         }}
       />
     </Box>

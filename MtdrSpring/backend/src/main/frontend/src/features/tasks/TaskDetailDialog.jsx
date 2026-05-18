@@ -621,9 +621,12 @@ export function TaskDetailDialog({
     try {
       const res = await deleteTaskById(task.id);
       if (res.ok) {
-        onDeleted?.(task.id);
+        const tid = Number(task.id);
+        onDeleted?.(tid);
         onClose();
-      } else setError('Could not delete task.');
+      } else {
+        setError('Could not delete task.');
+      }
     } catch {
       setError('Connection error.');
     } finally {

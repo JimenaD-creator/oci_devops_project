@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -23,6 +23,7 @@ import {
   deriveTaskStatusFromAssignments,
   isUserTaskAssigneeComplete,
   normalizeTaskStatus,
+  taskEntityId,
   userTaskRowStatus,
   userTaskRowTaskId,
 } from '../tasks/utils/taskUtils';
@@ -72,6 +73,8 @@ export default function SprintsPage({ projectId }) {
   );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
+  /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
+  const recentlyDeletedTaskIdsRef = useRef(new Set());
 
   useEffect(() => {
     if (effectiveProjectIdNum != null) {
@@ -136,10 +139,17 @@ export default function SprintsPage({ projectId }) {
       try {
         const { sprintsList, tasksList, userTasksList } =
           await fetchSprintsTasksAndAssignments(projectId);
-        const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+        const deleted = recentlyDeletedTaskIdsRef.current;
+        const visibleTasks = (Array.isArray(tasksList) ? tasksList : []).filter(
+          (t) => !deleted.has(taskEntityId(t)),
+        );
+        const visibleUserTasks = (Array.isArray(userTasksList) ? userTasksList : []).filter(
+          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+        );
+        const sorted = sortSprintsForDisplay(sprintsList, visibleTasks);
         setSprints(sorted);
-        setTasks(tasksList);
-        setUserTasks(userTasksList);
+        setTasks(visibleTasks);
+        setUserTasks(visibleUserTasks);
         setSelectedSprint((prev) => {
           if (prev) {
             const stillThere = sorted.find((s) => s.id === prev.id);
@@ -158,13 +168,24 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
-  useEffect(() => {
-    const onFocus = () => {
-      void loadData({ silent: true });
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [loadData]);
+  const handleTaskDeleted = useCallback((taskId) => {
+    const tid = String(taskId);
+    recentlyDeletedTaskIdsRef.current.add(tid);
+    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+
+    setTasks((prev) => {
+      const next = prev.filter((t) => taskEntityId(t) !== tid);
+      setSprints((sp) => sortSprintsForDisplay(sp, next));
+      return next;
+    });
+    setUserTasks((prev) =>
+      prev.filter((ut) => {
+        const utTid = userTaskRowTaskId(ut);
+        return !Number.isFinite(utTid) || String(utTid) !== tid;
+      }),
+    );
+    setSelectedTaskForDialog(null);
+  }, []);
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -786,14 +807,7 @@ export default function SprintsPage({ projectId }) {
           setSelectedTaskForDialog(null);
           void loadData({ silent: true });
         }}
-        onDeleted={(taskId) => {
-          setTasks((prev) => {
-            const next = prev.filter((x) => x.id !== taskId);
-            setSprints((sp) => sortSprintsForDisplay(sp, next));
-            return next;
-          });
-          setSelectedTaskForDialog(null);
-        }}
+        onDeleted={handleTaskDeleted}
       />
     </Box>
   );

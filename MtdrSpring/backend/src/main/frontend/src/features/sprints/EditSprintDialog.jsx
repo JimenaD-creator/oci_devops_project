@@ -15,8 +15,8 @@ import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
-import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import { sprintKpiNumber, toInputDate } from './utils/sprintUtils';
+import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/sprintConstants';
+import { sprintKpiNumber, toInputDate, oracleRgba } from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const theme = useTheme();
@@ -106,7 +106,23 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
 
   const canSave = Boolean(startDate && dueDate && sprintId != null);
 
-  // Función para obtener el color RGBA dinámico según el tema
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      fontSize: 15,
+      bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#C74126',
+        boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
+      },
+    },
+    '& .MuiInputLabel-root': { fontSize: 15, color: isDark ? '#9A9A9A' : undefined },
+    '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
+    '& .MuiFormHelperText-root': { fontSize: 13, color: isDark ? '#9A9A9A' : undefined },
+  };
+
   const getOracleRgba = (opacity) => {
     if (isDark) return `rgba(199, 70, 52, ${opacity * 0.8})`;
     return oracleRgba(opacity);
