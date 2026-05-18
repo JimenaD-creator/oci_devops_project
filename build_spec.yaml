@@ -7,6 +7,7 @@ env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm-java22
     DOCKER_REGISTRY: docker.io/dockerdiegojules
+    DOCKER_USERNAME: dockerdiegojules
   vaultVariables:
     DOCKERHUB_TOKEN: ocid1.vaultsecret.oc1.mx-queretaro-1.amaaaaaatmkmvoaafaoqzlq25wbpuxfo4xkelyeg7t3fag35zprcgr5tzmkq
   exportedVariables:
@@ -37,7 +38,7 @@ steps:
   - type: Command
     name: "Docker Hub Login"
     command: |
-      echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+      echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "dockerdiegojules" --password-stdin
 
   - type: Command
     name: "Build"
