@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Card, CardContent, Chip, LinearProgress } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -55,9 +55,9 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
             : '0 4px 16px rgba(0,0,0,0.08)', 
           transform: 'translateY(-1px)' 
         },
-        bgcolor: isSelected 
-          ? statusCfg.color 
-          : (isDark ? '#1C1E22' : 'white'),
+        bgcolor: isSelected
+  ? (isDark ? alpha(outlineColor, 0.12) : statusCfg.color)
+  : (isDark ? '#1C1E22' : 'white'),
       }}
     >
       <CardContent sx={{ p: 3 }}>
