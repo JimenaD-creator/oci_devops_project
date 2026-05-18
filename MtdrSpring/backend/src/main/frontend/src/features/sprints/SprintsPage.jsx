@@ -19,7 +19,13 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import TaskTable from '../tasks/TaskTable';
-import { isUserTaskAssigneeComplete, userTaskRowTaskId } from '../tasks/utils/taskUtils';
+import {
+  deriveTaskStatusFromAssignments,
+  isUserTaskAssigneeComplete,
+  normalizeTaskStatus,
+  userTaskRowStatus,
+  userTaskRowTaskId,
+} from '../tasks/utils/taskUtils';
 import {
   EditSprintDialog,
   NewSprintDialog,
@@ -27,6 +33,7 @@ import {
   SprintCard,
   TaskDetailDialog,
   API_BASE,
+  deleteSprintConfirmMessage,
   EASE_OUT,
   ORACLE_RED,
   ORACLE_RED_ACTION,
@@ -151,17 +158,21 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
+  useEffect(() => {
+    const onFocus = () => {
+      void loadData({ silent: true });
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadData]);
+
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
     setSelectedSprint(newSprint);
   };
   const handleDeleteSprint = async () => {
     if (!selectedSprint?.id) return;
-    if (
-      !window.confirm(
-        `Delete Sprint ${selectedSprint.id} permanently? This action cannot be undone.`,
-      )
-    ) {
+    if (!window.confirm(deleteSprintConfirmMessage(selectedSprint.id))) {
       return;
     }
     try {
@@ -192,67 +203,63 @@ export default function SprintsPage({ projectId }) {
   }, [userTasks]);
   const selectedSprintRows = useMemo(
     () =>
-      selectedSprintTasks.map((task) => ({
-        ...(function deriveTaskRowFields() {
-          const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
-          const resolveUtName = (ut) => {
-            const direct = String(
-              ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? '',
-            ).trim();
-            if (direct) return direct;
-            const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
-            if (Number.isFinite(uid)) {
-              const known = (projectDevelopers || []).find((u) => developerNumericId(u) === uid);
-              if (known?.name) return String(known.name).trim();
-              return `User ${uid}`;
-            }
-            return null;
-          };
-          const names = [
-            ...new Set(taskAssignments.map((ut) => resolveUtName(ut)).filter(Boolean)),
-          ];
-          const workedHours = taskAssignments.reduce((sum, ut) => {
-            const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
-            return sum + (Number.isFinite(n) ? n : 0);
-          }, 0);
-          const assigneeProgress =
-            taskAssignments.length > 0
-              ? [...taskAssignments]
-                  .map((ut) => {
-                    const uid = Number(
-                      ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId,
-                    );
-                    const name =
-                      resolveUtName(ut) || (Number.isFinite(uid) ? `User ${uid}` : 'Unknown');
-                    return {
-                      userId: Number.isFinite(uid) ? uid : null,
-                      name,
-                      completed: isUserTaskAssigneeComplete(ut),
-                    };
-                  })
-                  .sort((a, b) =>
-                    String(a.name).localeCompare(String(b.name), undefined, {
-                      sensitivity: 'base',
-                    }),
-                  )
-              : undefined;
-          return {
-            developers: names,
-            developer: names[0] ?? null,
-            actualHours: workedHours > 0 ? workedHours : null,
-            assigneeProgress,
-          };
-        })(),
-        id: task.id,
-        description: taskDisplayName(task),
-        priority: task.priority ?? null,
-        assignedHours: task.assignedHours ?? null,
-        done: task.status === 'DONE',
-        status: task.status,
-        statusRaw: task.status,
-        dueDate: task.dueDate,
-        completedAt: task.finishDate,
-      })),
+      selectedSprintTasks.map((task) => {
+        const taskAssignments = assignmentsByTaskId[Number(task.id)] || [];
+        const resolveUtName = (ut) => {
+          const direct = String(
+            ut?.user?.name ?? ut?.user?.NAME ?? ut?.user?.fullName ?? ut?.user?.displayName ?? '',
+          ).trim();
+          if (direct) return direct;
+          const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
+          if (Number.isFinite(uid)) {
+            const known = (projectDevelopers || []).find((u) => developerNumericId(u) === uid);
+            if (known?.name) return String(known.name).trim();
+            return `User ${uid}`;
+          }
+          return null;
+        };
+        const names = [...new Set(taskAssignments.map((ut) => resolveUtName(ut)).filter(Boolean))];
+        const workedHours = taskAssignments.reduce((sum, ut) => {
+          const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
+          return sum + (Number.isFinite(n) ? n : 0);
+        }, 0);
+        const assigneeProgress =
+          taskAssignments.length > 0
+            ? [...taskAssignments]
+                .map((ut) => {
+                  const uid = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
+                  const name =
+                    resolveUtName(ut) || (Number.isFinite(uid) ? `User ${uid}` : 'Unknown');
+                  return {
+                    userId: Number.isFinite(uid) ? uid : null,
+                    name,
+                    status: normalizeTaskStatus(userTaskRowStatus(ut)),
+                    completed: isUserTaskAssigneeComplete(ut),
+                  };
+                })
+                .sort((a, b) =>
+                  String(a.name).localeCompare(String(b.name), undefined, {
+                    sensitivity: 'base',
+                  }),
+                )
+            : undefined;
+        const derivedStatus = deriveTaskStatusFromAssignments(task.status, taskAssignments);
+        return {
+          id: task.id,
+          description: taskDisplayName(task),
+          priority: task.priority ?? null,
+          assignedHours: task.assignedHours ?? null,
+          done: derivedStatus === 'DONE',
+          status: derivedStatus,
+          statusRaw: derivedStatus,
+          dueDate: task.dueDate,
+          completedAt: task.finishDate,
+          developers: names,
+          developer: names[0] ?? null,
+          actualHours: workedHours > 0 ? workedHours : null,
+          assigneeProgress,
+        };
+      }),
     [selectedSprintTasks, assignmentsByTaskId, projectDevelopers],
   );
   const developerFilterOptions = useMemo(() => {
@@ -298,10 +305,14 @@ export default function SprintsPage({ projectId }) {
         const want = String(statusFilter).toUpperCase();
         const rowStatus = String(row.status || '').toUpperCase();
         let statusOk = rowStatus === want;
-        if (!statusOk && want === 'DONE' && developerFilter !== 'all') {
+        if (!statusOk && developerFilter !== 'all') {
           const f = String(developerFilter).trim();
           const mine = (row.assigneeProgress || []).find((p) => String(p.name).trim() === f);
-          statusOk = Boolean(mine?.completed);
+          if (mine?.status) {
+            statusOk = normalizeTaskStatus(mine.status) === want;
+          } else if (want === 'DONE') {
+            statusOk = Boolean(mine?.completed);
+          }
         }
         if (!statusOk) return false;
       }

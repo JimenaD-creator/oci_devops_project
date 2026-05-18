@@ -54,18 +54,12 @@ import {
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
-import { isUserTaskAssigneeComplete } from './utils/taskUtils';
+import { normalizeTaskStatus, userTaskRowStatus } from './utils/taskUtils';
 import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
 } from './utils/assigneeIdentityPalette';
-
-// ── Escala tipografica ────────────────────────────────────────────────────────
-// header title    15px 600 | header subtitle 13px 400
-// section labels  11px 600 uppercase
-// body/fields     13px 400 | field labels 13px
-// chips           12px 600 | captions/errors 12px 600
-// ─────────────────────────────────────────────────────────────────────────────
+import { DELETE_TASK_CONFIRM_MESSAGE } from './constants/taskConstants';
 
 const TYPE_OPTIONS = [
   {
@@ -621,12 +615,7 @@ export function TaskDetailDialog({
 
   const handleDeleteTask = async () => {
     if (!task?.id) return;
-    if (
-      !window.confirm(
-        'Delete this task permanently? Assignments and user-task rows will be removed. This cannot be undone.',
-      )
-    )
-      return;
+    if (!window.confirm(DELETE_TASK_CONFIRM_MESSAGE)) return;
     setSaving(true);
     setError('');
     try {
@@ -976,17 +965,20 @@ export function TaskDetailDialog({
                     .map((ut) => {
                       const uid = userIdFromUserTaskRow(ut);
                       const name = displayNameForAssignee(uid);
-                      const done = isUserTaskAssigneeComplete(ut);
                       const hrs =
                         Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0) || 0;
-                      return { ut, uid, name, done, hrs };
+                      return { ut, uid, name, hrs };
                     })
                     .sort((a, b) =>
                       String(a.name).localeCompare(String(b.name), undefined, {
                         sensitivity: 'base',
                       }),
                     )
-                    .map(({ ut, uid, name, done, hrs }) => {
+                    .map(({ ut, uid, name, hrs }) => {
+                      const assigneeStatusKey = normalizeTaskStatus(userTaskRowStatus(ut));
+                      const statusChip =
+                        STATUS_OPTIONS.find((o) => o.value === assigneeStatusKey) ??
+                        STATUS_OPTIONS[0];
                       const pal =
                         ASSIGNEE_IDENTITY_PALETTE[
                           assigneeIdentityPaletteIndex({ userId: uid, name })
@@ -1040,13 +1032,13 @@ export function TaskDetailDialog({
                                 py: 0.6,
                                 fontSize: 11,
                                 fontWeight: 600,
-                                letterSpacing: '0.05em',
-                                textTransform: 'uppercase',
-                                color: '#fff',
-                                bgcolor: done ? '#2E7D32' : '#E65100',
+                                letterSpacing: '0.04em',
+                                color: statusChip.color,
+                                bgcolor: statusChip.bg,
+                                borderLeft: `3px solid ${statusChip.dot}`,
                               }}
                             >
-                              {done ? 'Done' : 'Pending'}
+                              {statusChip.label}
                             </Box>
                           </Box>
                           {hrs > 0 && (

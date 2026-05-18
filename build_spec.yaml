@@ -7,6 +7,8 @@ env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm-java22
     DOCKER_REGISTRY: docker.io/dockerdiegojules
+  exportedVariables:
+    - IMAGE_VERSION
 
 steps:
   - type: Command
@@ -34,7 +36,8 @@ steps:
     name: "Build"
     command: |
       cd MtdrSpring
+      export IMAGE_VERSION=$(git rev-parse --short HEAD)
+      echo "IMAGE_VERSION=[$IMAGE_VERSION]"
       source env.sh
-      echo "DOCKER_REGISTRY=[$DOCKER_REGISTRY]"
       cd backend
       bash build.sh

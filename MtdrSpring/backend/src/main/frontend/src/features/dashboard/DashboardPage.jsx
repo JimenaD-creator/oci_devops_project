@@ -110,8 +110,12 @@ export default function DashboardPage({ projectId: propProjectId }) {
     handleRefresh();
   }, [projectId, loadProjectInfo, handleRefresh]);
 
-  useEffect(() => { setSeenBlockedKeysCsv(''); }, [projectId]);
-  useEffect(() => { if (!projectId) setSprintsLoading(false); }, [projectId]);
+  useEffect(() => {
+    setSeenBlockedKeysCsv('');
+  }, [projectId]);
+  useEffect(() => {
+    if (!projectId) setSprintsLoading(false);
+  }, [projectId]);
 
   const normalizedSelectedIds = useMemo(() => {
     if (!allSprints.length) return [];
@@ -131,7 +135,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
     const uniqueRaw = [...new Set(raw)];
     const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw.slice().sort((a, b) => a - b).join(',');
+    const uniqSorted = uniqueRaw
+      .slice()
+      .sort((a, b) => a - b)
+      .join(',');
     const hasDuplicateEntries = raw.length !== uniqueRaw.length;
     const needsPrune = uniqSorted !== normSorted;
     if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
@@ -139,7 +146,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
   const selectedSprints = useMemo(() => {
     const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
-    return normalizedSelectedIds.map((id) => byId.get(id)).filter(Boolean)
+    return normalizedSelectedIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
       .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
   }, [normalizedSelectedIds, allSprints]);
 
@@ -147,10 +156,12 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const primarySprint = selectedSprints[0];
 
   const { taskStatusDistribution, taskStatusTotal } = useMemo(
-    () => mergeTaskStatusAcrossSprints(selectedSprints), [selectedSprints],
+    () => mergeTaskStatusAcrossSprints(selectedSprints),
+    [selectedSprints],
   );
   const selectionMetrics = useMemo(
-    () => aggregateSelectionMetrics(selectedSprints), [selectedSprints],
+    () => aggregateSelectionMetrics(selectedSprints),
+    [selectedSprints],
   );
 
   const averageTrends = useMemo(() => {
@@ -198,7 +209,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
     if (compareMode) {
       return selectedSprints
         .map((s) => (s.dateRangeEn || s.dateRange || '').trim())
-        .filter(Boolean).join(' · ');
+        .filter(Boolean)
+        .join(' · ');
     }
     return primarySprint.dateRangeEn || primarySprint.dateRange || '';
   }, [primarySprint, compareMode, selectedSprints]);
@@ -209,7 +221,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
   );
 
   const blockedNotificationItems = useMemo(
-    () => buildBlockedTaskNotificationItems(selectedSprints), [selectedSprints],
+    () => buildBlockedTaskNotificationItems(selectedSprints),
+    [selectedSprints],
   );
   const hasBlockedNotifications = blockedNotificationItems.length > 0;
   const blockedNotifOpen = Boolean(blockedNotifAnchor);
@@ -281,7 +294,17 @@ export default function DashboardPage({ projectId: propProjectId }) {
   }
 
   return (
-    <Box sx={{ maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, width: '100%', mx: 'auto', pt: 0, px: 2, pb: 2, boxSizing: 'border-box' }}>
+    <Box
+      sx={{
+        maxWidth: DASHBOARD_CONTENT_MAX_WIDTH,
+        width: '100%',
+        mx: 'auto',
+        pt: 0,
+        px: 2,
+        pb: 2,
+        boxSizing: 'border-box',
+      }}
+    >
       <ScrollReveal>
         <Paper elevation={0} sx={{ p: 2.5, mb: 1.5, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1.5 }}>
@@ -327,7 +350,11 @@ export default function DashboardPage({ projectId: propProjectId }) {
               <IconButton
                 size="large"
                 onClick={(e) => setBlockedNotifAnchor(e.currentTarget)}
-                aria-label={hasUnreadBlockedNotifications ? 'Task block notifications (unread)' : 'Task block notifications'}
+                aria-label={
+                  hasUnreadBlockedNotifications
+                    ? 'Task block notifications (unread)'
+                    : 'Task block notifications'
+                }
                 aria-haspopup="true"
                 aria-expanded={blockedNotifOpen}
                 sx={{
@@ -434,7 +461,12 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 ) : (
                   blockedNotificationItems.map((n, idx) => {
                     const isUnread = !seenBlockedKeySet.has(n.key);
-                    const initials = n.developerName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                    const initials = n.developerName
+                      .split(' ')
+                      .map((w) => w[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase();
                     const avatarStyle = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
 
                     return (
@@ -452,14 +484,30 @@ export default function DashboardPage({ projectId: propProjectId }) {
                         }}
                       >
                         {/* Top row: avatar + name + time */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            mb: 0.75,
+                          }}
+                        >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{
-                              width: 28, height: 28, borderRadius: '8px',
-                              bgcolor: avatarStyle.bg, color: avatarStyle.color,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 11, fontWeight: 600, flexShrink: 0,
-                            }}>
+                            <Box
+                              sx={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '8px',
+                                bgcolor: avatarStyle.bg,
+                                color: avatarStyle.color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                flexShrink: 0,
+                              }}
+                            >
                               {initials}
                             </Box>
                             <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
@@ -473,7 +521,15 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
                         {/* Task ID */}
                         {n.taskId && (
-                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#C74126', mb: '2px', letterSpacing: '0.02em' }}>
+                          <Typography
+                            sx={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#C74126',
+                              mb: '2px',
+                              letterSpacing: '0.02em',
+                            }}
+                          >
                             {n.taskId}
                           </Typography>
                         )}
@@ -486,29 +542,59 @@ export default function DashboardPage({ projectId: propProjectId }) {
                         {/* Block card */}
                         <Box sx={{ borderRadius: '10px', overflow: 'hidden', border: `0.5px solid ${isDark ? '#7F3030' : '#F09595'}` }}>
                           {/* Card header — solid red */}
-                          <Box sx={{
-                            bgcolor: '#C74126', px: 1.25, py: 0.75,
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
-                          }}>
+                          <Box
+                            sx={{
+                              bgcolor: '#C74126',
+                              px: 1.25,
+                              py: 0.75,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 1,
+                            }}
+                          >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <LockOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }} />
-                              <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.95)', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                              <LockOutlinedIcon
+                                sx={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}
+                              />
+                              <Typography
+                                sx={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: 'rgba(255,255,255,0.95)',
+                                  letterSpacing: '0.03em',
+                                  textTransform: 'uppercase',
+                                }}
+                              >
                                 Blocked
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               {compareMode && n.sprintLabel && (
-                                <Box sx={{
-                                  fontSize: 11, fontWeight: 500,
-                                  color: 'rgba(255,255,255,0.8)',
-                                  bgcolor: 'rgba(0,0,0,0.18)',
-                                  px: 0.875, py: '1px',
-                                  borderRadius: '20px', lineHeight: 1.5,
-                                }}>
+                                <Box
+                                  sx={{
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    color: 'rgba(255,255,255,0.8)',
+                                    bgcolor: 'rgba(0,0,0,0.18)',
+                                    px: 0.875,
+                                    py: '1px',
+                                    borderRadius: '20px',
+                                    lineHeight: 1.5,
+                                  }}
+                                >
                                   {n.sprintLabel}
                                 </Box>
                               )}
-                              <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                              <Typography
+                                sx={{
+                                  fontSize: 11,
+                                  color: 'rgba(255,255,255,0.75)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.4,
+                                }}
+                              >
                                 <LockOutlinedIcon sx={{ fontSize: 11 }} />
                                 {formatBlockedSinceAge(n.blockedSince)}
                               </Typography>
@@ -589,10 +675,12 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 <FormControlLabel
                   key={sp.id}
                   control={
-                    <Checkbox size="small"
+                    <Checkbox
+                      size="small"
                       checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
                       onChange={(e) => toggleSprint(sp.id, e.target.checked)}
-                      sx={{ '&.Mui-checked': { color: sprintColor } }} />
+                      sx={{ '&.Mui-checked': { color: sprintColor } }}
+                    />
                   }
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -607,18 +695,26 @@ export default function DashboardPage({ projectId: propProjectId }) {
         </Paper>
       </ScrollReveal>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}>
+      <Box
+        sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}
+      >
         <ScrollReveal delay={0.05}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' }, alignItems: 'stretch', gap: { xs: 3, md: 3 }, width: '100%', minWidth: 0, mb: 4 }}>
             <Box sx={{ flex: { md: compareMode ? 'none' : '1 1 0' }, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.5, textAlign: 'left', width: '100%' }}>Scorecards</Typography>
               <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left', color: 'text.secondary' }}>Quick totals and averages for the sprint(s) currently selected above.</Typography>
               <DashboardTopMetrics
-                showSectionHeader={false} multiSprint={compareMode} scorecardsFourColumn={compareMode}
-                totalTasks={selectionMetrics.totalTasks} totalHours={selectionMetrics.totalHours}
-                avgTasksPerDev={selectionMetrics.avgTasksPerDev} avgHoursPerDev={selectionMetrics.avgHoursPerDev}
-                uniqueDevCount={selectionMetrics.uniqueDevCount} avgTasksTrend={averageTrends.avgTasksTrend}
-                avgHoursTrend={averageTrends.avgHoursTrend} avgTrendSeries={averageTrends.series}
+                showSectionHeader={false}
+                multiSprint={compareMode}
+                scorecardsFourColumn={compareMode}
+                totalTasks={selectionMetrics.totalTasks}
+                totalHours={selectionMetrics.totalHours}
+                avgTasksPerDev={selectionMetrics.avgTasksPerDev}
+                avgHoursPerDev={selectionMetrics.avgHoursPerDev}
+                uniqueDevCount={selectionMetrics.uniqueDevCount}
+                avgTasksTrend={averageTrends.avgTasksTrend}
+                avgHoursTrend={averageTrends.avgHoursTrend}
+                avgTrendSeries={averageTrends.series}
               />
             </Box>
             {!compareMode ? (
@@ -633,7 +729,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
           </Box>
         </ScrollReveal>
 
-        <ScrollReveal delay={0.06}><DashboardBlockedTasksPanel selectedSprints={selectedSprints} /></ScrollReveal>
+        <ScrollReveal delay={0.06}>
+          <DashboardBlockedTasksPanel selectedSprints={selectedSprints} />
+        </ScrollReveal>
 
         <ScrollReveal delay={0.06}>
           <Box sx={{ mb: 0 }}>
@@ -641,7 +739,11 @@ export default function DashboardPage({ projectId: propProjectId }) {
             <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, color: 'text.secondary' }}>Charts for workload, hours, and productivity by developer.</Typography>
           </Box>
         </ScrollReveal>
-        <DashboardDeveloperCharts developers={selectionMetrics.developers} selectedSprints={selectedSprints} compareMode={compareMode} />
+        <DashboardDeveloperCharts
+          developers={selectionMetrics.developers}
+          selectedSprints={selectedSprints}
+          compareMode={compareMode}
+        />
 
         <ScrollReveal delay={0.05}>
           <Box sx={{ mt: 4, mb: 0 }}>
@@ -650,7 +752,11 @@ export default function DashboardPage({ projectId: propProjectId }) {
           </Box>
         </ScrollReveal>
         <ScrollReveal delay={0.06}>
-          <DeveloperTable selectedSprints={selectedSprints} compareMode={compareMode} suppressCardTitle />
+          <DeveloperTable
+            selectedSprints={selectedSprints}
+            compareMode={compareMode}
+            suppressCardTitle
+          />
         </ScrollReveal>
       </Box>
     </Box>

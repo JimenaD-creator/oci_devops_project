@@ -11,7 +11,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
         taskManager = softwareSystem "Task Manager" "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows." {
             reactApp = container "React Frontend" "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin." "React 18" "Web Browser, Container, Single-page application"
-            apiApp = container "Spring Boot Backend" "Runs business rules, exposes APIs, runs scheduled jobs, handles the Telegram bot, and coordinates AI features." "Java 17, Spring Boot" "Container, Server-side application" {
+            apiApp = container "Spring Boot Backend" "Runs business rules, exposes APIs, runs scheduled jobs, handles the Telegram bot, and coordinates AI features." "Java 11, Spring Boot" "Container, Server-side application" {
                 kpiApi = component "KPI API" "Exposes productivity and delivery metrics; supports on-demand KPI refresh." "Spring REST"
                 managerChatApi = component "Manager chat API" "Entry point for contextual manager chat over project and sprint data." "Spring REST"
                 insightsApi = component "Sprint insights API" "Starts and reads asynchronous sprint narratives; serves developer radar views." "Spring REST"
@@ -26,7 +26,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
                 telegramIdentity = component "Telegram identity bridge" "Links Telegram chats to application users." "Spring Service"
 
                 kpiEngine = component "KPI engine" "Computes and stores sprint KPI fields from aggregates." "Spring Service"
-                sprintAi = component "Sprint AI orchestration" "Builds insight prompts, calls the LLM, stores sprint narratives." "Spring Service"
+                geminiService = component "Gemini Service" "Builds sprint insight prompts, calls Gemini, and stores generated narratives." "Spring Service"
                 semanticRetrieval = component "Semantic retrieval" "Embeds text and finds similar stored tasks." "Spring Service"
                 chatOrchestration = component "Chat orchestration" "Builds retrieval context and calls the LLM for manager chat." "Spring Service"
 
@@ -67,7 +67,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         telegramIdentity -> dataRepo "Reads and writes links between Telegram accounts and application users" "JPA / JDBC"
 
         managerChatApi -> chatOrchestration "Hands manager chat requests to orchestration" "Spring"
-        insightsApi -> sprintAi "Hands sprint narrative work to AI orchestration" "Spring"
+        insightsApi -> geminiService "Hands sprint narrative work to Gemini Service" "Spring"
 
         embeddingsApi -> semanticRetrieval "Asks semantic retrieval to build or refresh sprint embeddings" "Spring"
 
@@ -79,9 +79,9 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         chatOrchestration -> dataRepo "Loads project, sprint, and top task excerpts for the prompt" "JPA / JDBC"
         chatOrchestration -> gemini "Sends the composed prompt and receives the answer text" "HTTPS"
 
-        sprintAi -> gemini "Sends insight prompts and receives generated narrative text" "HTTPS"
-        sprintAi -> kpiEngine "Refreshes sprint KPI aggregates before building the prompt" "Spring"
-        sprintAi -> dataRepo "Loads sprint roster and context, then stores generated insight text" "JPA / JDBC"
+        geminiService -> gemini "Sends insight prompts and receives generated narrative text" "HTTPS"
+        geminiService -> kpiEngine "Refreshes sprint KPI aggregates before building the prompt" "Spring"
+        geminiService -> dataRepo "Loads sprint roster and context, then stores generated insight text" "JPA / JDBC"
 
         kpiEngine -> dataRepo "Updates KPI fields from aggregate queries" "JPA / JDBC"
 
@@ -99,19 +99,15 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
                 okeCluster = deploymentNode "Oracle Kubernetes Engine (OKE)" {
                     deploymentNode "Namespace mtdrworkshop" "Logical boundary in the cluster for the product’s workloads." "Kubernetes" {
-                        productionLb = infrastructureNode "OCI load balancer" "Public listener (port 80); forwards to in-cluster Service targets for SPA and API." "Kubernetes / OCI"
+                        productionLb = infrastructureNode "OCI load balancer" "Public listener on port 80; forwards to the Spring Boot Service." "Kubernetes / OCI"
 
-                        deploymentNode "Frontend Pod" {
-                            productionWeb = containerInstance reactApp
-                        }
-
-                        deploymentNode "Backend Pod" "Runs the API workload with two replicas for availability." "Kubernetes" {
+                        deploymentNode "Application Pod" "Single Spring Boot image serves the React build from /static and the REST API; two replicas." "Kubernetes" {
                             instances "2"
+                            productionWeb = containerInstance reactApp
                             productionApi = containerInstance apiApp
                         }
 
-                        productionLb -> productionWeb "Serves static SPA and assets" "HTTP / TCP, listener port 80 → pod/service target port"
-                        productionLb -> productionApi "Routes REST traffic to API Service" "HTTP / TCP, listener port 80 → pod/service target port"
+                        productionLb -> productionApi "Routes HTTP traffic to the application pods" "HTTP / TCP, port 80 → 8080"
                     }
                 }
 
@@ -138,16 +134,15 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         # Containers
         container taskManager "Containers" "Splits the product into the web app, the server that runs rules and integrations, the database, and the external assistants the server calls." {
             include *
-            autoLayout lr
         }
 
         # Components
-        component apiApp "Components" "Shows REST entry points, the Telegram bot, domain and KPI services, AI orchestration, semantic retrieval, and how everything reaches stored data." {
+        component apiApp "Components" "Shows REST entry points, the Telegram bot, domain and KPI services, Gemini Service, semantic retrieval, and how everything reaches stored data." {
             include *
         }
 
         # Deployment
-        deployment taskManager "Production" "Deployment" "Task Manager runs in production on Oracle Cloud: OKE cluster, load-balanced app pods, OCIR for images, and Autonomous Database." {
+        deployment taskManager "Production" "Deployment" "Task Manager runs in production on Oracle Cloud: OKE cluster, load-balanced Spring Boot pods (SPA + API), OCIR for images, and Autonomous Database." {
             include *
         }
 
@@ -163,11 +158,11 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
         # Dynamic: Sprint insights
         dynamic apiApp "Sprint_Insights_Generation" "Refreshes sprint metrics, gathers team context, asks the external model for a narrative, and saves the result." {
-            insightsApi -> sprintAi "Accepts generate narrative request"
-            sprintAi -> kpiEngine "Refreshes KPI snapshot for sprint"
-            sprintAi -> dataRepo "Loads sprint roster and task context" "JPA / JDBC"
-            sprintAi -> gemini "Sends insight prompt and receives narrative" "HTTPS"
-            sprintAi -> dataRepo "Persists insight result" "JPA / JDBC"
+            insightsApi -> geminiService "Accepts generate narrative request"
+            geminiService -> kpiEngine "Refreshes KPI snapshot for sprint"
+            geminiService -> dataRepo "Loads sprint roster and task context" "JPA / JDBC"
+            geminiService -> gemini "Sends insight prompt and receives narrative" "HTTPS"
+            geminiService -> dataRepo "Persists insight result" "JPA / JDBC"
             autoLayout lr
         }
 

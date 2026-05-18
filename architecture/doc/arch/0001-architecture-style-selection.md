@@ -5,7 +5,7 @@
 
 ## Context
 
-The Task Manager is a medium-sized system developed by a team of 4 people. The system must handle the lifecycle of development tasks, real-time interactions via Telegram, per-developer KPI calculations, and LLM-assisted insight generation using Google Gemini.
+The Task Manager is a medium-sized system. The system must handle the lifecycle of development tasks, real-time interactions via Telegram, per-developer KPI calculations, and LLM-assisted insight generation using Google Gemini.
 
 ## Decision
 

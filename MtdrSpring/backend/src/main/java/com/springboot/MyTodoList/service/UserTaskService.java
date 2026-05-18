@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import com.springboot.MyTodoList.repository.TaskRepository;
+import com.springboot.MyTodoList.repository.ToDoItemRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import org.slf4j.Logger;
@@ -39,6 +40,9 @@ public class UserTaskService {
 
     @Autowired
     private TaskRepository taskRepository;
+
+    @Autowired
+    private ToDoItemRepository toDoItemRepository;
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
@@ -143,6 +147,33 @@ public class UserTaskService {
         return UserTask.isCompletedAssignmentStatus(status);
     }
 
+    /**
+     * Updates one assignee's USER_TASK status and re-derives TASK.STATUS from all assignments.
+     * Used by Telegram and any per-developer status changes.
+     */
+    @Transactional
+    public boolean updateAssignmentStatus(Long userId, Long taskId, String status) {
+        if (userId == null || taskId == null || status == null || status.isBlank()) {
+            return false;
+        }
+        String canonical = status.trim().toUpperCase();
+        Optional<UserTask> opt = userTaskRepository.findByUser_IdAndTask_Id(userId, taskId);
+        if (opt.isEmpty()) {
+            logger.warn("updateAssignmentStatus: user {} has no USER_TASK row for task {}", userId, taskId);
+            return false;
+        }
+        UserTask ut = opt.get();
+        ut.setStatus(canonical);
+        userTaskRepository.saveAndFlush(ut);
+        Task synced = taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        if (synced != null && synced.getStatus() != null) {
+            int taskIdInt = Math.toIntExact(taskId);
+            toDoItemRepository.updateStatusOnly(taskIdInt, synced.getStatus());
+        }
+        logger.info("USER_TASK status for userId {} taskId {} set to {} (task row synced)", userId, taskId, canonical);
+        return true;
+    }
+
     private Long resolveAssigneeUserIdForWorkedHours(Long telegramHintUserId, Long taskId) {
         List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
         if (uts.size() == 1) {
@@ -173,6 +204,14 @@ public class UserTaskService {
             return true;
         }
         return uts.stream().anyMatch(ut -> ut.getUser().getId().equals(userId));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> getAssignmentStatus(Long userId, Long taskId) {
+        if (userId == null || taskId == null) {
+            return Optional.empty();
+        }
+        return userTaskRepository.findById(new UserTaskId(userId, taskId)).map(UserTask::getStatus);
     }
 
     @Transactional(readOnly = true)

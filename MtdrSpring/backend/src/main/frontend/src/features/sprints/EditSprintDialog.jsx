@@ -13,14 +13,10 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import {
-  newSprintDialogFieldOutline,
-  oracleRgba,
-  sprintKpiNumber,
-  toInputDate,
-} from './utils/sprintUtils';
+import { sprintKpiNumber, toInputDate } from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const theme = useTheme();
@@ -64,7 +60,6 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
       setError('Sprint project is missing. Please refresh and try again.');
       return;
     }
-
     setSaving(true);
     setError('');
     try {
@@ -135,15 +130,20 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             ? `0 16px 40px rgba(0,0,0,0.3)`
             : `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
           overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 24px)', sm: 640 },
+          maxWidth: { xs: 'calc(100% - 24px)', sm: 560 },
         },
       }}
     >
+      {/* Header */}
       <DialogTitle sx={{ p: 0 }}>
         <Box
           sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            px: 2.5,
+            pt: 2,
+            pb: 1.75,
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'space-between',
             gap: 2,
             px: 2.5,
@@ -153,7 +153,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             backgroundColor: 'background.paper',
           }}
         >
-          <Box sx={{ display: 'flex', gap: 1.75, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
                 width: 48,
@@ -167,7 +167,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
                 flexShrink: 0,
               }}
             >
-              <EditIcon sx={{ color: ORACLE_RED_ACTION, fontSize: 26 }} />
+              <SpeedOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Typography
@@ -196,7 +196,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             size="small"
             sx={{ color: 'text.secondary', '&:hover': { bgcolor: getOracleRgba(0.08) } }}
           >
-            <CloseIcon />
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
       </DialogTitle>
@@ -216,27 +216,42 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           Update the sprint window and optional goal. KPI metrics stored in the database are kept
           as-is.
         </Typography>
+
+        {error && (
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: ORACLE_RED_ACTION,
+              fontWeight: 600,
+              display: 'block',
+              mb: 1.5,
+            }}
+          >
+            {error}
+          </Typography>
+        )}
+
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <TextField
-              label="Start date"
+              label="Start date *"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
             <TextField
-              label="End date"
+              label="End date *"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              sx={newSprintDialogFieldOutline()}
+              sx={fieldSx}
             />
           </Stack>
           <TextField
@@ -250,25 +265,21 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             inputProps={{ maxLength: 2000 }}
             helperText={`${goal.length} / 2000 characters`}
             sx={{
-              ...newSprintDialogFieldOutline(),
-              '& .MuiOutlinedInput-root': { alignItems: 'flex-start' },
+              ...fieldSx,
+              '& .MuiOutlinedInput-root': {
+                ...fieldSx['& .MuiOutlinedInput-root'],
+                alignItems: 'flex-start',
+              },
             }}
           />
         </Stack>
-        {error ? (
-          <Typography
-            variant="caption"
-            sx={{ color: ORACLE_RED_ACTION, fontWeight: 600, mt: 1.5, display: 'block' }}
-          >
-            {error}
-          </Typography>
-        ) : null}
       </DialogContent>
 
+      {/* Footer */}
       <DialogActions
         sx={{
-          px: 2.5,
-          py: 2,
+          px: 3,
+          py: 1.5,
           gap: 1,
           borderTop: `1px solid ${getOracleRgba(0.12)}`,
           backgroundColor: 'background.paper',

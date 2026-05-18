@@ -19,6 +19,7 @@ import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
 } from './utils/assigneeIdentityPalette';
+import { assigneeStatusChipStyle, assigneeStatusLabel } from './utils/taskUtils';
 import { DeleteIcon } from 'lucide-react';
 import { UndoIcon } from 'lucide-react';
 import { DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
@@ -142,25 +143,24 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
   
   if (managerView && Array.isArray(assigneeProgress) && assigneeProgress.length > 1) {
     return (
-      <Stack spacing={0.45} sx={{ py: 0.25 }}>
+      <Stack spacing={0.65} sx={{ py: 0.35 }}>
         {assigneeProgress.map((row) => {
           const key =
             row.userId != null && Number.isFinite(row.userId) ? `u-${row.userId}` : row.name;
           const pal = ASSIGNEE_IDENTITY_PALETTE[assigneeIdentityPaletteIndex(row)];
+          const statusKey = row.status ?? (row.completed ? 'DONE' : 'TODO');
+          const statusChip = assigneeStatusChipStyle(statusKey);
+          const statusLabel = assigneeStatusLabel(statusKey);
           return (
             <Box
               key={key}
-              title={
-                row.completed
-                  ? 'This developer marked their part complete'
-                  : 'Waiting on this developer'
-              }
+              title={`${row.name}: ${statusLabel}`}
               sx={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'stretch',
+                width: 'max-content',
                 maxWidth: '100%',
-                minHeight: 24,
-                borderRadius: '10px',
+                borderRadius: '8px',
                 overflow: 'hidden',
                 border: `1px solid ${darkMode ? '#2A2C32' : 'rgba(0,0,0,0.1)'}`,
                 boxShadow: `0 1px 2px ${darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.06)'}`,
@@ -168,11 +168,10 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
             >
               <Box
                 sx={{
-                  flex: 1,
-                  minWidth: 0,
+                  flex: '0 1 auto',
                   pl: 0.85,
-                  pr: 0.5,
-                  py: 0.35,
+                  pr: 0.65,
+                  py: 0.4,
                   display: 'flex',
                   alignItems: 'center',
                   bgcolor: pal.light,
@@ -180,8 +179,7 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
                   color: pal.name,
                   fontSize: '0.68rem',
                   fontWeight: 800,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  lineHeight: 1.25,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -190,23 +188,20 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
               <Box
                 sx={{
                   flexShrink: 0,
-                  px: 0.7,
+                  px: 0.85,
+                  py: 0.4,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.58rem',
+                  fontSize: '0.65rem',
                   fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  writingMode: 'horizontal-tb',
-                  color: '#fff',
-                  bgcolor: row.completed ? '#1B5E20' : '#E65100',
-                  borderLeft: row.completed
-                    ? '1px solid rgba(255,255,255,0.25)'
-                    : '1px solid rgba(0,0,0,0.08)',
+                  lineHeight: 1.25,
+                  whiteSpace: 'nowrap',
+                  color: statusChip.color,
+                  bgcolor: statusChip.bg,
+                  borderLeft: `3px solid ${statusChip.border}`,
                 }}
               >
-                {row.completed ? 'Done' : 'Pending'}
+                {statusLabel}
               </Box>
             </Box>
           );
@@ -326,7 +321,7 @@ const DEFAULT_LAYOUT = {
 
 /** Manager view: same core columns + due date + completed (no On time). */
 const MANAGER_LAYOUT = {
-  colWidths: ['17%', '16%', '12%', '11%', '11%', '11%', '14%', '8%', '8%'],
+  colWidths: ['15%', '22%', '11%', '10%', '10%', '10%', '14%', '8%', '8%'],
   headers: [
     'Task',
     'Assignees',
@@ -454,7 +449,15 @@ export default function TaskTable({
                 >
                   {item.description}
                 </TableCell>
-                <TableCell sx={{ px: 1.5, ...columnCellSx(1) }}>
+                <TableCell
+                  sx={{
+                    px: 1.5,
+                    ...columnCellSx(1),
+                    overflow: 'visible',
+                    whiteSpace: 'normal',
+                    verticalAlign: 'top',
+                  }}
+                >
                   <DevelopersCell
                     developers={item.developers}
                     developer={item.developer}

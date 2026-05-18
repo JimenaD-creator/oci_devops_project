@@ -28,13 +28,19 @@ import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
-import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
+import {
+  API_BASE,
+  DELETE_TASK_CONFIRM_MESSAGE,
+  ORACLE_RED,
+  pageEase,
+} from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
   resolveActiveProjectId,
   sprintProjectIdFromJson,
   mapTaskToKanban,
   isUserTaskAssigneeComplete,
+  normalizeTaskStatus,
   pageFormFieldOutline,
   userTaskRowTaskId,
 } from './utils/taskUtils';
@@ -153,6 +159,16 @@ export default function TasksPage({ projectId }) {
       if (res.ok) {
         const updated = await res.json();
         setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+        if (assignees.length > 1 && ns !== 'DONE') {
+          const canonicalUt = normalizeTaskStatus(newStatus);
+          setUserTasks((prev) =>
+            prev.map((row) => {
+              const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+              if (rowTaskId !== Number(taskId)) return row;
+              return { ...row, status: canonicalUt };
+            }),
+          );
+        }
       }
     };
     try {
