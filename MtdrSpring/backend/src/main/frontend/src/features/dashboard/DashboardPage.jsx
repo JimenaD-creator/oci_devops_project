@@ -10,7 +10,6 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
-  CircularProgress,
   Popover,
   Stack,
   Button,
@@ -44,6 +43,7 @@ import ScrollReveal from './ScrollReveal';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { fetchProjectById } from './projectApi';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
 // ── Avatar palette for blocked notification items ────────────────────────────
 const AVATAR_PALETTE_LIGHT = [
@@ -78,20 +78,21 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
 
-  const loadProjectInfo = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const project = await fetchProjectById(projectId);
-      if (project) setCurrentProject(project);
-    } catch (err) {
-      console.error('Error loading project:', err);
+  useEffect(() => {
+    if (!projectId) {
+      setSprintsLoading(false);
+      return;
     }
-  }, [projectId]);
-
-  const handleRefresh = useCallback(() => {
+    let cancelled = false;
     setSprintsLoading(true);
-    fetchDashboardSprints(projectId)
-      .then((sprints) => {
+
+    Promise.all([
+      fetchProjectById(projectId).catch(() => null),
+      fetchDashboardSprints(projectId),
+    ])
+      .then(([project, sprints]) => {
+        if (cancelled) return;
+        if (project) setCurrentProject(project);
         setAllSprints(sprints);
         setSelectedSprintIds((prev) => {
           if (sprints.length > 0 && prev.length === 0) {
@@ -101,14 +102,14 @@ export default function DashboardPage({ projectId: propProjectId }) {
           return prev;
         });
       })
-      .finally(() => setSprintsLoading(false));
-  }, [projectId]);
+      .finally(() => {
+        if (!cancelled) setSprintsLoading(false);
+      });
 
-  useEffect(() => {
-    if (!projectId) return;
-    loadProjectInfo();
-    handleRefresh();
-  }, [projectId, loadProjectInfo, handleRefresh]);
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     setSeenBlockedKeysCsv('');
@@ -286,11 +287,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
   };
 
   if (sprintsLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: ORACLE_RED_ACTION }} />
-      </Box>
-    );
+    return <PageLoadingSpinner />;
   }
 
   return (
@@ -303,6 +300,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
         px: 2,
         pb: 2,
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
       <ScrollReveal>

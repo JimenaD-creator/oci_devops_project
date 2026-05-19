@@ -12,7 +12,6 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { API_BASE } from '../sprints/constants/sprintConstants';
-import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 
 // Icons as SVG components to avoid extra deps
 const BotIcon = () => (
@@ -140,20 +139,20 @@ export default function ManagerChatbot({ projectId }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
+    if (!open) return;
     const pid =
       projectId != null && String(projectId).trim() !== ''
         ? String(projectId).trim()
         : String(localStorage.getItem('currentProjectId') || '').trim();
-    if (!pid) return;
-    fetchDashboardSprints(pid, { forceFresh: true })
-      .then((data) => {
-        const filtered = Array.isArray(data)
-          ? data.filter((s) => String(s.assignedProject?.id) === String(pid))
-          : [];
-        setSprints(filtered);
-      })
+    if (!pid || sprints.length > 0) return;
+    fetch(`${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setSprints(Array.isArray(data) ? data : []))
       .catch(() => setSprints([]));
-  }, [projectId]);
+  }, [open, projectId, sprints.length]);
 
   // Scroll to bottom on new messages
   useEffect(() => {

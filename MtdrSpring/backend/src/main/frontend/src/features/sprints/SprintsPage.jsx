@@ -5,7 +5,6 @@ import {
   Typography,
   Grid,
   Button,
-  CircularProgress,
   FormControl,
   InputLabel,
   Select,
@@ -17,6 +16,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import TaskTable from '../tasks/TaskTable';
 import {
@@ -350,12 +350,7 @@ export default function SprintsPage({ projectId }) {
     });
   }, [selectedSprintRows, developerFilter, statusFilter, priorityFilter, dueDateFilter]);
 
-  if (loading)
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: ORACLE_RED }} />
-      </Box>
-    );
+  if (loading) return <PageLoadingSpinner color={ORACLE_RED} />;
 
   const subtitleProjectName =
     projectName ||

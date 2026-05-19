@@ -14,7 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Serves the React app for client-side routes (e.g. /login) without touching /api/**.
+ * Serves the React app for client-side routes (e.g. /login) without touching /api/** or static assets.
  */
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
@@ -29,8 +29,7 @@ public class SpaWebConfig extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        RequestDispatcher dispatcher = request.getRequestDispatcher("/index.html");
-        dispatcher.forward(request, response);
+        request.getRequestDispatcher("/index.html").forward(request, response);
     }
 
     private static boolean shouldNotForward(String uri) {

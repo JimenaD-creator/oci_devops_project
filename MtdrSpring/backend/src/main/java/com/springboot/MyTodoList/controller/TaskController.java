@@ -41,11 +41,13 @@ public class TaskController {
     }
     
     /**
-     * Get all tasks
+     * Get tasks, optionally filtered by project (via sprint).
      */
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks() {
-        List<Task> tasks = taskRepository.findAll();
+    public ResponseEntity<List<Task>> getAllTasks(@RequestParam(required = false) Long projectId) {
+        List<Task> tasks = projectId != null
+                ? taskRepository.findByProjectId(projectId)
+                : taskRepository.findAll();
         return ResponseEntity.ok(tasks);
     }
     

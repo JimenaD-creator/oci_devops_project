@@ -144,6 +144,23 @@ export const RECOMMENDATION_CATEGORY_LABELS = {
   blockers: 'Blockers',
 };
 
+/** Workload balance >= 70 = even task assignment; Gemini often confuses this with execution pace. */
+const WORKLOAD_UNEVEN_PROSE =
+  /\b(uneven|unbalanced|imbalance|imbalanced|bottleneck|desigual|desbalancead[oa]s?|not being executed evenly|not executed evenly)\b/i;
+
+export function normalizeWorkloadBalanceGuideText(text, workloadBalancePct) {
+  const wb = Number(workloadBalancePct);
+  if (!Number.isFinite(wb) || wb < 70) return text;
+  const raw = typeof text === 'string' ? text.trim() : '';
+  if (!raw || !WORKLOAD_UNEVEN_PROSE.test(raw)) return text;
+  const pct = Math.round(Math.min(100, Math.max(0, wb)));
+  return (
+    `At ${pct}%, task assignments are well balanced across developers with work in this sprint. ` +
+    'This KPI measures how evenly tasks are distributed, not how fast each person completes them — ' +
+    'use completion rate or developer insights if execution pace differs between teammates.'
+  );
+}
+
 /** Shown when a sprint insight section has no AI content yet */
 export const AI_INSIGHTS_EMPTY = {
   recommendations:

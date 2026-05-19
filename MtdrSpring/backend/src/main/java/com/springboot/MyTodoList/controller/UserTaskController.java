@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -44,8 +45,12 @@ public class UserTaskController {
     private TaskAssignmentSyncService taskAssignmentSyncService;
 
     @GetMapping
-    public ResponseEntity<List<UserTask>> getAllUserTasks() {
+    public ResponseEntity<List<UserTask>> getAllUserTasks(
+            @RequestParam(required = false) Long projectId) {
         try {
+            if (projectId != null) {
+                return ResponseEntity.ok(userTaskRepository.findByProjectIdWithUserAndTask(projectId));
+            }
             return ResponseEntity.ok(userTaskRepository.findAllWithUserAndTask());
         } catch (Exception e) {
             LOGGER.warn("findAllWithUserAndTask failed, falling back to findAll", e);

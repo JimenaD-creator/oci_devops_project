@@ -5,15 +5,19 @@
 ## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
 */
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import PageLoadingSpinner from './components/common/PageLoadingSpinner';
 import './index.css';
 import { AppThemeProvider } from './ThemeContext';
-import App from './app/App';
 import Login from './features/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { installAuthFetchInterceptor } from './utils/auth';
+
+const App = lazy(() => import('./app/App'));
+
+const BootLoader = () => <PageLoadingSpinner color="#E53935" minHeight="100vh" />;
 
 installAuthFetchInterceptor();
 
@@ -27,7 +31,9 @@ ReactDOM.render(
             path="/*"
             element={
               <ProtectedRoute>
-                <App />
+                <Suspense fallback={<BootLoader />}>
+                  <App />
+                </Suspense>
               </ProtectedRoute>
             }
           />

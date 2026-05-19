@@ -60,6 +60,11 @@ public class GeminiService {
     private static final Pattern ALERT_BLOCKER_LEXEMES = Pattern.compile(
         "\\b(blocked|blockers|blocker|blocking)\\b", Pattern.CASE_INSENSITIVE);
 
+    /** Prose that claims workload is uneven / imbalanced (EN + ES). */
+    private static final Pattern ALERT_WORKLOAD_UNEVEN_LEXEMES = Pattern.compile(
+        "\\b(uneven|unbalanced|imbalance|imbalanced|bottleneck|desigual|desbalancead[oa]s?)\\b",
+        Pattern.CASE_INSENSITIVE);
+
     /** JSON keys whose string values must stay machine-readable for the UI / API contract. */
     private static final Set<String> PRETTIFY_SKIP_KEYS = Set.of(
         "category", "severity", "kpi", "trend", "confidence");
@@ -731,7 +736,8 @@ public class GeminiService {
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
-            "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone.\n" +
+            "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
+            "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
             "- summary: English; may echo executiveSummary.overview.\n" +
             "- Do not include any text outside the JSON object";
     }
@@ -867,6 +873,8 @@ public class GeminiService {
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
             injectBlockedAssignmentsSnapshot(root, sprintId);
             normalizeAlertSeverities(root);
+            removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
@@ -1921,6 +1929,99 @@ public class GeminiService {
                 o.put("severity", "warning");
             }
         }
+    }
+
+    /**
+     * Drops alerts that claim uneven workload when the sprint KPI is already balanced (&gt;= 70).
+     * Gemini sometimes contradicts the numeric workloadBalance score (e.g. 98% + "uneven distribution").
+     */
+    private void removeContradictoryWorkloadBalanceAlerts(ObjectNode root, Long sprintId) {
+        JsonNode alertsNode = root.get("alerts");
+        if (alertsNode == null || !alertsNode.isArray()) {
+            return;
+        }
+        double sprintWb = -1.0;
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint != null && sprint.getWorkloadBalance() != null) {
+            sprintWb = toPercent(sprint.getWorkloadBalance());
+        }
+        ArrayNode in = (ArrayNode) alertsNode;
+        ArrayNode out = mapper.createArrayNode();
+        for (int i = 0; i < in.size(); i++) {
+            JsonNode item = in.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpiRaw = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            double alertVal = o.has("value") && o.get("value").isNumber()
+                ? o.get("value").asDouble()
+                : sprintWb;
+            double effectiveWb = Math.max(sprintWb, alertVal);
+            String message = o.path("message").isTextual() ? o.get("message").asText("") : "";
+            boolean workloadKpi = "workloadbalance".equals(kpi);
+            boolean unevenProse = ALERT_WORKLOAD_UNEVEN_LEXEMES.matcher(message).find();
+            boolean mentionsWorkloadBalance = message.toLowerCase(Locale.ROOT).contains("workload balance")
+                || message.toLowerCase(Locale.ROOT).contains("workload distribution")
+                || message.toLowerCase(Locale.ROOT).contains("balance del trabajo")
+                || message.toLowerCase(Locale.ROOT).contains("carga de trabajo");
+            if (effectiveWb >= 70.0) {
+                if (workloadKpi) {
+                    continue;
+                }
+                if (unevenProse && (mentionsWorkloadBalance || workloadKpi)) {
+                    continue;
+                }
+            }
+            out.add(item);
+        }
+        root.set("alerts", out);
+    }
+
+    /**
+     * Rewrites kpiManagerGuide.byMetric.workloadBalance when the sprint score is high but Gemini
+     * claims uneven assignment or uneven execution (common confusion with completion pace).
+     */
+    private void normalizeKpiManagerGuideWorkloadBalance(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null || sprint.getWorkloadBalance() == null) {
+            return;
+        }
+        double wb = toPercent(sprint.getWorkloadBalance());
+        if (wb < 70.0) {
+            return;
+        }
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode == null || !guideNode.isObject()) {
+            return;
+        }
+        ObjectNode guide = (ObjectNode) guideNode;
+        JsonNode byMetricNode = guide.get("byMetric");
+        ObjectNode byMetric;
+        if (byMetricNode == null || !byMetricNode.isObject()) {
+            byMetric = mapper.createObjectNode();
+            guide.set("byMetric", byMetric);
+        } else {
+            byMetric = (ObjectNode) byMetricNode;
+        }
+        String existing = byMetric.path("workloadBalance").asText("");
+        if (existing.isBlank()
+            || ALERT_WORKLOAD_UNEVEN_LEXEMES.matcher(existing).find()
+            || existing.toLowerCase(Locale.ROOT).contains("not being executed evenly")
+            || existing.toLowerCase(Locale.ROOT).contains("not executed evenly")) {
+            byMetric.put("workloadBalance", buildBalancedWorkloadGuideText(wb));
+        }
+    }
+
+    private static String buildBalancedWorkloadGuideText(double wb) {
+        int pct = (int) Math.round(Math.min(100.0, Math.max(0.0, wb)));
+        return String.format(
+            Locale.ROOT,
+            "At %d%%, task assignments are well balanced across developers with work in this sprint. "
+                + "This KPI measures how evenly tasks are distributed, not how fast each person completes them — "
+                + "use completion rate or developer insights if execution pace differs between teammates.",
+            pct);
     }
 
     /**

@@ -25,6 +25,11 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
     @Query("SELECT ut FROM UserTask ut JOIN FETCH ut.user JOIN FETCH ut.task")
     List<UserTask> findAllWithUserAndTask();
 
+    @Query(
+            "SELECT ut FROM UserTask ut JOIN FETCH ut.user JOIN FETCH ut.task t "
+                    + "WHERE t.assignedSprint.assignedProject.id = :projectId")
+    List<UserTask> findByProjectIdWithUserAndTask(@Param("projectId") Long projectId);
+
     /**
      * All USER_TASK rows for tasks in this sprint, with user and task eagerly loaded.
      * Avoid DISTINCT + JOIN FETCH (can drop valid rows on some providers); dedupe in Java if needed.

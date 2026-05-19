@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   Paper,
-  CircularProgress,
   FormControl,
   InputLabel,
   Select,
@@ -17,6 +16,7 @@ import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import InsightCard from './InsightCard';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
 export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const theme = useTheme();
@@ -163,12 +163,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
 
   const showNextSprintForecast = selectedSprintId != null;
 
-  if (loading)
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: '#C74634' }} />
-      </Box>
-    );
+  if (loading) return <PageLoadingSpinner />;
 
   return (
     <Box

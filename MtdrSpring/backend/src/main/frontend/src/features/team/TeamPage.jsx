@@ -21,6 +21,7 @@ import { DeveloperInsightsTable } from '../ai/InsightCardParts';
 import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import DashboardBlockedTasksPanel from '../dashboard/DashboardBlockedTasksPanel';
 import TeamWorkloadBreakdown from './TeamWorkloadBreakdown';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
 export default function TeamPage({
   projectId,
@@ -119,13 +120,7 @@ export default function TeamPage({
 
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: '#C74634' }} />
-      </Box>
-    );
-  }
+  if (loading) return <PageLoadingSpinner />;
 
   return (
     <Box

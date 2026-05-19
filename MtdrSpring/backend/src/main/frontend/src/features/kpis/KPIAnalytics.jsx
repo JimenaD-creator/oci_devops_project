@@ -19,6 +19,7 @@ import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { API_BASE } from '../sprints/constants/sprintConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
@@ -447,13 +448,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     };
   }, [currentSprint, sprints, kpis.productivityScore]);
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: '#C74634' }} />
-      </Box>
-    );
-  }
+  if (loading) return <PageLoadingSpinner />;
 
   return (
     <>

@@ -20,7 +20,6 @@ import {
   Button,
   IconButton,
   Chip,
-  LinearProgress,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -1218,14 +1217,9 @@ export function TaskDetailDialog({
                     })}
                   </Select>
                   {editMode && pickerLoading && (
-                    <LinearProgress
-                      sx={{
-                        mt: 1,
-                        borderRadius: 1,
-                        height: 3,
-                        '& .MuiLinearProgress-bar': { bgcolor: ORACLE_RED_ACTION },
-                      }}
-                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                      <CircularProgress size={22} sx={{ color: ORACLE_RED_ACTION }} />
+                    </Box>
                   )}
                   {editMode && !pickerLoading && resolvedDeveloperProjectId == null && (
                     <Typography

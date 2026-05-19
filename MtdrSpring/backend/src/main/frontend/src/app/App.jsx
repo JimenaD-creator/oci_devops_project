@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
-import { taskAPI } from '../services/API';
 import { API_BASE } from '../features/sprints/constants/sprintConstants';
-import ManagerChatbot from '../features/ai/ManagerChatbot';
 import { useThemeMode } from '../ThemeContext';
+import PageLoadingSpinner from '../components/common/PageLoadingSpinner';
 import {
   Box,
   Drawer,
@@ -48,14 +47,11 @@ const KPIAnalytics    = lazy(() => import('../features/kpis/KPIAnalytics'));
 const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
 const AIInsightsPage  = lazy(() => import('../features/ai/AIInsightsPage'));
 const TeamPage        = lazy(() => import('../features/team/TeamPage'));
+const ManagerChatbot  = lazy(() => import('../features/ai/ManagerChatbot'));
 
 const DRAWER_WIDTH = 240;
 
-const PageLoader = () => (
-  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-    <CircularProgress sx={{ color: '#E53935' }} />
-  </Box>
-);
+const PageLoader = () => <PageLoadingSpinner color="#E53935" />;
 
 const getInitials = (name) => {
   if (!name) return '';
@@ -90,9 +86,6 @@ function App() {
   const [menuAnchor, setMenuAnchor]   = useState(null);
   const [activePage, setActivePage]   = useState('dashboard');
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
-  const [isLoading, setLoading]       = useState(false);
-  const [isInserting, setInserting]   = useState(false);
-  const [items, setItems]             = useState([]);
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
   const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
@@ -145,13 +138,6 @@ function App() {
       navigate('/login', { replace: true });
     }
   }, [user, navigate]);
-
-  useEffect(() => {
-    if (user && user.role !== 'DEVELOPER') {
-      setLoading(true);
-      taskAPI.getAll().then((data) => setItems(data)).catch(() => {}).finally(() => setLoading(false));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (activePage === 'tasks' || activePage === 'sprints') setSprintsNavOpen(true);
@@ -258,27 +244,6 @@ function App() {
     localStorage.removeItem('currentProjectName');
     setMenuAnchor(null);
     navigate('/login', { replace: true });
-  };
-
-  const addItem = (taskData) => {
-    setInserting(true);
-    taskAPI.create(taskData).then((created) => setItems((prev) => [created, ...prev])).catch(() => {}).finally(() => setInserting(false));
-  };
-
-  const toggleDone = (e, id) => {
-    if (e?.preventDefault) e.preventDefault();
-    const item = items.find((i) => String(i.id) === String(id));
-    if (!item) return;
-    const updated = { ...item, status: item.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED' };
-    taskAPI.update(id, updated)
-      .then((res) => setItems((prev) => prev.map((i) => (String(i.id) === String(id) ? res : i))))
-      .catch(() => {});
-  };
-
-  const deleteItem = (id) => {
-    taskAPI.delete(id)
-      .then(() => setItems((prev) => prev.filter((i) => String(i.id) !== String(id))))
-      .catch(() => {});
   };
 
   if (user.role === 'ADMIN' && !selectedProjectId) {
@@ -550,18 +515,12 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           {activePage === 'dashboard' && (
             <DashboardPage
-              items={items} isLoading={isLoading}
-              toggleDone={toggleDone} deleteItem={deleteItem}
               onNavigateToTasks={() => setActivePage('tasks')}
               projectId={selectedProjectId}
             />
           )}
           {activePage === 'tasks' && (
-            <TasksPage
-              items={items} isLoading={isLoading} isInserting={isInserting}
-              toggleDone={toggleDone} deleteItem={deleteItem} addItem={addItem}
-              projectId={selectedProjectId}
-            />
+            <TasksPage projectId={selectedProjectId} />
           )}
           {activePage === 'sprints' && (
             <SprintsPage projectId={selectedProjectId} onNavigateToTasks={() => setActivePage('tasks')} />
@@ -588,7 +547,9 @@ function App() {
         )}
       </Box>
 
-      <ManagerChatbot projectId={selectedProjectId} />
+      <Suspense fallback={null}>
+        <ManagerChatbot projectId={selectedProjectId} />
+      </Suspense>
 
       {/* Snackbar de feedback */}
       <Snackbar

@@ -142,7 +142,7 @@ export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) 
     developers: list,
     developer: list[0] ?? null,
     dueDate: task.dueDate,
-    sprintId: task.assignedSprint?.id ?? null,
+    sprintId: task.assignedSprint?.id ?? task.assignedSprint?.ID ?? null,
     _raw: task,
   };
 }

@@ -6,6 +6,7 @@ import {
   KPI_LABELS,
   alignTrendsProductivityScore,
   alignKpiMetricsInText,
+  normalizeWorkloadBalanceGuideText,
 } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
@@ -321,12 +322,18 @@ export default function KpiManagerGuidePanel({
                 workloadBalance: currentSprintKpis.workloadBalance,
                 productivityScore: resolvedCurrentProductivityScore,
               });
-              const displayText =
+              let displayText =
                 key === 'productivityScore' && hasCurrentProductivityScore
                   ? alignGenericScorePhrase(
                       alignTrendsProductivityScore(alignedText, resolvedCurrentProductivityScore),
                     )
                   : alignedText;
+              if (key === 'workloadBalance') {
+                displayText = normalizeWorkloadBalanceGuideText(
+                  displayText,
+                  currentSprintKpis.workloadBalance,
+                );
+              }
               const title = KPI_LABELS[key] ?? key;
               const style = METRIC_STYLES[key] ?? {
                 title: SECTION_ACCENT,

@@ -6,7 +6,6 @@ import {
   Typography,
   Paper,
   Chip,
-  CircularProgress,
   FormControl,
   InputLabel,
   Select,
@@ -46,6 +45,7 @@ import {
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
 export default function TasksPage({ projectId }) {
   const theme = useTheme();
@@ -58,6 +58,7 @@ export default function TasksPage({ projectId }) {
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [developerFilter, setDeveloperFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [selectedSprintId, setSelectedSprintId] = useState('');
@@ -71,7 +72,10 @@ export default function TasksPage({ projectId }) {
 
   const loadData = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
-    if (!silent) setIsLoading(true);
+    if (!silent) {
+      setIsLoading(true);
+      setLoadError('');
+    }
     try {
       const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
       const deleted = recentlyDeletedTaskIdsRef.current;
@@ -82,12 +86,14 @@ export default function TasksPage({ projectId }) {
         (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
       );
       setRawTasks(visibleTasks);
-      setSprints(sprintsData);
+      setSprints(Array.isArray(sprintsData) ? sprintsData : []);
       setUserTasks(visibleUserTasks);
     } catch (error) {
       console.error('Error loading tasks data:', error);
       setRawTasks([]);
       setSprints([]);
+      setUserTasks([]);
+      if (!silent) setLoadError('Could not load tasks. Check that the server is running and try again.');
     } finally {
       if (!silent) setIsLoading(false);
     }
@@ -105,14 +111,24 @@ export default function TasksPage({ projectId }) {
   }, []);
 
   const kanbanSprintId = useMemo(() => {
-    if (!Array.isArray(sprints) || sprints.length === 0) return '';
-    const ids = sprints.map((s) => String(s.id));
+    const pid =
+      effectiveProjectId != null && Number(effectiveProjectId) > 0
+        ? Number(effectiveProjectId)
+        : Number(projectId) > 0
+          ? Number(projectId)
+          : null;
+    const pool =
+      pid != null
+        ? (sprints || []).filter((s) => sprintProjectIdFromJson(s) === pid)
+        : sprints || [];
+    if (!pool.length) return '';
+    const ids = pool.map((s) => String(s.id));
     if (selectedSprintId !== '' && selectedSprintId != null && ids.includes(String(selectedSprintId))) {
       return String(selectedSprintId);
     }
-    const picked = pickDefaultSelectedSprint(sprints);
+    const picked = pickDefaultSelectedSprint(pool);
     return picked?.id != null ? String(picked.id) : '';
-  }, [selectedSprintId, sprints]);
+  }, [selectedSprintId, sprints, effectiveProjectId, projectId]);
 
   const selectedProjectId = useMemo(() => {
     if (effectiveProjectId != null) return effectiveProjectId;
@@ -147,6 +163,13 @@ export default function TasksPage({ projectId }) {
     if (!selectedProjectId) return [];
     return (sprints || []).filter((s) => sprintProjectIdFromJson(s) === Number(selectedProjectId));
   }, [sprints, selectedProjectId]);
+
+  useEffect(() => {
+    if (selectedSprintId !== '' || !sprints.length) return;
+    const pool = sprintsForActiveProject.length ? sprintsForActiveProject : sprints;
+    const picked = pickDefaultSelectedSprint(pool);
+    if (picked?.id != null) setSelectedSprintId(String(picked.id));
+  }, [sprints, sprintsForActiveProject, selectedSprintId]);
 
   useEffect(() => {
     if (developerFilter === 'all') return;
@@ -329,21 +352,16 @@ export default function TasksPage({ projectId }) {
   const pendingChipBg = isDark ? '#3B2A1A' : '#FFF3E0';
 
   if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: ORACLE_RED }} />
-      </Box>
-    );
+    return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
   return (
-    <Box
-      component={motion.div}
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: pageEase }}
-      sx={{ maxWidth: 1200, width: '100%' }}
-    >
+    <Box sx={{ maxWidth: 1200, width: '100%' }}>
+      {loadError ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLoadError('')}>
+          {loadError}
+        </Alert>
+      ) : null}
       {/* Header card */}
       <Paper
         component={motion.div}
@@ -375,10 +393,7 @@ export default function TasksPage({ projectId }) {
                 onChange={(e) => setSelectedSprintId(String(e.target.value))}
                 disabled={!sprints.length}
               >
-                {(projectIdNum != null && Number.isFinite(projectIdNum)
-                  ? sprints.filter((s) => Number(s.assignedProject?.id) === projectIdNum)
-                  : sprints
-                ).map((s) => (
+                {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
                   <MenuItem key={s.id} value={String(s.id)}>Sprint {s.id}</MenuItem>
                 ))}
               </Select>
@@ -394,7 +409,7 @@ export default function TasksPage({ projectId }) {
             </Button>
           </Stack>
         </Box>
-        {!sprints.length && !isLoading ? (
+        {!sprints.length ? (
           <Typography variant="body2" sx={{ mt: 1.25, color: 'text.secondary' }}>No sprints available.</Typography>
         ) : null}
       </Paper>
@@ -459,8 +474,23 @@ export default function TasksPage({ projectId }) {
             <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>Tasks</Typography>
             <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: chipBg, fontWeight: 700 }} />
           </Box>
-          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg, overflow: 'hidden' }}>
-            <KanbanBoard items={filteredItems} onStatusChange={handleStatusChange} onDeleteTask={handleDeleteTask} onOpenTask={handleOpenTaskFromKanban} />
+          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg, overflow: 'hidden', minHeight: 200 }}>
+            {!kanbanSprintId ? (
+              <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                Select a sprint to view tasks.
+              </Typography>
+            ) : filteredItems.length === 0 ? (
+              <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                No tasks in this sprint. Create one with &quot;New task&quot;.
+              </Typography>
+            ) : (
+              <KanbanBoard
+                items={filteredItems}
+                onStatusChange={handleStatusChange}
+                onDeleteTask={handleDeleteTask}
+                onOpenTask={handleOpenTaskFromKanban}
+              />
+            )}
           </Paper>
         </Grid>
       </Grid>

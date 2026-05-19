@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import {
   Box,
   Container,
@@ -6,7 +7,6 @@ import {
   Grid,
   Card,
   Button,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -273,9 +273,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
         </Divider>
         
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
-            <CircularProgress sx={{ color: '#E53935' }} />
-          </Box>
+          <PageLoadingSpinner color="#E53935" minHeight={280} />
         ) : projects.length === 0 && mode === 'manager' ? (
           <Typography sx={{ textAlign: 'center', color: textSecondary, mb: 6 }}>
             No registered projects found. If you just logged in, please refresh the page; if the 
