@@ -19,6 +19,7 @@ import {
   Chip,
   Alert,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { developerAvatarColors } from '../../utils/developerColors';
@@ -41,6 +42,9 @@ export function TasksNewTaskDialog({
   defaultSprintId,
   pickerProjectId,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classification, setClassification] = useState('FEATURE');
@@ -224,10 +228,10 @@ export function TasksNewTaskDialog({
       ...b,
       '& .MuiOutlinedInput-root': {
         ...b['& .MuiOutlinedInput-root'],
-        bgcolor: FORM_FIELD_TINT_BG,
+        bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
       },
     };
-  }, []);
+  }, [isDark]);
 
   return (
     <Dialog
@@ -239,10 +243,13 @@ export function TasksNewTaskDialog({
         elevation: 0,
         sx: {
           borderRadius: 3,
-          border: '1px solid #ECECEC',
+          border: '1px solid',
+          borderColor: isDark ? '#2A2C32' : '#ECECEC',
           borderLeft: `4px solid ${ORACLE_RED}`,
-          bgcolor: '#FFFFFF',
-          boxShadow: '0 16px 40px rgba(199, 70, 52, 0.12)',
+          bgcolor: 'background.paper',
+          boxShadow: isDark 
+            ? '0 16px 40px rgba(0,0,0,0.4)' 
+            : '0 16px 40px rgba(199, 70, 52, 0.12)',
           height: { xs: 'auto', sm: '88vh' },
           maxHeight: 'calc(100vh - 24px)',
           overflow: 'hidden',
@@ -259,7 +266,8 @@ export function TasksNewTaskDialog({
             gap: 1.5,
             px: 2.5,
             py: 2,
-            borderBottom: '1px solid rgba(199, 70, 52, 0.12)',
+            borderBottom: '1px solid',
+            borderBottomColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -268,8 +276,9 @@ export function TasksNewTaskDialog({
                 width: 40,
                 height: 40,
                 borderRadius: 2,
-                bgcolor: 'rgba(199,70,52,0.10)',
-                border: '1px solid rgba(199, 70, 52, 0.18)',
+                bgcolor: isDark ? 'rgba(199,70,52,0.15)' : 'rgba(199,70,52,0.10)',
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(199, 70, 52, 0.25)' : 'rgba(199, 70, 52, 0.18)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -278,12 +287,12 @@ export function TasksNewTaskDialog({
               <TaskAltIcon sx={{ color: ORACLE_RED }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#1A1A1A' }}>
+              <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: 'text.primary' }}>
                 Create task
               </Typography>
               <Typography
                 variant="caption"
-                sx={{ color: '#616161', fontWeight: 600, display: 'block' }}
+                sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}
               >
                 Details, planning & assignees
               </Typography>
@@ -316,7 +325,7 @@ export function TasksNewTaskDialog({
               ...fieldOutlineTint,
               '& .MuiOutlinedInput-root': {
                 ...fieldOutlineTint['& .MuiOutlinedInput-root'],
-                bgcolor: FORM_FIELD_TINT_BG,
+                bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
               },
             }}
           />
@@ -429,7 +438,7 @@ export function TasksNewTaskDialog({
             </Alert>
           ) : null}
           {developersLoading ? (
-            <Typography variant="caption" sx={{ color: '#616161', fontWeight: 600 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               Cargando equipo del proyecto…
             </Typography>
           ) : null}
@@ -454,7 +463,7 @@ export function TasksNewTaskDialog({
             sx={{
               ...fieldOutlineTint,
               '& .MuiSelect-select': {
-                color: '#1A1A1A',
+                color: 'text.primary',
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
@@ -517,7 +526,7 @@ export function TasksNewTaskDialog({
                 return (
                   <MenuItem key={uid} value={uid}>
                     <Checkbox checked={selectedIds.includes(uid)} size="small" sx={{ py: 0 }} />
-                    <Typography variant="body2" sx={{ color: '#1A1A1A' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
                       {u.displayName}
                     </Typography>
                   </MenuItem>
@@ -555,11 +564,17 @@ export function TasksNewTaskDialog({
         </Stack>
       </DialogContent>
       <DialogActions
-        sx={{ px: 2.5, pb: 2.25, pt: 1.5, borderTop: '1px solid rgba(199, 70, 52, 0.12)' }}
+        sx={{ 
+          px: 2.5, 
+          pb: 2.25, 
+          pt: 1.5, 
+          borderTop: '1px solid',
+          borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)'
+        }}
       >
         <Button
           onClick={handleClose}
-          sx={{ color: '#616161', textTransform: 'none', fontWeight: 600 }}
+          sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
           disabled={saving}
         >
           Cancel

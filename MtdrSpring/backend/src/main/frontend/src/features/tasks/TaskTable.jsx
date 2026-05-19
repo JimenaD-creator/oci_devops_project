@@ -14,6 +14,7 @@ import {
   Stack,
   Box,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
@@ -41,11 +42,11 @@ export function getDeveloperLabel(developer) {
   return String(developer).replace(/_/g, ' ');
 }
 
-function OnTimeChip({ item }) {
+function OnTimeChip({ item, isDark }) {
   const onTime = completionOnTimeDisplay(item);
   if (onTime === '—') {
     return (
-      <Typography variant="caption" sx={{ color: '#BBB' }}>
+      <Typography variant="caption" sx={{ color: isDark ? '#5A5A5A' : '#BBB' }}>
         —
       </Typography>
     );
@@ -56,7 +57,7 @@ function OnTimeChip({ item }) {
       label={ok ? 'Yes' : 'No'}
       size="small"
       sx={{
-        bgcolor: ok ? '#E8F5E9' : '#FFEBEE',
+        bgcolor: ok ? (isDark ? '#1A4A2A' : '#E8F5E9') : (isDark ? '#4A1A1A' : '#FFEBEE'),
         color: ok ? '#2E7D32' : '#C62828',
         fontWeight: 700,
         fontSize: '0.7rem',
@@ -87,27 +88,26 @@ function resolveDeveloperName(developer) {
   return String(developer);
 }
 
-function DevChip({ developer }) {
+function DevChip({ developer, isDark }) {
   const resolved = resolveDeveloperName(developer);
   const d = DEV_COLORS[resolved];
   const label = getDeveloperLabel(resolved);
   const pickFromName = (name) => {
     const palettes = [
-      { bg: '#E3F2FD', color: '#0D47A1' }, // blue
-      { bg: '#E8F5E9', color: '#1B5E20' }, // green
-      { bg: '#FFF3E0', color: '#E65100' }, // orange
-      { bg: '#F3E5F5', color: '#6A1B9A' }, // purple
-      { bg: '#E0F2F1', color: '#00695C' }, // teal
-      { bg: '#FCE4EC', color: '#AD1457' }, // pink
-      { bg: '#FFF9C4', color: '#F57F17' }, // yellow
-      { bg: '#E8EAF6', color: '#283593' }, // indigo
-      { bg: '#F1F8E9', color: '#33691E' }, // light green
-      { bg: '#FBE9E7', color: '#BF360C' }, // deep orange
-      { bg: '#E0F7FA', color: '#006064' }, // cyan
-      { bg: '#EDE7F6', color: '#4527A0' }, // deep purple
+      { bg: '#E3F2FD', color: '#0D47A1' },
+      { bg: '#E8F5E9', color: '#1B5E20' },
+      { bg: '#FFF3E0', color: '#E65100' },
+      { bg: '#F3E5F5', color: '#6A1B9A' },
+      { bg: '#E0F2F1', color: '#00695C' },
+      { bg: '#FCE4EC', color: '#AD1457' },
+      { bg: '#FFF9C4', color: '#F57F17' },
+      { bg: '#E8EAF6', color: '#283593' },
+      { bg: '#F1F8E9', color: '#33691E' },
+      { bg: '#FBE9E7', color: '#BF360C' },
+      { bg: '#E0F7FA', color: '#006064' },
+      { bg: '#EDE7F6', color: '#4527A0' },
     ];
     const src = String(name || '');
-    // Polynomial hash with a larger prime to reduce collisions
     let h = 5381;
     for (let i = 0; i < src.length; i += 1) {
       h = (Math.imul(h, 33) ^ src.charCodeAt(i)) >>> 0;
@@ -118,7 +118,7 @@ function DevChip({ developer }) {
   const style = { bgcolor: palette.bg, color: palette.color };
   if (!resolved)
     return (
-      <Typography variant="caption" sx={{ color: '#BBB' }}>
+      <Typography variant="caption" sx={{ color: isDark ? '#5A5A5A' : '#BBB' }}>
         —
       </Typography>
     );
@@ -137,7 +137,10 @@ function DevChip({ developer }) {
   );
 }
 
-function DevelopersCell({ developers, developer, assigneeProgress, managerView }) {
+function DevelopersCell({ developers, developer, assigneeProgress, managerView, isDark }) {
+  const theme = useTheme();
+  const darkMode = theme.palette.mode === 'dark';
+  
   if (managerView && Array.isArray(assigneeProgress) && assigneeProgress.length > 1) {
     return (
       <Stack spacing={0.65} sx={{ py: 0.35 }}>
@@ -159,7 +162,8 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView }
                 maxWidth: '100%',
                 borderRadius: '8px',
                 overflow: 'hidden',
-                border: '1px solid rgba(0,0,0,0.08)',
+                border: `1px solid ${darkMode ? '#2A2C32' : 'rgba(0,0,0,0.1)'}`,
+                boxShadow: `0 1px 2px ${darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.06)'}`,
               }}
             >
               <Box
@@ -210,14 +214,14 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView }
     : [resolveDeveloperName(developer)].filter(Boolean);
   if (list.length === 0)
     return (
-      <Typography variant="caption" sx={{ color: '#BBB' }}>
+      <Typography variant="caption" sx={{ color: darkMode ? '#5A5A5A' : '#BBB' }}>
         —
       </Typography>
     );
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {list.map((name, idx) => (
-        <DevChip key={`${name}-${idx}`} developer={name} />
+        <DevChip key={`${name}-${idx}`} developer={name} isDark={darkMode} />
       ))}
     </div>
   );
@@ -266,21 +270,37 @@ function statusText(item) {
   return raw ? raw.replace(/_/g, ' ') : 'Unknown';
 }
 
-function taskStatusChipProps(item) {
+function taskStatusChipProps(item, isDark) {
   const st = normalizeStatus(item.statusRaw ?? item.status);
   if (st === 'DONE' || st === 'COMPLETED') {
-    return { label: statusText(item), bgcolor: '#E8F5E9', color: '#1B5E20' };
+    return { label: statusText(item), bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', color: '#1B5E20' };
   }
   if (st === 'IN_PROGRESS') {
-    return { label: statusText(item), bgcolor: '#E3F2FD', color: '#1565C0' };
+    return { label: statusText(item), bgcolor: isDark ? '#1A3A5C' : '#E3F2FD', color: '#1565C0' };
   }
   if (st === 'IN_REVIEW') {
-    return { label: statusText(item), bgcolor: '#F3E5F5', color: '#7B1FA2' };
+    return { label: statusText(item), bgcolor: isDark ? '#2A1A3D' : '#F3E5F5', color: '#7B1FA2' };
   }
   if (st === 'PENDING') {
-    return { label: statusText(item), bgcolor: '#FFF3E0', color: '#E65100' };
+    return { label: statusText(item), bgcolor: isDark ? '#4A2A1A' : '#FFF3E0', color: '#E65100' };
   }
-  return { label: statusText(item), bgcolor: '#ECEFF1', color: '#455A64' };
+  return { label: statusText(item), bgcolor: isDark ? '#2A2C32' : '#ECEFF1', color: isDark ? '#9A9A9A' : '#455A64' };
+}
+
+function getPriorityChipProps(priority, isDark) {
+  if (priority === 'CRITICAL') {
+    return { bgcolor: isDark ? '#4A1A1A' : '#FFEBEE', color: '#C62828' };
+  }
+  if (priority === 'HIGH') {
+    return { bgcolor: isDark ? '#4A2A1A' : '#FFF3E0', color: '#E65100' };
+  }
+  if (priority === 'MEDIUM') {
+    return { bgcolor: isDark ? '#4A3A1A' : '#FFF8E1', color: '#F57F17' };
+  }
+  if (priority === 'LOW') {
+    return { bgcolor: isDark ? '#2A2C32' : '#ECEFF1', color: isDark ? '#9A9A9A' : '#455A64' };
+  }
+  return { bgcolor: isDark ? '#2A2C32' : '#F5F5F5', color: isDark ? '#9A9A9A' : '#757575' };
 }
 
 const DEFAULT_LAYOUT = {
@@ -325,6 +345,9 @@ export default function TaskTable({
   /** e.g. 400 or '42vh' — enables sticky header + internal scroll */
   scrollMaxHeight,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const managerView = variant === 'manager';
   const hasActions = Boolean(onComplete || onUndo || onDelete);
   const baseLayout = managerView ? MANAGER_LAYOUT : DEFAULT_LAYOUT;
@@ -350,8 +373,8 @@ export default function TaskTable({
 
   const columnCellSx = (_idx) => {
     return {
-      bgcolor: '#FFFFFF',
-      borderLeft: '1px solid #F0F0F0',
+      bgcolor: 'background.paper',
+      borderLeft: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
     };
   };
 
@@ -360,9 +383,10 @@ export default function TaskTable({
       component={Paper}
       sx={{
         borderRadius: 3,
-        border: '1px solid #EFEFEF',
+        border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
         boxShadow: 'none',
         mb: 1,
+        bgcolor: 'background.paper',
         ...(scrollMaxHeight != null ? { maxHeight: scrollMaxHeight, overflow: 'auto' } : {}),
       }}
     >
@@ -386,15 +410,17 @@ export default function TaskTable({
             <TableRow>
               <TableCell
                 colSpan={colSpanEmpty}
-                sx={{ textAlign: 'center', py: 4, color: '#CCC', fontSize: '0.85rem' }}
+                sx={{ textAlign: 'center', py: 4, color: isDark ? '#5A5A5A' : '#CCC', fontSize: '0.85rem' }}
               >
                 No tasks
               </TableCell>
             </TableRow>
           )}
           {items.map((item) => {
-            const statusChip = taskStatusChipProps(item);
+            const statusChip = taskStatusChipProps(item, isDark);
+            const priorityChip = getPriorityChipProps(item.priority, isDark);
             const clickable = typeof onRowClick === 'function';
+            const completed = isCompletedStatus(item);
             return (
               <TableRow
                 key={item.id}
@@ -403,8 +429,8 @@ export default function TaskTable({
                 onClick={clickable ? () => onRowClick(item) : undefined}
                 sx={{
                   '&:last-child td': { border: 0 },
-                  '&:nth-of-type(odd)': { bgcolor: 'rgba(248, 251, 255, 0.6)' },
-                  '&:hover': { bgcolor: clickable ? 'rgba(199, 70, 52, 0.06)' : undefined },
+                  '&:nth-of-type(odd)': { bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(248, 251, 255, 0.6)' },
+                  '&:hover': { bgcolor: clickable ? (isDark ? 'rgba(199, 70, 52, 0.12)' : 'rgba(199, 70, 52, 0.06)') : undefined },
                   ...(clickable ? { cursor: 'pointer' } : {}),
                 }}
               >
@@ -417,8 +443,8 @@ export default function TaskTable({
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    textDecoration: isCompletedStatus(item) ? 'line-through' : 'none',
-                    color: isCompletedStatus(item) ? '#90A4AE' : '#1A1A1A',
+                    textDecoration: completed ? 'line-through' : 'none',
+                    color: completed ? (isDark ? '#5A5A5A' : '#90A4AE') : 'text.primary',
                   }}
                 >
                   {item.description}
@@ -437,6 +463,7 @@ export default function TaskTable({
                     developer={item.developer}
                     assigneeProgress={item.assigneeProgress}
                     managerView={managerView}
+                    isDark={isDark}
                   />
                 </TableCell>
                 <TableCell sx={{ px: 1.5, ...columnCellSx(2) }}>
@@ -457,36 +484,18 @@ export default function TaskTable({
                     label={String(item.priority || '—').replace(/_/g, ' ')}
                     size="small"
                     sx={{
-                      bgcolor:
-                        item.priority === 'CRITICAL'
-                          ? '#FFEBEE'
-                          : item.priority === 'HIGH'
-                            ? '#FFF3E0'
-                            : item.priority === 'MEDIUM'
-                              ? '#FFF8E1'
-                              : item.priority === 'LOW'
-                                ? '#ECEFF1'
-                                : '#F5F5F5',
-                      color:
-                        item.priority === 'CRITICAL'
-                          ? '#B71C1C'
-                          : item.priority === 'HIGH'
-                            ? '#E65100'
-                            : item.priority === 'MEDIUM'
-                              ? '#F57F17'
-                              : item.priority === 'LOW'
-                                ? '#455A64'
-                                : '#757575',
+                      bgcolor: priorityChip.bgcolor,
+                      color: priorityChip.color,
                       fontWeight: 700,
                       fontSize: '0.7rem',
                       height: 20,
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(4) }}>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(4) }}>
                   {item.assignedHours != null ? `${item.assignedHours}h` : '—'}
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(5) }}>
+                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(5) }}>
                   {item.actualHours != null && Number(item.actualHours) > 0
                     ? `${item.actualHours}h`
                     : '—'}
@@ -494,7 +503,7 @@ export default function TaskTable({
                 {managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}
+                      sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(6) }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
@@ -503,18 +512,16 @@ export default function TaskTable({
                         label={completionOnTimeDisplay(item)}
                         size="small"
                         sx={{
-                          bgcolor:
-                            completionOnTimeDisplay(item) === 'Yes'
-                              ? '#E8F5E9'
-                              : completionOnTimeDisplay(item) === 'No'
-                                ? '#FFEBEE'
-                                : '#F5F5F5',
-                          color:
-                            completionOnTimeDisplay(item) === 'Yes'
-                              ? '#2E7D32'
-                              : completionOnTimeDisplay(item) === 'No'
-                                ? '#C62828'
-                                : '#757575',
+                          bgcolor: completionOnTimeDisplay(item) === 'Yes'
+                            ? (isDark ? '#1A4A2A' : '#E8F5E9')
+                            : completionOnTimeDisplay(item) === 'No'
+                              ? (isDark ? '#4A1A1A' : '#FFEBEE')
+                              : (isDark ? '#2A2C32' : '#F5F5F5'),
+                          color: completionOnTimeDisplay(item) === 'Yes'
+                            ? '#2E7D32'
+                            : completionOnTimeDisplay(item) === 'No'
+                              ? '#C62828'
+                              : (isDark ? '#9A9A9A' : '#757575'),
                           fontWeight: 700,
                           fontSize: '0.72rem',
                           height: 22,
@@ -526,30 +533,28 @@ export default function TaskTable({
                 {!managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: '#666', ...columnCellSx(6) }}
+                      sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(6) }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
                     <TableCell sx={{ px: 1.5, ...columnCellSx(7) }}>
-                      <OnTimeChip item={item} />
+                      <OnTimeChip item={item} isDark={isDark} />
                     </TableCell>
                     <TableCell sx={{ px: 1.5, ...columnCellSx(8) }}>
                       <Chip
                         label={completionOnTimeDisplay(item)}
                         size="small"
                         sx={{
-                          bgcolor:
-                            completionOnTimeDisplay(item) === 'Yes'
-                              ? '#E8F5E9'
-                              : completionOnTimeDisplay(item) === 'No'
-                                ? '#FFEBEE'
-                                : '#F5F5F5',
-                          color:
-                            completionOnTimeDisplay(item) === 'Yes'
-                              ? '#2E7D32'
-                              : completionOnTimeDisplay(item) === 'No'
-                                ? '#C62828'
-                                : '#757575',
+                          bgcolor: completionOnTimeDisplay(item) === 'Yes'
+                            ? (isDark ? '#1A4A2A' : '#E8F5E9')
+                            : completionOnTimeDisplay(item) === 'No'
+                              ? (isDark ? '#4A1A1A' : '#FFEBEE')
+                              : (isDark ? '#2A2C32' : '#F5F5F5'),
+                          color: completionOnTimeDisplay(item) === 'Yes'
+                            ? '#2E7D32'
+                            : completionOnTimeDisplay(item) === 'No'
+                              ? '#C62828'
+                              : (isDark ? '#9A9A9A' : '#757575'),
                           fontWeight: 700,
                           fontSize: '0.72rem',
                           height: 22,

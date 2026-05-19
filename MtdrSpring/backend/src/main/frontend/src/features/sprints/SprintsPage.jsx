@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -12,7 +12,7 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -23,6 +23,7 @@ import {
   deriveTaskStatusFromAssignments,
   isUserTaskAssigneeComplete,
   normalizeTaskStatus,
+  taskEntityId,
   userTaskRowStatus,
   userTaskRowTaskId,
 } from '../tasks/utils/taskUtils';
@@ -51,6 +52,9 @@ import {
 } from './sprintsPageApi';
 
 export default function SprintsPage({ projectId }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
@@ -69,6 +73,8 @@ export default function SprintsPage({ projectId }) {
   );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
+  /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
+  const recentlyDeletedTaskIdsRef = useRef(new Set());
 
   useEffect(() => {
     if (effectiveProjectIdNum != null) {
@@ -133,10 +139,17 @@ export default function SprintsPage({ projectId }) {
       try {
         const { sprintsList, tasksList, userTasksList } =
           await fetchSprintsTasksAndAssignments(projectId);
-        const sorted = sortSprintsForDisplay(sprintsList, tasksList);
+        const deleted = recentlyDeletedTaskIdsRef.current;
+        const visibleTasks = (Array.isArray(tasksList) ? tasksList : []).filter(
+          (t) => !deleted.has(taskEntityId(t)),
+        );
+        const visibleUserTasks = (Array.isArray(userTasksList) ? userTasksList : []).filter(
+          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+        );
+        const sorted = sortSprintsForDisplay(sprintsList, visibleTasks);
         setSprints(sorted);
-        setTasks(tasksList);
-        setUserTasks(userTasksList);
+        setTasks(visibleTasks);
+        setUserTasks(visibleUserTasks);
         setSelectedSprint((prev) => {
           if (prev) {
             const stillThere = sorted.find((s) => s.id === prev.id);
@@ -155,13 +168,24 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
-  useEffect(() => {
-    const onFocus = () => {
-      void loadData({ silent: true });
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [loadData]);
+  const handleTaskDeleted = useCallback((taskId) => {
+    const tid = String(taskId);
+    recentlyDeletedTaskIdsRef.current.add(tid);
+    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+
+    setTasks((prev) => {
+      const next = prev.filter((t) => taskEntityId(t) !== tid);
+      setSprints((sp) => sortSprintsForDisplay(sp, next));
+      return next;
+    });
+    setUserTasks((prev) =>
+      prev.filter((ut) => {
+        const utTid = userTaskRowTaskId(ut);
+        return !Number.isFinite(utTid) || String(utTid) !== tid;
+      }),
+    );
+    setSelectedTaskForDialog(null);
+  }, []);
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -357,14 +381,14 @@ export default function SprintsPage({ projectId }) {
             variant="h4"
             sx={{
               fontWeight: 800,
-              color: '#1A1A1A',
+              color: 'text.primary',
               letterSpacing: '-0.5px',
               fontSize: { xs: '1.65rem', sm: '1.85rem' },
             }}
           >
             Sprints
           </Typography>
-          <Typography variant="body1" sx={{ color: '#757575', mt: 0.75 }}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', mt: 0.75 }}>
             {subtitleProjectName}
             {subtitleProjectId != null && <> · ID {subtitleProjectId}</>} · {sprints.length} total
             sprints
@@ -379,8 +403,8 @@ export default function SprintsPage({ projectId }) {
             size="small"
             sx={{
               textTransform: 'none',
-              borderColor: '#DDD',
-              color: '#555',
+              borderColor: isDark ? '#2A2C32' : '#DDD',
+              color: isDark ? '#9A9A9A' : '#555',
               borderRadius: 2,
               mr: 1,
             }}
@@ -395,7 +419,7 @@ export default function SprintsPage({ projectId }) {
             size="small"
             sx={{
               textTransform: 'none',
-              borderColor: '#E0B4AF',
+              borderColor: isDark ? '#7F3030' : '#E0B4AF',
               color: '#B64536',
               borderRadius: 2,
               mr: 1,
@@ -426,7 +450,7 @@ export default function SprintsPage({ projectId }) {
             <Typography
               sx={{
                 fontWeight: 800,
-                color: '#333',
+                color: 'text.primary',
                 mb: 1.5,
                 fontSize: '1.15rem',
                 letterSpacing: '-0.02em',
@@ -472,7 +496,7 @@ export default function SprintsPage({ projectId }) {
             <Typography
               sx={{
                 fontWeight: 800,
-                color: '#333',
+                color: 'text.primary',
                 fontSize: '1.02rem',
                 mb: 1.25,
                 display: 'block',
@@ -651,13 +675,13 @@ export default function SprintsPage({ projectId }) {
                   py: 3.5,
                   px: 2,
                   textAlign: 'center',
-                  border: '1px dashed #E0E0E0',
+                  border: `1px dashed ${isDark ? '#2A2C32' : '#E0E0E0'}`,
                   borderRadius: 2,
-                  bgcolor: '#FAFAFA',
+                  bgcolor: isDark ? '#16181C' : '#FAFAFA',
                   mt: 0.5,
                 }}
               >
-                <Typography sx={{ fontWeight: 600, color: '#616161', fontSize: '0.95rem' }}>
+                <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.95rem' }}>
                   {statusFilter !== 'all' &&
                   developerFilter === 'all' &&
                   priorityFilter === 'all' &&
@@ -783,14 +807,7 @@ export default function SprintsPage({ projectId }) {
           setSelectedTaskForDialog(null);
           void loadData({ silent: true });
         }}
-        onDeleted={(taskId) => {
-          setTasks((prev) => {
-            const next = prev.filter((x) => x.id !== taskId);
-            setSprints((sp) => sortSprintsForDisplay(sp, next));
-            return next;
-          });
-          setSelectedTaskForDialog(null);
-        }}
+        onDeleted={handleTaskDeleted}
       />
     </Box>
   );

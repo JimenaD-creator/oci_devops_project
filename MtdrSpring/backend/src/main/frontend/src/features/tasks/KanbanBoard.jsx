@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Menu, MenuItem, Divider } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { developerAvatarColors } from '../../utils/developerColors';
 import { STATUS_CHIP_SX } from '../sprints/constants/sprintConstants';
 import './KanbanBoard.css';
@@ -89,6 +90,8 @@ function bucketForItem(item) {
 }
 
 function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const [anchorEl, setAnchorEl] = useState(null);
 
   const hours = item.actualHours != null && item.actualHours !== '' ? `${item.actualHours}h` : '—';
@@ -206,20 +209,31 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
         onClick={(e) => e.stopPropagation()}
+        PaperProps={{
+          sx: {
+            bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+            border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+          }
+        }}
       >
         {STATUS_MENU_OPTIONS.map((opt) => (
           <MenuItem
             key={opt.value}
             selected={opt.value === rawStatus}
             onClick={() => handleMenuSelect(opt.value)}
-            sx={{ fontSize: '0.875rem', fontWeight: opt.value === rawStatus ? 700 : 400 }}
+            sx={{ 
+              fontSize: '0.875rem', 
+              fontWeight: opt.value === rawStatus ? 700 : 400,
+              color: isDark ? '#F0F0F0' : '#1A1A1A',
+              '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
+            }}
           >
             {opt.label}
           </MenuItem>
         ))}
         {typeof onDeleteTask === 'function'
           ? [
-              <Divider key="kanban-status-menu-divider" />,
+              <Divider key="kanban-status-menu-divider" sx={{ borderColor: isDark ? '#2A2C32' : '#E0E0E0' }} />,
               <MenuItem
                 key="kanban-status-menu-delete"
                 onClick={() => {

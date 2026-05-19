@@ -1,37 +1,45 @@
 import React, { useId, useState } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, IconButton, Popover, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 /** Oracle red — tooltip outline */
 export const TOOLTIP_OUTLINE_RED = '#C74634';
 
-export const TOOLTIP_TEXT = '#424242';
-export const TOOLTIP_CALC = '#1565C0';
+// Colores que ahora serán dinámicos según el tema
+const getTooltipTextColor = (isDark) => isDark ? '#F0F0F0' : '#424242';
+const getTooltipCalcColor = (isDark) => isDark ? '#90CAF9' : '#1565C0';
+const getTooltipBgColor = (isDark) => isDark ? '#1C1E22' : '#FFFFFF';
+const getTooltipArrowColor = (isDark) => isDark ? '#1C1E22' : '#FFFFFF';
 
 /** MUI Tooltip `componentsProps.tooltip.sx` + rounded red border */
-export const tooltipChromeSx = {
-  bgcolor: '#FFFFFF',
-  color: TOOLTIP_TEXT,
+export const getTooltipChromeSx = (isDark) => ({
+  bgcolor: getTooltipBgColor(isDark),
+  color: getTooltipTextColor(isDark),
   maxWidth: 340,
   border: `2px solid ${TOOLTIP_OUTLINE_RED}`,
   borderRadius: '12px',
-  boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+  boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.3)' : '0 8px 24px rgba(0,0,0,0.1)',
   px: 1.5,
   py: 1.25,
-};
+});
 
-export const tooltipArrowSx = {
-  color: '#FFFFFF',
+export const getTooltipArrowSx = (isDark) => ({
+  color: getTooltipArrowColor(isDark),
   '&::before': {
     border: `2px solid ${TOOLTIP_OUTLINE_RED}`,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: getTooltipArrowColor(isDark),
   },
-};
+});
 
 function FormulaFraction({ label, numerator, denominator, suffix }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const calcColor = getTooltipCalcColor(isDark);
+  
   return (
-    <Box sx={{ color: TOOLTIP_CALC, textAlign: 'center' }}>
+    <Box sx={{ color: calcColor, textAlign: 'center' }}>
       {label ? (
         <Typography sx={{ fontWeight: 700, fontSize: '0.8125rem', mb: 0.75 }}>{label}</Typography>
       ) : null}
@@ -51,7 +59,7 @@ function FormulaFraction({ label, numerator, denominator, suffix }) {
             width: '100%',
             maxWidth: 280,
             height: 2,
-            bgcolor: TOOLTIP_CALC,
+            bgcolor: calcColor,
             borderRadius: 1,
             opacity: 0.9,
           }}
@@ -75,12 +83,16 @@ function FormulaFraction({ label, numerator, denominator, suffix }) {
 }
 
 function FormulaPlain({ text }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const calcColor = getTooltipCalcColor(isDark);
+  
   return (
     <Typography
       component="div"
       variant="caption"
       sx={{
-        color: TOOLTIP_CALC,
+        color: calcColor,
         fontWeight: 600,
         fontSize: '0.8125rem',
         textAlign: 'center',
@@ -134,12 +146,16 @@ export function TooltipFormula({ formula, nested }) {
 }
 
 export function KpiTooltipBody({ what, representation, formula }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const textColor = getTooltipTextColor(isDark);
+  
   return (
     <Box sx={{ maxWidth: 300 }}>
       <Typography
         variant="caption"
         component="div"
-        sx={{ display: 'block', lineHeight: 1.5, fontSize: '0.8125rem', color: TOOLTIP_TEXT }}
+        sx={{ display: 'block', lineHeight: 1.5, fontSize: '0.8125rem', color: textColor }}
       >
         {what}
       </Typography>
@@ -152,7 +168,7 @@ export function KpiTooltipBody({ what, representation, formula }) {
             mt: 1,
             lineHeight: 1.5,
             fontSize: '0.8125rem',
-            color: TOOLTIP_TEXT,
+            color: textColor,
           }}
         >
           {representation}
@@ -226,10 +242,10 @@ export const KPI_TOOLTIPS = {
 };
 
 /** MUI Tooltip: white panel + red border; use with `arrow` and `KpiTooltipBody` as `title` */
-export const kpiMuiTooltipComponentsProps = {
-  tooltip: { sx: tooltipChromeSx },
-  arrow: { sx: tooltipArrowSx },
-};
+export const kpiMuiTooltipComponentsProps = (isDark) => ({
+  tooltip: { sx: getTooltipChromeSx(isDark) },
+  arrow: { sx: getTooltipArrowSx(isDark) },
+});
 
 const kpiInfoNudge = keyframes`
   0%, 100% {
@@ -254,6 +270,8 @@ export function KpiInfoCornerButton({
   iconSize = '1.15rem',
   placement = 'corner',
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const [anchor, setAnchor] = useState(null);
   const reactId = useId();
   const baseId = id ?? `kpi-info-${reactId.replace(/:/g, '')}`;
@@ -287,24 +305,24 @@ export function KpiInfoCornerButton({
                 right: 0,
                 alignSelf: 'center',
                 ml: 0.1,
-                bgcolor: 'rgba(255, 255, 255, 0.96)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                border: '1px solid rgba(199, 70, 52, 0.22)',
+                bgcolor: isDark ? 'rgba(28, 30, 34, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+                boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.06)',
+                border: `1px solid ${isDark ? 'rgba(199, 70, 52, 0.35)' : 'rgba(199, 70, 52, 0.22)'}`,
                 animation: `${kpiInfoNudge} 2.4s ease-in-out infinite`,
               }
             : {
                 position: 'absolute',
                 top: 6,
                 right: 6,
-                bgcolor: 'rgba(255, 255, 255, 0.92)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                border: '1px solid rgba(199, 70, 52, 0.28)',
+                bgcolor: isDark ? 'rgba(28, 30, 34, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+                boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.08)',
+                border: `1px solid ${isDark ? 'rgba(199, 70, 52, 0.4)' : 'rgba(199, 70, 52, 0.28)'}`,
                 animation: `${kpiInfoNudge} 2.4s ease-in-out infinite`,
               }),
           transition: 'transform 0.12s ease, background-color 0.15s ease, box-shadow 0.2s ease',
           '&:hover': {
-            bgcolor: 'rgba(199, 70, 52, 0.08)',
-            boxShadow: '0 2px 8px rgba(199, 70, 52, 0.2)',
+            bgcolor: isDark ? 'rgba(199, 70, 52, 0.15)' : 'rgba(199, 70, 52, 0.08)',
+            boxShadow: isDark ? '0 2px 8px rgba(199, 70, 52, 0.3)' : '0 2px 8px rgba(199, 70, 52, 0.2)',
             animation: 'none',
             transform: isInline ? 'none' : 'scale(1.05)',
           },
@@ -334,13 +352,13 @@ export function KpiInfoCornerButton({
         disableScrollLock
         PaperProps={{
           sx: {
-            bgcolor: tooltipChromeSx.bgcolor,
-            color: tooltipChromeSx.color,
+            bgcolor: getTooltipBgColor(isDark),
+            color: getTooltipTextColor(isDark),
             maxWidth: 360,
             width: 'min(360px, calc(100vw - 32px))',
-            border: tooltipChromeSx.border,
+            border: `2px solid ${TOOLTIP_OUTLINE_RED}`,
             borderRadius: '12px',
-            boxShadow: '0 10px 32px rgba(0,0,0,0.12)',
+            boxShadow: isDark ? '0 10px 32px rgba(0,0,0,0.3)' : '0 10px 32px rgba(0,0,0,0.12)',
             overflow: 'auto',
             maxHeight: 'min(70vh, 480px)',
           },

@@ -29,9 +29,9 @@ import java.util.Optional;
 
 @Service
 public class UserTaskService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(UserTaskService.class);
-    
+
     @Autowired
     private UserTaskRepository userTaskRepository;
 
@@ -109,6 +109,34 @@ public class UserTaskService {
 
     @Transactional(readOnly = true)
     public List<UserTask> findUserTasksForUserInSprint(Long userId, Long sprintId) {
+        if (userId == null || sprintId == null) {
+            return List.of();
+        }
+        return userTaskRepository.findByUser_IdAndTask_AssignedSprint_Id(userId, sprintId);
+    }
+
+    /**
+     * Returns all USER_TASK rows for a given user across all sprints.
+     * Used for the /myperformance Telegram command.
+     */
+    @Transactional(readOnly = true)
+    public List<UserTask> findByUserId(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return userTaskRepository.findByUser_Id(userId);
+    }
+
+    /**
+     * Finds all USER_TASK assignments for a specific user in a specific sprint.
+     * Used for the /myperformance Telegram command when a specific sprint is selected.
+     * 
+     * @param userId The user ID
+     * @param sprintId The sprint ID
+     * @return List of UserTask assignments for that user in that sprint
+     */
+    @Transactional(readOnly = true)
+    public List<UserTask> findByUserIdAndSprintId(Long userId, Long sprintId) {
         if (userId == null || sprintId == null) {
             return List.of();
         }
@@ -238,9 +266,9 @@ public class UserTaskService {
                 logger.info("Adding {}h for userId {} taskId {} (was {}h)", delta, effectiveUserId, taskId, previous);
             } else {
                 User user = userRepository.findById(effectiveUserId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
+                        .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
                 Task task = taskRepository.findById(taskId)
-                    .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+                        .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
                 userTask = new UserTask(user, task);
                 logger.info("Creating USER_TASK for userId {} taskId {} with {}h (first log)", effectiveUserId, taskId, delta);
             }
@@ -285,9 +313,9 @@ public class UserTaskService {
                 logger.info("Updating blocked reason for userId {} taskId {}", effectiveUserId, taskId);
             } else {
                 User user = userRepository.findById(effectiveUserId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
+                        .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
                 Task task = taskRepository.findById(taskId)
-                    .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+                        .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
                 userTask = new UserTask(user, task);
                 logger.info("Creating USER_TASK for userId {} taskId {} with blocked reason (first log)", effectiveUserId, taskId);
             }

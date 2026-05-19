@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
+import { useTheme } from '@mui/material/styles';
 import { APP_FONT_FAMILY } from '../../theme';
 import { developerAvatarColors } from '../../utils/developerColors';
 
@@ -49,17 +50,21 @@ const initialData = [
 const rate = (completed, assigned) => Math.round((completed / assigned) * 100);
 const avgHours = (hours, completed) => (hours / completed).toFixed(1);
 
-function getBadgeClass(val, highThreshold, midThreshold) {
-  if (val >= highThreshold) return 'badge-tier-high';
-  if (val >= midThreshold) return 'badge-tier-mid';
-  return 'badge-tier-low';
+function getBadgeClass(val, highThreshold, midThreshold, isDark) {
+  if (val >= highThreshold) return isDark ? 'badge-tier-high-dark' : 'badge-tier-high';
+  if (val >= midThreshold) return isDark ? 'badge-tier-mid-dark' : 'badge-tier-mid';
+  return isDark ? 'badge-tier-low-dark' : 'badge-tier-low';
 }
 
 function Badge({ val, green, yellow }) {
-  return <span className={`badge-base ${getBadgeClass(val, green, yellow)}`}>{val}%</span>;
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  return <span className={`badge-base ${getBadgeClass(val, green, yellow, isDark)}`}>{val}%</span>;
 }
 
 function WorkloadBar({ val }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <div className="workload-container">
       <div className="workload-track">
@@ -104,26 +109,15 @@ function DevAvatar({ name, initials, profilePicture, avatarColors }) {
   );
 }
 
-const fullColumns = [
-  { key: 'name', label: 'Developer', sortable: true },
-  { key: 'assigned', label: 'Tasks Assigned', sortable: true },
-  { key: 'completed', label: 'Tasks Completed', sortable: true },
-  { key: 'completionRate', label: 'Completion Rate', sortable: true },
-  { key: 'hours', label: 'Total Hours', sortable: true },
-  { key: 'avgHours', label: 'Average Hrs / Task', sortable: true },
-  { key: 'onTime', label: 'On-Time Delivery', sortable: true },
-  { key: 'participation', label: 'Participation Rate', sortable: true },
-  { key: 'workload', label: 'Workload Balance', sortable: false },
-];
-
-const SHARED_DEVELOPER_TABLE_CSS = `
+// Función para generar CSS dinámico según el tema
+const getSharedDeveloperTableCSS = (isDark) => `
   .table-card {
-    background: #FFFFFF; border-radius: 12px; border: 1px solid #1A1A1A;
+    background: ${isDark ? '#1C1E22' : '#FFFFFF'}; border-radius: 12px; border: 1px solid ${isDark ? '#2A2C32' : '#1A1A1A'};
     box-shadow: 0 1px 4px rgba(0,0,0,0.04); overflow: hidden; margin-bottom: 24px;
     font-family: ${APP_FONT_FAMILY}; -webkit-font-smoothing: antialiased;
   }
   .table-header {
-    padding: 20px; border-bottom: 1px solid #F0F0F0;
+    padding: 20px; border-bottom: 1px solid ${isDark ? '#2A2C32' : '#F0F0F0'};
     display: flex; flex-direction: column; gap: 12px;
   }
   @media (min-width: 640px) {
@@ -132,50 +126,50 @@ const SHARED_DEVELOPER_TABLE_CSS = `
   .table-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .table-title-icon-wrap {
     width: 36px; height: 36px; border-radius: 8px;
-    background: rgba(26,26,26,0.06);
+    background: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,26,0.06)'};
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .table-title {
     font-family: ${APP_FONT_FAMILY}; font-size: 1.05rem; font-weight: 800;
-    color: #1A1A1A; letter-spacing: -0.02em; margin: 0; line-height: 1.3;
+    color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; letter-spacing: -0.02em; margin: 0; line-height: 1.3;
   }
   .search-wrapper { position: relative; }
   .search-icon {
     position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: #666; pointer-events: none;
+    color: ${isDark ? '#9A9A9A' : '#666'}; pointer-events: none;
   }
   .search-wrapper input.search-input[type="text"] {
     box-sizing: border-box; font-family: ${APP_FONT_FAMILY};
     padding: 8px 12px 8px 36px; font-size: 0.8125rem;
-    border: 1px solid #E5E5E5; border-radius: 8px; width: 200px;
-    outline: none; color: #1A1A1A; background: #FAFAFA;
+    border: 1px solid ${isDark ? '#2A2C32' : '#E5E5E5'}; border-radius: 8px; width: 200px;
+    outline: none; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; background: ${isDark ? '#111214' : '#FAFAFA'};
   }
-  .search-wrapper input.search-input[type="text"]::placeholder { color: #999; }
-  .search-wrapper input.search-input[type="text"]:focus { border-color: #C74634; background: #FFFFFF; }
+  .search-wrapper input.search-input[type="text"]::placeholder { color: ${isDark ? '#5A5A5A' : '#999'}; }
+  .search-wrapper input.search-input[type="text"]:focus { border-color: #C74634; background: ${isDark ? '#1C1E22' : '#FFFFFF'}; }
   .table-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-family: ${APP_FONT_FAMILY}; }
-  thead tr { background: #FAFAFA; }
+  thead tr { background: ${isDark ? '#111214' : '#FAFAFA'}; }
   th {
-    text-align: left; font-size: 0.75rem; font-weight: 700; color: #555;
+    text-align: left; font-size: 0.75rem; font-weight: 700; color: ${isDark ? '#9A9A9A' : '#555'};
     padding: 12px 16px; white-space: nowrap; user-select: none; vertical-align: middle;
   }
   th.sortable { cursor: pointer; }
   th.sortable:hover { color: #C74634; }
-  th.th-sprint-compare-group { text-align: center; vertical-align: bottom; color: #1A1A1A; font-size: 0.8125rem; }
-  th.th-sprint-compare-group-bordered { border-left: 1px solid #E8E8E8; }
-  th.th-sprint-compare-sub-bordered { border-left: 1px solid #E8E8E8; }
-  .sprint-range-caption { display: block; font-size: 0.6875rem; color: #666; font-weight: 500; margin-top: 4px; }
-  td { padding: 12px 16px; border-top: 1px solid #F0F0F0; font-size: 0.875rem; color: #1A1A1A; }
-  td.td-sprint-compare-first { border-left: 1px solid #EFEFEF; }
-  .row-odd { background: rgba(250,250,250,0.85); }
-  tbody tr:hover { background: rgba(0,0,0,0.03); }
+  th.th-sprint-compare-group { text-align: center; vertical-align: bottom; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; font-size: 0.8125rem; }
+  th.th-sprint-compare-group-bordered { border-left: 1px solid ${isDark ? '#2A2C32' : '#E8E8E8'}; }
+  th.th-sprint-compare-sub-bordered { border-left: 1px solid ${isDark ? '#2A2C32' : '#E8E8E8'}; }
+  .sprint-range-caption { display: block; font-size: 0.6875rem; color: ${isDark ? '#9A9A9A' : '#666'}; font-weight: 500; margin-top: 4px; }
+  td { padding: 12px 16px; border-top: 1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}; font-size: 0.875rem; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; }
+  td.td-sprint-compare-first { border-left: 1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}; }
+  .row-odd { background: ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(250,250,250,0.85)'}; }
+  tbody tr:hover { background: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)'}; }
   .avatar-circle {
     width: 28px; height: 28px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .dev-name-text { font-size: 0.875rem; font-weight: 600; color: #1A1A1A; white-space: nowrap; }
-  .cell-muted { color: #666; font-weight: 500; }
-  .cell-strong { color: #1A1A1A; font-weight: 700; }
+  .dev-name-text { font-size: 0.875rem; font-weight: 600; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; white-space: nowrap; }
+  .cell-muted { color: ${isDark ? '#9A9A9A' : '#666'}; font-weight: 500; }
+  .cell-strong { color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; font-weight: 700; }
   .badge-base {
     display: inline-flex; align-items: center; padding: 2px 8px;
     border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid;
@@ -184,16 +178,19 @@ const SHARED_DEVELOPER_TABLE_CSS = `
   .badge-tier-high { color: #1B5E20; background: #E8F5E9; border-color: #A5D6A7; }
   .badge-tier-mid  { color: #E65100; background: #FFF3E0; border-color: #FFCC80; }
   .badge-tier-low  { color: #4A148C; background: #F3E5F5; border-color: #CE93D8; }
+  .badge-tier-high-dark { color: #A5D6A7; background: #1A4A2A; border-color: #2E7D32; }
+  .badge-tier-mid-dark  { color: #FFCC80; background: #4A2A1A; border-color: #E65100; }
+  .badge-tier-low-dark  { color: #CE93D8; background: #2A1A3D; border-color: #7B1FA2; }
   .workload-container { display: flex; align-items: center; gap: 8px; }
-  .workload-track { width: 96px; height: 8px; background: #F0F0F0; border-radius: 9999px; overflow: hidden; }
+  .workload-track { width: 96px; height: 8px; background: ${isDark ? '#2A2C32' : '#F0F0F0'}; border-radius: 9999px; overflow: hidden; }
   .workload-fill  { height: 100%; background: #607D8B; border-radius: 9999px; }
-  .workload-text  { font-size: 0.8125rem; font-weight: 600; color: #1A1A1A; }
-  .summary-row    { background: #F7F7F7; border-top: 2px solid #ECECEC; }
-  .summary-cell   { font-size: 0.8125rem; font-weight: 700; color: #1A1A1A; }
+  .workload-text  { font-size: 0.8125rem; font-weight: 600; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; }
+  .summary-row    { background: ${isDark ? '#16181C' : '#F7F7F7'}; border-top: 2px solid ${isDark ? '#2A2C32' : '#ECECEC'}; }
+  .summary-cell   { font-size: 0.8125rem; font-weight: 700; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; }
   .text-center    { text-align: center; }
 `;
 
-const SPRINT_METRICS_DASHBOARD_TEXT_CSS = `
+const getSprintMetricsDashboardTextCSS = (isDark) => `
   .dev-productivity-dashboard .table-title         { font-size: 1.2rem; }
   .dev-productivity-dashboard .table-title-icon-wrap { width: 40px; height: 40px; }
   .dev-productivity-dashboard th                   { font-size: 0.875rem; padding: 14px 16px; }
@@ -223,7 +220,22 @@ function sortValue(v) {
   return null;
 }
 
+const fullColumns = [
+  { key: 'name', label: 'Developer', sortable: true },
+  { key: 'assigned', label: 'Tasks Assigned', sortable: true },
+  { key: 'completed', label: 'Tasks Completed', sortable: true },
+  { key: 'completionRate', label: 'Completion Rate', sortable: true },
+  { key: 'hours', label: 'Total Hours', sortable: true },
+  { key: 'avgHours', label: 'Average Hrs / Task', sortable: true },
+  { key: 'onTime', label: 'On-Time Delivery', sortable: true },
+  { key: 'participation', label: 'Participation Rate', sortable: true },
+  { key: 'workload', label: 'Workload Balance', sortable: false },
+];
+
 function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
@@ -325,15 +337,15 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
 
   return (
     <>
-      <style>{SHARED_DEVELOPER_TABLE_CSS}</style>
-      <style>{SPRINT_METRICS_DASHBOARD_TEXT_CSS}</style>
+      <style>{getSharedDeveloperTableCSS(isDark)}</style>
+      <style>{getSprintMetricsDashboardTextCSS(isDark)}</style>
       <div className="table-card dev-productivity-dashboard">
         <div className="table-header">
           <div className="table-header-left">
             {!suppressCardTitle && (
               <>
                 <div className="table-title-icon-wrap">
-                  <Users size={22} color="#1A1A1A" strokeWidth={2} />
+                  <Users size={22} color={isDark ? '#F0F0F0' : '#1A1A1A'} strokeWidth={2} />
                 </div>
                 <h3 className="table-title">Developer Productivity Breakdown</h3>
               </>
@@ -560,6 +572,9 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
 }
 
 function FullAnalyticsTable() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
@@ -601,12 +616,12 @@ function FullAnalyticsTable() {
 
   return (
     <>
-      <style>{SHARED_DEVELOPER_TABLE_CSS}</style>
+      <style>{getSharedDeveloperTableCSS(isDark)}</style>
       <div className="table-card">
         <div className="table-header">
           <div className="table-header-left">
             <div className="table-title-icon-wrap">
-              <Users size={20} color="#1A1A1A" strokeWidth={2} />
+              <Users size={20} color={isDark ? '#F0F0F0' : '#1A1A1A'} strokeWidth={2} />
             </div>
             <h3 className="table-title">Developer Productivity Breakdown</h3>
           </div>

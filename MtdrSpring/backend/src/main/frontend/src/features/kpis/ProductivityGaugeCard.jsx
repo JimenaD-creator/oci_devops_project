@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { KpiInfoCornerButton, KPI_TOOLTIPS } from './KpiTooltipParts';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
@@ -10,6 +11,9 @@ const GAUGE_HEADER_ACCENT = '#1565C0';
 const GOAL_PCT = 80;
 
 export default function ProductivityGaugeCard({ selectedSprints, compareMode }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const score = React.useMemo(() => {
     if (!selectedSprints?.length) return 0;
     if (compareMode && selectedSprints.length > 1) {
@@ -31,8 +35,9 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
       sx={{
         p: { xs: 2, sm: 2.25 },
         borderRadius: 3,
-        border: '1px solid #EFEFEF',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+        boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
+        bgcolor: 'background.paper',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -56,7 +61,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
               width: 36,
               height: 36,
               borderRadius: 2,
-              bgcolor: 'rgba(21, 101, 192, 0.1)',
+              bgcolor: isDark ? 'rgba(21, 101, 192, 0.15)' : 'rgba(21, 101, 192, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -77,7 +82,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
             <Typography
               component="span"
               variant="subtitle1"
-              sx={{ fontWeight: 700, color: '#1A1A1A', lineHeight: 1.25 }}
+              sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.25 }}
             >
               Productivity Score
             </Typography>
@@ -127,7 +132,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
             textAlign: { xs: 'center', sm: 'left' },
           }}
         >
-          <Typography variant="body2" sx={{ color: '#888', fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}>
             Goal: {GOAL_PCT}%
           </Typography>
           <Box

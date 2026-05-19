@@ -11,12 +11,16 @@ import {
   Button,
   IconButton,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/sprintConstants';
 
 export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [goal, setGoal] = useState('');
@@ -80,7 +84,7 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
     '& .MuiOutlinedInput-root': {
       borderRadius: '8px',
       fontSize: 15,
-      bgcolor: FORM_FIELD_TINT_BG,
+      bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
       '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -88,9 +92,9 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
         boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
       },
     },
-    '& .MuiInputLabel-root': { fontSize: 15 },
+    '& .MuiInputLabel-root': { fontSize: 15, color: isDark ? '#9A9A9A' : undefined },
     '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
-    '& .MuiFormHelperText-root': { fontSize: 13 },
+    '& .MuiFormHelperText-root': { fontSize: 13, color: isDark ? '#9A9A9A' : undefined },
   };
 
   return (
@@ -103,8 +107,8 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
         elevation: 0,
         sx: {
           borderRadius: '16px',
-          border: '1px solid #ECECEC',
-          bgcolor: '#FFFFFF',
+          border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+          bgcolor: 'background.paper',
           overflow: 'hidden',
           maxWidth: { xs: 'calc(100% - 24px)', sm: 560 },
         },
@@ -164,8 +168,8 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
       </DialogTitle>
 
       {/* Body */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
-        <Typography sx={{ fontSize: 15, color: '#424242', mb: 2.5 }}>
+      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : 'transparent' }}>
+        <Typography sx={{ fontSize: 15, color: isDark ? '#9A9A9A' : '#424242', mb: 2.5 }}>
           Pick start and end dates, then add an optional sprint goal.
         </Typography>
 
@@ -242,8 +246,8 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           px: 3,
           py: 1.5,
           gap: 1,
-          borderTop: '1px solid #F0F0F0',
-          bgcolor: '#FAFAFA',
+          borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+          bgcolor: isDark ? '#111214' : '#FAFAFA',
           justifyContent: 'space-between',
         }}
       >
@@ -264,9 +268,9 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: '8px',
-              border: '1px solid #E0E0E0',
+              border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
               px: 2,
-              '&:hover': { bgcolor: '#F5F5F5' },
+              '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
             }}
           >
             Cancel

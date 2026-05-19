@@ -11,13 +11,17 @@ import {
   Button,
   IconButton,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
-import { API_BASE, ORACLE_RED_ACTION } from './constants/sprintConstants';
-import { sprintKpiNumber, toInputDate } from './utils/sprintUtils';
+import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/sprintConstants';
+import { sprintKpiNumber, toInputDate, oracleRgba } from './utils/sprintUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [goal, setGoal] = useState('');
@@ -105,17 +109,23 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const fieldSx = {
     '& .MuiOutlinedInput-root': {
       borderRadius: '8px',
-      fontSize: 13,
-      '& input, & textarea, & .MuiSelect-select': { fontSize: 13 },
+      fontSize: 15,
+      bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
         borderColor: '#C74126',
         boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
       },
     },
-    '& .MuiInputLabel-root': { fontSize: 13 },
+    '& .MuiInputLabel-root': { fontSize: 15, color: isDark ? '#9A9A9A' : undefined },
     '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
-    '& .MuiFormHelperText-root': { fontSize: 12 },
+    '& .MuiFormHelperText-root': { fontSize: 13, color: isDark ? '#9A9A9A' : undefined },
+  };
+
+  const getOracleRgba = (opacity) => {
+    if (isDark) return `rgba(199, 70, 52, ${opacity * 0.8})`;
+    return oracleRgba(opacity);
   };
 
   return (
@@ -128,9 +138,13 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
       PaperProps={{
         elevation: 0,
         sx: {
-          borderRadius: '16px',
-          border: '1px solid #ECECEC',
-          bgcolor: '#FFFFFF',
+          borderRadius: 3,
+          border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+          borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
+          bgcolor: 'background.paper',
+          boxShadow: isDark 
+            ? `0 16px 40px rgba(0,0,0,0.3)`
+            : `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
           overflow: 'hidden',
           maxWidth: { xs: 'calc(100% - 24px)', sm: 560 },
         },
@@ -147,16 +161,22 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 1.5,
+            gap: 2,
+            px: 2.5,
+            pt: 2.5,
+            pb: 2,
+            borderBottom: `1px solid ${getOracleRgba(0.12)}`,
+            backgroundColor: 'background.paper',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 38,
-                height: 38,
-                borderRadius: '10px',
-                bgcolor: 'rgba(255,255,255,0.18)',
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: getOracleRgba(0.12),
+                border: `1px solid ${getOracleRgba(0.2)}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -165,11 +185,22 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             >
               <SpeedOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 15, lineHeight: 1.2 }}>
-                Edit sprint{sprintId != null ? ` #${sprintId}` : ''}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  color: 'text.primary',
+                  lineHeight: 1.25,
+                  fontSize: '1.3rem',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Edit sprint{sprint?.id != null ? ` #${sprint.id}` : ''}
               </Typography>
-              <Typography sx={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mt: 0.35 }}
+              >
                 Dates & goal
               </Typography>
             </Box>
@@ -179,20 +210,25 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             onClick={handleClose}
             disabled={saving}
             size="small"
-            sx={{
-              color: 'rgba(255,255,255,0.85)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
-            }}
+            sx={{ color: 'text.secondary', '&:hover': { bgcolor: getOracleRgba(0.08) } }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      {/* Body */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
-        <Typography sx={{ fontSize: 13, color: '#424242', mb: 2.5, lineHeight: 1.5 }}>
+      <DialogContent
+        sx={{
+          px: 2.5,
+          pt: 2.25,
+          pb: 1.5,
+          backgroundColor: 'background.paper',
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{ color: isDark ? '#9A9A9A' : '#424242', fontWeight: 600, lineHeight: 1.5, mb: 2 }}
+        >
           Update the sprint window and optional goal. KPI metrics stored in the database are kept
           as-is.
         </Typography>
@@ -261,55 +297,35 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           px: 3,
           py: 1.5,
           gap: 1,
-          borderTop: '1px solid #F0F0F0',
-          bgcolor: '#FAFAFA',
-          justifyContent: 'space-between',
+          borderTop: `1px solid ${getOracleRgba(0.12)}`,
+          backgroundColor: 'background.paper',
+          justifyContent: 'flex-end',
         }}
       >
-        <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>
-          Fields marked with{' '}
-          <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>
-            *
-          </Box>{' '}
-          are required
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            onClick={handleClose}
-            disabled={saving}
-            sx={{
-              fontSize: 13,
-              color: 'text.secondary',
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: '8px',
-              border: '1px solid #E0E0E0',
-              px: 2,
-              '&:hover': { bgcolor: '#F5F5F5' },
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving || !canSave}
-            variant="contained"
-            disableElevation
-            startIcon={<CheckIcon sx={{ fontSize: '16px !important' }} />}
-            sx={{
-              fontSize: 13,
-              bgcolor: ORACLE_RED_ACTION,
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: '8px',
-              px: 2.5,
-              '&:hover': { bgcolor: '#A83B2D' },
-              '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' },
-            }}
-          >
-            {saving ? 'Saving…' : 'Save changes'}
-          </Button>
-        </Box>
+        <Button
+          onClick={handleClose}
+          disabled={saving}
+          sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600, px: 2 }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          variant="contained"
+          disableElevation
+          sx={{
+            bgcolor: ORACLE_RED_ACTION,
+            textTransform: 'none',
+            fontWeight: 700,
+            px: 2.5,
+            borderRadius: 2,
+            '&:hover': { bgcolor: '#A83B2D' },
+            '&.Mui-disabled': { bgcolor: isDark ? '#2A2C32' : '#E0E0E0', color: isDark ? '#5A5A5A' : '#9E9E9E' },
+          }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

@@ -2,20 +2,21 @@ package com.springboot.MyTodoList.util;
 
 public enum BotCommands {
 
-	START_COMMAND("/start"), 
-	HIDE_COMMAND("/hide"), 
-	LOGOUT_COMMAND("/logout"),
-	TODO_LIST("/todolist"),
-	ADD_ITEM("/additem"),
-	LLM_REQ("/llm");
+    START_COMMAND("/start"),
+    HIDE_COMMAND("/hide"),
+    LOGOUT_COMMAND("/logout"),
+    TODO_LIST("/todolist"),
+    ADD_ITEM("/additem"),
+    LLM_REQ("/llm"),
+    MY_PERFORMANCE("/myperformance");
 
-	private String command;
+    private String command;
 
-	BotCommands(String enumCommand) {
-		this.command = enumCommand;
-	}
+    BotCommands(String enumCommand) {
+        this.command = enumCommand;
+    }
 
-	public String getCommand() {
-		return command;
-	}
+    public String getCommand() {
+        return command;
+    }
 }

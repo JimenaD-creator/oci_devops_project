@@ -14,6 +14,13 @@ export function isUserTaskAssigneeComplete(ut) {
   return u === 'COMPLETED' || u === 'DONE';
 }
 
+/** Canonical string id for a TASK entity (API may use id or ID). */
+export function taskEntityId(task) {
+  const raw = task?.id ?? task?.ID ?? task?.taskId;
+  if (raw == null || raw === '') return null;
+  return String(raw);
+}
+
 /** Numeric TASK_ID for a user-task row (API may nest it under task, id, or root). */
 export function userTaskRowTaskId(ut) {
   const raw = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;

@@ -150,11 +150,7 @@ public class TaskController {
         if (!taskRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
-        List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
-        if (!assignments.isEmpty()) {
-            userTaskRepository.deleteAll(assignments);
-        }
-        taskRepository.deleteById(id);
+        taskService.deleteTaskById(id);
         return ResponseEntity.noContent().build();
     }
 }

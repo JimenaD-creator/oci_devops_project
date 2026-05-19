@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Clock, Users, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 import KpiGaugeCard from './KpiGaugeCard';
@@ -38,6 +39,9 @@ export const KPI_DEFS = [
  * @param {object[]} selectedSprints
  */
 export default function KPICards({ compareMode, selectedSprints = [] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const ordered = useMemo(
     () => [...selectedSprints].sort((a, b) => a.id - b.id),
     [selectedSprints],

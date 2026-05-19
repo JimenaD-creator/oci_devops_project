@@ -1,19 +1,20 @@
 import React from 'react';
 import { Box } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Clock, ClipboardList } from 'lucide-react';
 import { motion } from 'framer-motion';
 import TaskStatusDistributionChart from '../dashboard/TaskStatusDistributionChart';
 
 const ORACLE_RED = '#C74634';
 
-const cardBase = {
-  backgroundColor: 'white',
+const getCardBase = (isDark) => ({
+  backgroundColor: isDark ? '#1C1E22' : 'white',
   borderRadius: '12px',
-  border: '1px solid #EFEFEF',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+  border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+  boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.05)',
   padding: '1.05rem 1.2rem',
   overflow: 'hidden',
-};
+});
 
 /**
  * KPI cards + task status chart in one row (single-sprint dashboard).
@@ -23,6 +24,10 @@ export default function SummaryCards({
   taskStatusDistribution = [],
   taskStatusTotal = 0,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const cardBase = getCardBase(isDark);
+
   const cards = [
     {
       icon: ClipboardList,
@@ -54,7 +59,7 @@ export default function SummaryCards({
       width: '2.85rem',
       height: '2.85rem',
       borderRadius: '10px',
-      backgroundColor: 'rgba(199,70,52,0.1)',
+      backgroundColor: isDark ? 'rgba(199,70,52,0.15)' : 'rgba(199,70,52,0.1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -64,7 +69,7 @@ export default function SummaryCards({
     label: {
       fontSize: '0.75rem',
       fontWeight: 700,
-      color: '#555',
+      color: isDark ? '#9A9A9A' : '#555',
       marginBottom: '0.28rem',
       textTransform: 'uppercase',
       letterSpacing: '0.04em',
@@ -72,11 +77,11 @@ export default function SummaryCards({
     value: {
       fontSize: '1.95rem',
       fontWeight: 800,
-      color: '#1A1A1A',
+      color: 'text.primary',
       lineHeight: 1.08,
       marginBottom: '0.2rem',
     },
-    subtitle: { fontSize: '0.8rem', color: '#666', fontWeight: 500, lineHeight: 1.35 },
+    subtitle: { fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#666', fontWeight: 500, lineHeight: 1.35 },
   };
 
   return (

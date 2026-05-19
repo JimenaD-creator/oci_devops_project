@@ -3,6 +3,7 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
@@ -30,6 +31,22 @@ public class TaskService {
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Autowired
+    private TaskEmbeddingRepository taskEmbeddingRepository;
+
+    @Transactional
+    public void deleteTaskById(Long id) {
+        if (id == null) {
+            return;
+        }
+        List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
+        if (!assignments.isEmpty()) {
+            userTaskRepository.deleteAll(assignments);
+        }
+        taskEmbeddingRepository.deleteByTaskId(id);
+        taskRepository.deleteById(id);
+    }
 
     @Transactional
     public Task createTask(Task task, List<Long> assigneeUserIds) {

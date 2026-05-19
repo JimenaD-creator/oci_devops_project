@@ -10,6 +10,7 @@ import {
   Select,
   FormControl,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { API_BASE } from '../sprints/constants/sprintConstants';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 
@@ -90,7 +91,7 @@ const TrashIcon = () => (
 );
 
 // Renders markdown-lite: bold, bullets, line breaks
-function MessageText({ text }) {
+function MessageText({ text, isDark }) {
   const lines = text.split('\n');
   return (
     <Box component="span" sx={{ display: 'block' }}>
@@ -125,6 +126,9 @@ function MessageText({ text }) {
 }
 
 export default function ManagerChatbot({ projectId }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -247,12 +251,12 @@ export default function ManagerChatbot({ projectId }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 20px rgba(229,57,53,0.45)',
+                  boxShadow: isDark ? '0 4px 20px rgba(229,57,53,0.35)' : '0 4px 20px rgba(229,57,53,0.45)',
                   color: '#fff',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   '&:hover': {
                     transform: 'scale(1.08)',
-                    boxShadow: '0 6px 28px rgba(229,57,53,0.55)',
+                    boxShadow: isDark ? '0 6px 28px rgba(229,57,53,0.45)' : '0 6px 28px rgba(229,57,53,0.55)',
                   },
                   position: 'relative',
                 }}
@@ -295,21 +299,25 @@ export default function ManagerChatbot({ projectId }) {
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
-                  bgcolor: '#FFFFFF',
-                  boxShadow: '0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
-                  border: '1px solid rgba(229,57,53,0.12)',
+                  bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+                  boxShadow: isDark 
+                    ? '0 24px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15)'
+                    : '0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
+                  border: `1px solid ${isDark ? 'rgba(229,57,53,0.2)' : 'rgba(229,57,53,0.12)'}`,
                 }}
               >
                 {/* Header */}
                 <Box
                   sx={{
-                    background: 'linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%)',
+                    background: isDark 
+                      ? 'linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 100%)'
+                      : 'linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%)',
                     px: 2.5,
                     py: 1.75,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.5,
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.06)'}`,
                   }}
                 >
                   <Box
@@ -364,7 +372,7 @@ export default function ManagerChatbot({ projectId }) {
                         </Typography>
                       </Box>
                     </Box>
-                    <Typography sx={{ color: '#888', fontSize: '0.7rem', mt: 0.1 }}>
+                    <Typography sx={{ color: isDark ? '#9A9A9A' : '#888', fontSize: '0.7rem', mt: 0.1 }}>
                       Ask anything about your project
                     </Typography>
                   </Box>
@@ -374,7 +382,7 @@ export default function ManagerChatbot({ projectId }) {
                         size="small"
                         onClick={clearChat}
                         sx={{
-                          color: '#666',
+                          color: isDark ? '#9A9A9A' : '#666',
                           '&:hover': { color: '#E57373', bgcolor: 'rgba(229,57,53,0.1)' },
                         }}
                       >
@@ -385,7 +393,7 @@ export default function ManagerChatbot({ projectId }) {
                       size="small"
                       onClick={() => setOpen(false)}
                       sx={{
-                        color: '#666',
+                        color: isDark ? '#9A9A9A' : '#666',
                         '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
                       }}
                     >
@@ -399,15 +407,15 @@ export default function ManagerChatbot({ projectId }) {
                   sx={{
                     px: 2,
                     py: 1,
-                    bgcolor: '#FAFAFA',
-                    borderBottom: '1px solid #F0F0F0',
+                    bgcolor: isDark ? '#16181C' : '#FAFAFA',
+                    borderBottom: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1,
                   }}
                 >
                   <Typography
-                    sx={{ fontSize: '0.7rem', color: '#999', fontWeight: 600, flexShrink: 0 }}
+                    sx={{ fontSize: '0.7rem', color: isDark ? '#9A9A9A' : '#999', fontWeight: 600, flexShrink: 0 }}
                   >
                     CONTEXT
                   </Typography>
@@ -418,10 +426,10 @@ export default function ManagerChatbot({ projectId }) {
                       sx={{
                         fontSize: '0.75rem',
                         fontWeight: 600,
-                        color: '#1A1A1A',
-                        bgcolor: '#fff',
+                        color: isDark ? '#F0F0F0' : '#1A1A1A',
+                        bgcolor: isDark ? '#1C1E22' : '#fff',
                         borderRadius: '8px',
-                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#E8E8E8' },
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#2A2C32' : '#E8E8E8' },
                         '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#E53935' },
                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#E53935',
@@ -430,11 +438,11 @@ export default function ManagerChatbot({ projectId }) {
                         '& .MuiSelect-select': { py: 0.75 },
                       }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                      <MenuItem value="all" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
                         All sprints
                       </MenuItem>
                       {sprints.map((s) => (
-                        <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.75rem' }}>
+                        <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
                           Sprint {s.id}
                         </MenuItem>
                       ))}
@@ -454,7 +462,7 @@ export default function ManagerChatbot({ projectId }) {
                     gap: 1.5,
                     '&::-webkit-scrollbar': { width: 4 },
                     '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: '#E0E0E0', borderRadius: 2 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: isDark ? '#2A2C32' : '#E0E0E0', borderRadius: 2 },
                   }}
                 >
                   {/* Empty state with suggestions */}
@@ -473,8 +481,9 @@ export default function ManagerChatbot({ projectId }) {
                           width: 52,
                           height: 52,
                           borderRadius: '16px',
-                          background:
-                            'linear-gradient(135deg, rgba(229,57,53,0.12), rgba(183,28,28,0.08))',
+                          background: isDark
+                            ? 'linear-gradient(135deg, rgba(229,57,53,0.2), rgba(183,28,28,0.12))'
+                            : 'linear-gradient(135deg, rgba(229,57,53,0.12), rgba(183,28,28,0.08))',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -485,12 +494,12 @@ export default function ManagerChatbot({ projectId }) {
                       </Box>
                       <Box sx={{ textAlign: 'center' }}>
                         <Typography
-                          sx={{ fontWeight: 700, fontSize: '0.875rem', color: '#1A1A1A', mb: 0.5 }}
+                          sx={{ fontWeight: 700, fontSize: '0.875rem', color: 'text.primary', mb: 0.5 }}
                         >
                           How can I help?
                         </Typography>
                         <Typography
-                          sx={{ fontSize: '0.75rem', color: '#999', maxWidth: 260, mx: 'auto' }}
+                          sx={{ fontSize: '0.75rem', color: isDark ? '#9A9A9A' : '#999', maxWidth: 260, mx: 'auto' }}
                         >
                           Ask me about tasks, developers, sprint progress, or anything about your
                           project.
@@ -507,15 +516,15 @@ export default function ManagerChatbot({ projectId }) {
                               px: 1.5,
                               py: 1,
                               borderRadius: '10px',
-                              border: '1px solid #F0F0F0',
-                              bgcolor: '#FAFAFA',
+                              border: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+                              bgcolor: isDark ? '#1C1E22' : '#FAFAFA',
                               cursor: 'pointer',
                               fontSize: '0.75rem',
-                              color: '#555',
+                              color: isDark ? '#9A9A9A' : '#555',
                               fontWeight: 500,
                               transition: 'all 0.15s',
                               '&:hover': {
-                                bgcolor: '#FFF5F5',
+                                bgcolor: isDark ? '#2A1A1A' : '#FFF5F5',
                                 borderColor: 'rgba(229,57,53,0.3)',
                                 color: '#E53935',
                               },
@@ -570,24 +579,18 @@ export default function ManagerChatbot({ projectId }) {
                             py: 1,
                             borderRadius:
                               msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                            bgcolor:
-                              msg.role === 'user'
-                                ? 'linear-gradient(135deg, #E53935, #C62828)'
-                                : '#F5F5F5',
-                            background:
-                              msg.role === 'user'
-                                ? 'linear-gradient(135deg, #E53935, #C62828)'
-                                : '#F5F5F5',
-                            color: msg.role === 'user' ? '#fff' : '#1A1A1A',
+                            bgcolor: msg.role === 'user'
+                              ? 'linear-gradient(135deg, #E53935, #C62828)'
+                              : (isDark ? '#2A2C32' : '#F5F5F5'),
+                            color: msg.role === 'user' ? '#fff' : (isDark ? '#F0F0F0' : '#1A1A1A'),
                             fontSize: '0.8rem',
                             lineHeight: 1.55,
-                            boxShadow:
-                              msg.role === 'user'
-                                ? '0 2px 8px rgba(229,57,53,0.25)'
-                                : '0 1px 3px rgba(0,0,0,0.06)',
+                            boxShadow: msg.role === 'user'
+                              ? (isDark ? '0 2px 8px rgba(229,57,53,0.35)' : '0 2px 8px rgba(229,57,53,0.25)')
+                              : (isDark ? '0 1px 3px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.06)'),
                           }}
                         >
-                          <MessageText text={msg.content} />
+                          <MessageText text={msg.content} isDark={isDark} />
                         </Box>
                       </Box>
                     </motion.div>
@@ -619,7 +622,7 @@ export default function ManagerChatbot({ projectId }) {
                             px: 1.5,
                             py: 1,
                             borderRadius: '14px 14px 14px 4px',
-                            bgcolor: '#F5F5F5',
+                            bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
                             display: 'flex',
                             gap: 0.5,
                             alignItems: 'center',
@@ -632,7 +635,7 @@ export default function ManagerChatbot({ projectId }) {
                                 width: 6,
                                 height: 6,
                                 borderRadius: '50%',
-                                bgcolor: '#CCC',
+                                bgcolor: isDark ? '#9A9A9A' : '#CCC',
                                 animation: 'bounce 1.2s ease-in-out infinite',
                                 animationDelay: `${j * 0.2}s`,
                                 '@keyframes bounce': {
@@ -655,8 +658,8 @@ export default function ManagerChatbot({ projectId }) {
                   sx={{
                     px: 2,
                     py: 1.5,
-                    borderTop: '1px solid #F0F0F0',
-                    bgcolor: '#FAFAFA',
+                    borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+                    bgcolor: isDark ? '#111214' : '#FAFAFA',
                     display: 'flex',
                     gap: 1,
                     alignItems: 'flex-end',
@@ -676,13 +679,14 @@ export default function ManagerChatbot({ projectId }) {
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '12px',
-                        bgcolor: '#fff',
+                        bgcolor: isDark ? '#1C1E22' : '#fff',
                         fontSize: '0.8rem',
-                        '& fieldset': { borderColor: '#E8E8E8' },
+                        '& fieldset': { borderColor: isDark ? '#2A2C32' : '#E8E8E8' },
                         '&:hover fieldset': { borderColor: '#E53935' },
                         '&.Mui-focused fieldset': { borderColor: '#E53935', borderWidth: 1.5 },
                       },
-                      '& .MuiInputBase-input': { py: 1 },
+                      '& .MuiInputBase-input': { py: 1, color: isDark ? '#F0F0F0' : '#1A1A1A' },
+                      '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : '#666' },
                     }}
                   />
                   <IconButton
@@ -696,20 +700,20 @@ export default function ManagerChatbot({ projectId }) {
                       background:
                         input.trim() && !loading
                           ? 'linear-gradient(135deg, #E53935, #C62828)'
-                          : '#EEEEEE',
-                      color: input.trim() && !loading ? '#fff' : '#BDBDBD',
+                          : (isDark ? '#2A2C32' : '#EEEEEE'),
+                      color: input.trim() && !loading ? '#fff' : (isDark ? '#5A5A5A' : '#BDBDBD'),
                       transition: 'all 0.2s',
                       '&:hover': {
                         background:
                           input.trim() && !loading
                             ? 'linear-gradient(135deg, #EF5350, #E53935)'
-                            : '#EEEEEE',
+                            : (isDark ? '#2A2C32' : '#EEEEEE'),
                         transform: input.trim() && !loading ? 'scale(1.05)' : 'none',
                       },
-                      '&.Mui-disabled': { background: '#EEEEEE', color: '#BDBDBD' },
+                      '&.Mui-disabled': { background: isDark ? '#2A2C32' : '#EEEEEE', color: isDark ? '#5A5A5A' : '#BDBDBD' },
                     }}
                   >
-                    {loading ? <CircularProgress size={16} sx={{ color: '#999' }} /> : <SendIcon />}
+                    {loading ? <CircularProgress size={16} sx={{ color: isDark ? '#9A9A9A' : '#999' }} /> : <SendIcon />}
                   </IconButton>
                 </Box>
               </Box>

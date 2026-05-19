@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 /** Chart arc color (indigo — avoid red/green in chart fills). */
@@ -20,11 +21,17 @@ export default function KpiDonutChart({
   maxWidth = 280,
   valueFontSize = { xs: '1.65rem', sm: '1.85rem' },
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const p = Math.min(100, Math.max(0, Number(pct)));
   const data = [
     { name: 'score', value: p },
     { name: 'rest', value: 100 - p },
   ];
+
+  // Color para la parte "restante" del donut
+  const restFill = isDark ? '#2A2C32' : '#F0F0F0';
 
   return (
     <Box
@@ -51,7 +58,7 @@ export default function KpiDonutChart({
             stroke="none"
           >
             <Cell fill={arcColor} />
-            <Cell fill="#F0F0F0" />
+            <Cell fill={restFill} />
           </Pie>
         </PieChart>
       </ResponsiveContainer>
@@ -69,14 +76,14 @@ export default function KpiDonutChart({
           sx={{
             fontSize: valueFontSize,
             fontWeight: 800,
-            color: '#1A1A1A',
+            color: 'text.primary',
             lineHeight: 1,
           }}
         >
           {displayValue}
         </Typography>
         {displaySuffix ? (
-          <Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>
+          <Typography variant="caption" sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}>
             {displaySuffix}
           </Typography>
         ) : null}

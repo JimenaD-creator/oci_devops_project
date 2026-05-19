@@ -19,6 +19,7 @@ import {
   Typography,
   Stack,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
@@ -133,6 +134,8 @@ const PRIORITY_OPTIONS = [
 // ── Subcomponentes ────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
       <Typography
@@ -153,6 +156,8 @@ function SectionLabel({ children }) {
 }
 
 function SegmentedButtons({ options, value, onChange, sx }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box sx={{ display: 'flex', gap: 0.75, ...sx }}>
       {options.map((opt) => {
@@ -167,9 +172,9 @@ function SegmentedButtons({ options, value, onChange, sx }) {
               py: 0.875,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : 'text.secondary',
+              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
               fontSize: 15,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -179,7 +184,7 @@ function SegmentedButtons({ options, value, onChange, sx }) {
               justifyContent: 'center',
               gap: 0.5,
               '&:hover': {
-                bgcolor: active ? opt.bg : 'action.hover',
+                bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'),
                 borderColor: opt.border,
               },
             }}
@@ -190,7 +195,7 @@ function SegmentedButtons({ options, value, onChange, sx }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  bgcolor: active ? opt.dot : '#BDBDBD',
+                  bgcolor: active ? opt.dot : (isDark ? '#5A5A5A' : '#BDBDBD'),
                   flexShrink: 0,
                 }}
               />
@@ -204,6 +209,8 @@ function SegmentedButtons({ options, value, onChange, sx }) {
 }
 
 function TypeGrid({ value, onChange }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Box
       sx={{
@@ -223,9 +230,9 @@ function TypeGrid({ value, onChange }) {
               py: 1,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : '#E0E0E0'}`,
+              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : 'text.secondary',
+              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
               fontSize: 15,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -235,7 +242,7 @@ function TypeGrid({ value, onChange }) {
               gap: 0.5,
               transition: 'all 0.12s',
               '&:hover': {
-                bgcolor: active ? opt.bg : 'action.hover',
+                bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'),
                 borderColor: opt.border,
               },
             }}
@@ -259,6 +266,9 @@ export function NewTaskDialog({
   projectDevelopers,
   defaultSprintId,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classification, setClassification] = useState('FEATURE');
@@ -361,7 +371,7 @@ export function NewTaskDialog({
     '& .MuiOutlinedInput-root': {
       borderRadius: '8px',
       fontSize: 15,
-      bgcolor: FORM_FIELD_TINT_BG,
+      bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
       '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -369,10 +379,24 @@ export function NewTaskDialog({
         boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
       },
     },
-    '& .MuiInputLabel-root': { fontSize: 15 },
+    '& .MuiInputLabel-root': { fontSize: 15, color: isDark ? '#9A9A9A' : undefined },
     '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
-    '& .MuiMenuItem-root': { fontSize: 15 },
+    '& .MuiMenuItem-root': { fontSize: 15, color: isDark ? '#F0F0F0' : '#1A1A1A' },
   };
+
+  const chipPalettes = isDark
+    ? [
+        { bg: '#2D2A4A', border: '#6A5ACD', color: '#B39DDB' },
+        { bg: '#1A4A3A', border: '#4DB6AC', color: '#80CBC4' },
+        { bg: '#4A2A1A', border: '#FFB74D', color: '#FFCC80' },
+        { bg: '#4A1A1A', border: '#EF9A9A', color: '#FFAB91' },
+      ]
+    : [
+        { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
+        { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
+        { bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
+        { bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
+      ];
 
   return (
     <Dialog
@@ -384,8 +408,8 @@ export function NewTaskDialog({
         elevation: 0,
         sx: {
           borderRadius: '16px',
-          border: '1px solid #ECECEC',
-          bgcolor: '#FFFFFF',
+          border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+          bgcolor: 'background.paper',
           overflow: 'hidden',
           maxWidth: { xs: 'calc(100% - 24px)', sm: 680 },
         },
@@ -445,7 +469,7 @@ export function NewTaskDialog({
       </DialogTitle>
 
       {/* ── Body ── */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto' }}>
+      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : 'transparent' }}>
         <Stack spacing={2}>
           <TextField
             label="Task title *"
@@ -545,13 +569,6 @@ export function NewTaskDialog({
               input={<OutlinedInput label="Developers *" />}
               renderValue={(selected) => {
                 const ids = finiteUserIds(selected);
-
-                const chipPalettes = [
-                  { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
-                  { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
-                  { bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
-                  { bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
-                ];
                 return (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.25 }}>
                     {ids.length === 0 ? (
@@ -594,7 +611,7 @@ export function NewTaskDialog({
                   />
                   <ListItemText
                     primary={u.displayName}
-                    primaryTypographyProps={{ fontSize: 15, fontWeight: 500 }}
+                    primaryTypographyProps={{ fontSize: 15, fontWeight: 500, color: isDark ? '#F0F0F0' : '#1A1A1A' }}
                   />
                 </MenuItem>
               ))}
@@ -639,8 +656,8 @@ export function NewTaskDialog({
           px: 3,
           py: 1.5,
           gap: 1,
-          borderTop: '1px solid #F0F0F0',
-          bgcolor: '#FAFAFA',
+          borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+          bgcolor: isDark ? '#111214' : '#FAFAFA',
           justifyContent: 'space-between',
         }}
       >
@@ -661,9 +678,9 @@ export function NewTaskDialog({
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: '8px',
-              border: '1px solid #E0E0E0',
+              border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
               px: 2,
-              '&:hover': { bgcolor: '#F5F5F5' },
+              '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
             }}
           >
             Cancel

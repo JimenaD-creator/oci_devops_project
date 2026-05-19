@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { useInView } from 'framer-motion';
 import { Box, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { ListTodo } from 'lucide-react';
 import { RECHARTS_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography';
@@ -14,16 +15,19 @@ const CHART_HEIGHT_EMBEDDED = 300;
 const PIE_OUTER_RADIUS_EMBEDDED = 118;
 const PIE_ANIM_MS = 1000;
 
-const cardBase = {
-  backgroundColor: 'white',
+const cardBase = (isDark) => ({
+  backgroundColor: isDark ? '#1C1E22' : 'white',
   borderRadius: '12px',
-  border: '1px solid #EFEFEF',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+  border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+  boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.05)',
   padding: '1.05rem 1.2rem',
   overflow: 'hidden',
-};
+});
 
 function StatusTooltip({ active, payload }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const fill = row.fill || CHART_CARD_ACCENT;
@@ -31,20 +35,20 @@ function StatusTooltip({ active, payload }) {
   return (
     <Box
       sx={{
-        bgcolor: '#fff',
+        bgcolor: 'background.paper',
         borderRadius: 1,
         px: 1.5,
         py: 1.25,
         fontSize: 14,
-        boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
         border: '2px solid',
         borderColor: fill,
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1A1A', lineHeight: 1.2 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary', lineHeight: 1.2 }}>
         {row.name}
       </Typography>
-      <Typography sx={{ mt: 0.75, fontSize: '1.05rem', fontWeight: 800, color: '#1A1A1A' }}>
+      <Typography sx={{ mt: 0.75, fontSize: '1.05rem', fontWeight: 800, color: 'text.primary' }}>
         {row.value} tasks{pct ? ` · ${pct}` : ''}
       </Typography>
     </Box>
@@ -61,6 +65,9 @@ export default function TaskStatusDistributionChart({
   embedded = false,
   caption,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const embeddedCaption = caption ?? 'Task counts by workflow stage for the current sprint.';
   const hasTasks = total > 0;
   const plotHeight = embedded ? CHART_HEIGHT_EMBEDDED : CHART_HEIGHT;
@@ -88,7 +95,7 @@ export default function TaskStatusDistributionChart({
   return (
     <div
       style={{
-        ...cardBase,
+        ...cardBase(isDark),
         borderTop: embedded ? 'none' : `3px solid ${CHART_CARD_ACCENT}`,
         display: 'flex',
         flexDirection: 'column',
@@ -97,7 +104,7 @@ export default function TaskStatusDistributionChart({
         flex: embedded ? 1 : undefined,
         minHeight: 0,
         boxSizing: 'border-box',
-        padding: embedded ? '0.25rem 0 0 0' : cardBase.padding,
+        padding: embedded ? '0.25rem 0 0 0' : cardBase(isDark).padding,
       }}
     >
       {!embedded ? (
@@ -109,7 +116,7 @@ export default function TaskStatusDistributionChart({
               width: '2.65rem',
               height: '2.65rem',
               borderRadius: '10px',
-              backgroundColor: 'rgba(21, 101, 192, 0.1)',
+              backgroundColor: isDark ? 'rgba(21, 101, 192, 0.15)' : 'rgba(21, 101, 192, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -123,7 +130,7 @@ export default function TaskStatusDistributionChart({
               variant="h6"
               sx={{
                 fontWeight: 800,
-                color: '#1A1A1A',
+                color: 'text.primary',
                 fontSize: '1.125rem',
                 lineHeight: 1.35,
                 letterSpacing: '-0.02em',
@@ -131,14 +138,14 @@ export default function TaskStatusDistributionChart({
             >
               Tasks by status
             </Typography>
-            <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block' }}>
+            <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block', color: 'text.secondary' }}>
               How workload is split across task stages.
             </Typography>
           </div>
         </div>
       ) : (
         <Typography
-          sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 1.25, px: 0.5 }}
+          sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 1.25, px: 0.5, color: 'text.secondary' }}
         >
           {embeddedCaption}
         </Typography>
@@ -177,7 +184,7 @@ export default function TaskStatusDistributionChart({
                   <Cell
                     key={`cell-${entry.name}-${index}`}
                     fill={entry.fill}
-                    stroke="#fff"
+                    stroke={isDark ? '#1C1E22' : '#fff'}
                     strokeWidth={2}
                   />
                 ))}
@@ -193,12 +200,13 @@ export default function TaskStatusDistributionChart({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px dashed #B39DDB',
+              border: '1px dashed',
+              borderColor: isDark ? '#9C27B0' : '#B39DDB',
               borderRadius: 2,
-              bgcolor: '#F3E5F5',
+              bgcolor: isDark ? 'rgba(156, 39, 176, 0.1)' : '#F3E5F5',
             }}
           >
-            <Typography sx={{ color: '#6A1B9A', fontWeight: 600, fontSize: '0.95rem' }}>
+            <Typography sx={{ color: isDark ? '#CE93D8' : '#6A1B9A', fontWeight: 600, fontSize: '0.95rem' }}>
               No tasks in this sprint
             </Typography>
           </Box>
@@ -225,7 +233,7 @@ export default function TaskStatusDistributionChart({
               component="span"
               sx={{
                 fontSize: '1rem',
-                color: '#1A1A1A',
+                color: 'text.primary',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 0.75,

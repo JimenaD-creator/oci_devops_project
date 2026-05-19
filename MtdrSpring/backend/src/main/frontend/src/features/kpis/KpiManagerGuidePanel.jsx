@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper, Button, CircularProgress } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import {
   KPI_LABELS,
@@ -20,12 +21,20 @@ const METRIC_KEYS = [
   'productivityScore',
 ];
 
-const METRIC_STYLES = {
+const METRIC_STYLES_LIGHT = {
   completionRate: { title: '#1565C0', bg: '#E3F2FD', border: '#BBDEFB' },
   onTimeDelivery: { title: '#EF6C00', bg: '#FFF3E0', border: '#FFE0B2' },
   teamParticipation: { title: '#7B1FA2', bg: '#F3E5F5', border: '#E1BEE7' },
   workloadBalance: { title: '#2E7D32', bg: '#E8F5E9', border: '#C8E6C9' },
   productivityScore: { title: '#37474F', bg: '#ECEFF1', border: '#CFD8DC' },
+};
+
+const METRIC_STYLES_DARK = {
+  completionRate: { title: '#64B5F6', bg: '#1A3A5C', border: '#2A4A6C' },
+  onTimeDelivery: { title: '#FFB74D', bg: '#4A2A1A', border: '#6A4A2A' },
+  teamParticipation: { title: '#CE93D8', bg: '#2A1A3D', border: '#3A2A4D' },
+  workloadBalance: { title: '#81C784', bg: '#1A4A2A', border: '#2A5A3A' },
+  productivityScore: { title: '#90A4AE', bg: '#2A2C32', border: '#3A3C42' },
 };
 
 function clampOver100ForDisplay(rawText, options = {}) {
@@ -65,6 +74,10 @@ export default function KpiManagerGuidePanel({
   currentSprintKpis = {},
   onOpenAiInsights,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const METRIC_STYLES = isDark ? METRIC_STYLES_DARK : METRIC_STYLES_LIGHT;
+  
   const resolvedCurrentProductivityScore = Number.isFinite(Number(currentProductivityScore))
     ? Number(currentProductivityScore)
     : Number(productivityDelta?.currentScore);
@@ -120,6 +133,31 @@ export default function KpiManagerGuidePanel({
     });
   const hasGuide = Boolean(guide) && (introText !== '' || hasMetricLines);
 
+  // Colores para el delta de productividad
+  const deltaColors = {
+    up: {
+      bg: isDark ? '#1A4A2A' : '#E8F5E9',
+      border: isDark ? '#2E7D32' : '#C8E6C9',
+      text: isDark ? '#81C784' : '#1B5E20',
+    },
+    down: {
+      bg: isDark ? '#4A1A1A' : '#FFEBEE',
+      border: isDark ? '#C62828' : '#FFCDD2',
+      text: isDark ? '#EF9A9A' : '#B71C1C',
+    },
+    neutral: {
+      bg: isDark ? '#2A2C32' : '#ECEFF1',
+      border: isDark ? '#3A3C42' : '#CFD8DC',
+      text: isDark ? '#9A9A9A' : '#37474F',
+    },
+  };
+  const strongGainColors = {
+    bg: isDark ? '#1A4A2A' : '#C8E6C9',
+    border: isDark ? '#2E7D32' : '#2E7D32',
+    text: isDark ? '#81C784' : '#1B5E20',
+    highlight: isDark ? '#A5D6A7' : '#1B5E20',
+  };
+
   return (
     <Paper
       sx={{
@@ -128,8 +166,8 @@ export default function KpiManagerGuidePanel({
         borderRadius: 2,
         border: `1px solid ${sectionRgba(0.22)}`,
         borderLeft: `4px solid ${SECTION_ACCENT}`,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-        bgcolor: '#FAFAFF',
+        boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
+        bgcolor: isDark ? '#1C1E22' : '#FAFAFF',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -152,16 +190,16 @@ export default function KpiManagerGuidePanel({
                   mb: 2,
                   p: 1.5,
                   borderRadius: 1.5,
-                  border: '2px solid #2E7D32',
-                  bgcolor: '#C8E6C9',
-                  boxShadow: '0 1px 6px rgba(46,125,50,0.2)',
+                  border: `2px solid ${strongGainColors.border}`,
+                  bgcolor: strongGainColors.bg,
+                  boxShadow: isDark ? '0 1px 6px rgba(0,0,0,0.3)' : '0 1px 6px rgba(46,125,50,0.2)',
                 }}
               >
                 <Typography
                   sx={{
                     fontSize: '0.95rem',
                     fontWeight: 800,
-                    color: '#1B5E20',
+                    color: strongGainColors.text,
                     letterSpacing: '0.02em',
                     mb: 0.75,
                   }}
@@ -169,7 +207,7 @@ export default function KpiManagerGuidePanel({
                   Strong productivity gain
                 </Typography>
                 <Typography
-                  sx={{ fontSize: '0.88rem', color: '#1B5E20', fontWeight: 600, lineHeight: 1.55 }}
+                  sx={{ fontSize: '0.88rem', color: strongGainColors.text, fontWeight: 600, lineHeight: 1.55 }}
                 >
                   Productivity score vs Sprint {productivityDelta.previousSprintId}:{' '}
                   {productivityDelta.previousScore}% → {productivityDelta.currentScore}%
@@ -196,29 +234,14 @@ export default function KpiManagerGuidePanel({
                 mb: 2,
                 p: 1.25,
                 borderRadius: 1.5,
-                border:
-                  productivityDelta.tone === 'up'
-                    ? '1px solid #C8E6C9'
-                    : productivityDelta.tone === 'down'
-                      ? '1px solid #FFCDD2'
-                      : '1px solid #CFD8DC',
-                bgcolor:
-                  productivityDelta.tone === 'up'
-                    ? '#E8F5E9'
-                    : productivityDelta.tone === 'down'
-                      ? '#FFEBEE'
-                      : '#ECEFF1',
+                border: `1px solid ${deltaColors[productivityDelta.tone]?.border || deltaColors.neutral.border}`,
+                bgcolor: deltaColors[productivityDelta.tone]?.bg || deltaColors.neutral.bg,
               }}
             >
               <Typography
                 sx={{
                   fontSize: '0.9rem',
-                  color:
-                    productivityDelta.tone === 'up'
-                      ? '#1B5E20'
-                      : productivityDelta.tone === 'down'
-                        ? '#B71C1C'
-                        : '#37474F',
+                  color: deltaColors[productivityDelta.tone]?.text || deltaColors.neutral.text,
                   fontWeight: 700,
                   lineHeight: 1.5,
                 }}
@@ -233,21 +256,21 @@ export default function KpiManagerGuidePanel({
       {loading && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
           <CircularProgress size={22} sx={{ color: '#C74634' }} />
-          <Typography sx={{ color: '#607D8B', fontSize: '0.95rem' }}>
+          <Typography sx={{ color: isDark ? '#9A9A9A' : '#607D8B', fontSize: '0.95rem' }}>
             Loading AI context…
           </Typography>
         </Box>
       )}
 
       {!loading && fetchFailed && (
-        <Typography sx={{ color: '#78909C', fontSize: '0.95rem' }}>
+        <Typography sx={{ color: isDark ? '#9A9A9A' : '#78909C', fontSize: '0.95rem' }}>
           Could not load AI insights. Check your connection and try again.
         </Typography>
       )}
 
       {!loading && !fetchFailed && !hasGuide && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'flex-start' }}>
-          <Typography sx={{ color: '#546E7A', fontSize: '0.95rem', lineHeight: 1.55 }}>
+          <Typography sx={{ color: isDark ? '#9A9A9A' : '#546E7A', fontSize: '0.95rem', lineHeight: 1.55 }}>
             No manager KPI narrative yet for this sprint. Open AI Insights, select this sprint, and
             run Generate (or Regenerate) so Gemini can store a short interpretation here.
           </Typography>
@@ -275,7 +298,7 @@ export default function KpiManagerGuidePanel({
             <Typography
               sx={{
                 fontSize: { xs: '1rem', sm: '1.05rem' },
-                color: '#37474F',
+                color: isDark ? '#E0E0E0' : '#37474F',
                 lineHeight: 1.6,
                 fontWeight: 600,
                 mb: hasMetricLines ? 2.5 : 0,
@@ -307,8 +330,8 @@ export default function KpiManagerGuidePanel({
               const title = KPI_LABELS[key] ?? key;
               const style = METRIC_STYLES[key] ?? {
                 title: SECTION_ACCENT,
-                bg: '#F5F5F5',
-                border: '#E0E0E0',
+                bg: isDark ? '#2A2C32' : '#F5F5F5',
+                border: isDark ? '#3A3C42' : '#E0E0E0',
               };
               return (
                 <Box
@@ -332,7 +355,7 @@ export default function KpiManagerGuidePanel({
                   >
                     {title}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.95rem', color: '#455A64', lineHeight: 1.55 }}>
+                  <Typography sx={{ fontSize: '0.95rem', color: isDark ? '#E0E0E0' : '#455A64', lineHeight: 1.55 }}>
                     {displayText}
                   </Typography>
                 </Box>

@@ -39,10 +39,10 @@ public class WebSecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/", "/index.html", "/favicon.ico", "/manifest.json", "/static/**").permitAll()
                 .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/**").authenticated()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v2/api-docs", "/v3/api-docs/**").permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
             .httpBasic(h -> h.disable())

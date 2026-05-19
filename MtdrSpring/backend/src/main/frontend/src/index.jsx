@@ -4,16 +4,12 @@
 ## Copyright (c) 2021 Oracle, Inc.
 ## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
 */
-/*
- * @author  jean.de.lavarene@oracle.com
- */
 
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
 import './index.css';
-import { appTheme } from './theme';
+import { AppThemeProvider } from './ThemeContext';
 import App from './app/App';
 import Login from './features/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -23,7 +19,7 @@ installAuthFetchInterceptor();
 
 ReactDOM.render(
   <React.StrictMode>
-    <ThemeProvider theme={appTheme}>
+    <AppThemeProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -37,7 +33,7 @@ ReactDOM.render(
           />
         </Routes>
       </BrowserRouter>
-    </ThemeProvider>
+    </AppThemeProvider>
   </React.StrictMode>,
   document.getElementById('root'),
 );

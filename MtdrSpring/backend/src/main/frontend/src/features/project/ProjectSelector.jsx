@@ -22,6 +22,7 @@ import {
   TableRow,
   Paper,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -30,6 +31,9 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  
   const [projects, setProjects] = useState([]);
   const [userDetails, setUserDetails] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -184,11 +188,21 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
     }
   };
 
+  // Colores dinámicos según el tema
+  const bgColor = isDark ? '#1C1E22' : '#FFFFFF';
+  const textColor = isDark ? '#F0F0F0' : '#000000';
+  const textSecondary = isDark ? '#9A9A9A' : '#666666';
+  const borderColor = isDark ? '#2A2C32' : '#E0E0E0';
+  const cardBorder = isDark ? '#2A2C32' : '#E0E0E0';
+  const tableHeaderBg = isDark ? '#111214' : '#F5F5F5';
+  const tableBorder = isDark ? '#2A2C32' : '#EEE';
+  const dividerColor = isDark ? '#2A2C32' : '#E0E0E0';
+
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#FFFFFF', py: 6 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: bgColor, py: 6 }}>
       <Container maxWidth="lg">
         <Box sx={{ mb: 6, textAlign: 'center' }}>
-          <Typography sx={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: 4, color: '#000' }}>
+          <Typography sx={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: 4, color: textColor }}>
             ORACLE
           </Typography>
           <div
@@ -200,7 +214,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               marginBottom: '20px',
             }}
           />
-          <Typography variant="h5">
+          <Typography variant="h5" sx={{ color: textSecondary }}>
             {mode === 'manager' ? 'Select your project' : 'System Administration'}
           </Typography>
         </Box>
@@ -212,7 +226,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 variant="contained"
                 startIcon={<AddBoxIcon />}
                 onClick={() => openAndClear('project')}
-                sx={{ bgcolor: '#000' }}
+                sx={{ 
+  bgcolor: isDark ? '#2A2C32' : '#000', 
+  border: isDark ? '1px solid #444' : 'none',
+  '&:hover': { bgcolor: isDark ? '#3A3C42' : '#333' } 
+}}
               >
                 New Project
               </Button>
@@ -222,7 +240,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 variant="outlined"
                 startIcon={<GroupAddIcon />}
                 onClick={() => openAndClear('team')}
-                sx={{ color: '#000', borderColor: '#000' }}
+                sx={{ color: textColor, borderColor: borderColor, '&:hover': { borderColor: '#E53935', color: '#E53935' } }}
               >
                 New Team
               </Button>
@@ -232,7 +250,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 variant="outlined"
                 startIcon={<PersonAddIcon />}
                 onClick={() => openAndClear('member')}
-                sx={{ color: '#000', borderColor: '#000' }}
+                sx={{ color: textColor, borderColor: borderColor, '&:hover': { borderColor: '#E53935', color: '#E53935' } }}
               >
                 Assign Member
               </Button>
@@ -242,7 +260,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 variant="contained"
                 startIcon={<PersonAddIcon />}
                 onClick={() => openAndClear('user')}
-                sx={{ bgcolor: '#E53935' }}
+                sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}
               >
                 Register User
               </Button>
@@ -250,13 +268,16 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
           </Grid>
         )}
 
-        <Divider sx={{ mb: 4 }}>ACTIVE PROJECTS</Divider>
+        <Divider sx={{ mb: 4, borderColor: dividerColor }}>
+          <Typography sx={{ color: textSecondary }}>ACTIVE PROJECTS</Typography>
+        </Divider>
+        
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
-            <CircularProgress />
+            <CircularProgress sx={{ color: '#E53935' }} />
           </Box>
         ) : projects.length === 0 && mode === 'manager' ? (
-          <Typography sx={{ textAlign: 'center', color: '#666', mb: 6 }}>
+          <Typography sx={{ textAlign: 'center', color: textSecondary, mb: 6 }}>
             No registered projects found. If you just logged in, please refresh the page; if the 
             issue persists, contact an administrator.
           </Typography>
@@ -269,15 +290,16 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                   sx={{
                     p: 3,
                     cursor: 'pointer',
-                    border: '1px solid #E0E0E0',
+                    border: `1px solid ${cardBorder}`,
+                    bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    '&:hover': { borderColor: '#000', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
+                    '&:hover': { borderColor: '#E53935', boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)' },
                   }}
                 >
-                  <Typography sx={{ fontWeight: 700 }}>{proj.name}</Typography>
-                  <ArrowForwardIosIcon sx={{ fontSize: 12, color: '#CCC' }} />
+                  <Typography sx={{ fontWeight: 700, color: textColor }}>{proj.name}</Typography>
+                  <ArrowForwardIosIcon sx={{ fontSize: 12, color: isDark ? '#5A5A5A' : '#CCC' }} />
                 </Card>
               </Grid>
             ))}
@@ -286,46 +308,48 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
 
         {mode === 'admin' && (
           <>
-            <Divider sx={{ mb: 4 }}>USER DETAILS</Divider>
+            <Divider sx={{ mb: 4, borderColor: dividerColor }}>
+              <Typography sx={{ color: textSecondary }}>USER DETAILS</Typography>
+            </Divider>
             <TableContainer
               component={Paper}
-              sx={{ border: '1px solid #EEE', boxShadow: 'none', mb: 4 }}
+              sx={{ border: `1px solid ${tableBorder}`, boxShadow: 'none', mb: 4, bgcolor: bgColor }}
             >
               <Table>
-                <TableHead sx={{ bgcolor: '#F5F5F5' }}>
+                <TableHead sx={{ bgcolor: tableHeaderBg }}>
                   <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>USER</TableCell>
-                    <TableCell>ROLE</TableCell>
-                    <TableCell>TEAM ID</TableCell>
-                    <TableCell>TEAM</TableCell>
-                    <TableCell>PROJECT</TableCell>
-                    <TableCell>ACTIONS</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>ID</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>USER</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>ROLE</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>TEAM ID</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>TEAM</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>PROJECT</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {userDetails.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.id}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{user.name?.toUpperCase()}</TableCell>
-                      <TableCell>{user.role ? user.role.toUpperCase() : 'NO ROLE'}</TableCell>
-                      <TableCell>{user.teamId || '---'}</TableCell>
-                      <TableCell>
+                    <TableRow key={user.id} sx={{ borderBottom: `1px solid ${tableBorder}` }}>
+                      <TableCell sx={{ color: textSecondary }}>{user.id}</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: textColor }}>{user.name?.toUpperCase()}</TableCell>
+                      <TableCell sx={{ color: textSecondary }}>{user.role ? user.role.toUpperCase() : 'NO ROLE'}</TableCell>
+                      <TableCell sx={{ color: textSecondary }}>{user.teamId || '---'}</TableCell>
+                      <TableCell sx={{ color: textSecondary }}>
                         {(user.teamName || user.managedTeamName || '---').toUpperCase()}
                       </TableCell>
-                      <TableCell>{user.projectName || '---'}</TableCell>
+                      <TableCell sx={{ color: textSecondary }}>{user.projectName || '---'}</TableCell>
                       <TableCell>
                         <Button
                           size="small"
                           onClick={() => handleEditUser(user)}
-                          sx={{ mr: 1, color: '#000' }}
+                          sx={{ mr: 1, color: '#E53935' }}
                         >
                           EDIT
                         </Button>
                         <Button
                           size="small"
                           onClick={() => handleDeleteUser(user.id)}
-                          sx={{ color: '#E53935' }}
+                          sx={{ color: '#C62828' }}
                         >
                           DELETE
                         </Button>
@@ -340,14 +364,28 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
 
         {/* --- MODALS --- */}
 
-        <Dialog open={openModal === 'project'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>NEW PROJECT</DialogTitle>
+        <Dialog 
+          open={openModal === 'project'} 
+          onClose={() => setOpenModal(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+              border: `1px solid ${borderColor}`,
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>NEW PROJECT</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
               label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -358,24 +396,43 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 const v = parseInt(e.target.value, 10);
                 if (!isNaN(v)) setFormData({ ...formData, assignedTeam: { id: v } });
               }}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+            <Button onClick={() => setOpenModal(null)} sx={{ color: textSecondary }}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#333' } }}>
               CREATE
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openModal === 'team'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>NEW TEAM</DialogTitle>
+        <Dialog 
+          open={openModal === 'team'} 
+          onClose={() => setOpenModal(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+              border: `1px solid ${borderColor}`,
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>NEW TEAM</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
               label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -386,18 +443,32 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                 const v = parseInt(e.target.value, 10);
                 if (!isNaN(v)) setFormData({ ...formData, manager: { id: v } });
               }}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+            <Button onClick={() => setOpenModal(null)} sx={{ color: textSecondary }}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#333' } }}>
               CREATE
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openModal === 'member'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>ASSIGN MEMBER</DialogTitle>
+        <Dialog 
+          open={openModal === 'member'} 
+          onClose={() => setOpenModal(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+              border: `1px solid ${borderColor}`,
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>ASSIGN MEMBER</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
@@ -407,6 +478,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               onChange={(e) =>
                 setFormData({ ...formData, user: { id: parseInt(e.target.value, 10) } })
               }
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -416,6 +492,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               onChange={(e) =>
                 setFormData({ ...formData, team: { id: parseInt(e.target.value, 10) } })
               }
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -424,33 +505,57 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               margin="dense"
               value={formData.role || ''}
               onChange={(e) => setFormData({ ...formData, role: e.target.value.toUpperCase() })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             >
-              <MenuItem value="MANAGER">MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
+              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
+              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000' }}>
+            <Button onClick={() => setOpenModal(null)} sx={{ color: textSecondary }}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#333' } }}>
               ASSIGN
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openModal === 'user'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>REGISTER USER</DialogTitle>
+        <Dialog 
+          open={openModal === 'user'} 
+          onClose={() => setOpenModal(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+              border: `1px solid ${borderColor}`,
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>REGISTER USER</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
               label="NAME"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
               label="EMAIL"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -458,6 +563,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               type="password"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -466,13 +576,18 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               margin="dense"
               value={formData.type || ''}
               onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             >
-              <MenuItem value="MANAGER">MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
+              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
+              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
             </TextField>
 
             <Box sx={{ mt: 2 }}>
-              <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
+              <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
               <input
@@ -499,15 +614,24 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#E53935' }}>
+            <Button onClick={() => setOpenModal(null)} sx={{ color: textSecondary }}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}>
               REGISTER
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openModal === 'editUser'} onClose={() => setOpenModal(null)}>
-          <DialogTitle>EDIT USER — {selectedUser?.name?.toUpperCase()}</DialogTitle>
+        <Dialog 
+          open={openModal === 'editUser'} 
+          onClose={() => setOpenModal(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+              border: `1px solid ${borderColor}`,
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>EDIT USER — {selectedUser?.name?.toUpperCase()}</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
@@ -515,6 +639,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               margin="dense"
               value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -522,6 +651,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               margin="dense"
               value={formData.email || ''}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -529,6 +663,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               type="password"
               margin="dense"
               onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             />
             <TextField
               fullWidth
@@ -537,13 +676,18 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               margin="dense"
               value={formData.type || ''}
               onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
+              sx={{
+                '& .MuiInputLabel-root': { color: textSecondary },
+                '& .MuiOutlinedInput-root': { color: textColor },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: borderColor },
+              }}
             >
-              <MenuItem value="MANAGER">MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER">DEVELOPER</MenuItem>
+              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
+              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
             </TextField>
 
             <Box sx={{ mt: 2 }}>
-              <Typography variant="caption" sx={{ color: '#666', mb: 1, display: 'block' }}>
+              <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
               <input
@@ -570,8 +714,8 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)}>CANCEL</Button>
-            <Button onClick={handleEditAction} variant="contained" sx={{ bgcolor: '#000' }}>
+            <Button onClick={() => setOpenModal(null)} sx={{ color: textSecondary }}>CANCEL</Button>
+            <Button onClick={handleEditAction} variant="contained" sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#333' } }}>
               SAVE
             </Button>
           </DialogActions>
