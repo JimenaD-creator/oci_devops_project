@@ -23,3 +23,9 @@ export async function fetchManagerPrimaryProject(managerId) {
   if (!projRes.ok) return null;
   return projRes.json();
 }
+
+export async function fetchDeveloperPrimaryProject(userId) {
+  const projRes = await fetch(`${API_BASE}/api/projects/developer/${userId}`);
+  if (!projRes.ok) return null;
+  return projRes.json();
+}

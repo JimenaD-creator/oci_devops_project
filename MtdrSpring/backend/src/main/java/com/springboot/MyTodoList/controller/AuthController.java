@@ -44,11 +44,6 @@ public class AuthController {
         }
 
         User user = authenticatedUser.get();
-        String role = user.getType() != null ? user.getType().toUpperCase() : "DEVELOPER";
-        if ("DEVELOPER".equals(role)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Developers do not have permission to access this application."));
-        }
 
         String token = jwtService.generateToken(user);
         return ResponseEntity.ok(new AuthLoginResponse(token, new AuthUserResponse(user)));

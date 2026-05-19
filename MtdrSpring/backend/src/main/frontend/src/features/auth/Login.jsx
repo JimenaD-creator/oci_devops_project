@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
-import { fetchManagerPrimaryProject, loginWithCredentials } from './loginApi';
+import {
+  fetchDeveloperPrimaryProject,
+  fetchManagerPrimaryProject,
+  loginWithCredentials,
+} from './loginApi';
 
 const EyeIcon = ({ open }) => (
   <svg
@@ -111,14 +115,23 @@ export default function Login() {
           console.error('Could not pre-load the manager project');
         }
         navigate('/');
+      } else if (userData.role === 'DEVELOPER') {
+        try {
+          const project = await fetchDeveloperPrimaryProject(userData.id);
+          if (project) {
+            localStorage.setItem('currentProjectId', String(project.id));
+            localStorage.setItem('currentProjectName', project.name);
+          }
+        } catch (e) {
+          console.error('Could not pre-load the developer project');
+        }
+        navigate('/');
       }
     } catch (err) {
       setFormError(
         !err.status
           ? 'Could not connect to the server.'
-          : err.status === 403
-            ? 'Access denied: developers do not have permission to access this application.'
-            : 'Invalid credentials. Please try again.',
+          : 'Invalid credentials. Please try again.',
       );
     } finally {
       setIsLoading(false);

@@ -319,7 +319,7 @@ const DEFAULT_LAYOUT = {
   ],
 };
 
-/** Manager view: same core columns + due date + completed (no On time). */
+/** Manager view: same core columns + due date + on-time. */
 const MANAGER_LAYOUT = {
   colWidths: ['15%', '22%', '11%', '10%', '10%', '10%', '14%', '8%', '8%'],
   headers: [
@@ -333,6 +333,12 @@ const MANAGER_LAYOUT = {
     'On-time',
     '',
   ],
+};
+
+/** Developer My Tasks: plain labels, no assignee column. */
+const DEVELOPER_LAYOUT = {
+  colWidths: ['26%', '12%', '12%', '12%', '12%', '14%', '12%'],
+  headers: ['Task', 'Status', 'Priority', 'Planned hours', 'Hours worked', 'Due date', 'On time'],
 };
 
 export default function TaskTable({
@@ -349,8 +355,9 @@ export default function TaskTable({
   const isDark = theme.palette.mode === 'dark';
   
   const managerView = variant === 'manager';
+  const developerView = variant === 'developer';
   const hasActions = Boolean(onComplete || onUndo || onDelete);
-  const baseLayout = managerView ? MANAGER_LAYOUT : DEFAULT_LAYOUT;
+  const baseLayout = developerView ? DEVELOPER_LAYOUT : managerView ? MANAGER_LAYOUT : DEFAULT_LAYOUT;
   const layout = hasActions
     ? baseLayout
     : {

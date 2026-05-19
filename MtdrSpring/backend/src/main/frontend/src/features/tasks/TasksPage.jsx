@@ -46,12 +46,17 @@ import {
 } from './utils/taskUtils';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
+import {
+  filterUserTasksForUser,
+  taskIdsForUser,
+} from '../developer/developerTaskFilters';
 
-export default function TasksPage({ projectId }) {
+export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
   const effectiveProjectId = resolveActiveProjectId(projectId);
+  const currentUserId = developerMode ? Number(currentUser?.id) : null;
   const [rawTasks, setRawTasks] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [users] = useState([]);
@@ -306,9 +311,24 @@ export default function TasksPage({ projectId }) {
     return directName || null;
   }, [users, projectDevelopers]);
 
+  const scopedUserTasks = useMemo(() => {
+    if (!developerMode || !Number.isFinite(currentUserId)) return userTasks;
+    return filterUserTasksForUser(userTasks, currentUserId);
+  }, [userTasks, developerMode, currentUserId]);
+
+  const myTaskIds = useMemo(() => {
+    if (!developerMode || !Number.isFinite(currentUserId)) return null;
+    return taskIdsForUser(userTasks, currentUserId);
+  }, [userTasks, developerMode, currentUserId]);
+
+  const tasksForKanban = useMemo(() => {
+    if (!developerMode || !myTaskIds) return rawTasks;
+    return rawTasks.filter((t) => myTaskIds.has(Number(t.id)));
+  }, [rawTasks, developerMode, myTaskIds]);
+
   const developersByTaskId = useMemo(() => {
     const map = new Map();
-    userTasks.forEach((ut) => {
+    scopedUserTasks.forEach((ut) => {
       const rawTaskId = ut?.task?.id ?? ut?.task?.ID ?? ut?.id?.taskId ?? ut?.taskId;
       const taskId = rawTaskId != null ? String(rawTaskId) : null;
       const devName = resolveUserTaskDeveloperName(ut);
@@ -318,9 +338,12 @@ export default function TasksPage({ projectId }) {
       else if (!existing.includes(devName)) existing.push(devName);
     });
     return map;
-  }, [userTasks, resolveUserTaskDeveloperName]);
+  }, [scopedUserTasks, resolveUserTaskDeveloperName]);
 
-  const items = useMemo(() => rawTasks.map((task) => mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [])), [rawTasks, developersByTaskId]);
+  const items = useMemo(
+    () => tasksForKanban.map((task) => mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [])),
+    [tasksForKanban, developersByTaskId],
+  );
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -398,15 +421,17 @@ export default function TasksPage({ projectId }) {
                 ))}
               </Select>
             </FormControl>
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() => setDialogOpen(true)}
-              sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, minHeight: 40, '&:hover': { bgcolor: '#A83B2D' } }}
-            >
-              New task
-            </Button>
+            {!developerMode ? (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => setDialogOpen(true)}
+                sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, minHeight: 40, '&:hover': { bgcolor: '#A83B2D' } }}
+              >
+                New task
+              </Button>
+            ) : null}
           </Stack>
         </Box>
         {!sprints.length ? (
@@ -415,6 +440,7 @@ export default function TasksPage({ projectId }) {
       </Paper>
 
       {/* Filter card */}
+      {!developerMode ? (
       <Paper
         component={motion.div}
         initial={{ opacity: 0, y: 14 }}
@@ -459,6 +485,7 @@ export default function TasksPage({ projectId }) {
           <Chip label={`${filteredItems.length} shown`} size="small" sx={{ bgcolor: chipBg, fontWeight: 700, height: 22 }} />
         </Box>
       </Paper>
+      ) : null}
 
       {/* Kanban */}
       <Grid
@@ -471,7 +498,9 @@ export default function TasksPage({ projectId }) {
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
             <Box sx={{ width: 10, height: 10, bgcolor: ORACLE_RED, borderRadius: '50%' }} />
-            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>Tasks</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>
+              {developerMode ? 'Kanban Board' : 'Tasks'}
+            </Typography>
             <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: chipBg, fontWeight: 700 }} />
           </Box>
           <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg, overflow: 'hidden', minHeight: 200 }}>
@@ -481,13 +510,15 @@ export default function TasksPage({ projectId }) {
               </Typography>
             ) : filteredItems.length === 0 ? (
               <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
-                No tasks in this sprint. Create one with &quot;New task&quot;.
+                {developerMode
+                  ? 'You have no assigned tasks in this sprint.'
+                  : 'No tasks in this sprint. Create one with "New task".'}
               </Typography>
             ) : (
               <KanbanBoard
                 items={filteredItems}
                 onStatusChange={handleStatusChange}
-                onDeleteTask={handleDeleteTask}
+                onDeleteTask={developerMode ? undefined : handleDeleteTask}
                 onOpenTask={handleOpenTaskFromKanban}
               />
             )}
@@ -527,7 +558,9 @@ export default function TasksPage({ projectId }) {
         </DialogActions>
       </Dialog>
 
-      <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => loadData()} sprints={sprintsForActiveProject} projectDevelopers={projectDevelopers} defaultSprintId={kanbanSprintId || selectedSprintId || undefined} />
+      {!developerMode ? (
+        <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => loadData()} sprints={sprintsForActiveProject} projectDevelopers={projectDevelopers} defaultSprintId={kanbanSprintId || selectedSprintId || undefined} />
+      ) : null}
       <TaskDetailDialog
         open={taskDetailOpen} initialTask={taskForDetailDialog} sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers} activeProjectId={selectedProjectId} onClose={closeTaskDetailDialog}

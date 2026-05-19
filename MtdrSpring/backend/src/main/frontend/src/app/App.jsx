@@ -48,6 +48,8 @@ const ProjectSelector = lazy(() => import('../features/project/ProjectSelector')
 const AIInsightsPage  = lazy(() => import('../features/ai/AIInsightsPage'));
 const TeamPage        = lazy(() => import('../features/team/TeamPage'));
 const ManagerChatbot  = lazy(() => import('../features/ai/ManagerChatbot'));
+const MyPerformancePage = lazy(() => import('../features/developer/MyPerformancePage'));
+const MyTasksPage       = lazy(() => import('../features/developer/MyTasksPage'));
 
 const DRAWER_WIDTH = 240;
 
@@ -84,7 +86,17 @@ function App() {
   const { darkMode, toggleDark } = useThemeMode();
 
   const [menuAnchor, setMenuAnchor]   = useState(null);
-  const [activePage, setActivePage]   = useState('dashboard');
+  const [activePage, setActivePage]   = useState(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (!stored) return 'dashboard';
+      const parsed = JSON.parse(stored);
+      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
+      return role === 'DEVELOPER' ? 'my-tasks' : 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
@@ -132,12 +144,20 @@ function App() {
   }, [user, selectedProjectId]);
 
   useEffect(() => {
-    if (user && user.role === 'DEVELOPER') {
-      logout();
-      localStorage.clear();
-      navigate('/login', { replace: true });
+    if (user?.role === 'DEVELOPER' && !selectedProjectId) {
+      fetch(`${API_BASE}/api/projects/developer/${user.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((project) => {
+          if (project) {
+            localStorage.setItem('currentProjectId', project.id);
+            localStorage.setItem('currentProjectName', project.name);
+            setSelectedProjectId(String(project.id));
+            setSelectedProjectName(project.name);
+          }
+        })
+        .catch(() => {});
     }
-  }, [user, navigate]);
+  }, [user, selectedProjectId]);
 
   useEffect(() => {
     if (activePage === 'tasks' || activePage === 'sprints') setSprintsNavOpen(true);
@@ -214,7 +234,15 @@ function App() {
     setSelectedProjectName(null);
   };
 
-  if (!user || user.role === 'DEVELOPER') return null;
+  if (!user) return null;
+
+  const isDeveloper = user.role === 'DEVELOPER';
+
+  const DEVELOPER_NAV_ITEMS = [
+    { text: 'My Tasks', id: 'my-tasks', icon: <AssignmentIcon /> },
+    { text: 'Kanban Board', id: 'my-kanban', icon: <ViewKanbanIcon /> },
+    { text: 'My Performance', id: 'my-performance', icon: <AnalyticsIcon /> },
+  ];
 
   const NAV_ITEMS = [
     { text: 'Dashboard',      icon: <DashboardIcon />,   id: 'dashboard',   roles: ['ADMIN', 'MANAGER'] },
@@ -224,12 +252,12 @@ function App() {
     { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN'] },
   ].filter((item) => item.roles.includes(user.role));
 
-  const topNavItems = NAV_ITEMS.filter((item) =>
-    ['dashboard', 'ai-insights', 'analytics'].includes(item.id)
-  );
-  const secondaryNavItems = NAV_ITEMS.filter((item) =>
-    !['dashboard', 'ai-insights', 'analytics'].includes(item.id)
-  );
+  const topNavItems = isDeveloper
+    ? DEVELOPER_NAV_ITEMS
+    : NAV_ITEMS.filter((item) => ['dashboard', 'ai-insights', 'analytics'].includes(item.id));
+  const secondaryNavItems = isDeveloper
+    ? []
+    : NAV_ITEMS.filter((item) => !['dashboard', 'ai-insights', 'analytics'].includes(item.id));
 
   const SPRINTS_SUBITEMS = [
     { text: 'Tasks',        id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },
@@ -252,6 +280,10 @@ function App() {
         <ProjectSelector onSelect={handleSelectProject} />
       </Suspense>
     );
+  }
+
+  if (isDeveloper && !selectedProjectId) {
+    return <PageLoader />;
   }
 
   const drawerBg     = '#1A1A1A';
@@ -321,6 +353,8 @@ function App() {
             </ListItemButton>
           ))}
 
+          {!isDeveloper ? (
+          <>
           {/* Sprints colapsable */}
           <ListItemButton
             onClick={() => setSprintsNavOpen((o) => !o)}
@@ -370,6 +404,8 @@ function App() {
               })}
             </List>
           </Collapse>
+          </>
+          ) : null}
 
           {secondaryNavItems.map((item) => (
             <ListItemButton
@@ -539,17 +575,32 @@ function App() {
               onOpenAiInsights={handleOpenAiInsightsFromTeam}
             />
           )}
+          {activePage === 'my-tasks' && (
+            <MyTasksPage projectId={selectedProjectId} currentUser={user} />
+          )}
+          {activePage === 'my-kanban' && (
+            <TasksPage
+              projectId={selectedProjectId}
+              developerMode
+              currentUser={user}
+            />
+          )}
+          {activePage === 'my-performance' && (
+            <MyPerformancePage projectId={selectedProjectId} currentUser={user} />
+          )}
         </Suspense>
-        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team', 'my-tasks', 'my-kanban', 'my-performance'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Typography variant="h6" color="textSecondary">Section under development</Typography>
           </Box>
         )}
       </Box>
 
-      <Suspense fallback={null}>
-        <ManagerChatbot projectId={selectedProjectId} />
-      </Suspense>
+      {!isDeveloper ? (
+        <Suspense fallback={null}>
+          <ManagerChatbot projectId={selectedProjectId} />
+        </Suspense>
+      ) : null}
 
       {/* Snackbar de feedback */}
       <Snackbar

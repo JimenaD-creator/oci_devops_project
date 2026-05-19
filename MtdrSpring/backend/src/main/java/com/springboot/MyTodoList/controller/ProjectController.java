@@ -44,6 +44,13 @@ public class ProjectController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/developer/{userId}")
+    public ResponseEntity<Project> getProjectByDeveloper(@PathVariable Long userId) {
+        return projectRepository.findByTeamMemberUserId(userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/{projectId}/developers")
     public ResponseEntity<List<User>> getProjectDevelopers(@PathVariable Long projectId) {
         Optional<Project> projectOpt = projectRepository.findById(projectId);

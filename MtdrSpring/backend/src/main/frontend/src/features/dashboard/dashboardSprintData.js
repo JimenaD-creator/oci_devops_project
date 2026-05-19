@@ -475,15 +475,23 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       };
     }
     const { _devMap, _statusCounts, _blockedTaskMapByDeveloper, ...rest } = entry;
-    const devs = Object.values(_devMap);
+    const devEntries = Object.entries(_devMap);
+    const devs = devEntries.map(([, d]) => d);
     const maxHours = Math.max(...devs.map((d) => d.hours), 1);
-    devs.forEach((d) => {
+    devEntries.forEach(([devKey, d]) => {
       const taskIds = d._taskIds;
       const completedIds = d._completedTaskIds;
+      const onTimeIds = d._completedOnTimeIds;
       d.assigned = taskIds ? taskIds.size : 0;
       d.completed = completedIds ? completedIds.size : 0;
+      const onTimeCompleted = onTimeIds ? onTimeIds.size : 0;
+      d.onTime =
+        d.completed > 0 ? Math.round((onTimeCompleted / d.completed) * 100) : null;
+      const uidFromKey = /^u:(\d+)$/.exec(String(devKey));
+      if (uidFromKey) d.userId = Number(uidFromKey[1]);
       delete d._taskIds;
       delete d._completedTaskIds;
+      delete d._completedOnTimeIds;
       d.assignedHoursEstimate = Number(d._assignedHoursEstimate) || 0;
       delete d._assignedHoursEstimate;
       d.workload = Math.round((d.hours / maxHours) * 100);

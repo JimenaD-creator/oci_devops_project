@@ -255,6 +255,8 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
         row[`${sp.id}_assigned`] = d ? d.assigned : '—';
         row[`${sp.id}_completed`] = d ? d.completed : '—';
         row[`${sp.id}_hours`] = d ? d.hours : '—';
+        row[`${sp.id}_onTime`] =
+          d && typeof d.onTime === 'number' ? d.onTime : '—';
         row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : '—';
       });
       row.initials = initials || initialsFromName(name);
@@ -320,7 +322,19 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
 
+  const onTimeAvgForSprint = (spId) => {
+    const nums = sorted.map((r) => r[`${spId}_onTime`]).filter((v) => typeof v === 'number');
+    if (!nums.length) return null;
+    return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
+  };
+
   const renderHours = (v) => (typeof v === 'number' ? `${v}h` : v);
+  const renderOnTimeCell = (v) =>
+    typeof v === 'number' ? (
+      <Badge val={v} green={90} yellow={70} />
+    ) : (
+      <span className="cell-muted">—</span>
+    );
   const renderWorkloadCell = (v) =>
     typeof v === 'number' ? <WorkloadBar val={v} /> : <span className="cell-muted">—</span>;
 
@@ -377,7 +391,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                     {selectedSprints.map((sp, si) => (
                       <th
                         key={sp.id}
-                        colSpan={4}
+                        colSpan={5}
                         className={`th-sprint-compare-group${si > 0 ? ' th-sprint-compare-group-bordered' : ''}`}
                       >
                         {sp.shortLabel}
@@ -416,6 +430,15 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                             Total Hours {sortIcon(`${sp.id}_hours`)}
                           </div>
                         </th>,
+                        <th
+                          key={`${sp.id}-ot`}
+                          className="sortable"
+                          onClick={() => toggleSort(`${sp.id}_onTime`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
+                          </div>
+                        </th>,
                         <th key={`${sp.id}-w`}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             Workload Balance
@@ -449,6 +472,11 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_hours`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             Total Hours {sortIcon(`${sp.id}_hours`)}
+                          </div>
+                        </th>
+                        <th className="sortable" onClick={() => toggleSort(`${sp.id}_onTime`)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
                           </div>
                         </th>
                         <th>
@@ -494,6 +522,9 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                             <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">
                               {renderHours(r[`${sp.id}_hours`])}
                             </td>,
+                            <td key={`${r.name}-${sp.id}-ot`} className="text-center">
+                              {renderOnTimeCell(r[`${sp.id}_onTime`])}
+                            </td>,
                             <td key={`${r.name}-${sp.id}-w`}>
                               {renderWorkloadCell(r[`${sp.id}_workload`])}
                             </td>,
@@ -508,6 +539,9 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                               <td className="text-center cell-muted">
                                 {renderHours(r[`${sp.id}_hours`])}
                               </td>
+                              <td className="text-center">
+                                {renderOnTimeCell(r[`${sp.id}_onTime`])}
+                              </td>
                               <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
                             </>
                           );
@@ -521,6 +555,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                   ? selectedSprints.flatMap((sp, si) => {
                       const bc = si > 0 ? ' td-sprint-compare-first' : '';
                       const wAvg = workloadAvgForSprint(sp.id);
+                      const otAvg = onTimeAvgForSprint(sp.id);
                       return [
                         <td key={`avg-${sp.id}-a`} className={`summary-cell text-center${bc}`}>
                           {avgForKey(`${sp.id}_assigned`)}
@@ -530,6 +565,13 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                         </td>,
                         <td key={`avg-${sp.id}-h`} className="summary-cell text-center">
                           {hoursAvgForSprint(sp.id)}
+                        </td>,
+                        <td key={`avg-${sp.id}-ot`} className="summary-cell text-center">
+                          {otAvg != null ? (
+                            <span className="summary-cell">{otAvg}%</span>
+                          ) : (
+                            <span className="cell-muted">—</span>
+                          )}
                         </td>,
                         <td key={`avg-${sp.id}-w`} className="summary-cell">
                           {wAvg != null ? (
@@ -543,6 +585,7 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                   : (() => {
                       const sp = selectedSprints[0];
                       const wAvg = workloadAvgForSprint(sp.id);
+                      const otAvg = onTimeAvgForSprint(sp.id);
                       return (
                         <>
                           <td className="summary-cell text-center">
@@ -552,6 +595,13 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
                             {avgForKey(`${sp.id}_completed`)}
                           </td>
                           <td className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>
+                          <td className="summary-cell text-center">
+                            {otAvg != null ? (
+                              <span className="summary-cell">{otAvg}%</span>
+                            ) : (
+                              <span className="cell-muted">—</span>
+                            )}
+                          </td>
                           <td className="summary-cell">
                             {wAvg != null ? (
                               <WorkloadBar val={wAvg} />
