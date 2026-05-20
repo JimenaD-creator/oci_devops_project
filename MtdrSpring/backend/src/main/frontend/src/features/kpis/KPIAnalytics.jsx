@@ -20,8 +20,9 @@ import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
-import { API_BASE } from '../sprints/constants/sprintConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { fetchSprintInsights } from '../ai/insightsApi';
+import { getErrorMessage } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -80,9 +81,9 @@ function ProductivityScoreCard({
 
   const components = [
     { label: 'Completion rate', value: completionRate, weight: 'x0.4', color: '#1565C0' },
-    { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#FB8C00' },
+    { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#1D9E75' },
     { label: 'Team participation', value: teamParticipation, weight: 'x0.2', color: '#8E24AA' },
-    { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#1D9E75' },
+    { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#FB8C00' },
   ];
 
   return (
@@ -228,41 +229,56 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuide, setManagerGuide] = useState(null);
   const [managerGuideLoading, setManagerGuideLoading] = useState(false);
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
+  const [managerGuideInsightError, setManagerGuideInsightError] = useState(null);
+  /** True only after sprint/task KPI data finished loading (insights run after, not in parallel). */
+  const [kpiDataReady, setKpiDataReady] = useState(false);
 
   useEffect(() => {
-    if (loading || selectedSprintId == null) return undefined;
-    let cancelled = false;
+    if (!kpiDataReady || loading || selectedSprintId == null) return undefined;
+
+    const controller = new AbortController();
     setManagerGuideLoading(true);
     setManagerGuideFetchFailed(false);
+    setManagerGuideInsightError(null);
     setManagerGuide(null);
-    const url = `${API_BASE}/api/insights/sprint/${selectedSprintId}`;
-    fetch(url)
-      .then((res) => {
-        if (res.status === 404) return null;
-        if (!res.ok) throw new Error('insights fetch failed');
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled || !data) return;
-        if (data.error) {
+
+    (async () => {
+      try {
+        const { notFound, data } = await fetchSprintInsights(selectedSprintId, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+
+        if (notFound || !data) {
           setManagerGuide(null);
           return;
         }
+
+        if (data.error) {
+          setManagerGuide(null);
+          setManagerGuideInsightError(getErrorMessage(data.error));
+          return;
+        }
+
         setManagerGuide(data.insights?.kpiManagerGuide ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setManagerGuideFetchFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setManagerGuideLoading(false);
-      });
+      } catch (err) {
+        if (controller.signal.aborted || err?.name === 'AbortError') return;
+        setManagerGuideFetchFailed(true);
+      } finally {
+        if (!controller.signal.aborted) {
+          setManagerGuideLoading(false);
+        }
+      }
+    })();
+
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [selectedSprintId, loading]);
+  }, [selectedSprintId, loading, kpiDataReady]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setKpiDataReady(false);
     try {
       const pid =
         projectId != null && String(projectId).trim() !== ''
@@ -304,6 +320,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       setTasks([]);
     } finally {
       setLoading(false);
+      setKpiDataReady(true);
     }
   }, [projectId]);
 
@@ -667,6 +684,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             guide={managerGuide}
             loading={managerGuideLoading}
             fetchFailed={managerGuideFetchFailed}
+            insightError={managerGuideInsightError}
             productivityDelta={productivityDelta}
             currentProductivityScore={kpis.productivityScore}
             currentSprintKpis={kpis}

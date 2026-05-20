@@ -154,7 +154,13 @@ function DevCard({ dev }) {
   const isDark = theme.palette.mode === 'dark';
   const ov = overall(dev);
   const color = getColor(ov);
-  const initials = dev.developerName.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+  const displayName = String(dev?.developerName ?? 'Unknown').trim() || 'Unknown';
+  const initials = displayName
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <Paper
@@ -175,7 +181,7 @@ function DevCard({ dev }) {
         <Avatar dev={dev} color={color} initials={initials} />
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary', lineHeight: 1.2 }} noWrap>
-            {dev.developerName}
+            {displayName}
           </Typography>
           <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
             {dev._done ?? 0} done · {dev._total ?? 0} assigned
@@ -221,7 +227,11 @@ export default function DeveloperRadarCards({ sprintId }) {
         Scores normalized relative to team — higher is better within the sprint.
       </Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 2.5 }}>
-        {devs.map((d) => <DevCard key={d.developerName} dev={d} />)}
+        {devs
+          .filter((d) => d && String(d.developerName ?? '').trim())
+          .map((d) => (
+            <DevCard key={String(d.developerName).trim()} dev={d} />
+          ))}
       </Box>
     </Box>
   );
