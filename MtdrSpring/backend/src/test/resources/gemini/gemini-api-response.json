@@ -1,0 +1,13 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "```json\n{\"ok\":true,\"tasks\":[]}\n```"
+          }
+        ]
+      }
+    }
+  ]
+}
