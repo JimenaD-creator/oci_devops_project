@@ -87,7 +87,28 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
       .sort((a, b) => b.workload - a.workload);
   }, [sprint, aiOverloadMap]);
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0) {
+    return (
+      <Paper
+        sx={{
+          mb: 3,
+          p: 2.5,
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)',
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 0.75 }}>
+          Workload breakdown
+        </Typography>
+        <Typography sx={{ fontSize: '0.95rem', color: 'text.secondary', lineHeight: 1.55 }}>
+          No developers with assignments in this sprint yet. Add people to the sprint roster or assign
+          tasks, then refresh this page.
+        </Typography>
+      </Paper>
+    );
+  }
 
   const trackColor = (isOverloaded) => {
     if (isOverloaded) return isDark ? OVERLOAD_TRACK_DARK : OVERLOAD_TRACK_LIGHT;

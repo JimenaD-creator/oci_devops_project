@@ -25,6 +25,7 @@ import {
   Users,
 } from 'lucide-react';
 import { API_BASE, getErrorMessage, AI_INSIGHTS_EMPTY } from './aiInsightsConstants';
+import { fetchSprintInsights } from './insightsApi';
 import {
   AlertCard,
   SectionHeading,
@@ -123,22 +124,17 @@ export default function InsightCard({
   const loadExisting = useCallback(async () => {
     if (!sprintId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLastGeneratedAtMs(parseGeneratedAtMs(data.generatedAt));
-        if (data.error) {
-          setError(getErrorMessage(data.error));
-          setStatus('error');
-          return;
-        }
-        setInsights(data.insights);
-        setAcknowledged(data.acknowledged ?? false);
-        setStatus('loaded');
+      const { notFound, data } = await fetchSprintInsights(sprintId);
+      if (notFound || !data) return;
+      setLastGeneratedAtMs(parseGeneratedAtMs(data.generatedAt));
+      if (data.error) {
+        setError(getErrorMessage(data.error));
+        setStatus('error');
+        return;
       }
+      setInsights(data.insights);
+      setAcknowledged(data.acknowledged ?? false);
+      setStatus('loaded');
     } catch {
       /* network error on initial load — stay idle */
     }
@@ -174,14 +170,9 @@ export default function InsightCard({
         await new Promise((r) => setTimeout(r, INTERVAL_MS));
         if (cancelPollRef.current) return;
         try {
-          const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}`, {
-            cache: 'no-store',
-            headers: { Accept: 'application/json' },
-          });
+          const { notFound, data } = await fetchSprintInsights(sprintId, { retries: 1 });
           if (cancelPollRef.current) return;
-          if (res.ok) {
-            const data = await res.json();
-            // Backend persisted an error → stop polling immediately
+          if (!notFound && data) {
             if (data.error) {
               setError(getErrorMessage(data.error));
               setStatus('error');

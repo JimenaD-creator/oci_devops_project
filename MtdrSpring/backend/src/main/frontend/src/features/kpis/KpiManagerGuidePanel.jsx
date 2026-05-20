@@ -70,6 +70,7 @@ export default function KpiManagerGuidePanel({
   guide,
   loading,
   fetchFailed,
+  insightError = null,
   productivityDelta,
   currentProductivityScore = null,
   currentSprintKpis = {},
@@ -269,7 +270,15 @@ export default function KpiManagerGuidePanel({
         </Typography>
       )}
 
-      {!loading && !fetchFailed && !hasGuide && (
+      {!loading && !fetchFailed && insightError && (
+        <Typography sx={{ color: isDark ? '#EF9A9A' : '#C62828', fontSize: '0.95rem', lineHeight: 1.55 }}>
+          {insightError}
+          {' '}
+          Open AI Insights for this sprint and use Regenerate if the API key is now configured.
+        </Typography>
+      )}
+
+      {!loading && !fetchFailed && !insightError && !hasGuide && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'flex-start' }}>
           <Typography sx={{ color: isDark ? '#9A9A9A' : '#546E7A', fontSize: '0.95rem', lineHeight: 1.55 }}>
             No manager KPI narrative yet for this sprint. Open AI Insights, select this sprint, and
@@ -293,7 +302,7 @@ export default function KpiManagerGuidePanel({
         </Box>
       )}
 
-      {!loading && !fetchFailed && hasGuide && (
+      {!loading && !fetchFailed && !insightError && hasGuide && (
         <Box>
           {introText !== '' && (
             <Typography
