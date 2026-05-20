@@ -80,9 +80,9 @@ function ProductivityScoreCard({
 
   const components = [
     { label: 'Completion rate', value: completionRate, weight: 'x0.4', color: '#1565C0' },
-    { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#FB8C00' },
+    { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#1D9E75' },
     { label: 'Team participation', value: teamParticipation, weight: 'x0.2', color: '#8E24AA' },
-    { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#1D9E75' },
+    { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#FB8C00' },
   ];
 
   return (
