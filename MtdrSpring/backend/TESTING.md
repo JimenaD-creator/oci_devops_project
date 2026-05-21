@@ -4,11 +4,11 @@
 
 Backend **unit tests** use Mockito and `@WebMvcTest` (no Oracle, Telegram, or live Gemini in CI).
 
-**Path B coverage gate (`-Pcoverage-check`):** ≥ 70% line coverage on **classes that have dedicated test classes** (see list in `pom.xml` profile `coverage-check`). This excludes AI services, `BotActions`, bot controller, and boilerplate.
+**Path B coverage gate (`-Pcoverage-check`):** ≥ 70% line coverage on **19 scoped classes** (see `pom.xml` profile `coverage-check`): 8 controllers, 9 services (including `UserTaskService`), and `BotUserState`. Excludes AI HTTP (`GeminiService`, etc.), `BotActions`, bot controller, and boilerplate.
 
 **Excluded from the gate** (may still be tested optionally):
 
-- `GeminiService`, `DeepSeekService`, `ManagerChatService`, `EmbeddingService`
+- `GeminiService` (logic-only tests in `GeminiServiceTest`; omitted from gate — large class, slows JaCoCo), `DeepSeekService`, `ManagerChatService`, `EmbeddingService`
 - `BotActions`, `BotStateManager`, `ToDoItemBotController`, AI-related controllers
 - `model`, `dto`, `repository`, `config`, `security`
 
@@ -107,4 +107,4 @@ Fixtures: `src/test/resources/gemini/`. Tests cover:
 - `enrichInsightsForResponse` (snake_case → camelCase, DB-filled `developerInsights`, task status breakdown)
 - `extractJsonFromGeminiResponse` (markdown fence stripping via reflection)
 
-`GeminiService` is excluded from the `-Pcoverage-check` gate but should stay covered by these unit tests.
+`GeminiService` is excluded from the `-Pcoverage-check` gate (large class; slows CI). `GeminiServiceTest` still runs on every `mvn test`.
