@@ -186,7 +186,7 @@ export default function TeamPage({
               size="small"
               sx={{
                 minWidth: { xs: '100%', sm: 220 },
-                ...pageFormFieldOutline(),
+                ...pageFormFieldOutline(isDark),
                 '& .MuiSelect-select': {
                   color: 'text.primary',
                   fontWeight: 600,
