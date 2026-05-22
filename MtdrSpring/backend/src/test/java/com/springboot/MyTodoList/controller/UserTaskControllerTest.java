@@ -1,0 +1,115 @@
+package com.springboot.MyTodoList.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.springboot.MyTodoList.model.Task;
+import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.repository.TaskRepository;
+import com.springboot.MyTodoList.repository.UserRepository;
+import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(controllers = UserTaskController.class)
+@AutoConfigureMockMvc(addFilters = false)
+class UserTaskControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private UserTaskRepository userTaskRepository;
+
+    @MockBean
+    private UserRepository userRepository;
+
+    @MockBean
+    private TaskRepository taskRepository;
+
+    @MockBean
+    private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Test
+    void getAllUserTasks_returnsList() throws Exception {
+        when(userTaskRepository.findAllWithUserAndTask()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/user-tasks")).andExpect(status().isOk());
+    }
+
+    @Test
+    void getUserTasksBySprint_returnsList() throws Exception {
+        when(userTaskRepository.findByTask_AssignedSprint_Id(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/user-tasks/sprint/1")).andExpect(status().isOk());
+    }
+
+    @Test
+    void deleteAssignmentsForTask_returnsNoContent() throws Exception {
+        when(userTaskRepository.findByTask_Id(10L)).thenReturn(List.of(new UserTask()));
+
+        mockMvc.perform(delete("/api/user-tasks/task/10")).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void createUserTask_success_returnsOk() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        Task task = new Task();
+        task.setId(2L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(taskRepository.findById(2L)).thenReturn(Optional.of(task));
+        when(userTaskRepository.findById(any())).thenReturn(Optional.empty());
+        when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = "{\"userId\":1,\"taskId\":2,\"status\":\"done\"}";
+
+        mockMvc.perform(post("/api/user-tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        verify(taskAssignmentSyncService).syncTaskStatusFromAssignments(2L);
+    }
+
+    @Test
+    void createUserTask_missingIds_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/user-tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createUserTask_unknownUser_returnsNotFound() throws Exception {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/user-tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":1,\"taskId\":2}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getAllUserTasks_withProjectId_usesProjectQuery() throws Exception {
+        when(userTaskRepository.findByProjectIdWithUserAndTask(5L)).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/user-tasks").param("projectId", "5")).andExpect(status().isOk());
+    }
+}
