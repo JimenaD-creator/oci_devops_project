@@ -260,6 +260,7 @@
                                         <include>com/springboot/MyTodoList/service/AdminService*</include>
                                         <include>com/springboot/MyTodoList/service/UserTaskService*</include>
                                         <include>com/springboot/MyTodoList/util/BotUserState*</include>
+                                        <include>com/springboot/MyTodoList/util/BotStateManager*</include>
                                     </includes>
                                 </configuration>
                             </execution>

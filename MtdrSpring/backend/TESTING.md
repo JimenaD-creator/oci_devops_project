@@ -4,12 +4,12 @@
 
 Backend **unit tests** use Mockito and `@WebMvcTest` (no Oracle, Telegram, or live Gemini in CI).
 
-**Path B coverage gate (`-Pcoverage-check`):** ≥ 70% line coverage on **19 scoped classes** (see `pom.xml` profile `coverage-check`): 8 controllers, 9 services (including `UserTaskService`), and `BotUserState`. Excludes AI HTTP (`GeminiService`, etc.), `BotActions`, bot controller, and boilerplate.
+**Path B coverage gate (`-Pcoverage-check`):** ≥ 70% line coverage on **20 scoped classes** (see `pom.xml` profile `coverage-check`): 8 controllers, 9 services (including `UserTaskService`), and `BotUserState` + `BotStateManager`. Excludes AI HTTP (`GeminiService`, etc.), `BotActions` (orchestrator — tested but not gated), bot controller, and boilerplate.
 
 **Excluded from the gate** (may still be tested optionally):
 
 - `GeminiService` (logic-only tests in `GeminiServiceTest`; omitted from gate — large class, slows JaCoCo), `DeepSeekService`, `ManagerChatService`, `EmbeddingService`
-- `BotActions`, `BotStateManager`, `ToDoItemBotController`, AI-related controllers
+- `BotActions`, `ToDoItemBotController`, AI-related controllers (`BotStateManager` is in the gate; `BotActions` is not)
 - `model`, `dto`, `repository`, `config`, `security`
 
 ## Run tests
