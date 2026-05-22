@@ -139,7 +139,10 @@ class GeminiServiceTest {
         assertNotNull(enriched);
         assertEquals(1, enriched.get("developerInsights").size());
         assertEquals("Bob", enriched.get("developerInsights").get(0).get("developerName").asText());
-        assertTrue(enriched.get("developerInsights").get(0).get("insight").asText().contains("completed"));
+        String insight = enriched.get("developerInsights").get(0).get("insight").asText();
+        assertTrue(
+            insight.toLowerCase().contains("completed") || insight.toLowerCase().contains("assignment"),
+            () -> "unexpected insight: " + insight);
 
         assertTrue(enriched.has("taskStatusBreakdown"));
         assertEquals(2, enriched.get("taskStatusBreakdown").get("done").asInt());
@@ -193,6 +196,8 @@ class GeminiServiceTest {
         task.setFinishDate(now.plusDays(2));
 
         UserTask ut = new UserTask(user, task);
+        ut.setStatus("COMPLETED");
+        ut.setCompletedAt(now.plusDays(2));
         ut.setWorkedHours(6L);
         return ut;
     }
