@@ -30,7 +30,6 @@ import {
 } from '../dashboard/constants/dashboardConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
-//import KPIInsightsPanel from './KPIInsightsPanel';
 
 const pageEase = [0.22, 1, 0.36, 1];
 
@@ -69,7 +68,6 @@ function ProductivityScoreCard({
   onTimeDelivery,
   teamParticipation,
   workloadBalance,
-  /** Stretch to full height of the grid cell (pair with chart column). */
   fillColumnHeight = false,
 }) {
   const theme = useTheme();
@@ -230,7 +228,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuideLoading, setManagerGuideLoading] = useState(false);
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
   const [managerGuideInsightError, setManagerGuideInsightError] = useState(null);
-  /** True only after sprint/task KPI data finished loading (insights run after, not in parallel). */
   const [kpiDataReady, setKpiDataReady] = useState(false);
 
   useEffect(() => {
@@ -380,7 +377,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
-  /** Unique tasks in sprint (multi-assignee counts once) — aligns chart Total with donut KPIs. */
   const assignedTotalInSprint = kpis.totalTasks;
   const completedTotalInSprint = kpis.completedTasks;
   const selectedSprintIdForTotals = currentSprint?.id;
@@ -476,6 +472,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
         transition={{ duration: 0.35, ease: pageEase }}
         sx={{ maxWidth: 1200, width: '100%' }}
       >
+        {/* HEADER ACTUALIZADO CON ANIMACIONES Y SOPORTE PARA MODO OSCURO */}
         <Box
           component={motion.div}
           initial={{ opacity: 0, y: 14 }}
@@ -493,7 +490,11 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
           <Box>
             <Typography
               variant="h4"
-              sx={{ fontWeight: 800, color: SECTION_BRAND_DARK, letterSpacing: '-0.5px' }}
+              sx={{ 
+                fontWeight: 800, 
+                color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK, 
+                letterSpacing: '-0.5px' 
+              }}
             >
               KPI Analytics
             </Typography>
@@ -504,7 +505,10 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 size="small"
                 sx={{
                   minWidth: { xs: '100%', sm: 220 },
-                  ...pageFormFieldOutline(),
+                  ...pageFormFieldOutline(isDark),
+                  '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : undefined },
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#3A3C42' : undefined },
+                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#5A5C62' : undefined },
                   '& .MuiSelect-select': {
                     color: isDark ? '#F0F0F0' : '#1A1A1A',
                     fontWeight: 600,
@@ -542,15 +546,19 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
-                bgcolor: sectionRgba(0.08),
-                border: `1px solid ${sectionRgba(0.22)}`,
+                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : sectionRgba(0.08),
+                border: `1px solid ${isDark ? '#3A3C42' : sectionRgba(0.22)}`,
                 borderRadius: 2,
                 px: 2,
                 py: 1,
               }}
             >
-              <Target size={16} color={SECTION_ACCENT} aria-hidden />
-              <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: SECTION_BRAND_DARK }}>
+              <Target size={16} color={isDark ? '#64B5F6' : SECTION_ACCENT} aria-hidden />
+              <Typography sx={{ 
+                fontWeight: 700, 
+                fontSize: '0.875rem', 
+                color: isDark ? '#E0E0E0' : SECTION_BRAND_DARK 
+              }}>
                 Goal: +20% productivity
               </Typography>
             </Box>

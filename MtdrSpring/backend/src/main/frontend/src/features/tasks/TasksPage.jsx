@@ -406,16 +406,51 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             />
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
-            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 }, ...pageFormFieldOutline() }}>
-              <InputLabel id="tasks-header-sprint-select-label">Sprint</InputLabel>
-              <Select
-                labelId="tasks-header-sprint-select-label"
-                value={kanbanSprintId || ''}
-                label="Sprint"
-                inputProps={{ 'aria-label': 'Sprint' }}
-                onChange={(e) => setSelectedSprintId(String(e.target.value))}
-                disabled={!sprints.length}
-              >
+<FormControl
+  size="small"
+  sx={{
+    minWidth: { xs: '100%', sm: 180 },
+    ...pageFormFieldOutline(),
+    '& .MuiOutlinedInput-root': {
+      bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+      color: isDark ? '#F0F0F0' : '#1A1A1A',
+      '& fieldset': { borderColor: isDark ? '#2A2C32' : '#CCCCCC' },
+      '&:hover fieldset': { borderColor: isDark ? '#3A3C42' : '#AAAAAA' },
+    },
+    '& .MuiInputLabel-root': {
+      color: isDark ? '#9A9A9A' : '#666666',
+    },
+    '& .MuiSvgIcon-root': {
+      color: isDark ? '#9A9A9A' : '#666666',
+    },
+  }}
+>
+  <InputLabel id="tasks-header-sprint-select-label">Sprint</InputLabel>
+  <Select
+    labelId="tasks-header-sprint-select-label"
+    value={kanbanSprintId || ''}
+    label="Sprint"
+    inputProps={{ 'aria-label': 'Sprint' }}
+sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+    onChange={(e) => setSelectedSprintId(String(e.target.value))}
+    disabled={!sprints.length}
+    MenuProps={ {
+      PaperProps: {
+        sx: {
+          bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+          border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+          '& .MuiMenuItem-root': {
+            color: isDark ? '#F0F0F0' : '#1A1A1A',
+            '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
+            '&.Mui-selected': {
+              bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+              '&:hover': { bgcolor: isDark ? '#3A3C42' : '#E8E8E8' },
+            },
+          },
+        },
+      },
+    }}
+  >
                 {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
                   <MenuItem key={s.id} value={String(s.id)}>Sprint {s.id}</MenuItem>
                 ))}

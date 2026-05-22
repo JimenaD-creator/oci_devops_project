@@ -34,27 +34,39 @@ export function userTaskRowStatus(ut) {
 }
 
 /** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
-export function pageFormFieldOutline() {
+export function pageFormFieldOutline(isDark = false) {
   return {
-    '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' },
-    '& .MuiOutlinedInput-input': { color: '#1A1A1A' },
+    '& .MuiOutlinedInput-root': { 
+      borderRadius: 2, 
+      bgcolor: isDark ? '#1C1E22' : '#FFFFFF' 
+    },
+    '& .MuiOutlinedInput-input': { 
+      color: isDark ? '#F0F0F0' : '#1A1A1A' 
+    },
     '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(199, 70, 52, 0.35)',
+      borderColor: isDark ? '#3A3C42' : 'rgba(199, 70, 52, 0.35)',
     },
     '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(199, 70, 52, 0.55)',
+      borderColor: isDark ? '#5A5C62' : 'rgba(199, 70, 52, 0.55)',
     },
     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
       borderWidth: 2,
-      borderColor: ORACLE_RED,
+      borderColor: isDark ? '#EF5350' : ORACLE_RED,
     },
-    '& .MuiInputLabel-root': { color: '#616161' },
-    '& .MuiInputLabel-root.Mui-focused': { color: ORACLE_RED },
-    '& .MuiSelect-select': { color: '#1A1A1A' },
-    '& .MuiSelect-icon': { color: '#616161' },
+    '& .MuiInputLabel-root': { 
+      color: isDark ? '#9A9A9A' : '#616161' 
+    },
+    '& .MuiInputLabel-root.Mui-focused': { 
+      color: isDark ? '#EF5350' : ORACLE_RED 
+    },
+    '& .MuiSelect-select': { 
+      color: isDark ? '#F0F0F0' : '#1A1A1A' 
+    },
+    '& .MuiSelect-icon': { 
+      color: isDark ? '#9A9A9A' : '#616161' 
+    },
   };
 }
-
 export function createTaskSelectFillSx() {
   return {
     ...pageFormFieldOutline(),
