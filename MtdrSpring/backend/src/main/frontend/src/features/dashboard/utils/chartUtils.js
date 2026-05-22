@@ -72,6 +72,35 @@ export function buildHoursAxisDomainTicks(maxHours) {
   return { domain: [0, domainMax], ticks, domainMax };
 }
 
+/** Finer Y-axis ticks for compare-mode workload chart (does not affect combo/single). */
+export function buildCompareTaskAxisDomainTicks(maxStack) {
+  const padded = Math.max(maxStack * 1.1, maxStack + 1, 5);
+  const domainMax = Math.max(1, Math.ceil(padded));
+  let step = 1;
+  if (domainMax > 20) step = 2;
+  if (domainMax > 50) step = 3;
+  if (domainMax > 100) step = 5;
+  const ticks = [];
+  for (let v = 0; v < domainMax; v += step) ticks.push(v);
+  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
+  return { domain: [0, domainMax], ticks, domainMax };
+}
+
+/** Finer Y-axis ticks for compare-mode hours chart (does not affect combo/single). */
+export function buildCompareHoursAxisDomainTicks(maxHours) {
+  const padded = Math.max(maxHours * 1.12, maxHours + 1.5, 6);
+  const domainMax = Math.max(1, Math.ceil(padded));
+  let step = 1;
+  if (domainMax > 12) step = 2;
+  if (domainMax > 30) step = 3;
+  if (domainMax > 60) step = 4;
+  if (domainMax > 120) step = 6;
+  const ticks = [];
+  for (let v = 0; v < domainMax; v += step) ticks.push(v);
+  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
+  return { domain: [0, domainMax], ticks, domainMax };
+}
+
 export function maxSingleComboRange(developers) {
   let maxT = 0;
   let maxH = 0;

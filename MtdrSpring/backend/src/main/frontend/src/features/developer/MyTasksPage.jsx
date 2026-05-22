@@ -306,6 +306,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
       <TaskDetailDialog
         open={detailOpen}
         initialTask={taskForDetail}
+        initialUserTasks={userTasks}
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}

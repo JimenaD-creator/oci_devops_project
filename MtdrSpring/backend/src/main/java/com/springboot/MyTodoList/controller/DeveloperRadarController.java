@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
@@ -27,7 +28,6 @@ public class DeveloperRadarController {
         List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
         if (raw == null) raw = new ArrayList<>();
 
-        // Deduplicate
         LinkedHashMap<String, UserTask> deduped = new LinkedHashMap<>();
         for (UserTask ut : raw) {
             if (ut == null || ut.getId() == null) continue;
@@ -35,7 +35,13 @@ public class DeveloperRadarController {
             deduped.putIfAbsent(key, ut);
         }
 
-        // Aggregate per user
+        Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+        for (UserTask ut : deduped.values()) {
+            if (ut.getId() == null) continue;
+            Long tid = ut.getId().getTaskId();
+            assigneeCountByTask.merge(tid, 1, Integer::sum);
+        }
+
         class Agg {
             String name;
             String profilePicture;
@@ -58,18 +64,19 @@ public class DeveloperRadarController {
                 return x;
             });
             a.total++;
-            String st = t.getStatus() != null ? t.getStatus().trim().toUpperCase() : "";
-            if ("DONE".equals(st) || "COMPLETED".equals(st) || "FINISHED".equals(st)) {
+            if (isAssignmentComplete(ut)) {
                 a.done++;
-                boolean onTimeFlag = t.getFinishDate() != null && t.getDueDate() != null
-                    && !t.getFinishDate().isAfter(t.getDueDate());
-                if (onTimeFlag) a.onTime++; else a.late++;
+                int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                Boolean onTimeFlag = evaluateAssignmentOnTime(ut, t, assigneeCount);
+                if (onTimeFlag != null) {
+                    if (onTimeFlag) a.onTime++;
+                    else a.late++;
+                }
             }
             if (ut.getWorkedHours() != null) a.worked += ut.getWorkedHours();
             if (t.getAssignedHours() != null) a.assigned += t.getAssignedHours();
         }
 
-        // Roster-only members
         List<UserSprint> roster = userSprintRepository.findBySprintIdWithUser(sprintId);
         if (roster != null) {
             for (UserSprint us : roster) {
@@ -87,7 +94,6 @@ public class DeveloperRadarController {
 
         if (byUser.isEmpty()) return ResponseEntity.ok(Collections.emptyList());
 
-        // Normalization maxes
         int maxTotal     = byUser.values().stream().mapToInt(a -> a.total).max().orElse(1);
         int maxDone      = byUser.values().stream().mapToInt(a -> a.done).max().orElse(1);
         long maxWorked   = byUser.values().stream().mapToLong(a -> a.worked).max().orElse(1);
@@ -95,7 +101,8 @@ public class DeveloperRadarController {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Agg a : byUser.values()) {
             double completionRatio    = a.total > 0 ? (double) a.done / a.total : 0;
-            double onTimeRatio        = a.done  > 0 ? (double) a.onTime / a.done : 0;
+            int onTimeDenominator = a.onTime + a.late;
+            double onTimeRatio        = onTimeDenominator > 0 ? (double) a.onTime / onTimeDenominator : 0;
             double participationRatio = maxTotal > 0 ? (double) a.total / maxTotal : 0;
             double hoursRatio         = maxWorked > 0 ? (double) a.worked / maxWorked : 0;
             double efficiencyRatio    = (a.assigned > 0 && a.worked > 0)
@@ -104,7 +111,7 @@ public class DeveloperRadarController {
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("developerName",   a.name);
-            row.put("profilePicture",  a.profilePicture);  // null si no tiene foto
+            row.put("profilePicture",  a.profilePicture);
             row.put("completionRate",  scale(completionRatio));
             row.put("onTimeRate",      scale(onTimeRatio));
             row.put("participation",   scale(participationRatio));
@@ -121,6 +128,30 @@ public class DeveloperRadarController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    private static boolean isAssignmentComplete(UserTask ut) {
+        String s = ut.getStatus();
+        if (s == null) return false;
+        String n = s.trim().toUpperCase();
+        return "COMPLETED".equals(n) || "DONE".equals(n) || "COMPLETE".equals(n);
+    }
+
+    /**
+     * Per-assignee on-time: uses USER_TASK.completedAt, not TASK.finishDate (last finisher).
+     * Returns null when completion time is unknown (e.g. multi-assignee legacy rows).
+     */
+    private static Boolean evaluateAssignmentOnTime(UserTask ut, Task t, int assigneeCount) {
+        if (t.getDueDate() == null) return null;
+        LocalDateTime doneAt = ut.getCompletedAt();
+        if (doneAt == null) {
+            if (assigneeCount <= 1 && t.getFinishDate() != null) {
+                doneAt = t.getFinishDate();
+            } else {
+                return null;
+            }
+        }
+        return !doneAt.toLocalDate().isAfter(t.getDueDate().toLocalDate());
     }
 
     private int scale(double ratio) {

@@ -16,8 +16,11 @@ import { useTheme } from '@mui/material/styles';
 import { Target } from 'lucide-react';
 import KpiDonutChart from './KpiDonutChart';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
-import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
-import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
+import { useProjectData } from '../../contexts/ProjectDataContext';
+import {
+  computeProductivityScore,
+  productivityScoreFromSprintKpis,
+} from './productivityScoreUtils';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -73,9 +76,12 @@ function ProductivityScoreCard({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
-  const score = Math.round(
-    completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1,
-  );
+  const score = computeProductivityScore({
+    completionRate,
+    onTimeDelivery,
+    teamParticipation,
+    workloadBalance,
+  });
 
   const components = [
     { label: 'Completion rate', value: completionRate, weight: 'x0.4', color: '#1565C0' },
@@ -220,6 +226,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
+  const { sprints: sharedSprints, loading: sharedLoading, getRawBundle } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -273,38 +280,36 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     };
   }, [selectedSprintId, loading, kpiDataReady]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const syncKpiFromShared = useCallback(async () => {
+    const pid =
+      projectId != null && String(projectId).trim() !== ''
+        ? String(projectId).trim()
+        : typeof localStorage !== 'undefined'
+          ? String(localStorage.getItem('currentProjectId') || '').trim()
+          : '';
+    if (!pid) {
+      setSprints([]);
+      setTasks([]);
+      setLoading(false);
+      setKpiDataReady(true);
+      return;
+    }
+    setLoading(sharedLoading);
     setKpiDataReady(false);
     try {
-      const pid =
-        projectId != null && String(projectId).trim() !== ''
-          ? String(projectId).trim()
-          : typeof localStorage !== 'undefined'
-            ? String(localStorage.getItem('currentProjectId') || '').trim()
-            : '';
-      const projectKey = pid || null;
-
-      const [enrichedSprints, tasksDataRaw] = await Promise.all([
-        fetchDashboardSprints(projectKey),
-        fetchTasksForKpiProject(projectKey),
-      ]);
-
-      let sprintsData = Array.isArray(enrichedSprints) ? enrichedSprints : [];
+      const { tasks: tasksDataRaw } = await getRawBundle();
+      let sprintsData = Array.isArray(sharedSprints) ? sharedSprints : [];
       let tasksData = Array.isArray(tasksDataRaw) ? tasksDataRaw : [];
 
-      if (pid) {
-        sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
-        const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
-        tasksData = tasksData.filter((t) => {
-          const sid = taskSprintId(t);
-          return sid != null && sprintIds.has(sid);
-        });
-      }
+      sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
+      const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
+      tasksData = tasksData.filter((t) => {
+        const sid = taskSprintId(t);
+        return sid != null && sprintIds.has(sid);
+      });
 
       setSprints(sprintsData);
       setTasks(tasksData);
-
       setSelectedSprintId((prev) => {
         if (sprintsData.length === 0) return null;
         if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
@@ -319,11 +324,16 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       setLoading(false);
       setKpiDataReady(true);
     }
-  }, [projectId]);
+  }, [projectId, sharedSprints, sharedLoading, getRawBundle]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (sharedLoading && sharedSprints.length === 0) {
+      setLoading(true);
+      setKpiDataReady(false);
+      return;
+    }
+    syncKpiFromShared();
+  }, [syncKpiFromShared, sharedLoading, projectId, sharedSprints]);
 
   const getSelectedSprint = () => sprints.find((s) => s.id === selectedSprintId);
 
@@ -342,12 +352,10 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     ).length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    const onTimeTasks = sprintTasks.filter((t) => {
-      if (normalizeTaskStatus(t.status) !== 'DONE') return false;
-      return new Date(t.finishDate ?? new Date()) <= new Date(t.dueDate);
-    }).length;
     const onTimeDelivery =
-      completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 0;
+      typeof sprint?.kpis?.onTimeDelivery === 'number'
+        ? sprint.kpis.onTimeDelivery
+        : 0;
 
     const teamParticipation = sprint?.kpis?.teamParticipation ?? 0;
     const rawWb = Number(sprint?.kpis?.workloadBalance);
@@ -356,19 +364,19 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       : 0;
     const teamParticipationPct = Math.min(100, Math.max(0, Number(teamParticipation) || 0));
     const clampedWorkloadBalance = Math.min(100, Math.max(0, workloadBalancePct));
-    const productivityScore = Math.round(
-      completionRate * 0.4 +
-        onTimeDelivery * 0.3 +
-        teamParticipationPct * 0.2 +
-        clampedWorkloadBalance * 0.1,
-    );
+    const productivityScore = computeProductivityScore({
+      completionRate,
+      onTimeDelivery,
+      teamParticipation: teamParticipationPct,
+      workloadBalance: clampedWorkloadBalance,
+    });
 
     return {
       completionRate,
       onTimeDelivery,
       teamParticipation: teamParticipationPct,
       workloadBalance: clampedWorkloadBalance,
-      productivityScore: Math.min(100, Math.max(0, productivityScore)),
+      productivityScore,
       totalTasks,
       completedTasks,
     };
@@ -406,12 +414,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     Math.max(430, 430 + Math.round(chartDataDensity * 1.5)),
   );
 
-  const normalizeProductivityValue = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return 0;
-    return Math.min(100, Math.max(0, n <= 1 ? Math.round(n * 100) : Math.round(n)));
-  };
-
   const productivityDelta = React.useMemo(() => {
     if (!currentSprint) return null;
     const sorted = [...sprints].sort((a, b) => {
@@ -429,8 +431,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     }
 
     const previous = sorted[idx - 1];
-    const currentScore = normalizeProductivityValue(kpis.productivityScore);
-    const previousScore = normalizeProductivityValue(previous?.kpis?.productivityScore);
+    const currentScore = kpis.productivityScore;
+    const previousScore = productivityScoreFromSprintKpis(previous?.kpis);
     const delta = currentScore - previousScore;
     if (delta > 0) {
       const relativePct =

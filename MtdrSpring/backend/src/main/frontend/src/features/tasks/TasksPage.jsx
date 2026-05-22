@@ -44,6 +44,7 @@ import {
   taskEntityId,
   userTaskRowTaskId,
 } from './utils/taskUtils';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import {
@@ -74,15 +75,22 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
   const recentlyDeletedTaskIdsRef = useRef(new Set());
+  const { invalidateAndRefresh } = useProjectData();
 
   const loadData = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
+    const forceRefresh = opts.forceRefresh === true;
     if (!silent) {
       setIsLoading(true);
       setLoadError('');
     }
     try {
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
+      if (forceRefresh) {
+        await invalidateAndRefresh();
+      }
+      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId, {
+        forceFresh: forceRefresh,
+      });
       const deleted = recentlyDeletedTaskIdsRef.current;
       const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
         (t) => !deleted.has(taskEntityId(t)),
@@ -102,7 +110,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [effectiveProjectId]);
+  }, [effectiveProjectId, invalidateAndRefresh]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -265,6 +273,15 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     }
   }, [multiDoneTaskId, taskForDetailDialog, closeTaskDetailDialog]);
 
+  const refreshSharedAfterTaskMutation = useCallback(async () => {
+    try {
+      await invalidateAndRefresh();
+      await loadData({ silent: true });
+    } catch (e) {
+      console.error('Failed to refresh shared project data after task change:', e);
+    }
+  }, [invalidateAndRefresh, loadData]);
+
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm(DELETE_TASK_CONFIRM_MESSAGE)) return;
     const tid = Number(taskId);
@@ -275,10 +292,15 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         return;
       }
       removeTaskFromState(tid);
+      await refreshSharedAfterTaskMutation();
     } catch (e) {
       console.error('Error deleting task:', e);
     }
   };
+
+  const handleTaskCreated = useCallback(async () => {
+    await refreshSharedAfterTaskMutation();
+  }, [refreshSharedAfterTaskMutation]);
 
   useEffect(() => {
     if (multiDoneTaskId == null) return;
@@ -294,7 +316,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
       });
-      if (res.ok) await loadData();
+      if (res.ok) await loadData({ forceRefresh: true });
     } catch (e) { console.error('Error marking assignee done:', e); }
   };
 
@@ -594,11 +616,16 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
       </Dialog>
 
       {!developerMode ? (
-        <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => loadData()} sprints={sprintsForActiveProject} projectDevelopers={projectDevelopers} defaultSprintId={kanbanSprintId || selectedSprintId || undefined} />
+        <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleTaskCreated} sprints={sprintsForActiveProject} projectDevelopers={projectDevelopers} defaultSprintId={kanbanSprintId || selectedSprintId || undefined} />
       ) : null}
       <TaskDetailDialog
-        open={taskDetailOpen} initialTask={taskForDetailDialog} sprints={sprintsForActiveProject}
-        projectDevelopers={projectDevelopers} activeProjectId={selectedProjectId} onClose={closeTaskDetailDialog}
+        open={taskDetailOpen}
+        initialTask={taskForDetailDialog}
+        initialUserTasks={userTasks}
+        sprints={sprintsForActiveProject}
+        projectDevelopers={projectDevelopers}
+        activeProjectId={selectedProjectId}
+        onClose={closeTaskDetailDialog}
         onSaved={(updated, meta) => {
           setRawTasks((prev) => prev.map((t) => (Number(t.id) === Number(updated.id) ? { ...t, ...updated } : t)));
           if (meta?.assigneesChanged) {
@@ -622,9 +649,10 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
           }
           closeTaskDetailDialog();
         }}
-        onDeleted={(taskId) => {
+        onDeleted={async (taskId) => {
           removeTaskFromState(taskId);
           closeTaskDetailDialog();
+          await refreshSharedAfterTaskMutation();
         }}
       />
     </Box>

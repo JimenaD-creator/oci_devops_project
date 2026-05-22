@@ -37,6 +37,12 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
     @Query("SELECT ut FROM UserTask ut LEFT JOIN FETCH ut.user JOIN FETCH ut.task t WHERE t.assignedSprint.id = :sprintId")
     List<UserTask> findBySprintIdWithUserAndTask(@Param("sprintId") Long sprintId);
 
+    /** Task detail dialog: one round-trip with user names (avoids N+1 lazy loads). */
+    @Query(
+            "SELECT ut FROM UserTask ut LEFT JOIN FETCH ut.user JOIN FETCH ut.task t "
+                    + "WHERE ut.id.taskId = :taskId")
+    List<UserTask> findByTaskIdWithUserAndTask(@Param("taskId") Long taskId);
+
     @Query("SELECT DISTINCT t.assignedSprint.id FROM UserTask ut JOIN ut.task t WHERE ut.user.id = :userId AND t.assignedSprint IS NOT NULL")
     List<Long> findDistinctSprintIdsByUserId(@Param("userId") Long userId);
 }

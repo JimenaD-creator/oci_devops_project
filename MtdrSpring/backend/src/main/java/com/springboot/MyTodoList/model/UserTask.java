@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "USER_TASK")
@@ -32,6 +33,10 @@ public class UserTask {
 
     @Column(name = "BLOCKED_REASON", length = 500)
     private String blockedReason;
+
+    /** When this assignee marked their assignment complete (per-person on-time KPIs). */
+    @Column(name = "COMPLETED_AT")
+    private LocalDateTime completedAt;
 
     public UserTask() {}
 
@@ -78,11 +83,27 @@ public class UserTask {
     }
 
     public void setStatus(String status) {
+        boolean wasDone = isCompletedAssignment();
         this.status = status;
-        if (isCompletedAssignmentStatus(status)) {
+        boolean nowDone = isCompletedAssignmentStatus(status);
+        if (nowDone && !wasDone) {
+            this.completedAt = LocalDateTime.now();
+            this.isBlocked = false;
+            this.blockedReason = null;
+        } else if (!nowDone && wasDone) {
+            this.completedAt = null;
+        } else if (nowDone) {
             this.isBlocked = false;
             this.blockedReason = null;
         }
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
     }
 
     /** COMPLETED / DONE (and common aliases): assignment finished — block flags must not remain set. */

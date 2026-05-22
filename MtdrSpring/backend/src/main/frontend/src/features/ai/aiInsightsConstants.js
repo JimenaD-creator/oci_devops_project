@@ -1,3 +1,5 @@
+import { formatProductivityScoreDisplay } from '../kpis/productivityScoreUtils';
+
 export const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export const pageEase = [0.22, 1, 0.36, 1];
@@ -90,49 +92,155 @@ export function clampTrendsPercentLikeValues(text) {
  */
 export function alignTrendsProductivityScore(text, actualScore) {
   if (text == null || actualScore == null) return text;
-  const n = Number(actualScore);
-  if (!Number.isFinite(n)) return text;
-  const clampedActual = Math.max(0, Math.min(100, n));
-  const display = Number.isInteger(clampedActual)
-    ? `${clampedActual}%`
-    : `${clampedActual.toFixed(1)}%`;
+  const display = formatProductivityScoreDisplay(actualScore);
+  if (!display) return text;
   const source = String(text);
   const explicit = source.replace(
-    /(productivity\s+score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+    /(productivity\s+score\s*(?:of|is|:|at)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
     `$1${display}`,
   );
   if (explicit !== source) return explicit;
-  // Fallback for common wording: "Productivity remains high with a score of 100"
   if (/productiv/i.test(source)) {
-    return source.replace(/(\bscore\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/i, `$1${display}`);
+    return source.replace(/(\bscore\s*(?:of|is|:|at)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi, `$1${display}`);
   }
   return source;
 }
 
-function formatKpiMetricValue(rawValue) {
+/**
+ * Align all productivity-score mentions in AI prose to the KPI card value (integer %, e.g. 78%).
+ */
+export function alignProductivityScoreProse(text, actualScore) {
+  if (text == null || actualScore == null) return text;
+  const display = formatProductivityScoreDisplay(actualScore);
+  if (!display) return text;
+  let out = alignKpiMetricsInText(String(text), { productivityScore: actualScore });
+  out = alignTrendsProductivityScore(out, actualScore);
+  const productivityPatterns = [
+    /(productivity\s*score[^0-9]{0,48}?)(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
+    /(overall\s+productivity[^0-9]{0,40}?)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    /(composite\s+score[^0-9]{0,32}?)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ];
+  productivityPatterns.forEach((pattern) => {
+    out = out.replace(pattern, (_, prefix) => `${prefix}${display}`);
+  });
+  if (/productiv/i.test(out)) {
+    out = out.replace(
+      /(\bscore\s*(?:is\s+)?(?:at\s+)?(?:currently\s+)?(?:stands\s+at\s+|of\s+)?)(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
+      `$1${display}`,
+    );
+  }
+  // Gemini often writes "At 67.9%, the composite..." without the words "productivity score".
+  out = out.replace(
+    /^(\s*At\s+)(-?\d+(?:\.\d+)?)(\s*%)/i,
+    `$1${display}`,
+  );
+  out = out.replace(
+    /(composite(?:\s+\w+){0,8}?\s+(?:is\s+)?(?:at\s+)?)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    `$1${display}`,
+  );
+  return out;
+}
+
+function formatKpiMetricNumber(rawValue) {
   const n = Number(rawValue);
-  if (!Number.isFinite(n)) return rawValue;
-  const clamped = Math.max(0, Math.min(100, n));
-  return `${Math.round(clamped)}%`;
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.round(Math.min(100, Math.max(0, n))));
+}
+
+function formatKpiMetricValue(rawValue) {
+  return `${formatKpiMetricNumber(rawValue)}%`;
 }
 
 const KPI_METRIC_PATTERNS = {
-  completionRate: /(completion\s*rate\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  onTimeDelivery: /(on[- ]time\s*delivery\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  teamParticipation: /(team\s*participation\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  workloadBalance: /(workload\s*balance\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-  productivityScore: /(productivity\s*score\s*(?:of|is|was|at)?\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+  completionRate:
+    /(completion\s*rate(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+  onTimeDelivery:
+    /(on[- ]time\s*delivery(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+  teamParticipation:
+    /(team\s*participation(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+  workloadBalance:
+    /(workload\s*balance(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+  productivityScore:
+    /(productivity\s*score(?:\s+is\s+at\s+|\s+is\s+(?:currently\s+)?|\s+stands\s+at\s+|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
 };
 
+/** Gemini often puts the % far from the label ("…declined…, currently at 63%"). */
+const KPI_METRIC_PROXIMITY = {
+  onTimeDelivery: [
+    /(on[- ]time\s*delivery[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(on[- ]time\s*delivery[^.!?]{0,200}?\b(?:is\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+  ],
+  completionRate: [
+    /(completion\s*rate[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+  ],
+  teamParticipation: [
+    /(team\s*participation[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+  ],
+  workloadBalance: [
+    /(workload\s*balance[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+  ],
+  productivityScore: [
+    /(productivity\s*score[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(overall\s+productivity[^.!?]{0,200}?\b(?:is\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+  ],
+};
+
+/**
+ * Replace loose "currently at 63%" style phrases (alert bodies, manager guide).
+ */
+export function alignAlertLoosePercents(text, actualPercent) {
+  if (text == null || actualPercent == null) return text;
+  const display = formatKpiMetricValue(actualPercent);
+  let out = String(text);
+  out = out.replace(/\bcurrently\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `currently at ${display}`);
+  out = out.replace(/\bnow\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `now at ${display}`);
+  out = out.replace(/\bstands\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `stands at ${display}`);
+  return out;
+}
+
+function applyKpiMetricPatterns(text, key, actual) {
+  const num = formatKpiMetricNumber(actual);
+  const display = formatKpiMetricValue(actual);
+  let result = text;
+  const tight = KPI_METRIC_PATTERNS[key];
+  if (tight) {
+    result = result.replace(tight, (_, prefix) => `${prefix}${num}`);
+  }
+  const proximity = KPI_METRIC_PROXIMITY[key];
+  if (proximity) {
+    proximity.forEach((pattern) => {
+      result = result.replace(pattern, (_, prefix, _n, suffix = '%') => `${prefix}${num}${suffix}`);
+    });
+  }
+  return result;
+}
+
+/**
+ * Align AI prose to live KPI card values (KPI Analytics + AI Insights).
+ */
 export function alignKpiMetricsInText(text, metrics = {}) {
   if (text == null || typeof text !== 'string') return text;
   let result = String(text);
-  Object.entries(KPI_METRIC_PATTERNS).forEach(([key, pattern]) => {
-    const actual = metrics[key];
-    if (actual == null) return;
-    result = result.replace(pattern, (_, prefix) => `${prefix}${formatKpiMetricValue(actual)}`);
+  Object.entries(metrics).forEach(([key, actual]) => {
+    if (actual == null || !Number.isFinite(Number(actual))) return;
+    result = applyKpiMetricPatterns(result, key, actual);
   });
   return result;
+}
+
+/**
+ * Full pass for a single KPI block (alerts, manager guide lines).
+ */
+export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
+  if (text == null) return text;
+  const aligned = alignKpiMetricsInText(text, metrics);
+  const actual = metrics[metricKey];
+  if (actual == null) return aligned;
+  let out = alignAlertLoosePercents(aligned, actual);
+  if (metricKey === 'productivityScore') {
+    out = alignProductivityScoreProse(out, actual);
+  }
+  return out;
 }
 
 /** Gemini `actionableRecommendations[].category` → UI label */

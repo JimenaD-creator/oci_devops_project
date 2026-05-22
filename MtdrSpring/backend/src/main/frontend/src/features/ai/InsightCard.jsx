@@ -114,51 +114,14 @@ export default function InsightCard({
   const [error, setError] = useState(null);
   const [pollCount, setPollCount] = useState(0);
   const [lastGeneratedAtMs, setLastGeneratedAtMs] = useState(null);
+  const lastGeneratedAtMsRef = useRef(null);
   const cancelPollRef = useRef(false);
+  const autoGenerateStartedRef = useRef(new Set());
 
   const parseGeneratedAtMs = (value) => {
     const ms = new Date(value ?? '').getTime();
     return Number.isFinite(ms) ? ms : null;
   };
-
-  const loadExisting = useCallback(async () => {
-    if (!sprintId) return;
-    try {
-      const { notFound, data } = await fetchSprintInsights(sprintId);
-      if (notFound || !data) return;
-      setLastGeneratedAtMs(parseGeneratedAtMs(data.generatedAt));
-      if (data.error) {
-        setError(getErrorMessage(data.error));
-        setStatus('error');
-        return;
-      }
-      setInsights(data.insights);
-      setAcknowledged(data.acknowledged ?? false);
-      setStatus('loaded');
-    } catch {
-      /* network error on initial load — stay idle */
-    }
-  }, [sprintId]);
-
-  useEffect(() => {
-    cancelPollRef.current = true;
-    setInsights(null);
-    setStatus('idle');
-    setAcknowledged(false);
-    setError(null);
-    setPollCount(0);
-    setLastGeneratedAtMs(null);
-    cancelPollRef.current = false;
-    loadExisting();
-    return () => {
-      cancelPollRef.current = true;
-    };
-  }, [sprintId, loadExisting]);
-
-  useEffect(() => {
-    if (!sprintId || refreshToken === 0) return;
-    loadExisting();
-  }, [refreshToken, sprintId, loadExisting]);
 
   // Iterative loop — NOT recursive. Each iteration awaits before the next,
   // so the attempt counter increments correctly and the loop terminates at MAX_ATTEMPTS.
@@ -188,6 +151,7 @@ export default function InsightCard({
             }
             setInsights(data.insights);
             setAcknowledged(data.acknowledged ?? false);
+            lastGeneratedAtMsRef.current = generatedAtMs;
             setLastGeneratedAtMs(generatedAtMs);
             setStatus('loaded');
             setPollCount(attempt + 1);
@@ -207,7 +171,8 @@ export default function InsightCard({
     [sprintId],
   );
 
-  const handleGenerate = async () => {
+  const startGeneration = useCallback(async () => {
+    if (!sprintId) return;
     cancelPollRef.current = true;
     setStatus('generating');
     setError(null);
@@ -221,12 +186,74 @@ export default function InsightCard({
       if (!res.ok) throw new Error('POST failed');
       cancelPollRef.current = false;
       setStatus('polling');
-      pollForResults(lastGeneratedAtMs);
+      pollForResults(lastGeneratedAtMsRef.current);
     } catch {
       setError('Could not start AI analysis. Check server connection.');
       setStatus('error');
     }
-  };
+  }, [sprintId, pollForResults]);
+
+  const loadExisting = useCallback(
+    async (options = {}) => {
+      const { autoGenerate = false } = options;
+      if (!sprintId) return;
+      try {
+        const { notFound, data } = await fetchSprintInsights(sprintId);
+        if (notFound || !data) {
+          if (autoGenerate && !autoGenerateStartedRef.current.has(sprintId)) {
+            autoGenerateStartedRef.current.add(sprintId);
+            await startGeneration();
+          } else if (!autoGenerate) {
+            setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+          }
+          return;
+        }
+        const generatedMs = parseGeneratedAtMs(data.generatedAt);
+        lastGeneratedAtMsRef.current = generatedMs;
+        setLastGeneratedAtMs(generatedMs);
+        if (data.error) {
+          setError(getErrorMessage(data.error));
+          setStatus('error');
+          return;
+        }
+        setInsights(data.insights);
+        setAcknowledged(data.acknowledged ?? false);
+        setStatus('loaded');
+      } catch {
+        /* network error on initial load — stay idle unless generating */
+        if (!autoGenerate) {
+          setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+        }
+      }
+    },
+    [sprintId, startGeneration],
+  );
+
+  useEffect(() => {
+    cancelPollRef.current = true;
+    setInsights(null);
+    setStatus('idle');
+    setAcknowledged(false);
+    setError(null);
+    setPollCount(0);
+    setLastGeneratedAtMs(null);
+    lastGeneratedAtMsRef.current = null;
+    autoGenerateStartedRef.current.delete(sprintId);
+    cancelPollRef.current = false;
+    loadExisting({ autoGenerate: true });
+    return () => {
+      cancelPollRef.current = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-init when sprint changes
+  }, [sprintId]);
+
+  useEffect(() => {
+    if (!sprintId || refreshToken === 0) return;
+    loadExisting({ autoGenerate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when parent page becomes active
+  }, [refreshToken, sprintId]);
+
+  const handleGenerate = () => startGeneration();
 
   const handleAcknowledge = async () => {
     try {

@@ -25,8 +25,8 @@ import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DashboardBlockedTasksPanel from './DashboardBlockedTasksPanel';
 import DeveloperTable from '../kpis/DeveloperTable';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import {
-  fetchDashboardSprints,
   mergeTaskStatusAcrossSprints,
   aggregateSelectionMetrics,
   sprintDbIdSortKey,
@@ -68,6 +68,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const AVATAR_PALETTE = isDark ? AVATAR_PALETTE_DARK : AVATAR_PALETTE_LIGHT;
+  const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
   const [sprintsLoading, setSprintsLoading] = useState(true);
@@ -86,30 +87,38 @@ export default function DashboardPage({ projectId: propProjectId }) {
     let cancelled = false;
     setSprintsLoading(true);
 
-    Promise.all([
-      fetchProjectById(projectId).catch(() => null),
-      fetchDashboardSprints(projectId),
-    ])
-      .then(([project, sprints]) => {
+    Promise.all([fetchProjectById(projectId).catch(() => null)])
+      .then(([project]) => {
         if (cancelled) return;
         if (project) setCurrentProject(project);
-        setAllSprints(sprints);
-        setSelectedSprintIds((prev) => {
-          if (sprints.length > 0 && prev.length === 0) {
-            const picked = pickDefaultSelectedSprint(sprints);
-            if (picked?.id != null) return [Number(picked.id)];
-          }
-          return prev;
-        });
       })
       .finally(() => {
-        if (!cancelled) setSprintsLoading(false);
+        if (!cancelled && !sharedLoading) setSprintsLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, sharedLoading]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setAllSprints([]);
+      setSprintsLoading(false);
+      return;
+    }
+    setSprintsLoading(sharedLoading);
+    const sprints = Array.isArray(sharedSprints) ? sharedSprints : [];
+    setAllSprints(sprints);
+    setSelectedSprintIds((prev) => {
+      if (sprints.length > 0 && prev.length === 0) {
+        const picked = pickDefaultSelectedSprint(sprints);
+        if (picked?.id != null) return [Number(picked.id)];
+      }
+      return prev;
+    });
+    if (!sharedLoading) setSprintsLoading(false);
+  }, [projectId, sharedSprints, sharedLoading]);
 
   useEffect(() => {
     setSeenBlockedKeysCsv('');

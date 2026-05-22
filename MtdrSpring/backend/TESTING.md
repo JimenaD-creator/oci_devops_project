@@ -108,3 +108,30 @@ Fixtures: `src/test/resources/gemini/`. Tests cover:
 - `extractJsonFromGeminiResponse` (markdown fence stripping via reflection)
 
 `GeminiService` is excluded from the `-Pcoverage-check` gate (large class; slows CI). `GeminiServiceTest` still runs on every `mvn test`.
+
+### Per-assignee on-time (`USER_TASK.COMPLETED_AT`)
+
+On-time KPIs use each assignee’s completion time, not the task’s final `finishDate`. On an existing Oracle schema, run once:
+
+```sql
+ALTER TABLE USER_TASK ADD COMPLETED_AT TIMESTAMP(6);
+```
+
+New completions set `COMPLETED_AT` automatically when status moves to `COMPLETED`/`DONE`. Legacy rows without a timestamp are excluded from on-time/late counts for multi-assignee tasks (not counted as late).
+
+`GET /api/insights/sprint/{id}` rewrites `developerInsights[].insight` from the **current** `USER_TASK` snapshot (per-assignee completion and `COMPLETED_AT`), so Team → “AI per-developer analysis” stays aligned with live data without regenerating Gemini. Regenerate in AI Insights only when you want a fresh full narrative (alerts, recommendations, executive summary).
+
+When all assignees finish, `TASK.FINISH_DATE` is set to the **latest** `USER_TASK.COMPLETED_AT`, not the wall-clock moment of sync (fixes false “task late” if the last status change happens after the due date but assignees completed earlier).
+
+To fix an existing closed task in SQL:
+
+```sql
+UPDATE TASK t
+SET FINISH_DATE = (
+  SELECT MAX(ut.COMPLETED_AT)
+  FROM USER_TASK ut
+  WHERE ut.TASK_ID = t.ID
+)
+WHERE t.ID = :task_id
+  AND t.STATUS = 'DONE';
+```

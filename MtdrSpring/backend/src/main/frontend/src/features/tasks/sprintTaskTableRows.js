@@ -68,6 +68,7 @@ export function buildSprintTaskTableRows(tasks, userTasks, projectDevelopers = [
                 name,
                 status: normalizeTaskStatus(userTaskRowStatus(ut)),
                 completed: isUserTaskAssigneeComplete(ut),
+                completedAt: ut?.completedAt ?? ut?.completed_at ?? null,
               };
             })
             .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))

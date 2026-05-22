@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import { API_BASE } from '../features/sprints/constants/sprintConstants';
 import { useThemeMode } from '../ThemeContext';
+import { ProjectDataProvider } from '../contexts/ProjectDataContext';
 import PageLoadingSpinner from '../components/common/PageLoadingSpinner';
 import {
   Box,
@@ -101,6 +102,18 @@ function App() {
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
   const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
+  /** Pages already opened stay mounted (hidden) to avoid refetch on every sidebar click. */
+  const [visitedPages, setVisitedPages] = useState(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (!stored) return new Set(['dashboard']);
+      const parsed = JSON.parse(stored);
+      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
+      return new Set([role === 'DEVELOPER' ? 'my-tasks' : 'dashboard']);
+    } catch {
+      return new Set(['dashboard']);
+    }
+  });
 
   // ── Foto de perfil ───────────────────────────────────────────────────────────
   const fileInputRef = useRef(null);
@@ -162,6 +175,19 @@ function App() {
   useEffect(() => {
     if (activePage === 'tasks' || activePage === 'sprints') setSprintsNavOpen(true);
   }, [activePage]);
+
+  useEffect(() => {
+    setVisitedPages((prev) => {
+      if (prev.has(activePage)) return prev;
+      const next = new Set(prev);
+      next.add(activePage);
+      return next;
+    });
+  }, [activePage]);
+
+  const pageVisibilitySx = (pageId) => ({
+    display: activePage === pageId ? 'block' : 'none',
+  });
 
   // ── Handlers foto de perfil ──────────────────────────────────────────────────
   const handlePhotoClick = () => {
@@ -548,47 +574,77 @@ function App() {
           bgcolor: 'background.default',
         }}
       >
-        <Suspense fallback={<PageLoader />}>
-          {activePage === 'dashboard' && (
-            <DashboardPage
-              onNavigateToTasks={() => setActivePage('tasks')}
-              projectId={selectedProjectId}
-            />
-          )}
-          {activePage === 'tasks' && (
-            <TasksPage projectId={selectedProjectId} />
-          )}
-          {activePage === 'sprints' && (
-            <SprintsPage projectId={selectedProjectId} onNavigateToTasks={() => setActivePage('tasks')} />
-          )}
-          {activePage === 'analytics' && (
-            <KPIAnalytics projectId={selectedProjectId} onOpenAiInsights={() => setActivePage('ai-insights')} />
-          )}
-          {activePage === 'ai-insights' && (
-            <AIInsightsPage projectId={selectedProjectId} onOpenTeam={handleOpenTeamFromAi} />
-          )}
-          {activePage === 'team' && (
-            <TeamPage
-              projectId={selectedProjectId}
-              landingSprintId={teamLandingSprintId}
-              onLandingConsumed={handleTeamLandingConsumed}
-              onOpenAiInsights={handleOpenAiInsightsFromTeam}
-            />
-          )}
-          {activePage === 'my-tasks' && (
-            <MyTasksPage projectId={selectedProjectId} currentUser={user} />
-          )}
-          {activePage === 'my-kanban' && (
-            <TasksPage
-              projectId={selectedProjectId}
-              developerMode
-              currentUser={user}
-            />
-          )}
-          {activePage === 'my-performance' && (
-            <MyPerformancePage projectId={selectedProjectId} currentUser={user} />
-          )}
-        </Suspense>
+        <ProjectDataProvider projectId={selectedProjectId}>
+          <Suspense fallback={<PageLoader />}>
+            {visitedPages.has('dashboard') && (
+              <Box sx={pageVisibilitySx('dashboard')}>
+                <DashboardPage
+                  onNavigateToTasks={() => setActivePage('tasks')}
+                  projectId={selectedProjectId}
+                />
+              </Box>
+            )}
+            {visitedPages.has('tasks') && (
+              <Box sx={pageVisibilitySx('tasks')}>
+                <TasksPage projectId={selectedProjectId} />
+              </Box>
+            )}
+            {visitedPages.has('sprints') && (
+              <Box sx={pageVisibilitySx('sprints')}>
+                <SprintsPage
+                  projectId={selectedProjectId}
+                  onNavigateToTasks={() => setActivePage('tasks')}
+                />
+              </Box>
+            )}
+            {visitedPages.has('analytics') && (
+              <Box sx={pageVisibilitySx('analytics')}>
+                <KPIAnalytics
+                  projectId={selectedProjectId}
+                  onOpenAiInsights={() => setActivePage('ai-insights')}
+                />
+              </Box>
+            )}
+            {visitedPages.has('ai-insights') && (
+              <Box sx={pageVisibilitySx('ai-insights')}>
+                <AIInsightsPage
+                  projectId={selectedProjectId}
+                  onOpenTeam={handleOpenTeamFromAi}
+                  isPageActive={activePage === 'ai-insights'}
+                />
+              </Box>
+            )}
+            {visitedPages.has('team') && (
+              <Box sx={pageVisibilitySx('team')}>
+                <TeamPage
+                  projectId={selectedProjectId}
+                  landingSprintId={teamLandingSprintId}
+                  onLandingConsumed={handleTeamLandingConsumed}
+                  onOpenAiInsights={handleOpenAiInsightsFromTeam}
+                />
+              </Box>
+            )}
+            {visitedPages.has('my-tasks') && (
+              <Box sx={pageVisibilitySx('my-tasks')}>
+                <MyTasksPage projectId={selectedProjectId} currentUser={user} />
+              </Box>
+            )}
+            {visitedPages.has('my-kanban') && (
+              <Box sx={pageVisibilitySx('my-kanban')}>
+                <TasksPage
+                  projectId={selectedProjectId}
+                  developerMode
+                  currentUser={user}
+                />
+              </Box>
+            )}
+            {visitedPages.has('my-performance') && (
+              <Box sx={pageVisibilitySx('my-performance')}>
+                <MyPerformancePage projectId={selectedProjectId} currentUser={user} />
+              </Box>
+            )}
+          </Suspense>
+        </ProjectDataProvider>
         {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team', 'my-tasks', 'my-kanban', 'my-performance'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Typography variant="h6" color="textSecondary">Section under development</Typography>

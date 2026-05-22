@@ -41,9 +41,24 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GeminiService {
+
+    private static final long ENRICH_RESPONSE_CACHE_MS = 45_000;
+    private final ConcurrentHashMap<String, CachedEnrichedInsights> enrichResponseCache =
+        new ConcurrentHashMap<>();
+
+    private static final class CachedEnrichedInsights {
+        final JsonNode node;
+        final long expiresAtMs;
+
+        CachedEnrichedInsights(JsonNode node, long expiresAtMs) {
+            this.node = node;
+            this.expiresAtMs = expiresAtMs;
+        }
+    }
 
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
@@ -325,11 +340,18 @@ public class GeminiService {
                 int completedTasks;
                 int onTimeCompletedTasks;
                 int lateCompletedTasks;
+                int unknownCompletionTiming;
                 int completedWithZeroHours;
                 long workedHours;
                 long assignedHours;
                 boolean fromSprintRosterOnly;
                 final List<Map<String, Object>> taskSamples = new ArrayList<>();
+            }
+            Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+            for (UserTask ut : rows) {
+                if (ut.getId() != null) {
+                    assigneeCountByTask.merge(ut.getId().getTaskId(), 1, Integer::sum);
+                }
             }
             Map<Long, Agg> byUser = new LinkedHashMap<>();
             for (UserTask ut : rows) {
@@ -358,12 +380,15 @@ public class GeminiService {
                     return x;
                 });
                 a.taskRows++;
-                String st = t.getStatus();
-                if (st != null && "DONE".equalsIgnoreCase(st.trim())) {
+                if (isUserTaskAssignmentComplete(ut)) {
                     a.completedTasks++;
-                    if (isTaskFinishedOnTime(t)) {
+                    int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                    Boolean onTime = evaluateUserTaskOnTime(ut, t, assigneeCount);
+                    if (onTime == null) {
+                        a.unknownCompletionTiming++;
+                    } else if (onTime) {
                         a.onTimeCompletedTasks++;
-                    } else if (isTaskFinishedLate(t)) {
+                    } else {
                         a.lateCompletedTasks++;
                     }
                     if (ut.getWorkedHours() == null || ut.getWorkedHours() <= 0) {
@@ -437,6 +462,7 @@ public class GeminiService {
                 row.put("completedTasks", a.completedTasks);
                 row.put("onTimeCompletedTasks", a.onTimeCompletedTasks);
                 row.put("lateCompletedTasks", a.lateCompletedTasks);
+                row.put("unknownCompletionTiming", a.unknownCompletionTiming);
                 row.put("completedWithZeroHours", a.completedWithZeroHours);
                 row.put("workedHoursSum", a.workedHours);
                 row.put("assignedHoursSum", a.assignedHours);
@@ -854,6 +880,43 @@ public class GeminiService {
             if (insights == null || !insights.isObject()) {
                 return insights;
             }
+            String cacheKey = sprintId + "|" + insights.hashCode();
+            long now = System.currentTimeMillis();
+            CachedEnrichedInsights hit = enrichResponseCache.get(cacheKey);
+            if (hit != null && hit.expiresAtMs > now) {
+                return applyLiveDeveloperNarratives(hit.node, sprintId);
+            }
+            JsonNode enriched = enrichInsightsForResponseUncached(insights, sprintId);
+            if (enriched != null) {
+                enrichResponseCache.put(
+                    cacheKey,
+                    new CachedEnrichedInsights(enriched, now + ENRICH_RESPONSE_CACHE_MS));
+                if (enrichResponseCache.size() > 80) {
+                    enrichResponseCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
+                }
+            }
+            return applyLiveDeveloperNarratives(enriched, sprintId);
+        } catch (Exception e) {
+            System.err.println("[GeminiService] enrichInsightsForResponse: " + e.getMessage());
+            return insights;
+        }
+    }
+
+    /** Recomputes developerInsights text from DB on every response (not only at Gemini generation time). */
+    private JsonNode applyLiveDeveloperNarratives(JsonNode enriched, Long sprintId) {
+        if (enriched == null || !enriched.isObject() || sprintId == null) {
+            return enriched;
+        }
+        ObjectNode copy = ((ObjectNode) enriched).deepCopy();
+        syncDeveloperInsightNarrativesFromLiveWorkload(copy, sprintId);
+        return copy;
+    }
+
+    private JsonNode enrichInsightsForResponseUncached(JsonNode insights, Long sprintId) {
+        try {
+            if (insights == null || !insights.isObject()) {
+                return insights;
+            }
             JsonNode normalized = camelCaseKeysDeep(insights);
             if (!normalized.isObject()) {
                 return insights;
@@ -875,10 +938,11 @@ public class GeminiService {
             normalizeAlertSeverities(root);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
+            normalizeKpiManagerGuideProductivityScore(root, sprintId);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
-            System.err.println("[GeminiService] enrichInsightsForResponse: " + e.getMessage());
+            System.err.println("[GeminiService] enrichInsightsForResponseUncached: " + e.getMessage());
             return insights;
         }
     }
@@ -1174,6 +1238,155 @@ public class GeminiService {
             o.put("overloaded", false);
             dev.add(o);
         }
+    }
+
+    /**
+     * Overwrites persisted Gemini prose with facts from the current USER_TASK / TASK snapshot on every GET.
+     * Narrative style is kept similar to AI Insights, but counts and on-time/late come from live DB rows.
+     */
+    private void syncDeveloperInsightNarrativesFromLiveWorkload(ObjectNode root, Long sprintId) {
+        try {
+            JsonNode wl = mapper.readTree(buildTeamWorkloadJson(sprintId));
+            if (wl == null || !wl.isArray()) {
+                return;
+            }
+            long workedSum = 0;
+            int workedDevCount = 0;
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject() || row.path("fromSprintRosterOnly").asBoolean(false)) {
+                    continue;
+                }
+                workedSum += row.path("workedHoursSum").asLong(0);
+                workedDevCount++;
+            }
+            long teamAvgWorked = workedDevCount > 0
+                ? Math.round((double) workedSum / workedDevCount) : 0L;
+
+            ArrayNode dev = ensureArrayField(root, "developerInsights");
+            Map<String, ObjectNode> byNameLower = new HashMap<>();
+            for (JsonNode item : dev) {
+                if (item != null && item.isObject()) {
+                    String key = item.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+                    if (!key.isEmpty()) {
+                        byNameLower.put(key, (ObjectNode) item);
+                    }
+                }
+            }
+
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                String name = row.path("developerName").asText("").trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                String key = name.toLowerCase(Locale.ROOT);
+                ObjectNode o = byNameLower.get(key);
+                if (o == null) {
+                    o = mapper.createObjectNode();
+                    o.put("developerName", name);
+                    o.put("overloaded", false);
+                    dev.add(o);
+                    byNameLower.put(key, o);
+                }
+                o.put("insight", buildLiveDeveloperInsightNarrative(row, teamAvgWorked));
+                o.put("liveDataSynced", true);
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] syncDeveloperInsightNarrativesFromLiveWorkload: " + e.getMessage());
+        }
+    }
+
+    private static String buildLiveDeveloperInsightNarrative(JsonNode row, long teamAvgWorkedHours) {
+        boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
+        int completed = row.path("completedTasks").asInt(0);
+        int onTime = row.path("onTimeCompletedTasks").asInt(0);
+        int late = row.path("lateCompletedTasks").asInt(0);
+        int unknown = row.path("unknownCompletionTiming").asInt(0);
+        long worked = row.path("workedHoursSum").asLong(0);
+        int assignedRows = row.path("assignedTaskRows").asInt(0);
+
+        StringBuilder sb = new StringBuilder();
+        if (rosterOnly) {
+            sb.append("On the sprint roster with no assignment rows in the current snapshot.");
+        } else if (completed == 0 && assignedRows > 0) {
+            sb.append(String.format(
+                "%d assignment row(s) in this sprint; none marked complete in the current snapshot.",
+                assignedRows));
+        } else if (completed > 0) {
+            sb.append(String.format(
+                "Completed %d assignment%s",
+                completed,
+                completed == 1 ? "" : "s"));
+            int known = onTime + late;
+            if (known == 0 && unknown > 0) {
+                sb.append(
+                    "; completion time is not recorded yet (set USER_TASK.COMPLETED_AT or re-complete to judge on-time delivery).");
+            } else if (late == 0 && onTime > 0) {
+                sb.append(", all finished on or before the due date.");
+            } else if (onTime == 0 && late > 0) {
+                sb.append(", all finished after the deadline.");
+            } else if (late > 0 && onTime > 0) {
+                sb.append(String.format(
+                    ", with %d on time and %d after the deadline.",
+                    onTime,
+                    late));
+            }
+            if (unknown > 0 && known > 0) {
+                sb.append(String.format(
+                    " %d completed assignment%s lack a recorded completion timestamp.",
+                    unknown,
+                    unknown == 1 ? "" : "s"));
+            }
+        } else {
+            sb.append("No assignment rows in the workload snapshot for this sprint.");
+        }
+
+        String hoursPhrase = describeWorkedHoursVsTeam(worked, teamAvgWorkedHours);
+        if (!hoursPhrase.isEmpty()) {
+            sb.append(' ').append(hoursPhrase);
+        }
+        return sb.toString().trim();
+    }
+
+    private static String describeWorkedHoursVsTeam(long worked, long teamAvg) {
+        if (worked <= 0 && teamAvg <= 0) {
+            return "";
+        }
+        if (teamAvg <= 0) {
+            return worked > 0 ? "Hours logged on assignments." : "";
+        }
+        if (worked > teamAvg + Math.max(2, Math.round(teamAvg * 0.15))) {
+            return "Hours logged are above the team average.";
+        }
+        if (worked > 0 && worked < teamAvg - Math.max(2, Math.round(teamAvg * 0.15))) {
+            return "Hours logged are below the team average.";
+        }
+        return "Hours logged are within a reasonable range.";
+    }
+
+    private static boolean isUserTaskAssignmentComplete(UserTask ut) {
+        return UserTask.isCompletedAssignmentStatus(ut != null ? ut.getStatus() : null);
+    }
+
+    /**
+     * Per-assignee on-time: USER_TASK.completedAt vs task due date (calendar day).
+     * Returns null when completion time is unknown (typical legacy multi-assignee rows).
+     */
+    private static Boolean evaluateUserTaskOnTime(UserTask ut, Task t, int assigneeCount) {
+        if (t == null || t.getDueDate() == null) {
+            return null;
+        }
+        LocalDateTime doneAt = ut.getCompletedAt();
+        if (doneAt == null) {
+            if (assigneeCount <= 1 && t.getFinishDate() != null) {
+                doneAt = t.getFinishDate();
+            } else {
+                return null;
+            }
+        }
+        return !doneAt.toLocalDate().isAfter(t.getDueDate().toLocalDate());
     }
 
     private void addRecommendation(ArrayNode recs, String category, String text) {
@@ -2022,6 +2235,61 @@ public class GeminiService {
                 + "This KPI measures how evenly tasks are distributed, not how fast each person completes them — "
                 + "use completion rate or developer insights if execution pace differs between teammates.",
             pct);
+    }
+
+    /**
+     * Overwrites stale Gemini productivity decimals (e.g. 67.9) with the canonical composite score
+     * from sprint KPI fields — same formula as the Productivity Score KPI card.
+     */
+    private void normalizeKpiManagerGuideProductivityScore(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        int ps = (int) Math.round(computeProductivityScore(sprint));
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode == null || !guideNode.isObject()) {
+            return;
+        }
+        ObjectNode guide = (ObjectNode) guideNode;
+        JsonNode byMetricNode = guide.get("byMetric");
+        ObjectNode byMetric;
+        if (byMetricNode == null || !byMetricNode.isObject()) {
+            byMetric = mapper.createObjectNode();
+            guide.set("byMetric", byMetric);
+        } else {
+            byMetric = (ObjectNode) byMetricNode;
+        }
+        byMetric.put(
+            "productivityScore",
+            String.format(
+                Locale.ROOT,
+                "The Productivity Score is %d%%, matching the KPI card above "
+                    + "(completion 40%%, on-time delivery 30%%, team participation 20%%, workload balance 10%%).",
+                ps));
+        String intro = guide.path("intro").asText("");
+        if (!intro.isBlank() && PRODUCTIVITY_SCORE_IN_INTRO.matcher(intro).find()) {
+            guide.put("intro", replaceProductivityScoreMentionsInProse(intro, ps));
+        }
+    }
+
+    private static final Pattern PRODUCTIVITY_SCORE_IN_INTRO = Pattern.compile(
+        "productiv|composite\\s+score|weighted\\s+(?:kpi|score)",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String replaceProductivityScoreMentionsInProse(String text, int scorePct) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        String display = scorePct + "%";
+        String out = text.replaceAll(
+            "(?i)(productivity\\s*score[^0-9]{0,48}?)-?\\d+(?:\\.\\d+)?\\s*(?:%|points?)?",
+            "$1" + display);
+        out = out.replaceAll("(?i)^\\s*At\\s+-?\\d+(?:\\.\\d+)?\\s*%", "At " + display);
+        out = out.replaceAll(
+            "(?i)(composite[^0-9]{0,40}?)-?\\d+(?:\\.\\d+)?\\s*%?",
+            "$1" + display);
+        return out;
     }
 
     /**

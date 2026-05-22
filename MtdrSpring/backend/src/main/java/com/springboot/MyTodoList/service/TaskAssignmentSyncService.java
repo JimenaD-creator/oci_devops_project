@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -65,7 +67,13 @@ public class TaskAssignmentSyncService {
         task.setStatus(newStatus);
 
         if ("DONE".equals(newStatus) && !"DONE".equals(previous)) {
-            task.setFinishDate(LocalDateTime.now());
+            // Close date = last assignee completion, not "now" (avoids false "task late" in UI/KPIs).
+            LocalDateTime closedAt = uts.stream()
+                    .map(UserTask::getCompletedAt)
+                    .filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder())
+                    .orElse(LocalDateTime.now());
+            task.setFinishDate(closedAt);
         } else if (!"DONE".equals(newStatus) && "DONE".equals(previous)) {
             task.setFinishDate(task.getDueDate() != null ? task.getDueDate() : LocalDateTime.now());
         }

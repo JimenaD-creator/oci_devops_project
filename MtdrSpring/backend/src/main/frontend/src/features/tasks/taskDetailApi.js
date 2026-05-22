@@ -30,6 +30,14 @@ export async function fetchUserTasksForTask(taskId) {
   }
 }
 
+/** Task + assignee rows in parallel (detail dialog). */
+export async function fetchTaskDetailBundle(taskId) {
+  const id = Number(taskId);
+  if (!Number.isFinite(id)) return { task: null, userTasks: [] };
+  const [task, userTasks] = await Promise.all([fetchTaskById(id), fetchUserTasksForTask(id)]);
+  return { task, userTasks: Array.isArray(userTasks) ? userTasks : [] };
+}
+
 export async function deleteUserTasksForTask(taskId) {
   return fetch(`${API_BASE}/api/user-tasks/task/${taskId}`, { method: 'DELETE' });
 }

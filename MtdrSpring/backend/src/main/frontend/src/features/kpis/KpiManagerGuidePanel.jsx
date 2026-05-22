@@ -4,10 +4,15 @@ import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import {
   KPI_LABELS,
-  alignTrendsProductivityScore,
   alignKpiMetricsInText,
+  alignKpiProseForMetric,
+  alignProductivityScoreProse,
   normalizeWorkloadBalanceGuideText,
 } from '../ai/aiInsightsConstants';
+import {
+  buildProductivityManagerGuideLine,
+  formatProductivityScoreDisplay,
+} from './productivityScoreUtils';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -81,9 +86,14 @@ export default function KpiManagerGuidePanel({
   const METRIC_STYLES = isDark ? METRIC_STYLES_DARK : METRIC_STYLES_LIGHT;
   
   const resolvedCurrentProductivityScore = Number.isFinite(Number(currentProductivityScore))
-    ? Number(currentProductivityScore)
-    : Number(productivityDelta?.currentScore);
+    ? Math.round(Number(currentProductivityScore))
+    : Number.isFinite(Number(productivityDelta?.currentScore))
+      ? Math.round(Number(productivityDelta.currentScore))
+      : null;
   const hasCurrentProductivityScore = Number.isFinite(resolvedCurrentProductivityScore);
+  const productivityDisplay = hasCurrentProductivityScore
+    ? formatProductivityScoreDisplay(resolvedCurrentProductivityScore)
+    : '';
   const byMetric =
     guide && guide.byMetric && typeof guide.byMetric === 'object' ? guide.byMetric : null;
   const introTextRaw = clampOver100ForDisplay(
@@ -97,17 +107,8 @@ export default function KpiManagerGuidePanel({
     productivityScore: resolvedCurrentProductivityScore,
   });
   const introText = hasCurrentProductivityScore
-    ? alignTrendsProductivityScore(alignedIntroText, resolvedCurrentProductivityScore)
+    ? alignProductivityScoreProse(alignedIntroText, resolvedCurrentProductivityScore)
     : alignedIntroText;
-  const alignGenericScorePhrase = (text) => {
-    if (text == null || !hasCurrentProductivityScore) return text;
-    const n = Math.max(0, Math.min(100, Number(resolvedCurrentProductivityScore)));
-    const display = Number.isInteger(n) ? `${n}%` : `${n.toFixed(1)}%`;
-    return String(text).replace(
-      /(score\s*(?:of|is|:)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
-      `$1${display}`,
-    );
-  };
   const productivityDeltaTextRaw = clampOver100ForDisplay(
     typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',
     { aggressive: true },
@@ -120,12 +121,7 @@ export default function KpiManagerGuidePanel({
     productivityScore: resolvedCurrentProductivityScore,
   });
   const productivityDeltaText = hasCurrentProductivityScore
-    ? alignGenericScorePhrase(
-        alignTrendsProductivityScore(
-          productivityDeltaTextAligned,
-          resolvedCurrentProductivityScore,
-        ),
-      )
+    ? alignProductivityScoreProse(productivityDeltaTextAligned, resolvedCurrentProductivityScore)
     : productivityDeltaTextAligned;
   const hasMetricLines =
     byMetric &&
@@ -212,7 +208,8 @@ export default function KpiManagerGuidePanel({
                   sx={{ fontSize: '0.88rem', color: strongGainColors.text, fontWeight: 600, lineHeight: 1.55 }}
                 >
                   Productivity score vs Sprint {productivityDelta.previousSprintId}:{' '}
-                  {productivityDelta.previousScore}% → {productivityDelta.currentScore}%
+                  {formatProductivityScoreDisplay(productivityDelta.previousScore)} →{' '}
+                  {productivityDisplay || formatProductivityScoreDisplay(productivityDelta.currentScore)}
                   {productivityDelta.deltaPoints != null && (
                     <>
                       {' '}
@@ -331,12 +328,14 @@ export default function KpiManagerGuidePanel({
                 workloadBalance: currentSprintKpis.workloadBalance,
                 productivityScore: resolvedCurrentProductivityScore,
               });
-              let displayText =
-                key === 'productivityScore' && hasCurrentProductivityScore
-                  ? alignGenericScorePhrase(
-                      alignTrendsProductivityScore(alignedText, resolvedCurrentProductivityScore),
-                    )
-                  : alignedText;
+              const metricsForAlign = {
+                ...currentSprintKpis,
+                productivityScore: resolvedCurrentProductivityScore,
+              };
+              let displayText = alignKpiProseForMetric(alignedText, key, metricsForAlign);
+              if (key === 'productivityScore' && hasCurrentProductivityScore) {
+                displayText = buildProductivityManagerGuideLine(resolvedCurrentProductivityScore);
+              }
               if (key === 'workloadBalance') {
                 displayText = normalizeWorkloadBalanceGuideText(
                   displayText,

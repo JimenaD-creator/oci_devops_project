@@ -2,10 +2,10 @@
 export const CHART_DESC = {
   compare: {
     workload:
-      'One column per developer, stacked: solid = completed, lighter = pending, one stack per sprint.',
+      'Total completed and pending tasks per developer, summed across all selected sprints.',
     hours:
-      'Per sprint: solid bar = hours worked; lighter bar = estimated hours from task estimates.',
-    combo: 'Bars show completed tasks; lines show hours.',
+      'Total hours worked and estimated hours per developer, summed across all selected sprints.',
+    combo: 'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',
   },
   single: {
     workload: 'Completed and pending tasks assigned to each developer in this sprint.',
