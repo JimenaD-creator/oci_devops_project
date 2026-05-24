@@ -38,6 +38,9 @@ import {
   ORACLE_RED_ACTION,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
+import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
+import TaskDescriptionContent from '../../components/common/TaskDescriptionContent';
+import { sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
 import {
   deleteTaskById,
   deleteUserTasksForTask,
@@ -582,7 +585,7 @@ export function TaskDetailDialog({
       const payload = {
         ...taskRest,
         title: title.trim(),
-        description: (description || '').trim(),
+        description: sanitizeRichDescriptionHtml(description),
         classification,
         status,
         priority,
@@ -829,9 +832,9 @@ export function TaskDetailDialog({
               </Typography>
 
               <FieldLabel>Description</FieldLabel>
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2, whiteSpace: 'pre-wrap' }}>
-                {(task.description && String(task.description).trim()) || '—'}
-              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <TaskDescriptionContent description={task.description} />
+              </Box>
 
               {/* Status / Type / Priority as colored badges */}
               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -1198,14 +1201,11 @@ export function TaskDetailDialog({
                   size="small"
                   sx={fieldSx}
                 />
-                <TextField
+                <RichTextDescriptionField
                   label="Description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  fullWidth
-                  multiline
+                  onChange={setDescription}
                   minRows={3}
-                  size="small"
                   sx={fieldSx}
                 />
                 <Box>

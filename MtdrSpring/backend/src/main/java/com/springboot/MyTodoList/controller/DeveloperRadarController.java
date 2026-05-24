@@ -1,8 +1,14 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.model.Project;
+import com.springboot.MyTodoList.model.Sprint;
 import com.springboot.MyTodoList.model.Task;
+import com.springboot.MyTodoList.model.Team;
+import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.repository.SprintRepository;
+import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.model.UserSprint;
@@ -12,16 +18,34 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/insights")
 public class DeveloperRadarController {
+
+    private static final class DeveloperAgg {
+        String name;
+        String profilePicture;
+        int total;
+        int done;
+        int onTime;
+        int late;
+        long worked;
+        long assigned;
+    }
 
     @Autowired
     private UserTaskRepository userTaskRepository;
 
     @Autowired
     private UserSprintRepository userSprintRepository;
+
+    @Autowired
+    private SprintRepository sprintRepository;
+
+    @Autowired
+    private TeamMembersRepository teamMembersRepository;
 
     @GetMapping("/sprint/{sprintId}/developer-radar")
     public ResponseEntity<List<Map<String, Object>>> getDeveloperRadar(@PathVariable Long sprintId) {
@@ -42,22 +66,15 @@ public class DeveloperRadarController {
             assigneeCountByTask.merge(tid, 1, Integer::sum);
         }
 
-        class Agg {
-            String name;
-            String profilePicture;
-            int total, done, onTime, late;
-            long worked, assigned;
-        }
-
-        Map<Long, Agg> byUser = new LinkedHashMap<>();
+        Map<Long, DeveloperAgg> byUser = new LinkedHashMap<>();
 
         for (UserTask ut : deduped.values()) {
             Task t = ut.getTask();
             if (t == null) continue;
             Long uid = ut.getId().getUserId();
             User u = ut.getUser();
-            Agg a = byUser.computeIfAbsent(uid, id -> {
-                Agg x = new Agg();
+            DeveloperAgg a = byUser.computeIfAbsent(uid, id -> {
+                DeveloperAgg x = new DeveloperAgg();
                 x.name = (u != null && u.getName() != null && !u.getName().isBlank())
                     ? u.getName().trim() : ("User " + id);
                 x.profilePicture = (u != null) ? u.getProfilePicture() : null;
@@ -84,13 +101,11 @@ public class DeveloperRadarController {
                 if (u == null) continue;
                 Long uid = u.getId();
                 if (byUser.containsKey(uid)) continue;
-                Agg a = new Agg();
-                a.name = (u.getName() != null && !u.getName().isBlank())
-                    ? u.getName().trim() : ("User " + uid);
-                a.profilePicture = u.getProfilePicture();
-                byUser.put(uid, a);
+                byUser.put(uid, emptyAggForUser(u, uid));
             }
         }
+
+        addProjectTeamRoster(sprintId, byUser);
 
         if (byUser.isEmpty()) return ResponseEntity.ok(Collections.emptyList());
 
@@ -99,7 +114,7 @@ public class DeveloperRadarController {
         long maxWorked   = byUser.values().stream().mapToLong(a -> a.worked).max().orElse(1);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Agg a : byUser.values()) {
+        for (DeveloperAgg a : byUser.values()) {
             double completionRatio    = a.total > 0 ? (double) a.done / a.total : 0;
             int onTimeDenominator = a.onTime + a.late;
             double onTimeRatio        = onTimeDenominator > 0 ? (double) a.onTime / onTimeDenominator : 0;
@@ -128,6 +143,59 @@ public class DeveloperRadarController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    private void addProjectTeamRoster(Long sprintId, Map<Long, DeveloperAgg> byUser) {
+        Optional<Sprint> sprintOpt = sprintRepository.findById(sprintId);
+        if (sprintOpt.isEmpty()) {
+            return;
+        }
+        Project project = sprintOpt.get().getAssignedProject();
+        if (project == null) {
+            return;
+        }
+        Team team = project.getAssignedTeam();
+        if (team == null || team.getId() == null) {
+            return;
+        }
+        List<TeamMember> members = teamMembersRepository.findByTeam_Id(team.getId());
+        if (members != null) {
+            for (TeamMember tm : members) {
+                User u = tm.getUser();
+                if (u == null || !isDeveloperUser(u)) {
+                    continue;
+                }
+                Long uid = u.getId();
+                if (byUser.containsKey(uid)) {
+                    continue;
+                }
+                byUser.put(uid, emptyAggForUser(u, uid));
+            }
+        }
+        User manager = team.getManager();
+        if (manager != null && isDeveloperUser(manager)) {
+            Long uid = manager.getId();
+            if (!byUser.containsKey(uid)) {
+                byUser.put(uid, emptyAggForUser(manager, uid));
+            }
+        }
+    }
+
+    private static DeveloperAgg emptyAggForUser(User u, Long uid) {
+        DeveloperAgg a = new DeveloperAgg();
+        a.name = (u.getName() != null && !u.getName().isBlank())
+                ? u.getName().trim()
+                : ("User " + uid);
+        a.profilePicture = u.getProfilePicture();
+        return a;
+    }
+
+    private static boolean isDeveloperUser(User user) {
+        String type = user != null ? user.getType() : null;
+        if (type == null) {
+            return false;
+        }
+        return type.trim().toLowerCase(Locale.ROOT).contains("developer");
     }
 
     private static boolean isAssignmentComplete(UserTask ut) {

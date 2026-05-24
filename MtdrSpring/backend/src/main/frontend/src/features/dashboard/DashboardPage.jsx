@@ -42,7 +42,8 @@ import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
-import { fetchProjectById } from './projectApi';
+import { fetchProjectById, fetchProjectDevelopers } from './projectApi';
+import { countTeamDevelopers } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
 // ── Avatar palette for blocked notification items ────────────────────────────
@@ -74,6 +75,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
+  const [projectDevelopers, setProjectDevelopers] = useState([]);
   const [blockedNotifAnchor, setBlockedNotifAnchor] = useState(null);
   const [seenBlockedKeysCsv, setSeenBlockedKeysCsv] = useState('');
 
@@ -87,10 +89,14 @@ export default function DashboardPage({ projectId: propProjectId }) {
     let cancelled = false;
     setSprintsLoading(true);
 
-    Promise.all([fetchProjectById(projectId).catch(() => null)])
-      .then(([project]) => {
+    Promise.all([
+      fetchProjectById(projectId).catch(() => null),
+      fetchProjectDevelopers(projectId).catch(() => []),
+    ])
+      .then(([project, developers]) => {
         if (cancelled) return;
         if (project) setCurrentProject(project);
+        setProjectDevelopers(Array.isArray(developers) ? developers : []);
       })
       .finally(() => {
         if (!cancelled && !sharedLoading) setSprintsLoading(false);
@@ -119,6 +125,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
     if (!sharedLoading) setSprintsLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
+
+  useEffect(() => {
+    setProjectDevelopers([]);
+  }, [projectId]);
 
   useEffect(() => {
     setSeenBlockedKeysCsv('');
@@ -170,9 +180,24 @@ export default function DashboardPage({ projectId: propProjectId }) {
     [selectedSprints],
   );
   const selectionMetrics = useMemo(
-    () => aggregateSelectionMetrics(selectedSprints),
-    [selectedSprints],
+    () => aggregateSelectionMetrics(selectedSprints, projectDevelopers),
+    [selectedSprints, projectDevelopers],
   );
+
+  const teamDeveloperCount = useMemo(
+    () => countTeamDevelopers(projectDevelopers),
+    [projectDevelopers],
+  );
+
+  const avgTasksPerTeamDev = useMemo(() => {
+    if (!teamDeveloperCount) return 0;
+    return selectionMetrics.totalTasks / teamDeveloperCount;
+  }, [selectionMetrics.totalTasks, teamDeveloperCount]);
+
+  const avgHoursPerTeamDev = useMemo(() => {
+    if (!teamDeveloperCount) return 0;
+    return selectionMetrics.totalHours / teamDeveloperCount;
+  }, [selectionMetrics.totalHours, teamDeveloperCount]);
 
   const averageTrends = useMemo(() => {
     const chronological = [...selectedSprints].sort((a, b) => {
@@ -180,14 +205,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
       const tb = new Date(b?.startDate || 0).getTime();
       return ta - tb;
     });
-    const avgTasks = (sp) => {
-      const devCount = Array.isArray(sp?.developers) ? sp.developers.length : 0;
-      return devCount > 0 ? (Number(sp?.totalTasks) || 0) / devCount : 0;
-    };
-    const avgHours = (sp) => {
-      const devCount = Array.isArray(sp?.developers) ? sp.developers.length : 0;
-      return devCount > 0 ? (Number(sp?.totalHours) || 0) / devCount : 0;
-    };
+    const avgTasks = (sp) =>
+      teamDeveloperCount > 0 ? (Number(sp?.totalTasks) || 0) / teamDeveloperCount : 0;
+    const avgHours = (sp) =>
+      teamDeveloperCount > 0 ? (Number(sp?.totalHours) || 0) / teamDeveloperCount : 0;
     const series = chronological.map((sp, index) => ({
       sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
       avgTasksPerDev: Number(avgTasks(sp).toFixed(2)),
@@ -201,7 +222,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
       avgHoursTrend: { delta: avgHours(current) - avgHours(previous) },
       series,
     };
-  }, [selectedSprints]);
+  }, [selectedSprints, teamDeveloperCount]);
 
   const heroProgress = useMemo(() => {
     if (!taskStatusTotal) return 0;
@@ -224,11 +245,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
     }
     return primarySprint.dateRangeEn || primarySprint.dateRange || '';
   }, [primarySprint, compareMode, selectedSprints]);
-
-  const teamDeveloperCount = useMemo(
-    () => new Set(selectedSprints.flatMap((s) => (s.developers || []).map((d) => d.name))).size,
-    [selectedSprints],
-  );
 
   const blockedNotificationItems = useMemo(
     () => buildBlockedTaskNotificationItems(selectedSprints),
@@ -716,9 +732,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 scorecardsFourColumn={compareMode}
                 totalTasks={selectionMetrics.totalTasks}
                 totalHours={selectionMetrics.totalHours}
-                avgTasksPerDev={selectionMetrics.avgTasksPerDev}
-                avgHoursPerDev={selectionMetrics.avgHoursPerDev}
-                uniqueDevCount={selectionMetrics.uniqueDevCount}
+                avgTasksPerDev={avgTasksPerTeamDev}
+                avgHoursPerDev={avgHoursPerTeamDev}
+                uniqueDevCount={teamDeveloperCount}
                 avgTasksTrend={averageTrends.avgTasksTrend}
                 avgHoursTrend={averageTrends.avgHoursTrend}
                 avgTrendSeries={averageTrends.series}
@@ -750,6 +766,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
           developers={selectionMetrics.developers}
           selectedSprints={selectedSprints}
           compareMode={compareMode}
+          projectDevelopers={projectDevelopers}
         />
 
         <ScrollReveal delay={0.05}>
@@ -762,6 +779,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
           <DeveloperTable
             selectedSprints={selectedSprints}
             compareMode={compareMode}
+            projectDevelopers={projectDevelopers}
             suppressCardTitle
           />
         </ScrollReveal>

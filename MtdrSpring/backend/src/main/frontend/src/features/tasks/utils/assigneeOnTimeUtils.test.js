@@ -48,6 +48,29 @@ describe('assigneeOnTimeUtils', () => {
     expect(multiAssigneeTaskOnTime(progress, due, { assigneeCount: 2 })).toBe(true);
   });
 
+  it('multiAssigneeTaskOnTime is null while assignees are still pending', () => {
+    const progress = [
+      { completed: false, status: 'TODO' },
+      { completed: false, status: 'TODO' },
+    ];
+    expect(multiAssigneeTaskOnTime(progress, '2026-01-15T00:00:00.000Z', { assigneeCount: 2 })).toBe(
+      null,
+    );
+  });
+
+  it('taskOnTimeDisplayForManager shows — when multi-assignee task is still To Do', () => {
+    const item = {
+      dueDate: '2026-01-15T00:00:00.000Z',
+      statusRaw: 'TODO',
+      done: false,
+      assigneeProgress: [
+        { completed: false, status: 'TODO' },
+        { completed: false, status: 'TODO' },
+      ],
+    };
+    expect(taskOnTimeDisplayForManager(item)).toBe('—');
+  });
+
   it('multiAssigneeTaskOnTime is false when any assignee is late', () => {
     const progress = [
       { completed: true, completedAt: '2026-01-10T12:00:00.000Z' },

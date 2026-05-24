@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -23,6 +23,8 @@ import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import DashboardBlockedTasksPanel from '../dashboard/DashboardBlockedTasksPanel';
 import TeamWorkloadBreakdown from './TeamWorkloadBreakdown';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
+import { fetchProjectDevelopers } from '../dashboard/projectApi';
+import { mergeDeveloperInsightRows } from '../../utils/teamRosterUtils';
 
 export default function TeamPage({
   projectId,
@@ -38,9 +40,38 @@ export default function TeamPage({
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
-  const [developerInsightRows, setDeveloperInsightRows] = useState(null);
+  const [rawDeveloperInsightRows, setRawDeveloperInsightRows] = useState(null);
   const [insightsGeneratedAt, setInsightsGeneratedAt] = useState(null);
   const [sprintsReady, setSprintsReady] = useState(false);
+  const [projectDevelopers, setProjectDevelopers] = useState([]);
+
+  useEffect(() => {
+    const pid =
+      projectId != null && String(projectId).trim() !== ''
+        ? String(projectId).trim()
+        : typeof localStorage !== 'undefined'
+          ? String(localStorage.getItem('currentProjectId') || '').trim()
+          : '';
+    if (!pid) {
+      setSprints([]);
+      setSelectedSprintId(null);
+      setProjectDevelopers([]);
+      setLoading(false);
+      setSprintsReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchProjectDevelopers(pid)
+      .then((list) => {
+        if (!cancelled) setProjectDevelopers(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setProjectDevelopers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     const pid =
@@ -83,6 +114,11 @@ export default function TeamPage({
 
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
+  const developerInsightRows = useMemo(() => {
+    if (rawDeveloperInsightRows === null) return [];
+    return mergeDeveloperInsightRows(projectDevelopers, rawDeveloperInsightRows);
+  }, [projectDevelopers, rawDeveloperInsightRows]);
+
   /** Refetch AI rows when sprint KPIs / developer stats change (e.g. after task edits). */
   const sprintInsightsRefreshKey = selectedSprint
     ? JSON.stringify({
@@ -99,26 +135,26 @@ export default function TeamPage({
 
   useEffect(() => {
     if (!sprintsReady || selectedSprintId == null) {
-      setDeveloperInsightRows(null);
+      setRawDeveloperInsightRows(null);
       return undefined;
     }
     let cancelled = false;
     setInsightsLoading(true);
-    setDeveloperInsightRows(null);
+    setRawDeveloperInsightRows(null);
     fetchSprintInsights(selectedSprintId)
       .then(({ notFound, data }) => {
         if (cancelled) return;
         if (notFound || !data || data.error) {
-          setDeveloperInsightRows([]);
+          setRawDeveloperInsightRows([]);
           setInsightsGeneratedAt(null);
           return;
         }
         const rows = data.insights?.developerInsights;
-        setDeveloperInsightRows(Array.isArray(rows) ? rows : []);
+        setRawDeveloperInsightRows(Array.isArray(rows) ? rows : []);
         setInsightsGeneratedAt(data.generatedAt ?? null);
       })
       .catch(() => {
-        if (!cancelled) setDeveloperInsightRows([]);
+        if (!cancelled) setRawDeveloperInsightRows([]);
       })
       .finally(() => {
         if (!cancelled) setInsightsLoading(false);
@@ -245,6 +281,7 @@ export default function TeamPage({
           <TeamWorkloadBreakdown
             sprint={selectedSprint}
             aiDeveloperInsights={developerInsightRows}
+            projectDevelopers={projectDevelopers}
           />
 
           <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
@@ -292,7 +329,7 @@ export default function TeamPage({
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                   <CircularProgress size={28} sx={{ color: '#673AB7' }} />
                 </Box>
-              ) : developerInsightRows?.length > 0 ? (
+              ) : developerInsightRows.length > 0 ? (
                 <DeveloperInsightsTable rows={developerInsightRows} />
               ) : (
                 <Typography

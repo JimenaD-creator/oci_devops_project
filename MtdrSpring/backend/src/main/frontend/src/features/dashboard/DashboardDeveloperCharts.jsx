@@ -1129,6 +1129,7 @@ export default function DashboardDeveloperCharts({
   developers = [],
   selectedSprints = [],
   compareMode = false,
+  projectDevelopers = [],
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -1144,8 +1145,8 @@ export default function DashboardDeveloperCharts({
 
   const compareModel = useMemo(() => {
     if (!compareMode || orderedSelectedSprints.length < 2) return null;
-    return buildCompareDeveloperChartsModel(orderedSelectedSprints);
-  }, [compareMode, orderedSelectedSprints]);
+    return buildCompareDeveloperChartsModel(orderedSelectedSprints, projectDevelopers);
+  }, [compareMode, orderedSelectedSprints, projectDevelopers]);
 
   const aiSprintPayload = useMemo(
     () =>

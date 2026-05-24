@@ -25,11 +25,10 @@ import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
-import { developerNumericId, finiteUserIds } from '../../utils/userIds';
+import { developerNumericId } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import {
   API_BASE,
-  DELETE_TASK_CONFIRM_MESSAGE,
   ORACLE_RED,
   pageEase,
 } from './constants/taskConstants';
@@ -38,6 +37,8 @@ import {
   resolveActiveProjectId,
   sprintProjectIdFromJson,
   mapTaskToKanban,
+  mergeUpdatedTask,
+  patchUserTasksAfterTaskSave,
   isUserTaskAssigneeComplete,
   normalizeTaskStatus,
   pageFormFieldOutline,
@@ -282,22 +283,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     }
   }, [invalidateAndRefresh, loadData]);
 
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm(DELETE_TASK_CONFIRM_MESSAGE)) return;
-    const tid = Number(taskId);
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/${tid}`, { method: 'DELETE' });
-      if (!res.ok) {
-        console.error('Delete task failed:', res.status);
-        return;
-      }
-      removeTaskFromState(tid);
-      await refreshSharedAfterTaskMutation();
-    } catch (e) {
-      console.error('Error deleting task:', e);
-    }
-  };
-
   const handleTaskCreated = useCallback(async () => {
     await refreshSharedAfterTaskMutation();
   }, [refreshSharedAfterTaskMutation]);
@@ -362,9 +347,29 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     return map;
   }, [scopedUserTasks, resolveUserTaskDeveloperName]);
 
+  const assignmentsByTaskId = useMemo(() => {
+    const map = new Map();
+    scopedUserTasks.forEach((ut) => {
+      const tid = userTaskRowTaskId(ut);
+      if (!Number.isFinite(tid)) return;
+      if (!map.has(tid)) map.set(tid, []);
+      map.get(tid).push(ut);
+    });
+    return map;
+  }, [scopedUserTasks]);
+
   const items = useMemo(
-    () => tasksForKanban.map((task) => mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [])),
-    [tasksForKanban, developersByTaskId],
+    () =>
+      tasksForKanban.map((task) => {
+        const tid = Number(task.id);
+        const assignmentRows = assignmentsByTaskId.get(tid) ?? [];
+        return mapTaskToKanban(
+          task,
+          developersByTaskId.get(String(task.id)) ?? [],
+          assignmentRows,
+        );
+      }),
+    [tasksForKanban, developersByTaskId, assignmentsByTaskId],
   );
 
   const filteredItems = useMemo(() => {
@@ -575,8 +580,8 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
               <KanbanBoard
                 items={filteredItems}
                 onStatusChange={handleStatusChange}
-                onDeleteTask={developerMode ? undefined : handleDeleteTask}
                 onOpenTask={handleOpenTaskFromKanban}
+                statusMenuMode={developerMode ? 'full' : 'doneOnly'}
               />
             )}
           </Paper>
@@ -626,28 +631,17 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
         onClose={closeTaskDetailDialog}
-        onSaved={(updated, meta) => {
-          setRawTasks((prev) => prev.map((t) => (Number(t.id) === Number(updated.id) ? { ...t, ...updated } : t)));
-          if (meta?.assigneesChanged) {
-            const tid = Number(updated.id);
-            const ids = finiteUserIds(meta.assigneeUserIds);
-            setUserTasks((prev) => {
-              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
-              if (ids.length === 0) return rest;
-              const st = updated?.status ?? 'TODO';
-              const added = ids.map((userId) => {
-                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
-                const name = String(known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`).trim();
-                return { user: { id: userId, name: name || `User ${userId}` }, task: { id: tid }, status: st };
-              });
-              return [...rest, ...added];
-            });
-          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
-            const tid = Number(updated.id);
-            const st = meta.assignmentStatus;
-            setUserTasks((prev) => prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)));
-          }
+        onSaved={async (updated, meta) => {
+          setRawTasks((prev) => mergeUpdatedTask(prev, updated));
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
+          );
           closeTaskDetailDialog();
+          try {
+            await refreshSharedAfterTaskMutation();
+          } catch (e) {
+            console.error('Failed to refresh tasks after save:', e);
+          }
         }}
         onDeleted={async (taskId) => {
           removeTaskFromState(taskId);

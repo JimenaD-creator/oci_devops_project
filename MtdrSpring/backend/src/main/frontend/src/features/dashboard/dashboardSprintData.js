@@ -1,6 +1,10 @@
 import { inferStatusByDate } from '../sprints/utils/sprintUtils';
 import { computeProductivityScore } from '../kpis/productivityScoreUtils';
 import { isAssigneeCompletionOnTime } from '../tasks/utils/assigneeOnTimeUtils';
+import {
+  collectDeveloperNamesForSelection,
+  mergeRosterWithSprintDevelopers,
+} from '../../utils/teamRosterUtils';
 
 /** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
@@ -786,7 +790,7 @@ export function buildBlockedReportsForAiSprint(sp) {
   return out;
 }
 
-export function aggregateSelectionMetrics(selectedSprints) {
+export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = []) {
   let totalTasks = 0;
   let totalHours = 0;
   const devMap = new Map();
@@ -801,25 +805,24 @@ export function aggregateSelectionMetrics(selectedSprints) {
         completed: 0,
         hours: 0,
         assignedHoursEstimate: 0,
+        onTime: d.onTime,
+        workload: 0,
+        profilePicture: d.profilePicture ?? null,
+        userId: d.userId ?? null,
+        initials: d.initials,
       };
       cur.assigned += Number(d.assigned) || 0;
       cur.completed += Number(d.completed) || 0;
       cur.hours += Number(d.hours) || 0;
       cur.assignedHoursEstimate += Number(d.assignedHoursEstimate) || 0;
+      if (typeof d.workload === 'number') {
+        cur.workload = Math.max(cur.workload, d.workload);
+      }
       devMap.set(d.name, cur);
     });
   });
 
-  const uniqueDevCount = devMap.size;
-  const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
-  /** Mean of each developer’s total worked hours (USER_TASK) in the selection. */
-  const sumDevWorkedHours = Array.from(devMap.values()).reduce(
-    (s, d) => s + (Number(d.hours) || 0),
-    0,
-  );
-  const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
-
-  const developers = Array.from(devMap.values()).map((d) => {
+  const activityDevelopers = Array.from(devMap.values()).map((d) => {
     const assigned = d.assigned ?? 0;
     const completed = d.completed ?? 0;
     return {
@@ -828,6 +831,15 @@ export function aggregateSelectionMetrics(selectedSprints) {
       pending: Math.max(0, assigned - completed),
     };
   });
+
+  const developers = mergeRosterWithSprintDevelopers(projectDevelopers, activityDevelopers);
+  const uniqueDevCount = devMap.size;
+  const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
+  const sumDevWorkedHours = Array.from(devMap.values()).reduce(
+    (s, d) => s + (Number(d.hours) || 0),
+    0,
+  );
+  const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
 
   return {
     totalTasks,
@@ -855,10 +867,9 @@ export function completionRate(dev) {
   return Math.round((dev.completed / dev.assigned) * 100);
 }
 
-export function buildGroupedCompletedData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedCompletedData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -868,10 +879,9 @@ export function buildGroupedCompletedData(selectedSprints) {
   });
 }
 
-export function buildGroupedHoursData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedHoursData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -881,10 +891,9 @@ export function buildGroupedHoursData(selectedSprints) {
   });
 }
 
-export function buildGroupedWorkloadData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedWorkloadData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -905,7 +914,7 @@ export function sprintDbIdSortKey(sp) {
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
-export function buildCompareDeveloperChartsModel(selectedSprints) {
+export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelopers = []) {
   const sprints = [...(selectedSprints || [])]
     .filter(Boolean)
     .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
@@ -917,9 +926,7 @@ export function buildCompareDeveloperChartsModel(selectedSprints) {
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 
-  const nameSet = new Set();
-  sprints.forEach((sp) => (sp.developers || []).forEach((d) => nameSet.add(d.name)));
-  const names = Array.from(nameSet);
+  const names = collectDeveloperNamesForSelection(sprints, projectDevelopers);
 
   const baseRows = names.map((fullName) => {
     const row = { name: fullName, shortName: shortDevName(fullName) };

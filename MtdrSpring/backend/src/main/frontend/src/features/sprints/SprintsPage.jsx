@@ -22,7 +22,9 @@ import TaskTable from '../tasks/TaskTable';
 import {
   deriveTaskStatusFromAssignments,
   isUserTaskAssigneeComplete,
+  mergeUpdatedTask,
   normalizeTaskStatus,
+  patchUserTasksAfterTaskSave,
   taskEntityId,
   userTaskRowStatus,
   userTaskRowTaskId,
@@ -789,43 +791,22 @@ export default function SprintsPage({ projectId }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={() => setSelectedTaskForDialog(null)}
-        onSaved={(updated, meta) => {
+        onSaved={async (updated, meta) => {
           setTasks((prev) => {
-            const next = prev.map((x) =>
-              Number(x.id) === Number(updated.id) ? { ...x, ...updated } : x,
-            );
+            const next = mergeUpdatedTask(prev, updated);
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });
-          if (meta?.assigneesChanged) {
-            const tid = Number(updated.id);
-            const ids = finiteUserIds(meta.assigneeUserIds);
-            setUserTasks((prev) => {
-              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
-              if (ids.length === 0) return rest;
-              const st = updated?.status ?? 'TODO';
-              const added = ids.map((userId) => {
-                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
-                const name = String(
-                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
-                ).trim();
-                return {
-                  user: { id: userId, name: name || `User ${userId}` },
-                  task: { id: tid },
-                  status: st,
-                };
-              });
-              return [...rest, ...added];
-            });
-          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
-            const tid = Number(updated.id);
-            const st = meta.assignmentStatus;
-            setUserTasks((prev) =>
-              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
-            );
-          }
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
+          );
           setSelectedTaskForDialog(null);
-          void loadData({ silent: true });
+          try {
+            await invalidateAndRefresh();
+            await loadData({ silent: true, forceFresh: true });
+          } catch (e) {
+            console.error('Failed to refresh sprints data after task save:', e);
+          }
         }}
         onDeleted={handleTaskDeleted}
       />

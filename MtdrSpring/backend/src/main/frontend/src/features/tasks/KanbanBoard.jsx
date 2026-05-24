@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Clock } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Clock, GripVertical } from 'lucide-react';
 import { Menu, MenuItem, Divider } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { developerAvatarColors } from '../../utils/developerColors';
@@ -89,16 +89,71 @@ function bucketForItem(item) {
   return 'todo';
 }
 
-function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
+export const COLUMN_STATUS_MAP = {
+  todo: 'TODO',
+  inProgress: 'IN_PROGRESS',
+  review: 'IN_REVIEW',
+  done: 'DONE',
+};
+
+const DRAG_TASK_MIME = 'application/x-kanban-task-id';
+
+export function canDropTaskInColumn(columnId, rawStatus, statusMenuMode) {
+  const targetStatus = COLUMN_STATUS_MAP[columnId];
+  if (!targetStatus) return false;
+  const current = String(rawStatus || 'TODO').toUpperCase();
+  if (targetStatus === current) return false;
+  if (statusMenuMode === 'doneOnly') {
+    return columnId === 'done' && current !== 'DONE';
+  }
+  return true;
+}
+
+function isTaskDraggable(rawStatus, statusMenuMode, hasStatusHandler) {
+  if (!hasStatusHandler) return false;
+  const current = String(rawStatus || 'TODO').toUpperCase();
+  if (statusMenuMode === 'doneOnly') return current !== 'DONE';
+  return statusMenuOptionsForItem(current, statusMenuMode).length > 0;
+}
+
+/** Manager kanban: only transition to Done. Developer / default: full status menu. */
+function statusMenuOptionsForItem(rawStatus, statusMenuMode) {
+  if (statusMenuMode === 'doneOnly') {
+    if (rawStatus === 'DONE') return [];
+    return [{ value: 'DONE', label: 'Done' }];
+  }
+  return STATUS_MENU_OPTIONS;
+}
+
+function TaskCard({
+  item,
+  isDone,
+  onStatusChange,
+  onDeleteTask,
+  onOpenTask,
+  statusMenuMode = 'full',
+  draggable = false,
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const [anchorEl, setAnchorEl] = useState(null);
+  const suppressClickRef = useRef(false);
 
   const hours = item.actualHours != null && item.actualHours !== '' ? `${item.actualHours}h` : '—';
 
   const rawStatus = item.rawStatus || (isDone ? 'DONE' : 'TODO');
+  const menuOptions = statusMenuOptionsForItem(rawStatus, statusMenuMode);
+  const statusMenuEnabled = menuOptions.length > 0;
   const pillStyle = STATUS_PILL_STYLE[rawStatus] || STATUS_PILL_STYLE['TODO'];
   const pillLabel = STATUS_LABELS[rawStatus] || rawStatus;
+  const statusPillTitle = statusMenuEnabled
+    ? statusMenuMode === 'doneOnly'
+      ? 'Mark as done'
+      : 'Click to change status'
+    : 'Completed';
   const classificationKey = normalizeClassification(
     item.classification || item._raw?.classification,
   );
@@ -108,6 +163,7 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
 
   const handleChipClick = (e) => {
     e.stopPropagation();
+    if (!statusMenuEnabled) return;
     setAnchorEl(e.currentTarget);
   };
 
@@ -126,6 +182,10 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
   const kindClass = `kanban-task-card--kind-${classificationKey.toLowerCase().replace(/_/g, '-')}`;
 
   const handleCardClick = (e) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     if (typeof onOpenTask === 'function') {
       onOpenTask(item);
       return;
@@ -133,22 +193,60 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
     setAnchorEl(e.currentTarget);
   };
 
+  const handleDragStart = (e) => {
+    suppressClickRef.current = true;
+    e.dataTransfer.setData(DRAG_TASK_MIME, String(item.id));
+    e.dataTransfer.effectAllowed = 'move';
+    onDragStart?.(item.id);
+  };
+
+  const handleDragEnd = () => {
+    onDragEnd?.();
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const dragHint = draggable
+    ? statusMenuMode === 'doneOnly'
+      ? 'Drag to Done column to complete'
+      : 'Drag to another column to change status'
+    : undefined;
+
   return (
     <div
-      className={`kanban-task-card ${kindClass}${isDone ? ' kanban-task-card--done' : ''}`}
+      className={`kanban-task-card ${kindClass}${isDone ? ' kanban-task-card--done' : ''}${
+        isDragging ? ' kanban-task-card--dragging' : ''
+      }`}
+      draggable={draggable}
+      onDragStart={draggable ? handleDragStart : undefined}
+      onDragEnd={draggable ? handleDragEnd : undefined}
       onClick={handleCardClick}
-      style={{ cursor: 'pointer' }}
-      title={typeof onOpenTask === 'function' ? 'Click to view details' : undefined}
+      style={{ cursor: draggable || onOpenTask ? 'grab' : 'pointer' }}
+      title={
+        dragHint ||
+        (typeof onOpenTask === 'function' ? 'Click to view details' : undefined)
+      }
     >
       <div className="kanban-task-card-top">
+        {draggable ? (
+          <span className="kanban-task-drag-handle" aria-hidden>
+            <GripVertical size={14} />
+          </span>
+        ) : null}
         <span className="kanban-task-id">#{item.id}</span>
         <span
           className="kanban-task-status-pill"
-          style={{ background: pillStyle.bg, color: pillStyle.color, cursor: 'pointer' }}
+          style={{
+            background: pillStyle.bg,
+            color: pillStyle.color,
+            cursor: statusMenuEnabled ? 'pointer' : 'default',
+          }}
           onClick={handleChipClick}
-          title="Click to change status"
+          title={statusPillTitle}
         >
-          {pillLabel} ▾
+          {pillLabel}
+          {statusMenuEnabled ? ' ▾' : ''}
         </span>
       </div>
       <p className="kanban-task-title">{item.description || '(No title)'}</p>
@@ -216,7 +314,7 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
           }
         }}
       >
-        {STATUS_MENU_OPTIONS.map((opt) => (
+        {menuOptions.map((opt) => (
           <MenuItem
             key={opt.value}
             selected={opt.value === rawStatus}
@@ -251,7 +349,21 @@ function TaskCard({ item, isDone, onStatusChange, onDeleteTask, onOpenTask }) {
   );
 }
 
-export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask, onOpenTask }) {
+export default function KanbanBoard({
+  items = [],
+  onStatusChange,
+  onDeleteTask,
+  onOpenTask,
+  statusMenuMode = 'full',
+}) {
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState(null);
+
+  const draggingItem = useMemo(
+    () => items.find((i) => Number(i.id) === Number(draggingTaskId)),
+    [items, draggingTaskId],
+  );
+
   const columnsWithTasks = useMemo(() => {
     const buckets = { todo: [], inProgress: [], review: [], done: [] };
     items.forEach((item) => {
@@ -268,32 +380,100 @@ export default function KanbanBoard({ items = [], onStatusChange, onDeleteTask, 
     return COLUMN_DEFS.map((col) => ({ ...col, tasks: buckets[col.id] }));
   }, [items]);
 
+  const clearDragState = () => {
+    setDraggingTaskId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleColumnDragOver = (columnId) => (e) => {
+    if (!draggingItem || !onStatusChange) return;
+    const rawStatus = draggingItem.rawStatus || (draggingItem.done ? 'DONE' : 'TODO');
+    if (!canDropTaskInColumn(columnId, rawStatus, statusMenuMode)) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumnId !== columnId) setDragOverColumnId(columnId);
+  };
+
+  const handleColumnDrop = (columnId) => (e) => {
+    e.preventDefault();
+    const rawId = e.dataTransfer.getData(DRAG_TASK_MIME);
+    const taskId = rawId ? Number(rawId) : Number(draggingTaskId);
+    const item = items.find((i) => Number(i.id) === taskId) || draggingItem;
+    if (!item || !onStatusChange) {
+      clearDragState();
+      return;
+    }
+    const rawStatus = item.rawStatus || (item.done ? 'DONE' : 'TODO');
+    const newStatus = COLUMN_STATUS_MAP[columnId];
+    if (canDropTaskInColumn(columnId, rawStatus, statusMenuMode) && newStatus) {
+      onStatusChange(item.id, newStatus);
+    }
+    clearDragState();
+  };
+
   return (
     <div className="kanban-board">
-      {columnsWithTasks.map((col) => (
-        <div key={col.id} className={`kanban-column ${col.className}`}>
-          <div className="kanban-column-header">
-            <span className="kanban-column-header-title">{col.name}</span>
-            <span className="kanban-column-count">{col.tasks.length}</span>
+      {columnsWithTasks.map((col) => {
+        const isDropTarget =
+          dragOverColumnId === col.id &&
+          draggingItem &&
+          canDropTaskInColumn(
+            col.id,
+            draggingItem.rawStatus || (draggingItem.done ? 'DONE' : 'TODO'),
+            statusMenuMode,
+          );
+        return (
+          <div key={col.id} className={`kanban-column ${col.className}`}>
+            <div className="kanban-column-header">
+              <span className="kanban-column-header-title">{col.name}</span>
+              <span className="kanban-column-count">{col.tasks.length}</span>
+            </div>
+            <div
+              className={`kanban-column-body${isDropTarget ? ' kanban-column-body--drag-over' : ''}`}
+              onDragOver={handleColumnDragOver(col.id)}
+              onDragEnter={handleColumnDragOver(col.id)}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget)) return;
+                if (dragOverColumnId === col.id) setDragOverColumnId(null);
+              }}
+              onDrop={handleColumnDrop(col.id)}
+            >
+              {col.tasks.length === 0 ? (
+                <p className="kanban-empty-hint">
+                  {draggingTaskId && isDropTarget ? 'Drop here' : 'No tasks'}
+                </p>
+              ) : (
+                col.tasks.map((item) => {
+                  const rawStatus = item.rawStatus || (item.done ? 'DONE' : 'TODO');
+                  const cardDraggable = isTaskDraggable(
+                    rawStatus,
+                    statusMenuMode,
+                    typeof onStatusChange === 'function',
+                  );
+                  return (
+                    <TaskCard
+                      key={item.id}
+                      item={item}
+                      isDone={col.id === 'done'}
+                      onStatusChange={onStatusChange}
+                      onDeleteTask={onDeleteTask}
+                      onOpenTask={onOpenTask}
+                      statusMenuMode={statusMenuMode}
+                      draggable={cardDraggable}
+                      isDragging={Number(draggingTaskId) === Number(item.id)}
+                      onDragStart={setDraggingTaskId}
+                      onDragEnd={clearDragState}
+                    />
+                  );
+                })
+              )}
+            </div>
           </div>
-          <div className="kanban-column-body">
-            {col.tasks.length === 0 ? (
-              <p className="kanban-empty-hint">No tasks</p>
-            ) : (
-              col.tasks.map((item) => (
-                <TaskCard
-                  key={item.id}
-                  item={item}
-                  isDone={col.id === 'done'}
-                  onStatusChange={onStatusChange}
-                  onDeleteTask={onDeleteTask}
-                  onOpenTask={onOpenTask}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

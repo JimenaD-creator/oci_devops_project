@@ -1,4 +1,5 @@
 import { ORACLE_RED } from '../constants/taskConstants';
+import { developerNumericId, finiteUserIds } from '../../../utils/userIds';
 import {
   resolveActiveProjectIdNum,
   sprintProjectIdFromJson,
@@ -157,4 +158,44 @@ export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) 
     sprintId: task.assignedSprint?.id ?? task.assignedSprint?.ID ?? null,
     _raw: task,
   };
+}
+
+/** Replace one TASK in local state after save (matches id / ID / taskId). */
+export function mergeUpdatedTask(tasks, updated) {
+  const updatedId = taskEntityId(updated);
+  if (!updatedId) return tasks;
+  return tasks.map((t) => (taskEntityId(t) === updatedId ? { ...t, ...updated } : t));
+}
+
+/** Apply assignee / assignment-status side effects from TaskDetailDialog save meta. */
+export function patchUserTasksAfterTaskSave(prevUserTasks, updated, meta, projectDevelopers = []) {
+  if (!meta || !updated) return prevUserTasks;
+  const tid = Number(taskEntityId(updated));
+  if (!Number.isFinite(tid)) return prevUserTasks;
+
+  if (meta.assigneesChanged) {
+    const ids = finiteUserIds(meta.assigneeUserIds);
+    const rest = prevUserTasks.filter((ut) => userTaskRowTaskId(ut) !== tid);
+    if (ids.length === 0) return rest;
+    const st = updated?.status ?? 'TODO';
+    const added = ids.map((userId) => {
+      const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+      const name = String(
+        known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+      ).trim();
+      return {
+        user: { id: userId, name: name || `User ${userId}` },
+        task: { id: tid },
+        status: st,
+      };
+    });
+    return [...rest, ...added];
+  }
+
+  if (meta.syncAssignmentStatuses && meta.assignmentStatus != null) {
+    const st = meta.assignmentStatus;
+    return prevUserTasks.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut));
+  }
+
+  return prevUserTasks;
 }

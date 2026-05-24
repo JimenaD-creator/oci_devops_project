@@ -99,13 +99,13 @@ function assigneeProgressOnTimeResult(row, dueDate, taskMeta) {
 
 /**
  * Multi-assignee task: on time only if every assignee finished and each was on time.
- * Returns true | false | null (unknown).
+ * Returns true | false | null (pending or unknown — not "late").
  */
 export function multiAssigneeTaskOnTime(assigneeProgress, dueDate, taskMeta = {}) {
   const progress = Array.isArray(assigneeProgress) ? assigneeProgress : [];
   if (progress.length <= 1) return null;
 
-  if (!progress.every((row) => row.completed)) return false;
+  if (!progress.every((row) => row.completed)) return null;
 
   const results = progress.map((row) => assigneeProgressOnTimeResult(row, dueDate, taskMeta));
   if (results.some((r) => r === false)) return false;

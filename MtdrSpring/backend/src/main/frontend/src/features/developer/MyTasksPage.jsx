@@ -23,9 +23,12 @@ import {
 } from '../tasks/sprintTaskTableRows';
 import {
   isUserTaskAssigneeComplete,
+  mergeUpdatedTask,
   pageFormFieldOutline,
+  patchUserTasksAfterTaskSave,
   userTaskRowTaskId,
 } from '../tasks/utils/taskUtils';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import { ORACLE_RED, pageEase } from '../tasks/constants/taskConstants';
 import {
   pickDefaultSelectedSprint,
@@ -50,13 +53,21 @@ export default function MyTasksPage({ projectId, currentUser }) {
   const [selectedSprint, setSelectedSprint] = useState(null);
   const [taskForDetail, setTaskForDetail] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const { invalidateAndRefresh } = useProjectData();
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setLoadError('');
+  const loadData = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    const forceFresh = opts.forceFresh === true;
+    if (!silent) {
+      setLoading(true);
+      setLoadError('');
+    }
     try {
+      if (forceFresh) {
+        await invalidateAndRefresh();
+      }
       const { sprintsList, tasksList, userTasksList } =
-        await fetchSprintsTasksAndAssignments(projectId);
+        await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
       const sorted = sortSprintsForDisplay(
         Array.isArray(sprintsList) ? sprintsList : [],
         Array.isArray(tasksList) ? tasksList : [],
@@ -70,9 +81,9 @@ export default function MyTasksPage({ projectId, currentUser }) {
       setUserTasks([]);
       setLoadError('Could not load your tasks.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, invalidateAndRefresh]);
 
   useEffect(() => {
     loadData();
@@ -314,13 +325,18 @@ export default function MyTasksPage({ projectId, currentUser }) {
           setDetailOpen(false);
           setTaskForDetail(null);
         }}
-        onSaved={(updated) => {
-          setTasks((prev) =>
-            prev.map((t) => (Number(t.id) === Number(updated.id) ? { ...t, ...updated } : t)),
+        onSaved={async (updated, meta) => {
+          setTasks((prev) => mergeUpdatedTask(prev, updated));
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
           );
           setDetailOpen(false);
           setTaskForDetail(null);
-          loadData();
+          try {
+            await loadData({ silent: true, forceFresh: true });
+          } catch (e) {
+            console.error('Failed to refresh my tasks after save:', e);
+          }
         }}
       />
     </Box>
