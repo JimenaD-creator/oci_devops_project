@@ -1,25 +1,75 @@
-import { formatProductivityScoreDisplay } from '../kpis/productivityScoreUtils';
+import {
+  buildProductivityKpiAnalyticsGuideLine,
+  computeProductivityScore,
+  formatProductivityScoreDisplay,
+  resolveSprintTimelineContext,
+} from '../kpis/productivityScoreUtils';
 
 export const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export const pageEase = [0.22, 1, 0.36, 1];
 
-const ERROR_MESSAGES = {
-  QUOTA_EXCEEDED:
-    'The AI quota for today has been reached. Please try again tomorrow or use a different API key.',
-  API_KEY_MISSING:
-    'Gemini API key is not configured on the server. Set GEMINI_API_KEY in MtdrSpring/backend/.env and restart the backend.',
-  MODEL_NOT_FOUND: 'The AI model is unavailable. Contact your administrator.',
-  SPRINT_NOT_FOUND: 'This sprint was not found in the database.',
-  NO_PROJECT_ASSIGNED:
-    'This sprint has no project assigned. Assign a project before generating insights.',
-  UPSTREAM_TIMEOUT: 'The AI service took too long to respond. Please try again.',
-  UPSTREAM_UNAVAILABLE: 'The AI service is temporarily unavailable. Please try again shortly.',
-  GENERATION_FAILED: 'AI generation failed unexpectedly. Please try again.',
+/** Short copy for managers / end users (no paths, HTTP codes, or env var names). */
+const USER_ERROR_MESSAGES = {
+  QUOTA_EXCEEDED: 'Daily AI limit reached. Try again tomorrow.',
+  API_KEY_MISSING: 'AI is not available. Contact your administrator.',
+  MODEL_NOT_FOUND: 'AI is temporarily unavailable. Try again.',
+  SPRINT_NOT_FOUND: 'This sprint could not be found.',
+  NO_PROJECT_ASSIGNED: 'Assign a project to this sprint before generating insights.',
+  UPSTREAM_TIMEOUT: 'The request took too long. Try again.',
+  UPSTREAM_UNAVAILABLE: 'AI is temporarily unavailable. Try again.',
+  GENERATION_FAILED: 'Something went wrong. Try again.',
 };
 
 export function getErrorMessage(code) {
-  return ERROR_MESSAGES[code] ?? `Generation failed: ${code}`;
+  if (code == null || code === '') return USER_ERROR_MESSAGES.GENERATION_FAILED;
+  const key = String(code).trim();
+  return USER_ERROR_MESSAGES[key] ?? USER_ERROR_MESSAGES.GENERATION_FAILED;
+}
+
+export function isApiKeyInsightError(code) {
+  return String(code ?? '').trim() === 'API_KEY_MISSING';
+}
+
+/** Sprint id 0 is valid — do not use `if (!sprintId)` (0 is falsy in JS). */
+export function isValidSprintId(sprintId) {
+  return sprintId != null && sprintId !== '' && Number.isFinite(Number(sprintId));
+}
+
+/**
+ * KPI Analytics panel when persisted insights omit kpiManagerGuide (or generation failed partially).
+ */
+export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
+  const cr = Math.round(Number(kpis.completionRate) || 0);
+  const otd = Math.round(Number(kpis.onTimeDelivery) || 0);
+  const tp = Math.round(Math.min(100, Math.max(0, Number(kpis.teamParticipation) || 0)));
+  const wb = Math.round(Math.min(100, Math.max(0, Number(kpis.workloadBalance) || 0)));
+  const ps = computeProductivityScore({
+    completionRate: cr,
+    onTimeDelivery: otd,
+    teamParticipation: tp,
+    workloadBalance: wb,
+  });
+  const timeline = resolveSprintTimelineContext(sprint);
+  let intro = 'Summary from current sprint KPI scores.';
+  if (timeline.phase === 'not_started') {
+    intro = 'This sprint has not started yet — KPIs reflect planned scope, not final delivery.';
+  } else if (timeline.phase === 'in_progress') {
+    intro = 'This sprint is in progress — KPIs are a live snapshot, not final results.';
+  } else if (timeline.phase === 'ended') {
+    intro = 'This sprint has ended — KPIs summarize delivery for the full sprint window.';
+  }
+
+  return {
+    intro,
+    byMetric: {
+      completionRate: `Completion rate is ${cr}% — share of sprint tasks marked done.`,
+      onTimeDelivery: `On-time delivery is ${otd}% — completed work finished by the due date.`,
+      teamParticipation: `Team participation is ${tp}% — how actively the team engaged in this sprint.`,
+      workloadBalance: `Workload balance is ${wb}% — how evenly tasks are distributed across assignees.`,
+      productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint),
+    },
+  };
 }
 
 export const KPI_LABELS = {

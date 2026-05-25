@@ -24,9 +24,6 @@ public class ManagerChatService {
     @Autowired
     private GeminiApiConfiguration geminiApiConfiguration;
 
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
-
     @Autowired private SprintRepository sprintRepository;
     @Autowired private TaskRepository taskRepository;
     @Autowired private UserTaskRepository userTaskRepository;
@@ -394,7 +391,7 @@ public class ManagerChatService {
         String requestBody = mapper.writeValueAsString(body);
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiConfiguration.getApiKey()))
+            .uri(URI.create(geminiApiConfiguration.getApiUrl() + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))

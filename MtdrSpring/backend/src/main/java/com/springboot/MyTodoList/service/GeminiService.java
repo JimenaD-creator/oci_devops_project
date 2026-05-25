@@ -69,9 +69,6 @@ public class GeminiService {
     @Autowired
     private GeminiApiConfiguration geminiApiConfiguration;
 
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
-
     /** Matches DB-injected (or model-following) task-status lead; used to avoid duplicating on re-enrich. */
     private static final Pattern CANONICAL_TASK_STATUS_OVERVIEW_LEAD = Pattern.compile(
         "^(?i)Task status in this sprint:\\s*\\d+\\s+To do,\\s*\\d+\\s+In progress,\\s*\\d+\\s+In review,\\s*\\d+\\s+Done\\."
@@ -161,15 +158,17 @@ public class GeminiService {
             + "- Sort tasks, hours, and productivity by absolute delta descending.\n"
             + "- Do not include any extra keys.";
 
-        try {
-            String raw = callGemini(prompt);
-            String json = extractJsonFromGeminiResponse(raw);
-            JsonNode parsed = mapper.readTree(json);
-            if (parsed != null && parsed.isObject()) {
-                return parsed;
+        if (geminiApiConfiguration.isConfigured()) {
+            try {
+                String raw = callGemini(prompt);
+                String json = extractJsonFromGeminiResponse(raw);
+                JsonNode parsed = mapper.readTree(json);
+                if (parsed != null && parsed.isObject()) {
+                    return parsed;
+                }
+            } catch (Exception e) {
+                System.err.println("[GeminiService] generateDeveloperVariationInsights fallback: " + e.getMessage());
             }
-        } catch (Exception e) {
-            System.err.println("[GeminiService] generateDeveloperVariationInsights fallback: " + e.getMessage());
         }
         return buildDeveloperVariationFallback(sprintSnapshots);
     }
@@ -250,7 +249,7 @@ public class GeminiService {
             + "}]}],\"generationConfig\":{\"temperature\":0.5,\"maxOutputTokens\":512}}";
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiConfiguration.getApiKey()))
+            .uri(URI.create(geminiApiConfiguration.getApiUrl() + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -300,8 +299,12 @@ public class GeminiService {
         if (msg.contains("429") || msg.contains("RESOURCE_EXHAUSTED") || msg.contains("QUOTA")) {
             return "QUOTA_EXCEEDED";
         }
-        if (msg.contains("API KEY") || msg.contains("NOT CONFIGURED") || msg.contains("401") || msg.contains("403")) {
+        if (msg.contains("API KEY") || msg.contains("NOT CONFIGURED")
+            || msg.contains("API_KEY_MISSING")) {
             return "API_KEY_MISSING";
+        }
+        if (msg.contains("401") || msg.contains("403")) {
+            return "GENERATION_FAILED";
         }
         if (msg.contains("404") && msg.contains("NOT FOUND")) {
             return "MODEL_NOT_FOUND";
@@ -884,7 +887,7 @@ public class GeminiService {
         System.out.println("[GeminiService] Attempt " + attempt + "/" + maxRetries);
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiConfiguration.getApiKey()))
+            .uri(URI.create(geminiApiConfiguration.getApiUrl() + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(60)) // ← sube a 60s
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -1009,6 +1012,7 @@ public class GeminiService {
             normalizeAlertSeverities(root);
             filterPrematureSprintKpiAlerts(root, sprintId);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            enrichKpiManagerGuideIfEmpty(root, sprintId);
             normalizeKpiManagerGuidePercentSpacing(root);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
             normalizeKpiManagerGuideProductivityScore(root, sprintId);
@@ -1269,6 +1273,42 @@ public class GeminiService {
         ArrayNode a = mapper.createArrayNode();
         root.set(field, a);
         return a;
+    }
+
+    /** Fills kpiManagerGuide when Gemini omitted it so KPI Analytics can render without a blank panel. */
+    private void enrichKpiManagerGuideIfEmpty(ObjectNode root, Long sprintId) {
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode != null && guideNode.isObject()) {
+            String intro = guideNode.path("intro").asText("").trim();
+            JsonNode byMetric = guideNode.path("byMetric");
+            if (!intro.isEmpty() || (byMetric.isObject() && byMetric.size() > 0)) {
+                return;
+            }
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        int cr = (int) Math.round(toPercent(sprint.getCompletionRate()));
+        int otd = (int) Math.round(toPercent(sprint.getOnTimeDelivery()));
+        int tp = (int) Math.round(toPercent(sprint.getTeamParticipation()));
+        int wb = (int) Math.round(toPercent(sprint.getWorkloadBalance()));
+        int ps = (int) Math.round(computeProductivityScore(sprint));
+
+        ObjectNode guide = mapper.createObjectNode();
+        guide.put("intro", "Summary from current sprint KPI scores for this sprint.");
+        ObjectNode byMetric = mapper.createObjectNode();
+        byMetric.put("completionRate",
+            String.format("Completion rate is %d%% — share of sprint tasks marked done.", cr));
+        byMetric.put("onTimeDelivery",
+            String.format("On-time delivery is %d%% — completed work finished by the due date.", otd));
+        byMetric.put("teamParticipation",
+            String.format("Team participation is %d%% — team engagement in this sprint.", tp));
+        byMetric.put("workloadBalance",
+            String.format("Workload balance is %d%% — how evenly tasks are distributed.", wb));
+        byMetric.put("productivityScore", normalizeProductivityScoreGuideText("", ps, sprint));
+        guide.set("byMetric", byMetric);
+        root.set("kpiManagerGuide", guide);
     }
 
     private void enrichDeveloperInsightsIfEmpty(ObjectNode root, Long sprintId) throws Exception {

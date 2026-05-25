@@ -173,6 +173,11 @@ public class InsightsController {
             return payload;
         }
 
+        if (insight.getInsightsJson() == null || insight.getInsightsJson().isBlank()) {
+            payload.put("insights", null);
+            return payload;
+        }
+
         // Parse stored JSON; normalize snake_case / back-fill empty sections from DB workload (same as on save)
         try {
             JsonNode parsed = mapper.readTree(insight.getInsightsJson());

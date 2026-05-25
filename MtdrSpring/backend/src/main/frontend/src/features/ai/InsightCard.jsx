@@ -24,9 +24,15 @@ import {
   Lightbulb,
   Users,
 } from 'lucide-react';
-import { API_BASE, getErrorMessage, AI_INSIGHTS_EMPTY } from './aiInsightsConstants';
+import {
+  API_BASE,
+  getErrorMessage,
+  isApiKeyInsightError,
+  isValidSprintId,
+  AI_INSIGHTS_EMPTY,
+} from './aiInsightsConstants';
 import { fetchSprintInsights } from './insightsApi';
-import { useGeminiAiStatus } from './useGeminiAiStatus';
+import { fetchAiStatus } from './aiStatusApi';
 import {
   AlertCard,
   SectionHeading,
@@ -107,18 +113,17 @@ export default function InsightCard({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const { blocked: aiBlocked, message: aiConfigMessage } = useGeminiAiStatus();
 
   const [status, setStatus] = useState('idle');
   const [insights, setInsights] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
   const [pollCount, setPollCount] = useState(0);
   const [lastGeneratedAtMs, setLastGeneratedAtMs] = useState(null);
   const lastGeneratedAtMsRef = useRef(null);
   const cancelPollRef = useRef(false);
-  const autoGenerateStartedRef = useRef(new Set());
 
   const parseGeneratedAtMs = (value) => {
     const ms = new Date(value ?? '').getTime();
@@ -139,15 +144,28 @@ export default function InsightCard({
           if (cancelPollRef.current) return;
           if (!notFound && data) {
             if (data.error) {
-              setError(getErrorMessage(data.error));
-              setStatus('error');
+              // While regenerating, DB may still hold the previous failure until async save finishes.
+              if (minGeneratedAtMs != null) {
+                setPollCount(attempt + 1);
+                continue;
+              }
+              if (isApiKeyInsightError(data.error)) {
+                setErrorCode(data.error);
+                setError(getErrorMessage(data.error));
+                setStatus('error');
+                return;
+              }
+              setInsights(null);
+              setErrorCode(null);
+              setError(null);
+              setStatus('idle');
               return;
             }
             const generatedAtMs = parseGeneratedAtMs(data.generatedAt);
             const hasFreshGeneration =
               minGeneratedAtMs == null ||
               (generatedAtMs != null && generatedAtMs > Number(minGeneratedAtMs));
-            if (!hasFreshGeneration) {
+            if (!hasFreshGeneration || data.insights == null) {
               setPollCount(attempt + 1);
               continue;
             }
@@ -155,17 +173,20 @@ export default function InsightCard({
             setAcknowledged(data.acknowledged ?? false);
             lastGeneratedAtMsRef.current = generatedAtMs;
             setLastGeneratedAtMs(generatedAtMs);
+            setErrorCode(null);
+            setError(null);
             setStatus('loaded');
             setPollCount(attempt + 1);
             return;
           }
-          setPollCount(attempt + 1); // still 404 — keep waiting
+          setPollCount(attempt + 1);
         } catch {
           if (cancelPollRef.current) return;
           setPollCount(attempt + 1);
         }
       }
       if (!cancelPollRef.current) {
+        setErrorCode(null);
         setError('Took too long to generate. Please try again.');
         setStatus('error');
       }
@@ -174,15 +195,11 @@ export default function InsightCard({
   );
 
   const startGeneration = useCallback(async () => {
-    if (!sprintId) return;
-    if (aiBlocked) {
-      setError(aiConfigMessage || getErrorMessage('API_KEY_MISSING'));
-      setStatus('error');
-      return;
-    }
+    if (!isValidSprintId(sprintId)) return;
     cancelPollRef.current = true;
     setStatus('generating');
     setError(null);
+    setErrorCode(null);
     setInsights(null);
     setPollCount(0);
     try {
@@ -192,7 +209,9 @@ export default function InsightCard({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(getErrorMessage(data.error) || data.message || 'Could not start AI analysis.');
+        const code = data.error ?? null;
+        setErrorCode(code);
+        setError(getErrorMessage(code));
         setStatus('error');
         return;
       }
@@ -200,70 +219,81 @@ export default function InsightCard({
       setStatus('polling');
       pollForResults(lastGeneratedAtMsRef.current);
     } catch {
+      setErrorCode(null);
       setError('Could not start AI analysis. Check server connection.');
       setStatus('error');
     }
-  }, [sprintId, pollForResults, aiBlocked, aiConfigMessage]);
+  }, [sprintId, pollForResults]);
 
-  const loadExisting = useCallback(
-    async (options = {}) => {
-      const { autoGenerate = false } = options;
-      if (!sprintId) return;
-      try {
-        const { notFound, data } = await fetchSprintInsights(sprintId);
-        if (notFound || !data) {
-          if (autoGenerate && !aiBlocked && !autoGenerateStartedRef.current.has(sprintId)) {
-            autoGenerateStartedRef.current.add(sprintId);
-            await startGeneration();
-          } else if (!autoGenerate) {
-            setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+  const loadExisting = useCallback(async () => {
+    if (!isValidSprintId(sprintId)) return;
+    try {
+      const { notFound, data } = await fetchSprintInsights(sprintId);
+      if (notFound || !data) {
+        setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+        return;
+      }
+      const generatedMs = parseGeneratedAtMs(data.generatedAt);
+      lastGeneratedAtMsRef.current = generatedMs;
+      setLastGeneratedAtMs(generatedMs);
+      if (data.error) {
+        if (isApiKeyInsightError(data.error)) {
+          try {
+            const aiStatus = await fetchAiStatus();
+            if (aiStatus.geminiConfigured) {
+              setInsights(null);
+              setErrorCode(null);
+              setError(null);
+              setStatus('idle');
+              return;
+            }
+          } catch {
+            /* show stored error below */
           }
-          return;
-        }
-        const generatedMs = parseGeneratedAtMs(data.generatedAt);
-        lastGeneratedAtMsRef.current = generatedMs;
-        setLastGeneratedAtMs(generatedMs);
-        if (data.error) {
+          setErrorCode(data.error);
           setError(getErrorMessage(data.error));
           setStatus('error');
           return;
         }
-        setInsights(data.insights);
-        setAcknowledged(data.acknowledged ?? false);
-        setStatus('loaded');
-      } catch {
-        /* network error on initial load — stay idle unless generating */
-        if (!autoGenerate) {
-          setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
-        }
+        setInsights(null);
+        setErrorCode(null);
+        setError(null);
+        setStatus('idle');
+        return;
       }
-    },
-    [sprintId, startGeneration, aiBlocked],
-  );
+      if (data.insights == null) {
+        setInsights(null);
+        setStatus('idle');
+        return;
+      }
+      setInsights(data.insights);
+      setAcknowledged(data.acknowledged ?? false);
+      setErrorCode(null);
+      setError(null);
+      setStatus('loaded');
+    } catch {
+      setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+    }
+  }, [sprintId]);
 
   useEffect(() => {
+    if (!isValidSprintId(sprintId)) return;
     cancelPollRef.current = true;
     setInsights(null);
     setStatus('idle');
     setAcknowledged(false);
     setError(null);
+    setErrorCode(null);
     setPollCount(0);
     setLastGeneratedAtMs(null);
     lastGeneratedAtMsRef.current = null;
-    autoGenerateStartedRef.current.delete(sprintId);
     cancelPollRef.current = false;
-    loadExisting({ autoGenerate: true });
+    loadExisting();
     return () => {
       cancelPollRef.current = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-init when sprint changes
-  }, [sprintId]);
-
-  useEffect(() => {
-    if (!sprintId || refreshToken === 0) return;
-    loadExisting({ autoGenerate: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when parent page becomes active
-  }, [refreshToken, sprintId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when sprint or refreshToken changes
+  }, [sprintId, refreshToken]);
 
   const handleGenerate = () => startGeneration();
 
@@ -373,11 +403,10 @@ export default function InsightCard({
         </Box>
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
           {status === 'loaded' && (
-            <Tooltip title={aiBlocked ? 'AI not configured' : 'Regenerate'}>
+            <Tooltip title="Regenerate">
               <span>
                 <IconButton
                   onClick={handleGenerate}
-                  disabled={aiBlocked}
                   sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}
                 >
                 <RefreshCw size={20} />
@@ -396,12 +425,12 @@ export default function InsightCard({
       {/* Idle / Error */}
       {(status === 'idle' || status === 'error') && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
-          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
-            {status === 'idle'
-              ? 'No insights generated yet for this sprint.'
-              : 'Could not generate insights for this sprint.'}
-          </Typography>
-          {error && (
+          {status === 'idle' && (
+            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
+              No insights generated yet for this sprint.
+            </Typography>
+          )}
+          {status === 'error' && isApiKeyInsightError(errorCode) && error && (
             <Box
               sx={{
                 display: 'flex',
@@ -425,29 +454,15 @@ export default function InsightCard({
               </Typography>
             </Box>
           )}
-          {aiBlocked && aiConfigMessage && (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1,
-                p: 1.25,
-                bgcolor: isDark ? '#4A3A10' : '#FFF8E1',
-                borderRadius: 1.5,
-                border: `1px solid ${isDark ? '#8D6E14' : '#FFE082'}`,
-              }}
-            >
-              <AlertCircle size={14} color="#F57F17" style={{ marginTop: 1, flexShrink: 0 }} />
-              <Typography sx={{ fontSize: '0.9rem', color: isDark ? '#FFE082' : '#E65100', lineHeight: 1.45 }}>
-                {aiConfigMessage}
-              </Typography>
-            </Box>
+          {status === 'error' && !isApiKeyInsightError(errorCode) && (
+            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
+              {error || 'Could not generate insights for this sprint.'}
+            </Typography>
           )}
           <Button
             variant="contained"
             startIcon={<Sparkles size={18} />}
             onClick={handleGenerate}
-            disabled={aiBlocked}
             sx={{
               alignSelf: 'flex-start',
               bgcolor: '#673AB7',

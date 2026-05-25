@@ -7,6 +7,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseInsightsField(insights) {
+  if (insights == null) return null;
+  if (typeof insights === 'string') {
+    try {
+      const parsed = JSON.parse(insights);
+      return parsed != null && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return typeof insights === 'object' ? insights : null;
+}
+
 /**
  * Fetches persisted sprint insights with retries (avoids flaky failures when
  * the server is busy right after parallel KPI/dashboard loads).
@@ -46,6 +59,9 @@ export async function fetchSprintInsights(sprintId, options = {}) {
       }
 
       const data = await res.json();
+      if (data != null && typeof data === 'object') {
+        data.insights = parseInsightsField(data.insights);
+      }
       return { notFound: false, data };
     } catch (err) {
       if (signal?.aborted || err?.name === 'AbortError') {

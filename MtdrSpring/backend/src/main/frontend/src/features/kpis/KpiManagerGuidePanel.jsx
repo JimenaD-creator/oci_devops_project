@@ -7,16 +7,17 @@ import {
   alignKpiMetricsInText,
   alignKpiProseForMetric,
   alignProductivityScoreProse,
+  buildFallbackKpiManagerGuide,
   normalizeWorkloadBalanceGuideText,
 } from '../ai/aiInsightsConstants';
 import {
   buildProductivityKpiAnalyticsGuideLine,
+  finalizeProductivityManagerGuideText,
   formatProductivityScoreDisplay,
   resolveSprintTimelineContext,
   softenProductivityGuideForSprintPhase,
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
-  appendProductivityEvolutionNote,
 } from './productivityScoreUtils';
 import {
   SECTION_BRAND_DARK,
@@ -80,7 +81,6 @@ export default function KpiManagerGuidePanel({
   guide,
   loading,
   fetchFailed,
-  insightError = null,
   productivityDelta,
   currentProductivityScore = null,
   currentSprintKpis = {},
@@ -101,10 +101,15 @@ export default function KpiManagerGuidePanel({
   const productivityDisplay = hasCurrentProductivityScore
     ? formatProductivityScoreDisplay(resolvedCurrentProductivityScore)
     : '';
+  const fallbackGuide = buildFallbackKpiManagerGuide(currentSprintKpis, currentSprint);
+  const effectiveGuide =
+    guide && (guide.intro || guide.byMetric) ? guide : fallbackGuide;
   const byMetric =
-    guide && guide.byMetric && typeof guide.byMetric === 'object' ? guide.byMetric : null;
+    effectiveGuide?.byMetric && typeof effectiveGuide.byMetric === 'object'
+      ? effectiveGuide.byMetric
+      : null;
   const introTextRaw = clampOver100ForDisplay(
-    typeof guide?.intro === 'string' ? guide.intro.trim() : '',
+    typeof effectiveGuide?.intro === 'string' ? effectiveGuide.intro.trim() : '',
   );
   const alignedIntroText = alignKpiMetricsInText(introTextRaw, {
     completionRate: currentSprintKpis.completionRate,
@@ -136,7 +141,7 @@ export default function KpiManagerGuidePanel({
       const t = byMetric[k];
       return typeof t === 'string' && t.trim() !== '';
     });
-  const hasGuide = Boolean(guide) && (introText !== '' || hasMetricLines);
+  const hasGuide = introText !== '' || hasMetricLines;
 
   // Colores para el delta de productividad
   const deltaColors = {
@@ -280,16 +285,7 @@ export default function KpiManagerGuidePanel({
         </Typography>
       )}
 
-      {!loading && !fetchFailed && insightError && (
-        <Typography
-          sx={{ color: isDark ? '#EF9A9A' : '#C62828', fontSize: '0.95rem', lineHeight: 1.55 }}
-        >
-          {insightError} Open AI Insights for this sprint and use Regenerate if the API key is now
-          configured.
-        </Typography>
-      )}
-
-      {!loading && !fetchFailed && !insightError && !hasGuide && (
+      {!loading && !fetchFailed && !hasGuide && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'flex-start' }}>
           <Typography
             sx={{ color: isDark ? '#9A9A9A' : '#546E7A', fontSize: '0.95rem', lineHeight: 1.55 }}
@@ -315,7 +311,7 @@ export default function KpiManagerGuidePanel({
         </Box>
       )}
 
-      {!loading && !fetchFailed && !insightError && hasGuide && (
+      {!loading && !fetchFailed && hasGuide && (
         <Box>
           {introText !== '' && (
             <Typography
@@ -353,9 +349,14 @@ export default function KpiManagerGuidePanel({
                 displayText = stripProductivityGuideInstructionEcho(displayText);
                 displayText = stripProductivityLowScoreExcuses(displayText, sprintTimeline);
                 displayText = softenProductivityGuideForSprintPhase(displayText, sprintTimeline);
-                displayText = appendProductivityEvolutionNote(displayText, sprintTimeline);
                 if (!displayText.trim() && hasCurrentProductivityScore) {
                   displayText = buildProductivityKpiAnalyticsGuideLine(
+                    resolvedCurrentProductivityScore,
+                    currentSprint,
+                  );
+                } else if (hasCurrentProductivityScore) {
+                  displayText = finalizeProductivityManagerGuideText(
+                    displayText,
                     resolvedCurrentProductivityScore,
                     currentSprint,
                   );

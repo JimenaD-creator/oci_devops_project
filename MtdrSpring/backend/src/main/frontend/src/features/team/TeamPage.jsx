@@ -14,7 +14,7 @@ import { useTheme } from '@mui/material/styles';
 import { Users, UserCircle } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
-import { pageEase, AI_INSIGHTS_EMPTY } from '../ai/aiInsightsConstants';
+import { pageEase, AI_INSIGHTS_EMPTY, getErrorMessage } from '../ai/aiInsightsConstants';
 import { fetchSprintInsights } from '../ai/insightsApi';
 import { ORACLE_RED } from '../tasks/constants/taskConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
@@ -42,6 +42,7 @@ export default function TeamPage({
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [rawDeveloperInsightRows, setRawDeveloperInsightRows] = useState(null);
   const [insightsGeneratedAt, setInsightsGeneratedAt] = useState(null);
+  const [insightsError, setInsightsError] = useState(null);
   const [sprintsReady, setSprintsReady] = useState(false);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
 
@@ -114,24 +115,16 @@ export default function TeamPage({
 
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
+  const rosterForInsights = useMemo(() => {
+    if (projectDevelopers.length > 0) return projectDevelopers;
+    const sprintDevs = selectedSprint?.developers;
+    return Array.isArray(sprintDevs) ? sprintDevs : [];
+  }, [projectDevelopers, selectedSprint]);
+
   const developerInsightRows = useMemo(() => {
     if (rawDeveloperInsightRows === null) return [];
-    return mergeDeveloperInsightRows(projectDevelopers, rawDeveloperInsightRows);
-  }, [projectDevelopers, rawDeveloperInsightRows]);
-
-  /** Refetch AI rows when sprint KPIs / developer stats change (e.g. after task edits). */
-  const sprintInsightsRefreshKey = selectedSprint
-    ? JSON.stringify({
-        id: selectedSprint.id,
-        devs: (selectedSprint.developers || []).map((d) => [
-          d.name,
-          d.assigned,
-          d.completed,
-          d.onTime,
-          d.hours,
-        ]),
-      })
-    : '';
+    return mergeDeveloperInsightRows(rosterForInsights, rawDeveloperInsightRows);
+  }, [rosterForInsights, rawDeveloperInsightRows]);
 
   useEffect(() => {
     if (!sprintsReady || selectedSprintId == null) {
@@ -141,20 +134,33 @@ export default function TeamPage({
     let cancelled = false;
     setInsightsLoading(true);
     setRawDeveloperInsightRows(null);
+    setInsightsError(null);
     fetchSprintInsights(selectedSprintId)
       .then(({ notFound, data }) => {
         if (cancelled) return;
-        if (notFound || !data || data.error) {
+        if (notFound || !data) {
+          setRawDeveloperInsightRows([]);
+          setInsightsGeneratedAt(null);
+          setInsightsError(null);
+          return;
+        }
+        const rows = data.insights?.developerInsights;
+        const aiRows = Array.isArray(rows) ? rows : [];
+        if (data.error && aiRows.length === 0) {
+          setInsightsError(getErrorMessage(data.error));
           setRawDeveloperInsightRows([]);
           setInsightsGeneratedAt(null);
           return;
         }
-        const rows = data.insights?.developerInsights;
-        setRawDeveloperInsightRows(Array.isArray(rows) ? rows : []);
+        setInsightsError(null);
+        setRawDeveloperInsightRows(aiRows);
         setInsightsGeneratedAt(data.generatedAt ?? null);
       })
       .catch(() => {
-        if (!cancelled) setRawDeveloperInsightRows([]);
+        if (!cancelled) {
+          setRawDeveloperInsightRows([]);
+          setInsightsError(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setInsightsLoading(false);
@@ -162,7 +168,7 @@ export default function TeamPage({
     return () => {
       cancelled = true;
     };
-  }, [selectedSprintId, sprintsReady, sprintInsightsRefreshKey]);
+  }, [selectedSprintId, sprintsReady]);
 
   if (loading) return <PageLoadingSpinner />;
 
@@ -292,7 +298,7 @@ export default function TeamPage({
           <TeamWorkloadBreakdown
             sprint={selectedSprint}
             aiDeveloperInsights={developerInsightRows}
-            projectDevelopers={projectDevelopers}
+            projectDevelopers={rosterForInsights}
           />
 
           <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
@@ -350,8 +356,8 @@ export default function TeamPage({
                     fontStyle: 'italic',
                   }}
                 >
-                  {AI_INSIGHTS_EMPTY.developers} Use AI Insights for this sprint and run Generate
-                  (or Regenerate) to store narrative rows here.
+                  {insightsError ||
+                    'No AI narrative for this sprint yet. Generate insights in AI Insights, then return here.'}
                 </Typography>
               )}
               {typeof onOpenAiInsights === 'function' &&

@@ -358,6 +358,7 @@ export function TaskDetailDialog({
   onClose,
   onSaved,
   onDeleted,
+  readOnly = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -507,7 +508,12 @@ export function TaskDetailDialog({
     setAssignedUserIds(finiteUserIds(loadedAssigneeUserIds));
   };
 
+  useEffect(() => {
+    if (readOnly && editMode) setEditMode(false);
+  }, [readOnly, editMode]);
+
   const handleStartEdit = () => {
+    if (readOnly) return;
     if (!task) return;
     applyTaskToForm(task);
     setEditMode(true);
@@ -742,7 +748,7 @@ export function TaskDetailDialog({
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-            {!editMode && task && (
+            {!readOnly && !editMode && task && (
               <>
                 <Button
                   variant="contained"

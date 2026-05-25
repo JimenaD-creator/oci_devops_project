@@ -211,6 +211,13 @@ const getSprintMetricsDashboardTextCSS = (isDark) => `
   }
   .dev-productivity-dashboard .avatar-circle       { width: 32px; height: 32px; }
   .dev-productivity-dashboard .avatar-circle span  { font-size: 11px !important; }
+  .dev-productivity-dashboard tr.row-highlight-you td {
+    background: ${isDark ? 'rgba(199, 70, 52, 0.12)' : 'rgba(199, 70, 52, 0.06)'};
+  }
+  .dev-productivity-dashboard tr.row-highlight-you .dev-name-text {
+    font-weight: 800;
+    color: ${isDark ? '#F0F0F0' : '#1A1A1A'};
+  }
 `;
 
 function initialsFromName(name) {
@@ -236,11 +243,17 @@ const fullColumns = [
   { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
+function normalizeDeveloperName(name) {
+  return String(name ?? '').trim().toLowerCase();
+}
+
 function SprintMetricsTable({
   selectedSprints,
   compareMode,
   projectDevelopers = [],
   suppressCardTitle = false,
+  filterDeveloperName = null,
+  highlightDeveloperName = null,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -249,7 +262,13 @@ function SprintMetricsTable({
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
   const rows = useMemo(() => {
-    const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+    let names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+    const filterName = String(filterDeveloperName ?? '').trim();
+    if (filterName) {
+      const target = normalizeDeveloperName(filterName);
+      const matched = names.filter((n) => normalizeDeveloperName(n) === target);
+      names = matched.length ? matched : [filterName];
+    }
     return names.map((name) => {
       const row = { name };
       let initials = '';
@@ -278,11 +297,22 @@ function SprintMetricsTable({
       row.profilePicture = profilePicture;
       return row;
     });
-  }, [selectedSprints, projectDevelopers]);
+  }, [selectedSprints, projectDevelopers, filterDeveloperName]);
+
+  const hideSearch = Boolean(String(filterDeveloperName ?? '').trim());
+  const highlightName = String(highlightDeveloperName ?? '').trim();
+
+  const isHighlightedRow = (rowName) => {
+    if (!highlightName) return false;
+    return normalizeDeveloperName(rowName) === normalizeDeveloperName(highlightName);
+  };
 
   const filtered = useMemo(
-    () => rows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
-    [rows, search],
+    () =>
+      hideSearch
+        ? rows
+        : rows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
+    [rows, search, hideSearch],
   );
 
   const sorted = useMemo(() => {
@@ -380,16 +410,18 @@ function SprintMetricsTable({
               </>
             )}
           </div>
-          <div className="search-wrapper">
-            <Search className="search-icon" size={14} />
-            <input
-              type="text"
-              placeholder="Search developer..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="search-input"
-            />
-          </div>
+          {!hideSearch ? (
+            <div className="search-wrapper">
+              <Search className="search-icon" size={14} />
+              <input
+                type="text"
+                placeholder="Search developer..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="search-input"
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="table-scroll">
@@ -508,8 +540,14 @@ function SprintMetricsTable({
             <tbody>
               {sorted.map((r, i) => {
                 const av = developerAvatarColors(r.name);
+                const rowClass = [
+                  i % 2 === 1 ? 'row-odd' : '',
+                  isHighlightedRow(r.name) ? 'row-highlight-you' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
                 return (
-                  <tr key={r.name} className={i % 2 === 1 ? 'row-odd' : ''}>
+                  <tr key={r.name} className={rowClass || undefined}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <DevAvatar
@@ -518,7 +556,23 @@ function SprintMetricsTable({
                           profilePicture={r.profilePicture}
                           avatarColors={av}
                         />
-                        <span className="dev-name-text">{r.name}</span>
+                        <span className="dev-name-text">
+                          {r.name}
+                          {isHighlightedRow(r.name) ? (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                color: '#C74634',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              You
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                     </td>
                     {compareMode
@@ -795,6 +849,8 @@ export default function DeveloperTable({
   compareMode,
   projectDevelopers = [],
   suppressCardTitle = false,
+  filterDeveloperName = null,
+  highlightDeveloperName = null,
 }) {
   if (selectedSprints != null) {
     if (!selectedSprints.length) return null;
@@ -804,6 +860,8 @@ export default function DeveloperTable({
         compareMode={!!compareMode}
         projectDevelopers={projectDevelopers}
         suppressCardTitle={!!suppressCardTitle}
+        filterDeveloperName={filterDeveloperName}
+        highlightDeveloperName={highlightDeveloperName}
       />
     );
   }

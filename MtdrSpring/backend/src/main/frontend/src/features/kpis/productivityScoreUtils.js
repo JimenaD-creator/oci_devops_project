@@ -183,6 +183,48 @@ export function appendProductivityEvolutionNote(text, timeline) {
   return `${raw} ${note}`;
 }
 
+function productivityScoreLeadLine(score) {
+  const display = formatProductivityScoreDisplay(score);
+  if (!display) return '';
+  return (
+    `The Productivity Score is ${display}, combining completion rate, on-time delivery, ` +
+    'team participation, and workload balance into one indicator for overall sprint performance.'
+  );
+}
+
+function productivityScorePercentPresent(text, score) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return false;
+  const display = formatProductivityScoreDisplay(score);
+  if (display && raw.includes(display)) return true;
+  const n = Number(score);
+  if (Number.isFinite(n)) {
+    const rounded = String(Math.round(n));
+    if (new RegExp(`productivity\\s+score\\s+is\\s+${rounded}(?:\\.\\d+)?\\s*%`, 'i').test(raw)) {
+      return true;
+    }
+  }
+  return /\bproductivity\s+score\s+is\s+\d+(?:\.\d+)?\s*%/i.test(raw);
+}
+
+/**
+ * KPI Manager Guide: always show current score % even when excuse-stripping left only the evolution note.
+ */
+export function finalizeProductivityManagerGuideText(text, score, sprint = null) {
+  const display = formatProductivityScoreDisplay(score);
+  if (!display) return String(text ?? '').trim();
+  let out = String(text ?? '').trim();
+  if (!productivityScorePercentPresent(out, score)) {
+    const lead = productivityScoreLeadLine(score);
+    out = out ? `${lead} ${out}` : lead;
+  }
+  const timeline = resolveSprintTimelineContext(sprint);
+  if (timeline.isEarly || timeline.phase === 'not_started') {
+    out = appendProductivityEvolutionNote(out, timeline);
+  }
+  return out.trim();
+}
+
 /** Strip judgmental performance labels when sprint has not started or is still early. */
 export function softenProductivityGuideForSprintPhase(text, timeline) {
   if (text == null) return text;
@@ -204,13 +246,7 @@ export function softenProductivityGuideForSprintPhase(text, timeline) {
  * @param {{ startDate?: string, dueDate?: string, start_date?: string, due_date?: string }|null} [sprint]
  */
 export function buildProductivityKpiAnalyticsGuideLine(score, sprint = null) {
-  const display = formatProductivityScoreDisplay(score);
-  if (!display) return '';
-  const timeline = resolveSprintTimelineContext(sprint);
-  let line =
-    `The Productivity Score is ${display}, combining completion rate, on-time delivery, ` +
-    'team participation, and workload balance into one indicator for overall sprint performance.';
-  return appendProductivityEvolutionNote(line, timeline);
+  return finalizeProductivityManagerGuideText('', score, sprint);
 }
 
 /** @deprecated Use buildProductivityKpiAnalyticsGuideLine for KPI Analytics. */

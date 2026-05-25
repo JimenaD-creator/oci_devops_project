@@ -207,11 +207,25 @@ function DevCard({ dev }) {
   );
 }
 
-export default function DeveloperRadarCards({ sprintId }) {
+function normalizeDeveloperName(name) {
+  return String(name ?? '').trim().toLowerCase();
+}
+
+/**
+ * @param {'grid' | 'single'} layout
+ *   - grid: manager Team view — multiple cards in a responsive row (default)
+ *   - single: developer My Performance — one card, narrow column beside AI text
+ */
+export default function DeveloperRadarCards({
+  sprintId,
+  developerName = null,
+  developerUserId = null,
+  layout = 'grid',
+}) {
   const [devs, setDevs] = React.useState([]);
 
   useEffect(() => {
-    if (!sprintId) return;
+    if (sprintId == null || sprintId === '' || !Number.isFinite(Number(sprintId))) return;
     const base = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
     fetch(`${base}/api/insights/sprint/${sprintId}/developer-radar`, { cache: 'no-store', headers: { Accept: 'application/json' } })
       .then((r) => (r.ok ? r.json() : []))
@@ -219,19 +233,51 @@ export default function DeveloperRadarCards({ sprintId }) {
       .catch(() => setDevs([]));
   }, [sprintId]);
 
-  if (devs.length === 0) return null;
+  const visibleDevs = React.useMemo(() => {
+    const list = devs.filter((d) => d && String(d.developerName ?? '').trim());
+    if (layout !== 'single') return list;
+
+    const uid = Number(developerUserId);
+    if (Number.isFinite(uid)) {
+      const byId = list.filter((d) => Number(d.developerUserId) === uid);
+      if (byId.length) return byId;
+    }
+    const filter = String(developerName ?? '').trim();
+    if (!filter) return list;
+    const target = normalizeDeveloperName(filter);
+    return list.filter((d) => normalizeDeveloperName(d.developerName) === target);
+  }, [devs, developerName, developerUserId, layout]);
+
+  if (visibleDevs.length === 0) return null;
+
+  const isSingleLayout = layout === 'single';
 
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box sx={{ mt: isSingleLayout ? 0 : 2, width: '100%' }}>
       <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 600, mb: 1.5 }}>
         Scores normalized relative to team — higher is better within the sprint.
       </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 2.5 }}>
-        {devs
-          .filter((d) => d && String(d.developerName ?? '').trim())
-          .map((d) => (
-            <DevCard key={String(d.developerName).trim()} dev={d} />
-          ))}
+      <Box
+        sx={
+          isSingleLayout
+            ? {
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: 2.5,
+                maxWidth: 420,
+                mx: 'auto',
+              }
+            : {
+                display: 'grid',
+                width: '100%',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: 2.5,
+              }
+        }
+      >
+        {visibleDevs.map((d) => (
+          <DevCard key={String(d.developerName).trim()} dev={d} />
+        ))}
       </Box>
     </Box>
   );

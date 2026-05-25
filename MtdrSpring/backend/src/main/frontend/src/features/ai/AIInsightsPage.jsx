@@ -22,7 +22,7 @@ import {
 import InsightCard from './InsightCard';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageActive = true }) {
+export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
@@ -30,15 +30,6 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageAct
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
-  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
-
-  /** Reload persisted insights when the user opens this page again (no 15s polling). */
-  useEffect(() => {
-    if (isPageActive) {
-      setInsightsRefreshKey((k) => k + 1);
-    }
-  }, [isPageActive]);
-
   useEffect(() => {
     const pid =
       projectId != null && String(projectId).trim() !== ''
@@ -252,7 +243,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageAct
           nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
           currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
           currentSprintMetrics={currentSprintKpiMetrics}
-          refreshToken={insightsRefreshKey}
+          refreshToken={0}
           onOpenTeam={onOpenTeam}
         />
       )}

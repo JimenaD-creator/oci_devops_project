@@ -865,6 +865,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
+        readOnly={developerMode}
         onClose={closeTaskDetailDialog}
         onSaved={async (updated, meta) => {
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));

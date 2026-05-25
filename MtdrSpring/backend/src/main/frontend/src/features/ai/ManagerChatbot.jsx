@@ -697,9 +697,7 @@ export default function ManagerChatbot({ projectId }) {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={
-                      aiBlocked
-                        ? 'AI chat unavailable — configure GEMINI_API_KEY on the server'
-                        : 'Ask about your project...'
+                      aiBlocked ? 'AI chat unavailable' : 'Ask about your project...'
                     }
                     multiline
                     maxRows={3}

@@ -25,7 +25,6 @@ import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { fetchSprintInsights } from '../ai/insightsApi';
-import { getErrorMessage } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
@@ -248,7 +247,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuide, setManagerGuide] = useState(null);
   const [managerGuideLoading, setManagerGuideLoading] = useState(false);
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
-  const [managerGuideInsightError, setManagerGuideInsightError] = useState(null);
   const [kpiDataReady, setKpiDataReady] = useState(false);
 
   useEffect(() => {
@@ -257,7 +255,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const controller = new AbortController();
     setManagerGuideLoading(true);
     setManagerGuideFetchFailed(false);
-    setManagerGuideInsightError(null);
     setManagerGuide(null);
 
     (async () => {
@@ -269,12 +266,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
 
         if (notFound || !data) {
           setManagerGuide(null);
-          return;
-        }
-
-        if (data.error) {
-          setManagerGuide(null);
-          setManagerGuideInsightError(getErrorMessage(data.error));
           return;
         }
 
@@ -717,7 +708,6 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             guide={managerGuide}
             loading={managerGuideLoading}
             fetchFailed={managerGuideFetchFailed}
-            insightError={managerGuideInsightError}
             productivityDelta={productivityDelta}
             currentProductivityScore={kpis.productivityScore}
             currentSprintKpis={kpis}

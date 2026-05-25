@@ -18,12 +18,18 @@ public class GeminiApiConfiguration {
     @Value("${gemini.api.key:}")
     private String apiKey;
 
+    @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent}")
+    private String apiUrl;
+
     @PostConstruct
     void logStartupStatus() {
         if (!isConfigured()) {
             System.err.println(
                 "[Gemini] GEMINI_API_KEY is missing — sprint insights generation, manager chat, "
                     + "and task embeddings cannot call Gemini until it is set.");
+        } else {
+            System.out.println("[Gemini] API key loaded (length=" + apiKey.length() + ")");
+            System.out.println("[Gemini] generateContent endpoint: " + apiUrl);
         }
     }
 
@@ -33,6 +39,11 @@ public class GeminiApiConfiguration {
 
     public String getApiKey() {
         return apiKey;
+    }
+
+    /** Full REST URL for {@code :generateContent} (includes model id). */
+    public String getApiUrl() {
+        return apiUrl;
     }
 
     public void requireConfigured() {
