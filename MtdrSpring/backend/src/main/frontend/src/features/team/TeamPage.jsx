@@ -256,20 +256,31 @@ export default function TeamPage({
       </Box>
 
       {sprints.length === 0 && (
-        <Paper sx={{ 
-          p: 4, 
-          textAlign: 'center', 
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-        }}>
+        <Paper
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
           <Typography color="textSecondary">No sprints found for this project.</Typography>
         </Paper>
       )}
 
       {selectedSprintId != null && !selectedSprint && sprints.length > 0 && (
-        <Paper sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+        <Paper
+          sx={{
+            p: 3,
+            mb: 3,
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
           <Typography color="text.secondary">
             Sprint data is still syncing. Pick another sprint in the dropdown or refresh the page.
           </Typography>

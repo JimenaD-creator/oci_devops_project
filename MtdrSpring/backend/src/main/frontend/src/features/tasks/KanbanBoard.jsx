@@ -223,10 +223,7 @@ function TaskCard({
       onDragEnd={draggable ? handleDragEnd : undefined}
       onClick={handleCardClick}
       style={{ cursor: draggable || onOpenTask ? 'grab' : 'pointer' }}
-      title={
-        dragHint ||
-        (typeof onOpenTask === 'function' ? 'Click to view details' : undefined)
-      }
+      title={dragHint || (typeof onOpenTask === 'function' ? 'Click to view details' : undefined)}
     >
       <div className="kanban-task-card-top">
         {draggable ? (
@@ -311,7 +308,7 @@ function TaskCard({
           sx: {
             bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
             border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
-          }
+          },
         }}
       >
         {menuOptions.map((opt) => (
@@ -319,8 +316,8 @@ function TaskCard({
             key={opt.value}
             selected={opt.value === rawStatus}
             onClick={() => handleMenuSelect(opt.value)}
-            sx={{ 
-              fontSize: '0.875rem', 
+            sx={{
+              fontSize: '0.875rem',
               fontWeight: opt.value === rawStatus ? 700 : 400,
               color: isDark ? '#F0F0F0' : '#1A1A1A',
               '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
@@ -331,7 +328,10 @@ function TaskCard({
         ))}
         {typeof onDeleteTask === 'function'
           ? [
-              <Divider key="kanban-status-menu-divider" sx={{ borderColor: isDark ? '#2A2C32' : '#E0E0E0' }} />,
+              <Divider
+                key="kanban-status-menu-divider"
+                sx={{ borderColor: isDark ? '#2A2C32' : '#E0E0E0' }}
+              />,
               <MenuItem
                 key="kanban-status-menu-delete"
                 onClick={() => {

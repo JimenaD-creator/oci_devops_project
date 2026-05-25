@@ -2,9 +2,7 @@ import { developerNumericId } from './userIds';
 
 export function rosterDeveloperDisplayName(user) {
   if (!user) return 'Unknown';
-  const name = String(
-    user?.name ?? user?.NAME ?? user?.displayName ?? user?.fullName ?? '',
-  ).trim();
+  const name = String(user?.name ?? user?.NAME ?? user?.displayName ?? user?.fullName ?? '').trim();
   if (name) return name;
   const id = developerNumericId(user);
   return id != null ? `User ${id}` : 'Unknown';
@@ -30,9 +28,7 @@ export function resolveProfilePictureFromRoster(projectDevelopers, { name, userI
     .trim()
     .toLowerCase();
   if (!nameKey) return null;
-  const byName = roster.find(
-    (u) => rosterDeveloperDisplayName(u).toLowerCase() === nameKey,
-  );
+  const byName = roster.find((u) => rosterDeveloperDisplayName(u).toLowerCase() === nameKey);
   return rosterDeveloperProfilePicture(byName);
 }
 
@@ -47,7 +43,9 @@ function initialsFromName(name) {
     .split(/\s+/)
     .filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return String(name || '').slice(0, 2).toUpperCase();
+  return String(name || '')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 /** Count unique developers on the project team roster. */
@@ -60,9 +58,7 @@ export function countTeamDevelopers(developers) {
   });
   if (ids.size > 0) return ids.size;
   const names = new Set(
-    developers
-      .map((u) => rosterDeveloperDisplayName(u))
-      .filter((n) => n && n !== 'Unknown'),
+    developers.map((u) => rosterDeveloperDisplayName(u)).filter((n) => n && n !== 'Unknown'),
   );
   return names.size;
 }
@@ -133,10 +129,7 @@ export function mergeRosterWithSprintDevelopers(projectDevelopers, sprintDevelop
         ...fromActivity,
         name: fromActivity.name || name,
         userId: fromActivity.userId ?? uid,
-        profilePicture:
-          fromActivity.profilePicture ??
-          rosterDeveloperProfilePicture(u) ??
-          null,
+        profilePicture: fromActivity.profilePicture ?? rosterDeveloperProfilePicture(u) ?? null,
         shortName: fromActivity.shortName ?? shortDevNameLocal(fromActivity.name || name),
         pending: Math.max(0, assigned - completed),
       });
@@ -184,14 +177,11 @@ export function collectDeveloperNamesForSelection(selectedSprints, projectDevelo
     names.push(t);
   };
   (projectDevelopers || []).forEach((u) => add(rosterDeveloperDisplayName(u)));
-  (selectedSprints || []).forEach((sp) =>
-    (sp.developers || []).forEach((d) => add(d?.name)),
-  );
+  (selectedSprints || []).forEach((sp) => (sp.developers || []).forEach((d) => add(d?.name)));
   return names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
-const NO_TASKS_INSIGHT =
-  'On the project team with no tasks assigned in this sprint.';
+const NO_TASKS_INSIGHT = 'On the project team with no tasks assigned in this sprint.';
 
 /**
  * AI per-developer table: include full project roster, including developers with no assignments.

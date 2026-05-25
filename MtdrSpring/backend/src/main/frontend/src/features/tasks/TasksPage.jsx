@@ -27,11 +27,7 @@ import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
-import {
-  API_BASE,
-  ORACLE_RED,
-  pageEase,
-} from './constants/taskConstants';
+import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import {
   resolveActiveProjectId,
@@ -48,10 +44,7 @@ import {
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
-import {
-  filterUserTasksForUser,
-  taskIdsForUser,
-} from '../developer/developerTaskFilters';
+import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
 
 export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
@@ -78,42 +71,51 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const recentlyDeletedTaskIdsRef = useRef(new Set());
   const { invalidateAndRefresh } = useProjectData();
 
-  const loadData = useCallback(async (opts = {}) => {
-    const silent = opts.silent === true;
-    const forceRefresh = opts.forceRefresh === true;
-    if (!silent) {
-      setIsLoading(true);
-      setLoadError('');
-    }
-    try {
-      if (forceRefresh) {
-        await invalidateAndRefresh();
+  const loadData = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      const forceRefresh = opts.forceRefresh === true;
+      if (!silent) {
+        setIsLoading(true);
+        setLoadError('');
       }
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId, {
-        forceFresh: forceRefresh,
-      });
-      const deleted = recentlyDeletedTaskIdsRef.current;
-      const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
-        (t) => !deleted.has(taskEntityId(t)),
-      );
-      const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
-        (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
-      );
-      setRawTasks(visibleTasks);
-      setSprints(Array.isArray(sprintsData) ? sprintsData : []);
-      setUserTasks(visibleUserTasks);
-    } catch (error) {
-      console.error('Error loading tasks data:', error);
-      setRawTasks([]);
-      setSprints([]);
-      setUserTasks([]);
-      if (!silent) setLoadError('Could not load tasks. Check that the server is running and try again.');
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, [effectiveProjectId, invalidateAndRefresh]);
+      try {
+        if (forceRefresh) {
+          await invalidateAndRefresh();
+        }
+        const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(
+          effectiveProjectId,
+          {
+            forceFresh: forceRefresh,
+          },
+        );
+        const deleted = recentlyDeletedTaskIdsRef.current;
+        const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
+          (t) => !deleted.has(taskEntityId(t)),
+        );
+        const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
+          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+        );
+        setRawTasks(visibleTasks);
+        setSprints(Array.isArray(sprintsData) ? sprintsData : []);
+        setUserTasks(visibleUserTasks);
+      } catch (error) {
+        console.error('Error loading tasks data:', error);
+        setRawTasks([]);
+        setSprints([]);
+        setUserTasks([]);
+        if (!silent)
+          setLoadError('Could not load tasks. Check that the server is running and try again.');
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [effectiveProjectId, invalidateAndRefresh],
+  );
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     try {
@@ -137,7 +139,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         : sprints || [];
     if (!pool.length) return '';
     const ids = pool.map((s) => String(s.id));
-    if (selectedSprintId !== '' && selectedSprintId != null && ids.includes(String(selectedSprintId))) {
+    if (
+      selectedSprintId !== '' &&
+      selectedSprintId != null &&
+      ids.includes(String(selectedSprintId))
+    ) {
       return String(selectedSprintId);
     }
     const picked = pickDefaultSelectedSprint(pool);
@@ -155,23 +161,37 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   useEffect(() => {
     if (selectedProjectId != null) {
-      try { localStorage.setItem('currentProjectId', String(selectedProjectId)); } catch (e) {}
+      try {
+        localStorage.setItem('currentProjectId', String(selectedProjectId));
+      } catch (e) {}
     }
   }, [selectedProjectId]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!selectedProjectId) { setProjectDevelopers([]); return () => { cancelled = true; }; }
+    if (!selectedProjectId) {
+      setProjectDevelopers([]);
+      return () => {
+        cancelled = true;
+      };
+    }
     (async () => {
       try {
         const data = await fetchProjectDevelopersList(selectedProjectId);
         if (!cancelled) setProjectDevelopers(Array.isArray(data) ? data : []);
-      } catch { if (!cancelled) setProjectDevelopers([]); }
+      } catch {
+        if (!cancelled) setProjectDevelopers([]);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedProjectId]);
 
-  const developerFilterOptions = useMemo(() => (Array.isArray(projectDevelopers) ? projectDevelopers : []), [projectDevelopers]);
+  const developerFilterOptions = useMemo(
+    () => (Array.isArray(projectDevelopers) ? projectDevelopers : []),
+    [projectDevelopers],
+  );
 
   const sprintsForActiveProject = useMemo(() => {
     if (!selectedProjectId) return [];
@@ -194,7 +214,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const handleStatusChange = async (taskId, newStatus) => {
     const task = rawTasks.find((t) => t.id === taskId);
     if (!task) return;
-    const assignees = userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId));
+    const assignees = userTasks.filter(
+      (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId),
+    );
     const ns = String(newStatus || '').toUpperCase();
     const putTask = async () => {
       const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
@@ -218,7 +240,10 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       }
     };
     try {
-      if (assignees.length === 0) { await putTask(); return; }
+      if (assignees.length === 0) {
+        await putTask();
+        return;
+      }
       if (assignees.length === 1) {
         if (ns === 'DONE') {
           const ut = assignees[0];
@@ -229,50 +254,69 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
           });
           if (markDoneRes.ok) {
-            setUserTasks((prev) => prev.map((row) => {
-              const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
-              const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
-              if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
-              return { ...row, status: 'COMPLETED' };
-            }));
+            setUserTasks((prev) =>
+              prev.map((row) => {
+                const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+                const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
+                if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
+                return { ...row, status: 'COMPLETED' };
+              }),
+            );
             await putTask();
           }
-        } else { await putTask(); }
+        } else {
+          await putTask();
+        }
         return;
       }
       if (ns === 'DONE') {
         const allDone = assignees.every((ut) => isUserTaskAssigneeComplete(ut));
-        if (allDone) { await putTask(); } else { setMultiDoneTaskId(taskId); }
+        if (allDone) {
+          await putTask();
+        } else {
+          setMultiDoneTaskId(taskId);
+        }
         return;
       }
       await putTask();
-    } catch (e) { console.error('Error updating task status:', e); }
+    } catch (e) {
+      console.error('Error updating task status:', e);
+    }
   };
 
   const handleOpenTaskFromKanban = useCallback((kanbanItem) => {
     const raw = kanbanItem?._raw;
-    if (raw && raw.id != null) { setTaskForDetailDialog(raw); setTaskDetailOpen(true); }
+    if (raw && raw.id != null) {
+      setTaskForDetailDialog(raw);
+      setTaskDetailOpen(true);
+    }
   }, []);
 
-  const closeTaskDetailDialog = useCallback(() => { setTaskDetailOpen(false); setTaskForDetailDialog(null); }, []);
+  const closeTaskDetailDialog = useCallback(() => {
+    setTaskDetailOpen(false);
+    setTaskForDetailDialog(null);
+  }, []);
 
-  const removeTaskFromState = useCallback((taskId) => {
-    const tid = String(taskId);
-    recentlyDeletedTaskIdsRef.current.add(tid);
-    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
-    setRawTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
-    setUserTasks((prev) =>
-      prev.filter((ut) => {
-        const utTid = userTaskRowTaskId(ut);
-        return !Number.isFinite(utTid) || String(utTid) !== tid;
-      }),
-    );
-    const tidNum = Number(taskId);
-    if (Number(multiDoneTaskId) === tidNum) setMultiDoneTaskId(null);
-    if (taskForDetailDialog && taskEntityId(taskForDetailDialog) === tid) {
-      closeTaskDetailDialog();
-    }
-  }, [multiDoneTaskId, taskForDetailDialog, closeTaskDetailDialog]);
+  const removeTaskFromState = useCallback(
+    (taskId) => {
+      const tid = String(taskId);
+      recentlyDeletedTaskIdsRef.current.add(tid);
+      setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+      setRawTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
+      setUserTasks((prev) =>
+        prev.filter((ut) => {
+          const utTid = userTaskRowTaskId(ut);
+          return !Number.isFinite(utTid) || String(utTid) !== tid;
+        }),
+      );
+      const tidNum = Number(taskId);
+      if (Number(multiDoneTaskId) === tidNum) setMultiDoneTaskId(null);
+      if (taskForDetailDialog && taskEntityId(taskForDetailDialog) === tid) {
+        closeTaskDetailDialog();
+      }
+    },
+    [multiDoneTaskId, taskForDetailDialog, closeTaskDetailDialog],
+  );
 
   const refreshSharedAfterTaskMutation = useCallback(async () => {
     try {
@@ -289,8 +333,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   useEffect(() => {
     if (multiDoneTaskId == null) return;
-    const uts = userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId));
-    if (uts.length > 0 && uts.every((ut) => isUserTaskAssigneeComplete(ut))) setMultiDoneTaskId(null);
+    const uts = userTasks.filter(
+      (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId),
+    );
+    if (uts.length > 0 && uts.every((ut) => isUserTaskAssigneeComplete(ut)))
+      setMultiDoneTaskId(null);
   }, [userTasks, multiDoneTaskId]);
 
   const markAssigneeDone = async (taskId, ut) => {
@@ -302,21 +349,42 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
       });
       if (res.ok) await loadData({ forceRefresh: true });
-    } catch (e) { console.error('Error marking assignee done:', e); }
+    } catch (e) {
+      console.error('Error marking assignee done:', e);
+    }
   };
 
-  const resolveUserTaskDeveloperName = useCallback((ut) => {
-    if (!ut) return null;
-    const user = ut.user;
-    const numericUserId = developerNumericId(ut?.id?.userId) ?? developerNumericId(ut?.userId) ?? developerNumericId(ut?.user?.ID) ?? developerNumericId(user);
-    if (numericUserId != null && Number.isFinite(numericUserId)) {
-      const known = users.find((u) => developerNumericId(u) === numericUserId) || projectDevelopers.find((u) => developerNumericId(u) === numericUserId);
-      if (known) return String(known.name ?? known.displayName ?? known.email ?? `User ${numericUserId}`);
-      return `User ${numericUserId}`;
-    }
-    const directName = String(user?.name ?? user?.NAME ?? user?.fullName ?? user?.displayName ?? user?.email ?? user?.username ?? user?.userName ?? '').trim();
-    return directName || null;
-  }, [users, projectDevelopers]);
+  const resolveUserTaskDeveloperName = useCallback(
+    (ut) => {
+      if (!ut) return null;
+      const user = ut.user;
+      const numericUserId =
+        developerNumericId(ut?.id?.userId) ??
+        developerNumericId(ut?.userId) ??
+        developerNumericId(ut?.user?.ID) ??
+        developerNumericId(user);
+      if (numericUserId != null && Number.isFinite(numericUserId)) {
+        const known =
+          users.find((u) => developerNumericId(u) === numericUserId) ||
+          projectDevelopers.find((u) => developerNumericId(u) === numericUserId);
+        if (known)
+          return String(known.name ?? known.displayName ?? known.email ?? `User ${numericUserId}`);
+        return `User ${numericUserId}`;
+      }
+      const directName = String(
+        user?.name ??
+          user?.NAME ??
+          user?.fullName ??
+          user?.displayName ??
+          user?.email ??
+          user?.username ??
+          user?.userName ??
+          '',
+      ).trim();
+      return directName || null;
+    },
+    [users, projectDevelopers],
+  );
 
   const scopedUserTasks = useMemo(() => {
     if (!developerMode || !Number.isFinite(currentUserId)) return userTasks;
@@ -363,11 +431,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       tasksForKanban.map((task) => {
         const tid = Number(task.id);
         const assignmentRows = assignmentsByTaskId.get(tid) ?? [];
-        return mapTaskToKanban(
-          task,
-          developersByTaskId.get(String(task.id)) ?? [],
-          assignmentRows,
-        );
+        return mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [], assignmentRows);
       }),
     [tasksForKanban, developersByTaskId, assignmentsByTaskId],
   );
@@ -376,22 +440,38 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     return items.filter((item) => {
       if (!kanbanSprintId || String(item.sprintId) !== String(kanbanSprintId)) return false;
       if (developerFilter !== 'all') {
-        const names = item.developers?.length ? item.developers : item.developer ? [item.developer] : [];
+        const names = item.developers?.length
+          ? item.developers
+          : item.developer
+            ? [item.developer]
+            : [];
         if (!names.some((n) => String(n) === String(developerFilter))) return false;
       }
-      if (priorityFilter !== 'all' && String(item.priority ?? '').toUpperCase() !== String(priorityFilter).toUpperCase()) return false;
+      if (
+        priorityFilter !== 'all' &&
+        String(item.priority ?? '').toUpperCase() !== String(priorityFilter).toUpperCase()
+      )
+        return false;
       if (!matchesDueDateRange(item, dueFrom, dueTo)) return false;
       return true;
     });
   }, [items, kanbanSprintId, developerFilter, priorityFilter, dueFrom, dueTo]);
 
   const pendingCount = useMemo(() => {
-    const scope = kanbanSprintId ? items.filter((i) => String(i.sprintId) === String(kanbanSprintId)) : items;
+    const scope = kanbanSprintId
+      ? items.filter((i) => String(i.sprintId) === String(kanbanSprintId))
+      : items;
     return scope.filter((i) => !i.done).length;
   }, [items, kanbanSprintId]);
 
-  const hasActiveFilters = developerFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueFrom) || Boolean(dueTo);
-  const clearAllFilters = () => { setDeveloperFilter('all'); setPriorityFilter('all'); setDueFrom(''); setDueTo(''); };
+  const hasActiveFilters =
+    developerFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueFrom) || Boolean(dueTo);
+  const clearAllFilters = () => {
+    setDeveloperFilter('all');
+    setPriorityFilter('all');
+    setDueFrom('');
+    setDueTo('');
+  };
   const projectIdNum = projectId != null && projectId !== '' ? Number(projectId) : null;
 
   // Colores reactivos al tema
@@ -423,7 +503,10 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}>
+            <Typography
+              variant="h4"
+              sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}
+            >
               Kanban Board
             </Typography>
             <Chip
@@ -432,54 +515,61 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               sx={{ mt: 1, bgcolor: pendingChipBg, color: '#E65100', fontWeight: 700 }}
             />
           </Box>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
-<FormControl
-  size="small"
-  sx={{
-    minWidth: { xs: '100%', sm: 180 },
-    ...pageFormFieldOutline(),
-    '& .MuiOutlinedInput-root': {
-      bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
-      color: isDark ? '#F0F0F0' : '#1A1A1A',
-      '& fieldset': { borderColor: isDark ? '#2A2C32' : '#CCCCCC' },
-      '&:hover fieldset': { borderColor: isDark ? '#3A3C42' : '#AAAAAA' },
-    },
-    '& .MuiInputLabel-root': {
-      color: isDark ? '#9A9A9A' : '#666666',
-    },
-    '& .MuiSvgIcon-root': {
-      color: isDark ? '#9A9A9A' : '#666666',
-    },
-  }}
->
-  <InputLabel id="tasks-header-sprint-select-label">Sprint</InputLabel>
-  <Select
-    labelId="tasks-header-sprint-select-label"
-    value={kanbanSprintId || ''}
-    label="Sprint"
-    inputProps={{ 'aria-label': 'Sprint' }}
-sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
-    onChange={(e) => setSelectedSprintId(String(e.target.value))}
-    disabled={!sprints.length}
-    MenuProps={ {
-      PaperProps: {
-        sx: {
-          bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
-          border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
-          '& .MuiMenuItem-root': {
-            color: isDark ? '#F0F0F0' : '#1A1A1A',
-            '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
-            '&.Mui-selected': {
-              bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
-              '&:hover': { bgcolor: isDark ? '#3A3C42' : '#E8E8E8' },
-            },
-          },
-        },
-      },
-    }}
-  >
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.25}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+          >
+            <FormControl
+              size="small"
+              sx={{
+                minWidth: { xs: '100%', sm: 180 },
+                ...pageFormFieldOutline(),
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+                  color: isDark ? '#F0F0F0' : '#1A1A1A',
+                  '& fieldset': { borderColor: isDark ? '#2A2C32' : '#CCCCCC' },
+                  '&:hover fieldset': { borderColor: isDark ? '#3A3C42' : '#AAAAAA' },
+                },
+                '& .MuiInputLabel-root': {
+                  color: isDark ? '#9A9A9A' : '#666666',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: isDark ? '#9A9A9A' : '#666666',
+                },
+              }}
+            >
+              <InputLabel id="tasks-header-sprint-select-label">Sprint</InputLabel>
+              <Select
+                labelId="tasks-header-sprint-select-label"
+                value={kanbanSprintId || ''}
+                label="Sprint"
+                inputProps={{ 'aria-label': 'Sprint' }}
+                sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+                onChange={(e) => setSelectedSprintId(String(e.target.value))}
+                disabled={!sprints.length}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+                      border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+                      '& .MuiMenuItem-root': {
+                        color: isDark ? '#F0F0F0' : '#1A1A1A',
+                        '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
+                        '&.Mui-selected': {
+                          bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+                          '&:hover': { bgcolor: isDark ? '#3A3C42' : '#E8E8E8' },
+                        },
+                      },
+                    },
+                  },
+                }}
+              >
                 {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>Sprint {s.id}</MenuItem>
+                  <MenuItem key={s.id} value={String(s.id)}>
+                    Sprint {s.id}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -489,7 +579,13 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={() => setDialogOpen(true)}
-                sx={{ bgcolor: ORACLE_RED, textTransform: 'none', fontWeight: 700, minHeight: 40, '&:hover': { bgcolor: '#A83B2D' } }}
+                sx={{
+                  bgcolor: ORACLE_RED,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  minHeight: 40,
+                  '&:hover': { bgcolor: '#A83B2D' },
+                }}
               >
                 New task
               </Button>
@@ -497,56 +593,125 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
           </Stack>
         </Box>
         {!sprints.length ? (
-          <Typography variant="body2" sx={{ mt: 1.25, color: 'text.secondary' }}>No sprints available.</Typography>
+          <Typography variant="body2" sx={{ mt: 1.25, color: 'text.secondary' }}>
+            No sprints available.
+          </Typography>
         ) : null}
       </Paper>
 
       {/* Filter card */}
       {!developerMode ? (
-      <Paper
-        component={motion.div}
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
-        elevation={0}
-        sx={{ p: 1.5, mb: 1.25, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: filterBg }}
-      >
-        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-          <FilterListIcon sx={{ fontSize: 21, color: ORACLE_RED }} />
-          <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1rem' }}>Filter tasks</Typography>
-        </Stack>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'flex-end' }}>
-          <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}>
-            <InputLabel>Developer</InputLabel>
-            <Select value={developerFilter} onChange={(e) => setDeveloperFilter(e.target.value)} label="Developer" inputProps={{ 'aria-label': 'Developer' }}>
-              <MenuItem value="all">All developers</MenuItem>
-              {developerFilterOptions.map((u) => {
-                const uid = developerNumericId(u);
-                return <MenuItem key={uid ?? u.name} value={u.name}>{u.name}</MenuItem>;
-              })}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}>
-            <InputLabel>Priority</InputLabel>
-            <Select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} label="Priority" inputProps={{ 'aria-label': 'Priority' }}>
-              <MenuItem value="all">All priorities</MenuItem>
-              <MenuItem value="LOW">Low</MenuItem>
-              <MenuItem value="MEDIUM">Medium</MenuItem>
-              <MenuItem value="HIGH">High</MenuItem>
-              <MenuItem value="CRITICAL">Critical</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField size="small" type="date" label="Due from" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }} />
-          <TextField size="small" type="date" label="Due to" value={dueTo} onChange={(e) => setDueTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }} />
-          {hasActiveFilters && (
-            <Button size="small" variant="outlined" color="inherit" disableRipple onClick={clearAllFilters}
-              sx={{ '&&': { textTransform: 'none', fontWeight: 600, flexShrink: 0, minHeight: 34, py: 0.25, border: `1px solid ${ORACLE_RED}`, color: ORACLE_RED, outline: 0, boxShadow: 'none', '&:hover': { borderColor: ORACLE_RED, bgcolor: alpha(ORACLE_RED, 0.06) } } }}>
-              Clear filters
-            </Button>
-          )}
-          <Chip label={`${filteredItems.length} shown`} size="small" sx={{ bgcolor: chipBg, fontWeight: 700, height: 22 }} />
-        </Box>
-      </Paper>
+        <Paper
+          component={motion.div}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
+          elevation={0}
+          sx={{
+            p: 1.5,
+            mb: 1.25,
+            borderRadius: 3,
+            border: `1px solid ${borderColor}`,
+            bgcolor: filterBg,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+            <FilterListIcon sx={{ fontSize: 21, color: ORACLE_RED }} />
+            <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1rem' }}>
+              Filter tasks
+            </Typography>
+          </Stack>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'flex-end' }}>
+            <FormControl
+              size="small"
+              sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
+            >
+              <InputLabel>Developer</InputLabel>
+              <Select
+                value={developerFilter}
+                onChange={(e) => setDeveloperFilter(e.target.value)}
+                label="Developer"
+                inputProps={{ 'aria-label': 'Developer' }}
+              >
+                <MenuItem value="all">All developers</MenuItem>
+                {developerFilterOptions.map((u) => {
+                  const uid = developerNumericId(u);
+                  return (
+                    <MenuItem key={uid ?? u.name} value={u.name}>
+                      {u.name}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+            <FormControl
+              size="small"
+              sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
+            >
+              <InputLabel>Priority</InputLabel>
+              <Select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                label="Priority"
+                inputProps={{ 'aria-label': 'Priority' }}
+              >
+                <MenuItem value="all">All priorities</MenuItem>
+                <MenuItem value="LOW">Low</MenuItem>
+                <MenuItem value="MEDIUM">Medium</MenuItem>
+                <MenuItem value="HIGH">High</MenuItem>
+                <MenuItem value="CRITICAL">Critical</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              type="date"
+              label="Due from"
+              value={dueFrom}
+              onChange={(e) => setDueFrom(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Due to"
+              value={dueTo}
+              onChange={(e) => setDueTo(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
+            />
+            {hasActiveFilters && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                disableRipple
+                onClick={clearAllFilters}
+                sx={{
+                  '&&': {
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    flexShrink: 0,
+                    minHeight: 34,
+                    py: 0.25,
+                    border: `1px solid ${ORACLE_RED}`,
+                    color: ORACLE_RED,
+                    outline: 0,
+                    boxShadow: 'none',
+                    '&:hover': { borderColor: ORACLE_RED, bgcolor: alpha(ORACLE_RED, 0.06) },
+                  },
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+            <Chip
+              label={`${filteredItems.length} shown`}
+              size="small"
+              sx={{ bgcolor: chipBg, fontWeight: 700, height: 22 }}
+            />
+          </Box>
+        </Paper>
       ) : null}
 
       {/* Kanban */}
@@ -555,7 +720,8 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
-        container spacing={3}
+        container
+        spacing={3}
       >
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
@@ -563,9 +729,24 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
             <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>
               {developerMode ? 'Kanban Board' : 'Tasks'}
             </Typography>
-            <Chip label={filteredItems.length} size="small" sx={{ ml: 'auto', bgcolor: chipBg, fontWeight: 700 }} />
+            <Chip
+              label={filteredItems.length}
+              size="small"
+              sx={{ ml: 'auto', bgcolor: chipBg, fontWeight: 700 }}
+            />
           </Box>
-          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg, overflow: 'hidden', minHeight: 200 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 3,
+              borderRadius: 3,
+              border: `1px solid ${borderColor}`,
+              bgcolor: cardBg,
+              overflow: 'hidden',
+              minHeight: 200,
+            }}
+          >
             {!kanbanSprintId ? (
               <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
                 Select a sprint to view tasks.
@@ -589,39 +770,93 @@ sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
       </Grid>
 
       {/* Multi-done dialog */}
-      <Dialog open={multiDoneTaskId != null} onClose={() => setMultiDoneTaskId(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper' } }}>
-        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'text.primary' }}>Complete each assignment</DialogTitle>
+      <Dialog
+        open={multiDoneTaskId != null}
+        onClose={() => setMultiDoneTaskId(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'text.primary' }}>
+          Complete each assignment
+        </DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>The task moves to Done only when every developer assigned has been marked complete.</Alert>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            The task moves to Done only when every developer assigned has been marked complete.
+          </Alert>
           <Typography variant="body2" sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}>
-            {multiDoneTaskId != null ? rawTasks.find((t) => t.id === multiDoneTaskId)?.title || `Task #${multiDoneTaskId}` : ''}
+            {multiDoneTaskId != null
+              ? rawTasks.find((t) => t.id === multiDoneTaskId)?.title || `Task #${multiDoneTaskId}`
+              : ''}
           </Typography>
           <Stack spacing={1.5}>
             {multiDoneTaskId != null
-              ? userTasks.filter((ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId)).map((ut) => {
-                  const done = isUserTaskAssigneeComplete(ut);
-                  const name = ut.user?.name || `User ${ut.user?.id ?? ut.user?.ID ?? '?'}`;
-                  return (
-                    <Box key={`${ut.user?.id ?? ut.user?.ID}-${multiDoneTaskId}`} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" sx={{ color: 'text.primary' }}>{name}</Typography>
-                      {done ? (
-                        <Chip label="Done" size="small" sx={{ bgcolor: isDark ? '#0D2E12' : '#E8F5E9', color: '#2E7D32', fontWeight: 700 }} />
-                      ) : (
-                        <Button size="small" variant="outlined" onClick={() => markAssigneeDone(multiDoneTaskId, ut)} sx={{ textTransform: 'none', fontWeight: 600 }}>Mark complete</Button>
-                      )}
-                    </Box>
-                  );
-                })
+              ? userTasks
+                  .filter(
+                    (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(multiDoneTaskId),
+                  )
+                  .map((ut) => {
+                    const done = isUserTaskAssigneeComplete(ut);
+                    const name = ut.user?.name || `User ${ut.user?.id ?? ut.user?.ID ?? '?'}`;
+                    return (
+                      <Box
+                        key={`${ut.user?.id ?? ut.user?.ID}-${multiDoneTaskId}`}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                          {name}
+                        </Typography>
+                        {done ? (
+                          <Chip
+                            label="Done"
+                            size="small"
+                            sx={{
+                              bgcolor: isDark ? '#0D2E12' : '#E8F5E9',
+                              color: '#2E7D32',
+                              fontWeight: 700,
+                            }}
+                          />
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => markAssigneeDone(multiDoneTaskId, ut)}
+                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                          >
+                            Mark complete
+                          </Button>
+                        )}
+                      </Box>
+                    );
+                  })
               : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 2.5, pb: 2 }}>
-          <Button onClick={() => setMultiDoneTaskId(null)} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>Close</Button>
+          <Button
+            onClick={() => setMultiDoneTaskId(null)}
+            sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
 
       {!developerMode ? (
-        <NewTaskDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleTaskCreated} sprints={sprintsForActiveProject} projectDevelopers={projectDevelopers} defaultSprintId={kanbanSprintId || selectedSprintId || undefined} />
+        <NewTaskDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          onCreated={handleTaskCreated}
+          sprints={sprintsForActiveProject}
+          projectDevelopers={projectDevelopers}
+          defaultSprintId={kanbanSprintId || selectedSprintId || undefined}
+        />
       ) : null}
       <TaskDetailDialog
         open={taskDetailOpen}

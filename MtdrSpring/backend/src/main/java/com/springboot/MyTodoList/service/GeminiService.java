@@ -602,6 +602,7 @@ public class GeminiService {
             m.put("startDate", start != null ? start.toString() : "");
             m.put("dueDate", due != null ? due.toString() : "");
             m.put("asOf", now.toString());
+            m.put("isEarlySnapshot", isSprintEarlyForProductivityGuide(s));
             if (s.getGoal() != null && !s.getGoal().isBlank()) {
                 m.put("sprintGoal", s.getGoal().trim());
             }
@@ -821,6 +822,12 @@ public class GeminiService {
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
             "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
             "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
+            "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, teamParticipation, and workloadBalance — "
+            + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
+            + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
+            + "(no baseline, expected, underperforming, sprint not started, early snapshot, little work completed yet, or similar excuses). "
+            + "You MAY add one short sentence that the score will update as the sprint runs and tasks or hours change. "
+            + "FORBIDDEN always: \"matching the KPI card above\", formula weights (40%%/30%%/20%%/10%%).\n" +
             "- summary: English; may echo executiveSummary.overview.\n" +
             "- Do not include any text outside the JSON object";
     }
@@ -2046,13 +2053,166 @@ public class GeminiService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = sprint.getStartDate();
         LocalDateTime due = sprint.getDueDate();
-        if (start != null && now.isBefore(start)) {
+        if (start == null || due == null) {
+            return "unknown";
+        }
+        java.time.LocalDate today = now.toLocalDate();
+        java.time.LocalDate startDay = start.toLocalDate();
+        java.time.LocalDate dueDay = due.toLocalDate();
+        if (today.isBefore(startDay)) {
             return "not_started";
         }
-        if (due != null && now.isAfter(due)) {
+        if (today.isAfter(dueDay)) {
             return "ended";
         }
         return "in_progress";
+    }
+
+    private static boolean isSprintEarlyForProductivityGuide(Sprint sprint) {
+        if (sprint == null) {
+            return true;
+        }
+        String phase = resolveSprintPhase(sprint);
+        if ("not_started".equals(phase)) {
+            return true;
+        }
+        if ("ended".equals(phase)) {
+            return false;
+        }
+        LocalDateTime start = sprint.getStartDate();
+        LocalDateTime due = sprint.getDueDate();
+        if (start == null || due == null) {
+            return true;
+        }
+        java.time.LocalDate today = LocalDateTime.now().toLocalDate();
+        java.time.LocalDate startDay = start.toLocalDate();
+        java.time.LocalDate dueDay = due.toLocalDate();
+        long daysTotal = java.time.temporal.ChronoUnit.DAYS.between(startDay, dueDay) + 1;
+        long daysElapsed = java.time.temporal.ChronoUnit.DAYS.between(startDay, today) + 1;
+        if (daysTotal < 1) {
+            daysTotal = 1;
+        }
+        if (daysElapsed < 1) {
+            daysElapsed = 1;
+        }
+        return daysElapsed <= 4L || ((double) daysElapsed / (double) daysTotal) <= 0.25;
+    }
+
+    private static String stripProductivityGuideInstructionEcho(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String out = text.trim();
+        out = out.replaceAll("(?i),?\\s*matching the KPI card above\\s*\\([^)]*\\)\\.?", ".");
+        out = out.replaceAll("(?i),?\\s*matching the KPI card above\\.?", ".");
+        out = out.replaceAll("(?i)\\s*\\(completion\\s*40\\s*%[^)]*workload\\s*balance\\s*10\\s*%\\)\\.?", "");
+        out = out.replaceAll("(?i)\\s*\\(completion\\s*×\\s*0\\.4[^)]*\\)\\.?", "");
+        out = out.replaceAll("\\s{2,}", " ").replaceAll("\\.\\s*\\.", ".").trim();
+        return out;
+    }
+
+    private static final Pattern PRODUCTIVITY_NEGATIVE_LABEL = Pattern.compile(
+        "\\b(weak|poor|underperform|under-performing|dragging|mixed|behind|at risk|falling short|struggling)\\b",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String softenProductivityGuidePerformanceLabels(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return PRODUCTIVITY_NEGATIVE_LABEL.matcher(text).replaceAll("").replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private static final Pattern PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE = Pattern.compile(
+        ".*\\b(?:sprint\\s+has\\s+not\\s+started|sprint\\s+not\\s+started|not\\s+started\\s+yet|"
+            + "just\\s+begun|only\\s+just\\s+begun|early\\s+snapshot|pre-execution|"
+            + "low\\s+(?:value|score|figure|percentage)[^.]{0,120}(?:expected|normal|baseline)|"
+            + "baseline\\s+from|does\\s+not\\s+mean|underperform|"
+            + "little\\s+completed\\s+work|not\\s+poor\\s+delivery\\s+yet|"
+            + "a\\s+low\\s+value\\s+is\\s+expected|few\\s+days\\s+in)\\b.*",
+        Pattern.CASE_INSENSITIVE);
+
+    /** Drops sentences that excuse a low productivityScore before the sprint is mature. */
+    private static String stripProductivityLowScoreExcuses(String text, Sprint sprint) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        if (!"not_started".equals(resolveSprintPhase(sprint)) && !isSprintEarlyForProductivityGuide(sprint)) {
+            return text;
+        }
+        String[] parts = text.split("(?<=[.!?])\\s+");
+        if (parts.length <= 1) {
+            return PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE.matcher(text).matches() ? "" : text;
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String part : parts) {
+            String s = part.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            if (!PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE.matcher(s).matches()) {
+                if (kept.length() > 0) {
+                    kept.append(' ');
+                }
+                kept.append(s);
+            }
+        }
+        String out = kept.toString().trim();
+        return out.isEmpty() ? text.trim() : out;
+    }
+
+    private static final Pattern PRODUCTIVITY_EVOLUTION_NOTE_ALREADY = Pattern.compile(
+        "\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
+            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|task\\s+(?:progress|updates?)|"
+            + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins)\\b",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String productivityEvolutionNote(Sprint sprint) {
+        String phase = resolveSprintPhase(sprint);
+        if ("not_started".equals(phase)) {
+            return "It will update once the sprint begins and tasks move through statuses, "
+                + "assignments, and logged hours feed the four KPIs.";
+        }
+        if (isSprintEarlyForProductivityGuide(sprint)) {
+            return "It will keep updating as tasks progress and completion, on-time delivery, "
+                + "participation, and workload balance change during the sprint.";
+        }
+        return "";
+    }
+
+    private static String appendProductivityEvolutionNote(String text, Sprint sprint) {
+        if (text == null || text.isBlank()) {
+            return productivityEvolutionNote(sprint);
+        }
+        String note = productivityEvolutionNote(sprint);
+        if (note.isBlank()) {
+            return text.trim();
+        }
+        String raw = text.trim();
+        if (PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(raw).find()) {
+            return raw;
+        }
+        return raw + " " + note;
+    }
+
+    /** Align %% with KPI card; keep Gemini prose like other metrics (strip prompt echoes only). */
+    private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
+        int clamped = Math.min(100, Math.max(0, scorePct));
+        if (existing == null || existing.isBlank()) {
+            return appendProductivityEvolutionNote(
+                String.format(
+                    Locale.ROOT,
+                    "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
+                        + "team participation, and workload balance into one indicator for overall sprint performance.",
+                    clamped),
+                sprint);
+        }
+        String out = stripProductivityGuideInstructionEcho(existing);
+        out = stripProductivityLowScoreExcuses(out, sprint);
+        if ("not_started".equals(resolveSprintPhase(sprint)) || isSprintEarlyForProductivityGuide(sprint)) {
+            out = softenProductivityGuidePerformanceLabels(out);
+        }
+        out = replaceProductivityScoreMentionsInProse(out, clamped);
+        return appendProductivityEvolutionNote(out, sprint);
     }
 
     private static final class AssignmentLoadSnap {
@@ -2592,13 +2752,8 @@ public class GeminiService {
         } else {
             byMetric = (ObjectNode) byMetricNode;
         }
-        byMetric.put(
-            "productivityScore",
-            String.format(
-                Locale.ROOT,
-                "The Productivity Score is %d%%, matching the KPI card above "
-                    + "(completion 40%%, on-time delivery 30%%, team participation 20%%, workload balance 10%%).",
-                ps));
+        String existing = byMetric.path("productivityScore").asText("");
+        byMetric.put("productivityScore", normalizeProductivityScoreGuideText(existing, ps, sprint));
         String intro = guide.path("intro").asText("");
         if (!intro.isBlank() && PRODUCTIVITY_SCORE_IN_INTRO.matcher(intro).find()) {
             guide.put("intro", replaceProductivityScoreMentionsInProse(intro, ps));

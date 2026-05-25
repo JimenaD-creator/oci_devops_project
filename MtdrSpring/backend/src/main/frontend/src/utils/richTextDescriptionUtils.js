@@ -1,16 +1,4 @@
-const ALLOWED_TAGS = new Set([
-  'B',
-  'STRONG',
-  'I',
-  'EM',
-  'U',
-  'UL',
-  'OL',
-  'LI',
-  'P',
-  'BR',
-  'DIV',
-]);
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'P', 'BR', 'DIV']);
 
 function cleanNode(node) {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -61,7 +49,10 @@ export function richDescriptionPlainText(value) {
   const raw = String(value).trim();
   if (!raw) return '';
   if (typeof document === 'undefined') {
-    return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return raw
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
   const div = document.createElement('div');
   div.innerHTML = looksLikeRichDescriptionHtml(raw) ? sanitizeRichDescriptionHtml(raw) : raw;

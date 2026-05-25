@@ -75,7 +75,7 @@ function ProductivityScoreCard({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const score = computeProductivityScore({
     completionRate,
     onTimeDelivery,
@@ -157,7 +157,15 @@ function ProductivityScoreCard({
         />
       </Box>
 
-      <Box sx={{ height: 8, bgcolor: isDark ? '#2A2C32' : '#F0F0F0', borderRadius: 99, mb: 2, overflow: 'hidden' }}>
+      <Box
+        sx={{
+          height: 8,
+          bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+          borderRadius: 99,
+          mb: 2,
+          overflow: 'hidden',
+        }}
+      >
         <Box
           sx={{
             height: '100%',
@@ -178,7 +186,13 @@ function ProductivityScoreCard({
           <Grid item xs={6} key={label}>
             <Box sx={{ bgcolor: isDark ? '#16181C' : '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                <Typography sx={{ fontSize: '0.7rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.7rem',
+                    color: isDark ? '#9A9A9A' : '#607D8B',
+                    fontWeight: 600,
+                  }}
+                >
                   {label}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: '#90A4AE' }}>{weight}</Typography>
@@ -353,9 +367,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     const onTimeDelivery =
-      typeof sprint?.kpis?.onTimeDelivery === 'number'
-        ? sprint.kpis.onTimeDelivery
-        : 0;
+      typeof sprint?.kpis?.onTimeDelivery === 'number' ? sprint.kpis.onTimeDelivery : 0;
 
     const teamParticipation = sprint?.kpis?.teamParticipation ?? 0;
     const rawWb = Number(sprint?.kpis?.workloadBalance);
@@ -492,10 +504,10 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
           <Box>
             <Typography
               variant="h4"
-              sx={{ 
-                fontWeight: 800, 
-                color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK, 
-                letterSpacing: '-0.5px' 
+              sx={{
+                fontWeight: 800,
+                color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
+                letterSpacing: '-0.5px',
               }}
             >
               KPI Analytics
@@ -509,8 +521,12 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                   minWidth: { xs: '100%', sm: 220 },
                   ...pageFormFieldOutline(isDark),
                   '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : undefined },
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#3A3C42' : undefined },
-                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#5A5C62' : undefined },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: isDark ? '#3A3C42' : undefined,
+                  },
+                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: isDark ? '#5A5C62' : undefined,
+                  },
                   '& .MuiSelect-select': {
                     color: isDark ? '#F0F0F0' : '#1A1A1A',
                     fontWeight: 600,
@@ -556,11 +572,13 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
               }}
             >
               <Target size={16} color={isDark ? '#64B5F6' : SECTION_ACCENT} aria-hidden />
-              <Typography sx={{ 
-                fontWeight: 700, 
-                fontSize: '0.875rem', 
-                color: isDark ? '#E0E0E0' : SECTION_BRAND_DARK 
-              }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  color: isDark ? '#E0E0E0' : SECTION_BRAND_DARK,
+                }}
+              >
                 Goal: +20% productivity
               </Typography>
             </Box>
@@ -630,7 +648,12 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                 />
                 <Typography
                   variant="caption"
-                  sx={{ color: isDark ? '#9A9A9A' : '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}
+                  sx={{
+                    color: isDark ? '#9A9A9A' : '#455A64',
+                    fontWeight: 700,
+                    display: 'block',
+                    mb: 0.5,
+                  }}
                 >
                   {label}
                 </Typography>
@@ -698,6 +721,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             productivityDelta={productivityDelta}
             currentProductivityScore={kpis.productivityScore}
             currentSprintKpis={kpis}
+            currentSprint={currentSprint}
             onOpenAiInsights={onOpenAiInsights}
           />
         </Box>

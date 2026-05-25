@@ -53,9 +53,9 @@ describe('assigneeOnTimeUtils', () => {
       { completed: false, status: 'TODO' },
       { completed: false, status: 'TODO' },
     ];
-    expect(multiAssigneeTaskOnTime(progress, '2026-01-15T00:00:00.000Z', { assigneeCount: 2 })).toBe(
-      null,
-    );
+    expect(
+      multiAssigneeTaskOnTime(progress, '2026-01-15T00:00:00.000Z', { assigneeCount: 2 }),
+    ).toBe(null);
   });
 
   it('taskOnTimeDisplayForManager shows — when multi-assignee task is still To Do', () => {
@@ -76,9 +76,9 @@ describe('assigneeOnTimeUtils', () => {
       { completed: true, completedAt: '2026-01-10T12:00:00.000Z' },
       { completed: true, completedAt: '2026-01-20T12:00:00.000Z' },
     ];
-    expect(multiAssigneeTaskOnTime(progress, '2026-01-15T00:00:00.000Z', { assigneeCount: 2 })).toBe(
-      false,
-    );
+    expect(
+      multiAssigneeTaskOnTime(progress, '2026-01-15T00:00:00.000Z', { assigneeCount: 2 }),
+    ).toBe(false);
   });
 
   it('taskOnTimeDisplayForManager returns Yes when all assignees on time', () => {
