@@ -32,22 +32,18 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageAct
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
 
-<<<<<<< HEAD
-  // Crear mapa de números de sprint secuenciales por proyecto
+  /** DB sprint id → human label "Sprint 0", "Sprint 1", … (order by id within project). */
   const sprintNumberMap = useMemo(() => {
     const map = new Map();
-    // Ordenar sprints por ID para mantener consistencia
     [...sprints]
-      .sort((a, b) => a.id - b.id)
+      .sort((a, b) => Number(a.id) - Number(b.id))
       .forEach((sprint, index) => {
         map.set(sprint.id, index);
       });
     return map;
   }, [sprints]);
 
-=======
   /** Reload persisted insights when the user opens this page again (no 15s polling). */
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
   useEffect(() => {
     if (isPageActive) {
       setInsightsRefreshKey((k) => k + 1);
@@ -101,7 +97,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageAct
     }
   }, [sprints]);
 
-  const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
+  const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
   const normalizeKpiPercent = (v) => {
     const n = Number(v);
@@ -274,15 +270,9 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageAct
           sprintLabel={getSprintLabel(selectedSprint.id)}
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
-<<<<<<< HEAD
           nextSprintLabel={nextSprintForSelected ? getSprintLabel(nextSprintForSelected.id) : null}
-          nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
-          currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
-=======
-          nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
           nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
           currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
           currentSprintMetrics={currentSprintKpiMetrics}
           refreshToken={insightsRefreshKey}
           onOpenTeam={onOpenTeam}

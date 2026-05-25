@@ -126,10 +126,16 @@ export default function TeamPage({
 
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
+  const rosterForInsights = useMemo(() => {
+    if (projectDevelopers.length > 0) return projectDevelopers;
+    const sprintDevs = selectedSprint?.developers;
+    return Array.isArray(sprintDevs) ? sprintDevs : [];
+  }, [projectDevelopers, selectedSprint]);
+
   const developerInsightRows = useMemo(() => {
     if (rawDeveloperInsightRows === null) return [];
-    return mergeDeveloperInsightRows(projectDevelopers, rawDeveloperInsightRows);
-  }, [projectDevelopers, rawDeveloperInsightRows]);
+    return mergeDeveloperInsightRows(rosterForInsights, rawDeveloperInsightRows);
+  }, [rosterForInsights, rawDeveloperInsightRows]);
 
   /** Refetch AI rows when sprint KPIs / developer stats change (e.g. after task edits). */
   const sprintInsightsRefreshKey = selectedSprint
@@ -308,11 +314,7 @@ export default function TeamPage({
           <TeamWorkloadBreakdown
             sprint={selectedSprint}
             aiDeveloperInsights={developerInsightRows}
-<<<<<<< HEAD
-            sprintNumberMap={sprintNumberMap}
-=======
-            projectDevelopers={projectDevelopers}
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
+            projectDevelopers={rosterForInsights}
           />
 
           <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} sprintNumberMap={sprintNumberMap} />
