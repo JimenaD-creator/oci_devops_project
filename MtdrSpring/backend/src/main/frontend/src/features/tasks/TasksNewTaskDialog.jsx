@@ -32,6 +32,7 @@ import {
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
 import { createTaskSelectFillSx, pageFormFieldOutline } from './utils/taskUtils';
+import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 
 export function TasksNewTaskDialog({
   open,
@@ -60,6 +61,13 @@ export function TasksNewTaskDialog({
   /** null = not loaded for this open session; avoids empty list while parent list is still loading. */
   const [fetchedDevelopers, setFetchedDevelopers] = useState(null);
   const [developersLoading, setDevelopersLoading] = useState(false);
+
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+
+  // Obtener sprints ordenados para el select
+  const sortedSprints = useMemo(() => {
+    return [...(sprints || [])].sort((a, b) => a.id - b.id);
+  }, [sprints]);
 
   const resetForm = () => {
     setTitle('');
@@ -408,14 +416,22 @@ export function TasksNewTaskDialog({
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Sprint</InputLabel>
-              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
-                {sprints.map((s) => (
+              <Select 
+                value={sprintId} 
+                onChange={(e) => setSprintId(e.target.value)} 
+                label="Sprint"
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  return formatSprintLabel(sprintNumberMap, value);
+                }}
+              >
+                {sortedSprints.map((s) => (
                   <MenuItem
                     key={s.id}
                     value={String(s.id)}
                     sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
                   >
-                    {`Sprint ${s.id}`}
+                    {formatSprintLabel(sprintNumberMap, s.id)}
                   </MenuItem>
                 ))}
               </Select>

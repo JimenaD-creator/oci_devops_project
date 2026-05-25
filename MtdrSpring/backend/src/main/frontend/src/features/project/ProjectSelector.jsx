@@ -182,7 +182,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
       name: user.name, 
       type: user.role, 
       email: user.email,
-      phonenumber: user.phonenumber || '' 
+      phoneNumber: user.phoneNumber || '' 
     });
     setOpenModal('editUser');
   };
@@ -403,7 +403,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                         <TableCell sx={{ color: textSecondary }}>{user.id}</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: textColor }}>{user.name?.toUpperCase()}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.email || '---'}</TableCell>
-                        <TableCell sx={{ color: textSecondary }}>{user.phonenumber || '---'}</TableCell>
+                        <TableCell sx={{ color: textSecondary }}>{user.phoneNumber || '---'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.role ? user.role.toUpperCase() : 'NO ROLE'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.teamId || '---'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>
@@ -600,7 +600,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               fullWidth
               label="PHONE NUMBER"
               margin="dense"
-              onChange={(e) => setFormData({ ...formData, phonenumber: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
               sx={inputSx}
             />
             <TextField
@@ -692,8 +692,8 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               fullWidth
               label="PHONE NUMBER"
               margin="dense"
-              value={formData.phonenumber || ''}
-              onChange={(e) => setFormData({ ...formData, phonenumber: e.target.value })}
+              value={formData.phoneNumber || ''}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
               sx={inputSx}
             />
             <TextField

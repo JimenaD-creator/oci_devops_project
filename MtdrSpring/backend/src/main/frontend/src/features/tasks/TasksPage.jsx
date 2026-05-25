@@ -71,6 +71,21 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const recentlyDeletedTaskIdsRef = useRef(new Set());
   const { invalidateAndRefresh } = useProjectData();
 
+  const getSprintNumber = useCallback((sprintId, sprintsList) => {
+    const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
+    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
+    return index >= 0 ? index : sprintId;
+  }, []);
+
+  const getSprintLabel = useCallback(
+    (sprintId, sprintsList) => {
+      if (sprintId == null) return '';
+      const sprintNum = getSprintNumber(sprintId, sprintsList);
+      return `Sprint ${sprintNum}`;
+    },
+    [getSprintNumber],
+  );
+
   const loadData = useCallback(
     async (opts = {}) => {
       const silent = opts.silent === true;
@@ -197,6 +212,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     if (!selectedProjectId) return [];
     return (sprints || []).filter((s) => sprintProjectIdFromJson(s) === Number(selectedProjectId));
   }, [sprints, selectedProjectId]);
+
+  // Ordenar sprints para el select
+  const sortedSprintsForSelect = useMemo(() => {
+    return [...sprintsForActiveProject].sort((a, b) => a.id - b.id);
+  }, [sprintsForActiveProject]);
 
   useEffect(() => {
     if (selectedSprintId !== '' || !sprints.length) return;
@@ -515,12 +535,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               sx={{ mt: 1, bgcolor: pendingChipBg, color: '#E65100', fontWeight: 700 }}
             />
           </Box>
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1.25}
-            alignItems={{ xs: 'stretch', sm: 'center' }}
-            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
-          >
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
             <FormControl
               size="small"
               sx={{
@@ -531,6 +546,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   color: isDark ? '#F0F0F0' : '#1A1A1A',
                   '& fieldset': { borderColor: isDark ? '#2A2C32' : '#CCCCCC' },
                   '&:hover fieldset': { borderColor: isDark ? '#3A3C42' : '#AAAAAA' },
+                },
+                '& .MuiSelect-select': {
+                  color: isDark ? '#F0F0F0' : '#1A1A1A',
                 },
                 '& .MuiInputLabel-root': {
                   color: isDark ? '#9A9A9A' : '#666666',
@@ -546,9 +564,13 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                 value={kanbanSprintId || ''}
                 label="Sprint"
                 inputProps={{ 'aria-label': 'Sprint' }}
-                sx={{ color: isDark ? '#F0F0F0' : '#1A1A1A' }}
                 onChange={(e) => setSelectedSprintId(String(e.target.value))}
                 disabled={!sprints.length}
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  const sprintNum = getSprintNumber(Number(value), sprintsForActiveProject.length ? sprintsForActiveProject : sprints);
+                  return `Sprint ${sprintNum}`;
+                }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -566,9 +588,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   },
                 }}
               >
-                {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
+                {sortedSprintsForSelect.map((s, index) => (
                   <MenuItem key={s.id} value={String(s.id)}>
-                    Sprint {s.id}
+                    Sprint {index}
                   </MenuItem>
                 ))}
               </Select>

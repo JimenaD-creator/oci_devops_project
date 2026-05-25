@@ -386,6 +386,12 @@ export function TaskDetailDialog({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [taskUserTasks, setTaskUserTasks] = useState([]);
 
+
+const sprintNumberMap = useMemo(() => {
+  const map = new Map();
+  [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
+  return map;
+}, [sprints]);
   const resolvedDeveloperProjectId = useMemo(() => {
     const source =
       task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
@@ -924,8 +930,10 @@ export function TaskDetailDialog({
                 <Box>
                   <FieldLabel color="#5C6BC0">Sprint</FieldLabel>
                   <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
-                    {task.assignedSprint?.id != null ? `Sprint ${task.assignedSprint.id}` : '—'}
-                  </Typography>
+{task.assignedSprint?.id != null
+  ? `Sprint ${sprintNumberMap.get(task.assignedSprint.id) ?? task.assignedSprint.id}`
+  : '—'}
+                    </Typography>
                 </Box>
                 <Box>
                   <FieldLabel color="#5C6BC0">Assigned to</FieldLabel>
@@ -1245,8 +1253,9 @@ export function TaskDetailDialog({
                       label="Sprint"
                     >
                       {sprints.map((s) => (
-                        <MenuItem key={s.id} value={String(s.id)}>{`Sprint ${s.id}`}</MenuItem>
-                      ))}
+<MenuItem key={s.id} value={String(s.id)}>
+    {`Sprint ${sprintNumberMap.get(s.id) ?? s.id}`}
+  </MenuItem>                      ))}
                     </Select>
                   </FormControl>
                   <TextField

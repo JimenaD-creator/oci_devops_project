@@ -274,3 +274,37 @@ export function sprintKpiNumber(sprint, key) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
+
+/** DB sprint id → 0-based display index (Sprint 0, Sprint 1, …), sorted by id within project. */
+export function buildSprintNumberMap(sprints) {
+  const map = new Map();
+  if (!Array.isArray(sprints)) return map;
+  [...sprints]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .forEach((sprint, index) => {
+      map.set(sprint.id, index);
+    });
+  return map;
+}
+
+/** Lookup display index; handles numeric/string id keys. Returns undefined if not in map. */
+export function getSprintDisplayIndex(sprintNumberMap, sprintId) {
+  if (sprintId == null || sprintId === '' || !(sprintNumberMap instanceof Map)) {
+    return undefined;
+  }
+  const want = Number(sprintId);
+  if (!Number.isFinite(want)) return undefined;
+  if (sprintNumberMap.has(sprintId)) return sprintNumberMap.get(sprintId);
+  for (const [id, num] of sprintNumberMap.entries()) {
+    if (Number(id) === want) return num;
+  }
+  return undefined;
+}
+
+/** Human label for selectors/cards; Sprint 0 is valid (do not use truthy checks on index). */
+export function formatSprintLabel(sprintNumberMap, sprintId) {
+  const n = getSprintDisplayIndex(sprintNumberMap, sprintId);
+  if (n !== undefined && Number.isFinite(n)) return `Sprint ${n}`;
+  if (sprintId == null || sprintId === '') return '';
+  return `Sprint ${sprintId}`;
+}

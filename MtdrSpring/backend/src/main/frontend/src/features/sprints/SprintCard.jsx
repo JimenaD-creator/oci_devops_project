@@ -14,7 +14,7 @@ import {
 } from './constants/sprintConstants';
 import { formatDate, inferSprintStatus } from './utils/sprintUtils';
 
-export function SprintCard({ sprint, tasks, isSelected, onClick }) {
+export function SprintCard({ sprint, tasks, isSelected, onClick, sprintNumber }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
@@ -75,7 +75,7 @@ export function SprintCard({ sprint, tasks, isSelected, onClick }) {
               fontSize: '1.08rem',
               color: 'text.primary',
             }}>
-              Sprint {sprint.id}
+Sprint {sprintNumber ?? sprint.id}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
               <CalendarTodayIcon sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#AAA' }} />

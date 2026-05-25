@@ -691,30 +691,33 @@ export default function DashboardPage({ projectId: propProjectId }) {
           <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#616161', fontWeight: 600, mb: 1.25 }}>
             Select one or more sprints below to filter the dashboard. Check additional boxes to compare sprints side by side.
           </Typography>
-          <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            {allSprints.map((sp) => {
-              const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[0];
-              return (
-                <FormControlLabel
-                  key={sp.id}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
-                      onChange={(e) => toggleSprint(sp.id, e.target.checked)}
-                      sx={{ '&.Mui-checked': { color: sprintColor } }}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: sprintColor, flexShrink: 0 }} />
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>{sp.name}</Typography>
-                    </Box>
-                  }
-                />
-              );
-            })}
-          </FormGroup>
+  <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+  {allSprints.map((sp, index) => {
+    const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[0];
+    const sprintNumber = index ; // Número secuencial basado en el orden
+    return (
+      <FormControlLabel
+        key={sp.id}
+        control={
+          <Checkbox
+            size="small"
+            checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
+            onChange={(e) => toggleSprint(sp.id, e.target.checked)}
+            sx={{ '&.Mui-checked': { color: sprintColor } }}
+          />
+        }
+        label={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: sprintColor, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              {`Sprint ${sprintNumber}`}
+            </Typography>
+          </Box>
+        }
+      />
+    );
+  })}
+</FormGroup>
         </Paper>
       </ScrollReveal>
 

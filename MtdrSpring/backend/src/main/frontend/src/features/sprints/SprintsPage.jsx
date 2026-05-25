@@ -41,6 +41,8 @@ import {
   ORACLE_RED,
   ORACLE_RED_ACTION,
   pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
   sortTasksForSprintTable,
@@ -77,6 +79,7 @@ export default function SprintsPage({ projectId }) {
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
   const { invalidateAndRefresh } = useProjectData();
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
   /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
   const recentlyDeletedTaskIdsRef = useRef(new Set());
 
@@ -530,12 +533,13 @@ export default function SprintsPage({ projectId }) {
                   }}
                   sx={{ flex: '0 0 320px', minWidth: 280, maxWidth: 360, scrollSnapAlign: 'start' }}
                 >
-                  <SprintCard
-                    sprint={sprint}
-                    tasks={tasks}
-                    isSelected={selectedSprint?.id === sprint.id}
-                    onClick={() => setSelectedSprint(sprint)}
-                  />
+<SprintCard
+  sprint={sprint}
+  tasks={tasks}
+  isSelected={selectedSprint?.id === sprint.id}
+  onClick={() => setSelectedSprint(sprint)}
+  sprintNumber={sprintNumberMap.get(sprint.id)}
+/>
                 </Box>
               ))}
             </Box>
@@ -550,7 +554,9 @@ export default function SprintsPage({ projectId }) {
                 display: 'block',
               }}
             >
-              {selectedSprint ? `Tasks · Sprint ${selectedSprint.id}` : 'Tasks'}
+{selectedSprint
+                ? `Tasks · ${formatSprintLabel(sprintNumberMap, selectedSprint.id) || `Sprint ${selectedSprint.id}`}`
+                : 'Tasks'}
             </Typography>
             <Box
               sx={{

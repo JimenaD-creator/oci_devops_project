@@ -12,7 +12,11 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
+} from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import {
@@ -22,14 +26,29 @@ import {
 import InsightCard from './InsightCard';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
+export default function AIInsightsPage({
+  projectId,
+  onOpenTeam = null,
+  isPageActive = true,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
+  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
+
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+
+  /** Reload persisted insights when the user opens this page again (no 15s polling). */
+  useEffect(() => {
+    if (isPageActive) {
+      setInsightsRefreshKey((k) => k + 1);
+    }
+  }, [isPageActive]);
+
   useEffect(() => {
     const pid =
       projectId != null && String(projectId).trim() !== ''
@@ -77,7 +96,7 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
     }
   }, [sprints]);
 
-  const selectedSprint = sprints.find((s) => s.id === selectedSprintId);
+  const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
   const normalizeKpiPercent = (v) => {
     const n = Number(v);
@@ -122,6 +141,12 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const showNextSprintForecast = selectedSprintId != null;
 
   if (loading) return <PageLoadingSpinner />;
+
+  // Obtener etiquetas de sprint con números secuenciales
+  const getSprintLabel = (sprintId) => {
+    if (sprintId == null) return null;
+    return formatSprintLabel(sprintNumberMap, sprintId);
+  };
 
   return (
     <Box
@@ -214,12 +239,12 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  return `Sprint ${value}`;
+                  return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
                 {sprints.map((s) => (
                   <MenuItem key={s.id} value={s.id}>
-                    Sprint {s.id}
+                    {formatSprintLabel(sprintNumberMap, s.id)}
                   </MenuItem>
                 ))}
               </Select>
@@ -236,14 +261,14 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
         <InsightCard
           key={selectedSprint.id}
           sprintId={selectedSprint.id}
-          sprintLabel={`Sprint ${selectedSprint.id}`}
+          sprintLabel={getSprintLabel(selectedSprint.id)}
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
-          nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
+          nextSprintLabel={nextSprintForSelected ? getSprintLabel(nextSprintForSelected.id) : null}
           nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
           currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
           currentSprintMetrics={currentSprintKpiMetrics}
-          refreshToken={0}
+          refreshToken={insightsRefreshKey}
           onOpenTeam={onOpenTeam}
         />
       )}

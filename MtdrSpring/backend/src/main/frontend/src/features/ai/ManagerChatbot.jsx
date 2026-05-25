@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
@@ -147,6 +147,18 @@ export default function ManagerChatbot({ projectId }) {
   const [hasUnread, setHasUnread] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Crear mapa de números de sprint secuenciales
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    [...sprints].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i));
+    return map;
+  }, [sprints]);
+
+  // Obtener sprints ordenados para el select
+  const sortedSprintsForSelect = useMemo(() => {
+    return [...sprints].sort((a, b) => a.id - b.id);
+  }, [sprints]);
 
   useEffect(() => {
     if (!open) return;
@@ -452,11 +464,14 @@ export default function ManagerChatbot({ projectId }) {
                       <MenuItem value="all" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
                         All sprints
                       </MenuItem>
-                      {sprints.map((s) => (
-                        <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
-                          Sprint {s.id}
-                        </MenuItem>
-                      ))}
+                      {sortedSprintsForSelect.map((s) => {
+                        const sprintNumber = sprintNumberMap.get(s.id);
+                        return (
+                          <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+                            Sprint {sprintNumber}
+                          </MenuItem>
+                        );
+                      })}
                     </Select>
                   </FormControl>
                 </Box>

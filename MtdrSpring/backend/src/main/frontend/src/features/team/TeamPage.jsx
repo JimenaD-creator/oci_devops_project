@@ -13,7 +13,11 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Users, UserCircle } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
+} from '../sprints/utils/sprintUtils';
 import { pageEase, AI_INSIGHTS_EMPTY, getErrorMessage } from '../ai/aiInsightsConstants';
 import { fetchSprintInsights } from '../ai/insightsApi';
 import { ORACLE_RED } from '../tasks/constants/taskConstants';
@@ -74,6 +78,8 @@ export default function TeamPage({
     };
   }, [projectId]);
 
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+
   useEffect(() => {
     const pid =
       projectId != null && String(projectId).trim() !== ''
@@ -126,6 +132,20 @@ export default function TeamPage({
     return mergeDeveloperInsightRows(rosterForInsights, rawDeveloperInsightRows);
   }, [rosterForInsights, rawDeveloperInsightRows]);
 
+  /** Refetch AI rows when sprint KPIs / developer stats change (e.g. after task edits). */
+  const sprintInsightsRefreshKey = selectedSprint
+    ? JSON.stringify({
+        id: selectedSprint.id,
+        devs: (selectedSprint.developers || []).map((d) => [
+          d.name,
+          d.assigned,
+          d.completed,
+          d.onTime,
+          d.hours,
+        ]),
+      })
+    : '';
+
   useEffect(() => {
     if (!sprintsReady || selectedSprintId == null) {
       setRawDeveloperInsightRows(null);
@@ -168,7 +188,7 @@ export default function TeamPage({
     return () => {
       cancelled = true;
     };
-  }, [selectedSprintId, sprintsReady]);
+  }, [selectedSprintId, sprintsReady, sprintInsightsRefreshKey]);
 
   if (loading) return <PageLoadingSpinner />;
 
@@ -247,12 +267,12 @@ export default function TeamPage({
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  return `Sprint ${value}`;
+                  return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
                 {sprints.map((s) => (
                   <MenuItem key={s.id} value={s.id}>
-                    Sprint {s.id}
+                    {formatSprintLabel(sprintNumberMap, s.id)}
                   </MenuItem>
                 ))}
               </Select>
@@ -301,7 +321,7 @@ export default function TeamPage({
             projectDevelopers={rosterForInsights}
           />
 
-          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
+          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} sprintNumberMap={sprintNumberMap} />
 
           <Paper
             sx={{
@@ -407,7 +427,7 @@ export default function TeamPage({
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Developer radar
             </Typography>
-            <DeveloperRadarCards sprintId={selectedSprint.id} />
+            <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} />
           </Paper>
         </>
       )}

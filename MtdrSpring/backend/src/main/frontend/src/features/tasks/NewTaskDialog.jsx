@@ -31,6 +31,7 @@ import {
 } from '../sprints/constants/sprintConstants';
 import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
 import { richDescriptionPlainText, sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
+import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 
 const TYPE_OPTIONS = [
   {
@@ -284,6 +285,13 @@ export function NewTaskDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+
+  // Obtener sprints ordenados para el select
+  const sortedSprints = useMemo(() => {
+    return [...(sprints || [])].sort((a, b) => a.id - b.id);
+  }, [sprints]);
+
   useEffect(() => {
     if (!open) return;
     const fallbackSprintId = defaultSprintId != null ? String(defaultSprintId) : '';
@@ -518,14 +526,18 @@ export function NewTaskDialog({
                 value={sprintId}
                 onChange={(e) => setSprintId(e.target.value)}
                 label="Sprint *"
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  return formatSprintLabel(sprintNumberMap, value);
+                }}
               >
-                {(sprints || []).map((s) => (
+                {sortedSprints.map((s) => (
                   <MenuItem
                     key={s.id}
                     value={String(s.id)}
                     sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
                   >
-                    {`Sprint ${s.id}`}
+                    {formatSprintLabel(sprintNumberMap, s.id)}
                   </MenuItem>
                 ))}
               </Select>

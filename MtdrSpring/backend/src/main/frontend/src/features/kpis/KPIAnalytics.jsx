@@ -249,6 +249,19 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
   const [kpiDataReady, setKpiDataReady] = useState(false);
 
+  // Crear mapa de números de sprint secuenciales
+  const getSprintNumber = useCallback((sprintId) => {
+    const sortedSprints = [...sprints].sort((a, b) => a.id - b.id);
+    const index = sortedSprints.findIndex(s => s.id === sprintId);
+    return index >= 0 ? index + 1 : sprintId;
+  }, [sprints]);
+
+  const getSprintLabel = useCallback((sprintId) => {
+    if (sprintId == null) return '';
+    const sprintNum = getSprintNumber(sprintId);
+    return `Sprint ${sprintNum}`;
+  }, [getSprintNumber]);
+
   useEffect(() => {
     if (!kpiDataReady || loading || selectedSprintId == null) return undefined;
 
@@ -437,6 +450,9 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const currentScore = kpis.productivityScore;
     const previousScore = productivityScoreFromSprintKpis(previous?.kpis);
     const delta = currentScore - previousScore;
+    
+    const previousSprintNum = getSprintNumber(previous.id);
+    
     if (delta > 0) {
       const relativePct =
         previousScore > 0 ? ((currentScore - previousScore) / previousScore) * 100 : null;
@@ -444,7 +460,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
         delta >= 20 || (previousScore > 0 && relativePct != null && relativePct >= 20);
       return {
         tone: 'up',
-        text: `Productivity increased by ${delta} point${delta === 1 ? '' : 's'} versus Sprint ${previous.id} (${previousScore}% → ${currentScore}%).`,
+        text: `Productivity increased by ${delta} point${delta === 1 ? '' : 's'} versus Sprint ${previousSprintNum} (${previousScore}% → ${currentScore}%).`,
         previousSprintId: previous.id,
         previousScore,
         currentScore,
@@ -457,16 +473,19 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       const abs = Math.abs(delta);
       return {
         tone: 'down',
-        text: `Productivity decreased by ${abs} point${abs === 1 ? '' : 's'} versus Sprint ${previous.id} (${previousScore}% → ${currentScore}%).`,
+        text: `Productivity decreased by ${abs} point${abs === 1 ? '' : 's'} versus Sprint ${previousSprintNum} (${previousScore}% → ${currentScore}%).`,
       };
     }
     return {
       tone: 'neutral',
-      text: `Productivity is stable versus Sprint ${previous.id} (${currentScore}%).`,
+      text: `Productivity is stable versus Sprint ${previousSprintNum} (${currentScore}%).`,
     };
-  }, [currentSprint, sprints, kpis.productivityScore]);
+  }, [currentSprint, sprints, kpis.productivityScore, getSprintNumber]);
 
   if (loading) return <PageLoadingSpinner />;
+
+  // Ordenar sprints para el select
+  const sortedSprintsForSelect = [...sprints].sort((a, b) => a.id - b.id);
 
   return (
     <>
@@ -539,14 +558,18 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                   displayEmpty
                   renderValue={(value) => {
                     if (value === '' || value == null) return 'Select sprint';
-                    return `Sprint ${value}`;
+                    const sprintNum = getSprintNumber(value);
+                    return `Sprint ${sprintNum}`;
                   }}
                 >
-                  {sprints.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      Sprint {s.id}
-                    </MenuItem>
-                  ))}
+                  {sortedSprintsForSelect.map((s, index) => {
+                    const sprintNumber = index + 1;
+                    return (
+                      <MenuItem key={s.id} value={s.id}>
+                        Sprint {sprintNumber}
+                      </MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
             )}
@@ -704,7 +727,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
             </Grid>
           </Grid>
           <KpiManagerGuidePanel
-            sprintLabel={currentSprint ? `Sprint ${currentSprint.id}` : ''}
+            sprintLabel={getSprintLabel(selectedSprintId)}
             guide={managerGuide}
             loading={managerGuideLoading}
             fetchFailed={managerGuideFetchFailed}
