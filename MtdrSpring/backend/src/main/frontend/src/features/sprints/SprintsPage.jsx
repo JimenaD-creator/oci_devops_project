@@ -22,7 +22,9 @@ import TaskTable from '../tasks/TaskTable';
 import {
   deriveTaskStatusFromAssignments,
   isUserTaskAssigneeComplete,
+  mergeUpdatedTask,
   normalizeTaskStatus,
+  patchUserTasksAfterTaskSave,
   taskEntityId,
   userTaskRowStatus,
   userTaskRowTaskId,
@@ -50,6 +52,7 @@ import {
   fetchSprintsProjectSummary,
   fetchSprintsTasksAndAssignments,
 } from './sprintsPageApi';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
@@ -73,11 +76,15 @@ export default function SprintsPage({ projectId }) {
   );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
+<<<<<<< HEAD
   const sprintNumberMap = useMemo(() => {
   const map = new Map();
   [...sprints].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
   return map;
 }, [sprints]);
+=======
+  const { invalidateAndRefresh } = useProjectData();
+>>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
   /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
   const recentlyDeletedTaskIdsRef = useRef(new Set());
 
@@ -140,10 +147,11 @@ export default function SprintsPage({ projectId }) {
   const loadData = useCallback(
     async (opts = {}) => {
       const silent = opts.silent === true;
+      const forceFresh = opts.forceFresh === true;
       if (!silent) setLoading(true);
       try {
         const { sprintsList, tasksList, userTasksList } =
-          await fetchSprintsTasksAndAssignments(projectId);
+          await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
         const deleted = recentlyDeletedTaskIdsRef.current;
         const visibleTasks = (Array.isArray(tasksList) ? tasksList : []).filter(
           (t) => !deleted.has(taskEntityId(t)),
@@ -173,24 +181,71 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
-  const handleTaskDeleted = useCallback((taskId) => {
-    const tid = String(taskId);
-    recentlyDeletedTaskIdsRef.current.add(tid);
-    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+  const handleTaskDeleted = useCallback(
+    async (taskId) => {
+      const tid = String(taskId);
+      recentlyDeletedTaskIdsRef.current.add(tid);
+      setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
 
-    setTasks((prev) => {
-      const next = prev.filter((t) => taskEntityId(t) !== tid);
-      setSprints((sp) => sortSprintsForDisplay(sp, next));
-      return next;
-    });
-    setUserTasks((prev) =>
-      prev.filter((ut) => {
-        const utTid = userTaskRowTaskId(ut);
-        return !Number.isFinite(utTid) || String(utTid) !== tid;
-      }),
-    );
-    setSelectedTaskForDialog(null);
-  }, []);
+      setTasks((prev) => {
+        const next = prev.filter((t) => taskEntityId(t) !== tid);
+        setSprints((sp) => sortSprintsForDisplay(sp, next));
+        return next;
+      });
+      setUserTasks((prev) =>
+        prev.filter((ut) => {
+          const utTid = userTaskRowTaskId(ut);
+          return !Number.isFinite(utTid) || String(utTid) !== tid;
+        }),
+      );
+      setSelectedTaskForDialog(null);
+      try {
+        await invalidateAndRefresh();
+        await loadData({ silent: true, forceFresh: true });
+      } catch (e) {
+        console.error('Failed to refresh project data after task delete:', e);
+      }
+    },
+    [invalidateAndRefresh, loadData],
+  );
+
+  const handleTaskCreated = useCallback(
+    async (createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
+      setTasks((prev) => {
+        const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
+        const next = exists ? prev : [createdTask, ...prev];
+        setSprints((sp) => sortSprintsForDisplay(sp, next));
+        return next;
+      });
+      if (createdTask?.id) {
+        const byId = new Map(
+          (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
+        );
+        const optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
+          const matched = byId.get(Number(uid));
+          return {
+            task: { id: Number(createdTask.id) },
+            user: {
+              id: Number(uid),
+              name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
+            },
+            status: assignmentStatus,
+          };
+        });
+        if (optimisticRows.length > 0) {
+          setUserTasks((prev) => [...optimisticRows, ...prev]);
+        }
+      }
+      setNewTaskDialogOpen(false);
+      try {
+        await invalidateAndRefresh();
+        await loadData({ silent: true, forceFresh: true });
+      } catch (e) {
+        console.error('Failed to refresh project data after task create:', e);
+      }
+    },
+    [invalidateAndRefresh, loadData, projectDevelopers],
+  );
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -261,6 +316,7 @@ export default function SprintsPage({ projectId }) {
                     name,
                     status: normalizeTaskStatus(userTaskRowStatus(ut)),
                     completed: isUserTaskAssigneeComplete(ut),
+                    completedAt: ut?.completedAt ?? ut?.completed_at ?? null,
                   };
                 })
                 .sort((a, b) =>
@@ -715,34 +771,7 @@ export default function SprintsPage({ projectId }) {
       <NewTaskDialog
         open={newTaskDialogOpen}
         onClose={() => setNewTaskDialogOpen(false)}
-        onCreated={(createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
-          setTasks((prev) => {
-            const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
-            const next = exists ? prev : [createdTask, ...prev];
-            setSprints((sp) => sortSprintsForDisplay(sp, next));
-            return next;
-          });
-          if (createdTask?.id) {
-            const byId = new Map(
-              (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
-            );
-            const optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
-              const matched = byId.get(Number(uid));
-              return {
-                task: { id: Number(createdTask.id) },
-                user: {
-                  id: Number(uid),
-                  name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
-                },
-                status: assignmentStatus,
-              };
-            });
-            if (optimisticRows.length > 0) {
-              setUserTasks((prev) => [...optimisticRows, ...prev]);
-            }
-          }
-          setNewTaskDialogOpen(false);
-        }}
+        onCreated={handleTaskCreated}
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         defaultSprintId={selectedSprint?.id}
@@ -766,47 +795,27 @@ export default function SprintsPage({ projectId }) {
       <TaskDetailDialog
         open={Boolean(selectedTaskForDialog)}
         initialTask={selectedTaskForDialog}
+        initialUserTasks={userTasks}
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={() => setSelectedTaskForDialog(null)}
-        onSaved={(updated, meta) => {
+        onSaved={async (updated, meta) => {
           setTasks((prev) => {
-            const next = prev.map((x) =>
-              Number(x.id) === Number(updated.id) ? { ...x, ...updated } : x,
-            );
+            const next = mergeUpdatedTask(prev, updated);
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });
-          if (meta?.assigneesChanged) {
-            const tid = Number(updated.id);
-            const ids = finiteUserIds(meta.assigneeUserIds);
-            setUserTasks((prev) => {
-              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
-              if (ids.length === 0) return rest;
-              const st = updated?.status ?? 'TODO';
-              const added = ids.map((userId) => {
-                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
-                const name = String(
-                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
-                ).trim();
-                return {
-                  user: { id: userId, name: name || `User ${userId}` },
-                  task: { id: tid },
-                  status: st,
-                };
-              });
-              return [...rest, ...added];
-            });
-          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
-            const tid = Number(updated.id);
-            const st = meta.assignmentStatus;
-            setUserTasks((prev) =>
-              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
-            );
-          }
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
+          );
           setSelectedTaskForDialog(null);
-          void loadData({ silent: true });
+          try {
+            await invalidateAndRefresh();
+            await loadData({ silent: true, forceFresh: true });
+          } catch (e) {
+            console.error('Failed to refresh sprints data after task save:', e);
+          }
         }}
         onDeleted={handleTaskDeleted}
       />

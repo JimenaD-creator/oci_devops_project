@@ -1,9 +1,6 @@
 import { API_BASE } from './constants/sprintConstants';
-import {
-  fetchJsonNoStore,
-  resolveActiveProjectIdNum,
-  sprintProjectIdFromJson,
-} from './utils/sprintUtils';
+import { fetchProjectBundleRaw } from '../dashboard/dashboardSprintData';
+import { resolveActiveProjectIdNum, sprintProjectIdFromJson } from './utils/sprintUtils';
 
 export async function fetchSprintsProjectDevelopers(projectIdNum) {
   const res = await fetch(`${API_BASE}/api/projects/${projectIdNum}/developers`);
@@ -17,28 +14,12 @@ export async function fetchSprintsProjectSummary(projectIdNum) {
   return res.json();
 }
 
-export async function fetchSprintsTasksAndAssignments(projectIdProp) {
+export async function fetchSprintsTasksAndAssignments(projectIdProp, options = {}) {
   const pid = resolveActiveProjectIdNum(projectIdProp);
-  const sprintsUrl =
-    pid != null
-      ? `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`
-      : `${API_BASE}/api/sprints`;
-  const tasksUrl =
-    pid != null
-      ? `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`
-      : `${API_BASE}/api/tasks`;
-  const userTasksUrl =
-    pid != null
-      ? `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`
-      : `${API_BASE}/api/user-tasks`;
-  const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
-    fetchJsonNoStore(sprintsUrl),
-    fetchJsonNoStore(tasksUrl),
-    fetchJsonNoStore(userTasksUrl),
-  ]);
-  let sprintsData = await sprintsRes.json();
-  const tasksData = await tasksRes.json();
-  const userTasksData = await userTasksRes.json();
+  const projectKey = pid != null ? String(pid) : null;
+  const { sprints: rawSprints, tasks: tasksData, userTasks: userTasksData } =
+    await fetchProjectBundleRaw(projectKey, options);
+  let sprintsData = rawSprints;
   const tasksList = Array.isArray(tasksData) ? tasksData : [];
   const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];
   if (pid != null && Array.isArray(sprintsData)) {

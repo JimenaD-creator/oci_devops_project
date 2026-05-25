@@ -65,7 +65,12 @@ public class UserTaskController {
 
     @GetMapping("/task/{taskId}")
     public ResponseEntity<List<UserTask>> getUserTasksByTask(@PathVariable Long taskId) {
-        return ResponseEntity.ok(userTaskRepository.findByTask_Id(taskId));
+        try {
+            return ResponseEntity.ok(userTaskRepository.findByTaskIdWithUserAndTask(taskId));
+        } catch (Exception e) {
+            LOGGER.warn("findByTaskIdWithUserAndTask failed for task {}, using simple find", taskId, e);
+            return ResponseEntity.ok(userTaskRepository.findByTask_Id(taskId));
+        }
     }
 
     @DeleteMapping("/task/{taskId}")

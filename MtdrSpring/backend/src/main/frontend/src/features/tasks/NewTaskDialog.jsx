@@ -29,6 +29,8 @@ import {
   FORM_FIELD_TINT_BG,
   ORACLE_RED_ACTION,
 } from '../sprints/constants/sprintConstants';
+import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
+import { richDescriptionPlainText, sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
 
 const TYPE_OPTIONS = [
   {
@@ -324,7 +326,7 @@ export function NewTaskDialog({
 
   const canSave = Boolean(
     title.trim() &&
-    description.trim() &&
+    richDescriptionPlainText(description) &&
     startDate &&
     dueDate &&
     sprintId &&
@@ -353,7 +355,7 @@ export function NewTaskDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
-          description: description.trim(),
+          description: sanitizeRichDescriptionHtml(description),
           classification,
           status,
           priority,
@@ -494,14 +496,12 @@ export function NewTaskDialog({
             sx={fieldSx}
           />
 
-          <TextField
-            label="Description *"
+          <RichTextDescriptionField
+            label="Description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            multiline
+            onChange={setDescription}
             minRows={3}
-            size="small"
+            required
             sx={fieldSx}
           />
 

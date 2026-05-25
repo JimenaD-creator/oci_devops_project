@@ -1,4 +1,10 @@
 import { inferStatusByDate } from '../sprints/utils/sprintUtils';
+import { computeProductivityScore } from '../kpis/productivityScoreUtils';
+import { isAssigneeCompletionOnTime } from '../tasks/utils/assigneeOnTimeUtils';
+import {
+  collectDeveloperNamesForSelection,
+  mergeRosterWithSprintDevelopers,
+} from '../../utils/teamRosterUtils';
 
 /** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
@@ -27,7 +33,8 @@ let cachedData = {
   timestamp: 0,
   projectId: null,
 };
-const CACHE_TTL = 30000; // 30 segundos
+/** In-memory TTL for sprints + tasks + user-tasks bundle (shared across all pages). */
+const CACHE_TTL = 120000; // 2 minutes
 
 /**
  * Mutates each sprint: accentColor from palette by order among all sprints (sorted by id).
@@ -297,18 +304,18 @@ function deriveKpisFromLiveData(
 
   const tasksInSprint = (tasksList || []).filter((t) => taskSprintId(t) === sprintId);
 
-  let doneForOnTime = 0;
-  let onTimeCount = 0;
-  tasksInSprint.forEach((t) => {
-    if (bucketTaskStatus(t.status) !== 'DONE') return;
-    doneForOnTime++;
-    const fd = t.finishDate;
-    const dd = t.dueDate;
-    if (fd != null && dd != null && new Date(fd).getTime() <= new Date(dd).getTime()) {
-      onTimeCount += 1;
-    }
+  let doneAssignments = 0;
+  let onTimeAssignments = 0;
+  (userTasksList || []).forEach((ut) => {
+    const taskId = resolveUserTaskTaskId(ut);
+    if (taskId == null || Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return;
+    if (!userTaskRowEligibleForWorkedHours(ut)) return;
+    doneAssignments += 1;
+    const meta = taskSprintMap[taskId];
+    if (isAssigneeCompletionOnTime(ut, meta?.dueDate, meta) === true) onTimeAssignments += 1;
   });
-  const onTimeDeliveryPct = doneForOnTime > 0 ? Math.round((onTimeCount / doneForOnTime) * 100) : 0;
+  const onTimeDeliveryPct =
+    doneAssignments > 0 ? Math.round((onTimeAssignments / doneAssignments) * 100) : 0;
 
   // Live Team Participation = logged USER_TASK hours / planned TASK hours (same sprint).
   const totalExpectedHours = tasksInSprint.reduce((sum, t) => {
@@ -324,12 +331,24 @@ function deriveKpisFromLiveData(
   const teamParticipationPct =
     totalExpectedHours > 0 ? Math.round((totalWorkedHours / totalExpectedHours) * 100) : 0;
 
+  const workloadBalancePct = (() => {
+    const raw = Number(storedKpis?.workloadBalance ?? 0);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.min(100, Math.max(0, Math.round(raw <= 1 ? raw * 100 : raw)));
+  })();
+
   return {
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
     teamParticipation: Math.min(100, Math.max(0, teamParticipationPct)),
-    productivityScore: completionRatePct,
+    workloadBalance: workloadBalancePct,
+    productivityScore: computeProductivityScore({
+      completionRate: completionRatePct,
+      onTimeDelivery: onTimeDeliveryPct,
+      teamParticipation: teamParticipationPct,
+      workloadBalance: workloadBalancePct,
+    }),
   };
 }
 
@@ -373,6 +392,18 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     sprintMap[sid]._statusCounts[b] += 1;
   });
 
+  const assigneeCountByTask = {};
+  userTasks.forEach((ut) => {
+    const taskId = resolveUserTaskTaskId(ut);
+    if (taskId != null && Number.isFinite(taskId)) {
+      assigneeCountByTask[taskId] = (assigneeCountByTask[taskId] || 0) + 1;
+    }
+  });
+  Object.keys(taskSprintMap).forEach((tid) => {
+    const n = Number(tid);
+    taskSprintMap[n].assigneeCount = assigneeCountByTask[n] || 1;
+  });
+
   userTasks.forEach((ut) => {
     const taskId = resolveUserTaskTaskId(ut);
     const sprintIdForUt = resolveSprintIdForUserTaskRow(ut, taskId, taskSprintMap);
@@ -397,6 +428,8 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
         _taskIds: new Set(),
         _completedTaskIds: new Set(),
         _completedOnTimeIds: new Set(),
+        _completedAssignments: 0,
+        _onTimeAssignments: 0,
         _assignedHoursEstimate: 0,
         hours: 0,
         workload: 0,
@@ -417,15 +450,11 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       dm._taskIds.add(taskId);
       if (utCompleted) {
         dm._completedTaskIds.add(taskId);
+        dm._completedAssignments += 1;
         const meta = taskSprintMap[taskId];
-        const fd = meta?.finishDate;
-        const dd = meta?.dueDate;
-        if (fd != null && dd != null) {
-          const fdMs = new Date(fd).getTime();
-          const ddMs = new Date(dd).getTime();
-          if (Number.isFinite(fdMs) && Number.isFinite(ddMs) && fdMs <= ddMs) {
-            dm._completedOnTimeIds.add(taskId);
-          }
+        if (isAssigneeCompletionOnTime(ut, meta?.dueDate, meta) === true) {
+          dm._completedOnTimeIds.add(taskId);
+          dm._onTimeAssignments += 1;
         }
       }
     }
@@ -484,13 +513,21 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       d.assigned = taskIds ? taskIds.size : 0;
       d.completed = completedIds ? completedIds.size : 0;
       const onTimeCompleted = onTimeIds ? onTimeIds.size : 0;
+      const completedAssignments = Number(d._completedAssignments) || 0;
+      const onTimeAssignments = Number(d._onTimeAssignments) || 0;
       d.onTime =
-        d.completed > 0 ? Math.round((onTimeCompleted / d.completed) * 100) : null;
+        completedAssignments > 0
+          ? Math.round((onTimeAssignments / completedAssignments) * 100)
+          : d.completed > 0
+            ? Math.round((onTimeCompleted / d.completed) * 100)
+            : null;
       const uidFromKey = /^u:(\d+)$/.exec(String(devKey));
       if (uidFromKey) d.userId = Number(uidFromKey[1]);
       delete d._taskIds;
       delete d._completedTaskIds;
       delete d._completedOnTimeIds;
+      delete d._completedAssignments;
+      delete d._onTimeAssignments;
       d.assignedHoursEstimate = Number(d._assignedHoursEstimate) || 0;
       delete d._assignedHoursEstimate;
       d.workload = Math.round((d.hours / maxHours) * 100);
@@ -525,6 +562,51 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 const fetchJsonNoCache = (url) =>
   fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
 
+function isCacheValidForProject(pid, now, forceFresh) {
+  return (
+    !forceFresh &&
+    cachedData.sprints &&
+    cachedData.tasks &&
+    cachedData.userTasks &&
+    cachedData.projectId === pid &&
+    now - cachedData.timestamp < CACHE_TTL
+  );
+}
+
+/**
+ * Returns raw API arrays (sprints, tasks, userTasks) using the same cache as fetchDashboardSprints.
+ */
+export async function fetchProjectBundleRaw(projectId, options = {}) {
+  const forceFresh = Boolean(options?.forceFresh);
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  if (!pid) {
+    return { sprints: [], tasks: [], userTasks: [] };
+  }
+
+  const now = Date.now();
+  if (isCacheValidForProject(pid, now, forceFresh)) {
+    return {
+      sprints: cachedData.sprints,
+      tasks: cachedData.tasks,
+      userTasks: cachedData.userTasks,
+    };
+  }
+
+  await fetchDashboardSprints(pid, options);
+  return {
+    sprints: cachedData.sprints ?? [],
+    tasks: cachedData.tasks ?? [],
+    userTasks: cachedData.userTasks ?? [],
+  };
+}
+
+/** Tasks from bundle cache when warm; otherwise loads the bundle once. */
+export async function fetchCachedProjectTasks(projectId, options = {}) {
+  const { tasks } = await fetchProjectBundleRaw(projectId, options);
+  return Array.isArray(tasks) ? tasks : [];
+}
+
 export async function fetchDashboardSprints(projectId, options = {}) {
   const forceFresh = Boolean(options?.forceFresh);
   const pid =
@@ -535,6 +617,7 @@ export async function fetchDashboardSprints(projectId, options = {}) {
 
   const now = Date.now();
 
+<<<<<<< HEAD
   // Check cache first
   if (
     !forceFresh &&
@@ -548,6 +631,12 @@ console.log('Using cached dashboard data');
 const sortedCached = [...cachedData.sprints].sort((a, b) => a.id - b.id);
 const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
 const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
+=======
+  if (isCacheValidForProject(pid, now, forceFresh)) {
+    console.log('Using cached dashboard data');
+    const mapped = cachedData.sprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
+    const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
+>>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
     assignSprintAccentColors(enriched);
     return enriched;
   }
@@ -716,7 +805,7 @@ export function buildBlockedReportsForAiSprint(sp) {
   return out;
 }
 
-export function aggregateSelectionMetrics(selectedSprints) {
+export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = []) {
   let totalTasks = 0;
   let totalHours = 0;
   const devMap = new Map();
@@ -731,25 +820,24 @@ export function aggregateSelectionMetrics(selectedSprints) {
         completed: 0,
         hours: 0,
         assignedHoursEstimate: 0,
+        onTime: d.onTime,
+        workload: 0,
+        profilePicture: d.profilePicture ?? null,
+        userId: d.userId ?? null,
+        initials: d.initials,
       };
       cur.assigned += Number(d.assigned) || 0;
       cur.completed += Number(d.completed) || 0;
       cur.hours += Number(d.hours) || 0;
       cur.assignedHoursEstimate += Number(d.assignedHoursEstimate) || 0;
+      if (typeof d.workload === 'number') {
+        cur.workload = Math.max(cur.workload, d.workload);
+      }
       devMap.set(d.name, cur);
     });
   });
 
-  const uniqueDevCount = devMap.size;
-  const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
-  /** Mean of each developer’s total worked hours (USER_TASK) in the selection. */
-  const sumDevWorkedHours = Array.from(devMap.values()).reduce(
-    (s, d) => s + (Number(d.hours) || 0),
-    0,
-  );
-  const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
-
-  const developers = Array.from(devMap.values()).map((d) => {
+  const activityDevelopers = Array.from(devMap.values()).map((d) => {
     const assigned = d.assigned ?? 0;
     const completed = d.completed ?? 0;
     return {
@@ -758,6 +846,15 @@ export function aggregateSelectionMetrics(selectedSprints) {
       pending: Math.max(0, assigned - completed),
     };
   });
+
+  const developers = mergeRosterWithSprintDevelopers(projectDevelopers, activityDevelopers);
+  const uniqueDevCount = devMap.size;
+  const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
+  const sumDevWorkedHours = Array.from(devMap.values()).reduce(
+    (s, d) => s + (Number(d.hours) || 0),
+    0,
+  );
+  const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
 
   return {
     totalTasks,
@@ -785,10 +882,9 @@ export function completionRate(dev) {
   return Math.round((dev.completed / dev.assigned) * 100);
 }
 
-export function buildGroupedCompletedData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedCompletedData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -798,10 +894,9 @@ export function buildGroupedCompletedData(selectedSprints) {
   });
 }
 
-export function buildGroupedHoursData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedHoursData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -811,10 +906,9 @@ export function buildGroupedHoursData(selectedSprints) {
   });
 }
 
-export function buildGroupedWorkloadData(selectedSprints) {
-  const names = new Set();
-  selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-  return Array.from(names).map((name) => {
+export function buildGroupedWorkloadData(selectedSprints, projectDevelopers = []) {
+  const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+  return names.map((name) => {
     const row = { name: shortDevName(name), _full: name };
     selectedSprints.forEach((sp) => {
       const dev = (sp.developers || []).find((d) => d.name === name);
@@ -835,7 +929,7 @@ export function sprintDbIdSortKey(sp) {
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
-export function buildCompareDeveloperChartsModel(selectedSprints) {
+export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelopers = []) {
   const sprints = [...(selectedSprints || [])]
     .filter(Boolean)
     .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
@@ -847,9 +941,7 @@ shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 
-  const nameSet = new Set();
-  sprints.forEach((sp) => (sp.developers || []).forEach((d) => nameSet.add(d.name)));
-  const names = Array.from(nameSet);
+  const names = collectDeveloperNamesForSelection(sprints, projectDevelopers);
 
   const baseRows = names.map((fullName) => {
     const row = { name: fullName, shortName: shortDevName(fullName) };

@@ -20,6 +20,10 @@ import {
   assigneeIdentityPaletteIndex,
 } from './utils/assigneeIdentityPalette';
 import { assigneeStatusChipStyle, assigneeStatusLabel } from './utils/taskUtils';
+import {
+  isAssigneeCompletionOnTime,
+  taskOnTimeDisplayForManager,
+} from './utils/assigneeOnTimeUtils';
 import { DeleteIcon } from 'lucide-react';
 import { UndoIcon } from 'lucide-react';
 import { DEVELOPER_DISPLAY_NAME } from '../dashboard/dashboardSprintData';
@@ -137,7 +141,7 @@ function DevChip({ developer, isDark }) {
   );
 }
 
-function DevelopersCell({ developers, developer, assigneeProgress, managerView, isDark }) {
+function DevelopersCell({ item, developers, developer, assigneeProgress, managerView, isDark }) {
   const theme = useTheme();
   const darkMode = theme.palette.mode === 'dark';
   
@@ -151,6 +155,16 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
           const statusKey = row.status ?? (row.completed ? 'DONE' : 'TODO');
           const statusChip = assigneeStatusChipStyle(statusKey);
           const statusLabel = assigneeStatusLabel(statusKey);
+          const onTimeResult = row.completed
+            ? isAssigneeCompletionOnTime(
+                { status: 'COMPLETED', completedAt: row.completedAt },
+                item?.dueDate,
+                {
+                  finishDate: item?.completedAt ?? item?.completed_at,
+                  assigneeCount: assigneeProgress.length,
+                },
+              )
+            : null;
           return (
             <Box
               key={key}
@@ -203,6 +217,26 @@ function DevelopersCell({ developers, developer, assigneeProgress, managerView, 
               >
                 {statusLabel}
               </Box>
+              {onTimeResult != null && (
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    px: 0.75,
+                    py: 0.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    lineHeight: 1.25,
+                    whiteSpace: 'nowrap',
+                    color: onTimeResult ? '#1B5E20' : '#B71C1C',
+                    bgcolor: onTimeResult ? (darkMode ? '#1A4A2A' : '#E8F5E9') : (darkMode ? '#4A1A1A' : '#FFEBEE'),
+                    borderLeft: `3px solid ${onTimeResult ? '#43A047' : '#E53935'}`,
+                  }}
+                >
+                  {onTimeResult ? 'On time' : 'Late'}
+                </Box>
+              )}
             </Box>
           );
         })}
@@ -254,10 +288,7 @@ function isCompletedStatus(item) {
 }
 
 function completionOnTimeDisplay(item) {
-  const dueMs = toTimeMs(item.dueDate);
-  const finishMs = toTimeMs(item.completedAt ?? item.completed_at);
-  if (!isCompletedStatus(item) || dueMs == null || finishMs == null) return '—';
-  return finishMs <= dueMs ? 'Yes' : 'No';
+  return taskOnTimeDisplayForManager(item);
 }
 
 function statusText(item) {
@@ -466,6 +497,7 @@ export default function TaskTable({
                   }}
                 >
                   <DevelopersCell
+                    item={item}
                     developers={item.developers}
                     developer={item.developer}
                     assigneeProgress={item.assigneeProgress}

@@ -87,6 +87,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.telegram</groupId>
             <artifactId>telegrambots-springboot-longpolling-starter</artifactId>
             <version>9.1.0</version>
@@ -164,6 +169,26 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
@@ -185,4 +210,64 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- Optional: mvn test -Pcoverage-check -Dspring.profiles.active=test (fails if scoped coverage &lt; 70%) -->
+    <profiles>
+        <profile>
+            <id>coverage-check</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>check-scoped-70</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <rule>
+                                            <element>BUNDLE</element>
+                                            <limits>
+                                                <limit>
+                                                    <counter>LINE</counter>
+                                                    <value>COVEREDRATIO</value>
+                                                    <minimum>0.70</minimum>
+                                                </limit>
+                                            </limits>
+                                        </rule>
+                                    </rules>
+                                    <!-- Path B: only classes with dedicated unit tests (see TESTING.md) -->
+                                    <includes>
+                                        <include>com/springboot/MyTodoList/controller/AuthController*</include>
+                                        <include>com/springboot/MyTodoList/controller/TaskController*</include>
+                                        <include>com/springboot/MyTodoList/controller/SprintController*</include>
+                                        <include>com/springboot/MyTodoList/controller/UserController*</include>
+                                        <include>com/springboot/MyTodoList/controller/KpiController*</include>
+                                        <include>com/springboot/MyTodoList/controller/ProjectController*</include>
+                                        <include>com/springboot/MyTodoList/controller/UserTaskController*</include>
+                                        <include>com/springboot/MyTodoList/controller/ToDoItemController*</include>
+                                        <include>com/springboot/MyTodoList/service/TaskService*</include>
+                                        <include>com/springboot/MyTodoList/service/SprintService*</include>
+                                        <include>com/springboot/MyTodoList/service/UserService*</include>
+                                        <include>com/springboot/MyTodoList/service/JwtService*</include>
+                                        <include>com/springboot/MyTodoList/service/KpiService*</include>
+                                        <include>com/springboot/MyTodoList/service/ToDoItemService*</include>
+                                        <include>com/springboot/MyTodoList/service/TaskAssignmentSyncService*</include>
+                                        <include>com/springboot/MyTodoList/service/AdminService*</include>
+                                        <include>com/springboot/MyTodoList/service/UserTaskService*</include>
+                                        <include>com/springboot/MyTodoList/util/BotUserState*</include>
+                                        <include>com/springboot/MyTodoList/util/BotStateManager*</include>
+                                    </includes>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
