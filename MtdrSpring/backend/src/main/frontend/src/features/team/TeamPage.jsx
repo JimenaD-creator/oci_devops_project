@@ -13,7 +13,11 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Users, UserCircle } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
+} from '../sprints/utils/sprintUtils';
 import { pageEase, AI_INSIGHTS_EMPTY, getErrorMessage } from '../ai/aiInsightsConstants';
 import { fetchSprintInsights } from '../ai/insightsApi';
 import { ORACLE_RED } from '../tasks/constants/taskConstants';
@@ -74,17 +78,7 @@ export default function TeamPage({
     };
   }, [projectId]);
 
-  // Crear mapa de números de sprint secuenciales por proyecto
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    // Ordenar sprints por ID para mantener consistencia
-    [...sprints]
-      .sort((a, b) => a.id - b.id)
-      .forEach((sprint, index) => {
-        map.set(sprint.id, index);
-      });
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
   useEffect(() => {
     const pid =
@@ -273,18 +267,14 @@ export default function TeamPage({
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  const sprintNum = sprintNumberMap.get(value);
-                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
+                  return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
-                {sprints.map((s) => {
-                  const sprintNum = sprintNumberMap.get(s.id);
-                  return (
-                    <MenuItem key={s.id} value={s.id}>
-                      {sprintNum ? `Sprint ${sprintNum}` : `Sprint ${s.id}`}
-                    </MenuItem>
-                  );
-                })}
+                {sprints.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {formatSprintLabel(sprintNumberMap, s.id)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>

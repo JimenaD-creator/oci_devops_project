@@ -1016,6 +1016,7 @@ public class GeminiService {
             normalizeKpiManagerGuidePercentSpacing(root);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
             normalizeKpiManagerGuideProductivityScore(root, sprintId);
+            pruneInvalidWorkloadRecommendations(root, sprintId);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
@@ -1533,7 +1534,7 @@ public class GeminiService {
                 addRecommendation(recs, "planning",
                     "On-time delivery is under 60% among completed tasks — prioritize due dates and unblock stuck work.");
             }
-            if (wb > 0.0 && wb < 70.0) {
+            if (wb > 0.0 && wb < 70.0 && countDevelopersWithAssignments(sprint.getId()) >= 2) {
                 addRecommendation(recs, "workload_redistribution",
                     "Workload balance is under 70% — consider redistributing tasks among developers.");
             }
@@ -1882,7 +1883,8 @@ public class GeminiService {
             }
 
             List<DeveloperStatusLoad> rows = new ArrayList<>(buildDeveloperStatusLoad(sprintId).values());
-            if (rows.size() < 2) {
+            if (rows.size() < 2 || countDevelopersWithAssignments(sprintId) < 2) {
+                clearWorkloadRedistribution(root);
                 return;
             }
 
@@ -2089,6 +2091,119 @@ public class GeminiService {
             }
         } catch (Exception e) {
             System.err.println("[GeminiService] refineWorkloadRedistributionRecommendations: " + e.getMessage());
+        }
+    }
+
+    private static boolean isValidWorkloadDeveloperName(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        String n = name.trim();
+        if (n.matches("(?i)^(n/?a|unknown|unassigned|none|tbd|—|-)$")) {
+            return false;
+        }
+        if (n.matches("(?i).*(most[- ]?loaded|least[- ]?loaded).*developer.*")) {
+            return false;
+        }
+        return true;
+    }
+
+    private int countDevelopersWithAssignments(Long sprintId) {
+        try {
+            JsonNode wl = mapper.readTree(buildTeamWorkloadJson(sprintId));
+            if (wl == null || !wl.isArray()) {
+                return 0;
+            }
+            int count = 0;
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                if (row.path("fromSprintRosterOnly").asBoolean(false)
+                    || row.path("fromProjectTeamOnly").asBoolean(false)) {
+                    continue;
+                }
+                if (row.path("assignedTaskRows").asInt(0) < 1) {
+                    continue;
+                }
+                if (!isValidWorkloadDeveloperName(row.path("developerName").asText(""))) {
+                    continue;
+                }
+                count++;
+            }
+            return count;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void clearWorkloadRedistribution(ObjectNode root) {
+        root.set("workloadRecommendations", mapper.createArrayNode());
+        ArrayNode actionable = ensureArrayField(root, "actionableRecommendations");
+        ArrayNode kept = mapper.createArrayNode();
+        for (JsonNode n : actionable) {
+            if (n.isObject()
+                && "workload_redistribution".equalsIgnoreCase(n.path("category").asText(""))) {
+                continue;
+            }
+            kept.add(n);
+        }
+        root.set("actionableRecommendations", kept);
+    }
+
+    private boolean isValidWorkloadMoveRecommendation(JsonNode rec) {
+        if (rec == null || !rec.isObject()) {
+            return false;
+        }
+        int move = rec.path("tasksToMove").asInt(-1);
+        if (move < 1) {
+            return false;
+        }
+        String from = rec.path("from").asText("").trim();
+        String to = rec.path("to").asText("").trim();
+        if (!isValidWorkloadDeveloperName(from) || !isValidWorkloadDeveloperName(to)) {
+            return false;
+        }
+        return !from.equalsIgnoreCase(to);
+    }
+
+    /**
+     * Drops impossible redistribution rows (0 tasks, placeholder names, single-developer teams).
+     */
+    private void pruneInvalidWorkloadRecommendations(ObjectNode root, Long sprintId) {
+        try {
+            if (countDevelopersWithAssignments(sprintId) < 2) {
+                clearWorkloadRedistribution(root);
+                return;
+            }
+            JsonNode wlNode = root.get("workloadRecommendations");
+            if (wlNode != null && wlNode.isArray()) {
+                ArrayNode kept = mapper.createArrayNode();
+                for (JsonNode n : wlNode) {
+                    if (isValidWorkloadMoveRecommendation(n)) {
+                        kept.add(n);
+                    }
+                }
+                root.set("workloadRecommendations", kept);
+            }
+            ArrayNode actionable = ensureArrayField(root, "actionableRecommendations");
+            ArrayNode actionKept = mapper.createArrayNode();
+            for (JsonNode n : actionable) {
+                if (!n.isObject()) {
+                    continue;
+                }
+                if ("workload_redistribution".equalsIgnoreCase(n.path("category").asText(""))) {
+                    String text = n.path("text").asText("");
+                    if (text.matches("(?is).*\\bmove\\s+~?\\s*0\\s+task.*")
+                        || text.matches("(?is).*(?:\\bto\\s+|\\bfrom\\s+)(n/?a|unknown|unassigned)\\b.*")) {
+                        continue;
+                    }
+                }
+                actionKept.add(n);
+            }
+            root.set("actionableRecommendations", actionKept);
+        } catch (Exception e) {
+            System.err.println("[GeminiService] pruneInvalidWorkloadRecommendations: " + e.getMessage());
         }
     }
 

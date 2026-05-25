@@ -300,6 +300,31 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   return out;
 }
 
+/** Placeholder / invalid assignee names — not valid redistribution targets. */
+const INVALID_WORKLOAD_DEVELOPER_RE =
+  /^(n\/?a|unknown|unassigned|none|tbd|—|-)$/i;
+
+const PLACEHOLDER_WORKLOAD_DEVELOPER_RE =
+  /(most[- ]?loaded|least[- ]?loaded).{0,24}developer/i;
+
+/** True when a name can appear in a move-from / move-to workload recommendation. */
+export function isValidWorkloadDeveloperName(name) {
+  const n = String(name ?? '').trim();
+  if (!n) return false;
+  if (INVALID_WORKLOAD_DEVELOPER_RE.test(n)) return false;
+  if (PLACEHOLDER_WORKLOAD_DEVELOPER_RE.test(n)) return false;
+  return true;
+}
+
+/** Structured workload row or merged recommendation text is actionable. */
+export function isValidWorkloadMoveRecommendation({ from, to, tasksToMove } = {}) {
+  const move = Number(tasksToMove);
+  if (!Number.isFinite(move) || move < 1) return false;
+  if (!isValidWorkloadDeveloperName(from) || !isValidWorkloadDeveloperName(to)) return false;
+  if (String(from).trim().toLowerCase() === String(to).trim().toLowerCase()) return false;
+  return true;
+}
+
 /** Gemini `actionableRecommendations[].category` → UI label */
 export const RECOMMENDATION_CATEGORY_LABELS = {
   workload_redistribution: 'Workload redistribution',

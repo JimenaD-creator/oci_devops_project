@@ -31,6 +31,7 @@ import {
 } from '../sprints/constants/sprintConstants';
 import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
 import { richDescriptionPlainText, sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
+import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 
 const TYPE_OPTIONS = [
   {
@@ -284,12 +285,7 @@ export function NewTaskDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Crear mapa de números de sprint secuenciales
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
   // Obtener sprints ordenados para el select
   const sortedSprints = useMemo(() => {
@@ -532,22 +528,18 @@ export function NewTaskDialog({
                 label="Sprint *"
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
-                  const sprintNum = sprintNumberMap.get(Number(value));
-                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
+                  return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
-                {sortedSprints.map((s) => {
-                  const sprintNumber = sprintNumberMap.get(s.id);
-                  return (
-                    <MenuItem
-                      key={s.id}
-                      value={String(s.id)}
-                      sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
-                    >
-                      {sprintNumber ? `Sprint ${sprintNumber}` : `Sprint ${s.id}`}
-                    </MenuItem>
-                  );
-                })}
+                {sortedSprints.map((s) => (
+                  <MenuItem
+                    key={s.id}
+                    value={String(s.id)}
+                    sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
+                  >
+                    {formatSprintLabel(sprintNumberMap, s.id)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <TextField

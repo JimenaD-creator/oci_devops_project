@@ -29,6 +29,7 @@ import {
   getErrorMessage,
   isApiKeyInsightError,
   isValidSprintId,
+  isValidWorkloadMoveRecommendation,
   AI_INSIGHTS_EMPTY,
 } from './aiInsightsConstants';
 import { fetchSprintInsights } from './insightsApi';
@@ -63,19 +64,26 @@ function computeRecommendationList(ins) {
   if (!ins) return [];
   const actionables = [...(ins.actionableRecommendations ?? [])];
   const workloadRows = [...(ins.workloadRecommendations ?? [])];
-  const structuredWorkload = workloadRows.map((r) => {
-    const from = r.from ? String(r.from).trim() : '';
-    const to = r.to ? String(r.to).trim() : '';
-    const n = r.tasksToMove;
-    const rs = typeof r.reason === 'string' ? r.reason.trim() : '';
-    const hasMove = from && to && n != null && Number.isFinite(Number(n));
-    const head = hasMove ? `Move ~${n} task(s) from ${from} to ${to}` : `Move ~${n ?? '?'} task(s)`;
-    const text = rs ? `${head}: ${rs}` : `${head}.`;
-    return {
-      category: 'workload_redistribution',
-      text,
-    };
-  });
+  const structuredWorkload = workloadRows
+    .filter((r) =>
+      isValidWorkloadMoveRecommendation({
+        from: r?.from,
+        to: r?.to,
+        tasksToMove: r?.tasksToMove,
+      }),
+    )
+    .map((r) => {
+      const from = String(r.from).trim();
+      const to = String(r.to).trim();
+      const n = Number(r.tasksToMove);
+      const rs = typeof r.reason === 'string' ? r.reason.trim() : '';
+      const head = `Move ~${n} task(s) from ${from} to ${to}`;
+      const text = rs ? `${head}: ${rs}` : `${head}.`;
+      return {
+        category: 'workload_redistribution',
+        text,
+      };
+    });
 
   const dropAiWorkloadDuplicates = structuredWorkload.length > 0;
   const merged = [
@@ -91,6 +99,13 @@ function computeRecommendationList(ins) {
   const out = [];
   for (const rec of merged) {
     if (!rec || typeof rec.text !== 'string' || !rec.text.trim()) continue;
+    if (
+      String(rec?.category ?? '').toLowerCase() === 'workload_redistribution' &&
+      (/\bmove\s+~?\s*0\s+task/i.test(rec.text) ||
+        /(?:\bto\s+|\bfrom\s+)(n\/?a|unknown|unassigned)\b/i.test(rec.text))
+    ) {
+      continue;
+    }
     const key = normalizeRecommendationKey(rec);
     if (seen.has(key)) continue;
     seen.add(key);

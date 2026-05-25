@@ -12,7 +12,11 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
+} from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
 import {
@@ -36,16 +40,7 @@ export default function AIInsightsPage({
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
 
-  /** DB sprint id → human label "Sprint 0", "Sprint 1", … (order by id within project). */
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    [...sprints]
-      .sort((a, b) => Number(a.id) - Number(b.id))
-      .forEach((sprint, index) => {
-        map.set(sprint.id, index);
-      });
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
   /** Reload persisted insights when the user opens this page again (no 15s polling). */
   useEffect(() => {
@@ -150,8 +145,7 @@ export default function AIInsightsPage({
   // Obtener etiquetas de sprint con números secuenciales
   const getSprintLabel = (sprintId) => {
     if (sprintId == null) return null;
-    const sprintNum = sprintNumberMap.get(sprintId);
-    return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${sprintId}`;
+    return formatSprintLabel(sprintNumberMap, sprintId);
   };
 
   return (
@@ -245,18 +239,14 @@ export default function AIInsightsPage({
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  const sprintNum = sprintNumberMap.get(value);
-                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
+                  return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
-                {sprints.map((s) => {
-                  const sprintNum = sprintNumberMap.get(s.id);
-                  return (
-                    <MenuItem key={s.id} value={s.id}>
-                      {sprintNum ? `Sprint ${sprintNum}` : `Sprint ${s.id}`}
-                    </MenuItem>
-                  );
-                })}
+                {sprints.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {formatSprintLabel(sprintNumberMap, s.id)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
