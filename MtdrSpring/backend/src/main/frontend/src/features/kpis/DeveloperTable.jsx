@@ -3,6 +3,10 @@ import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-re
 import { useTheme } from '@mui/material/styles';
 import { APP_FONT_FAMILY } from '../../theme';
 import { developerAvatarColors } from '../../utils/developerColors';
+import {
+  collectDeveloperNamesForSelection,
+  resolveProfilePictureFromRoster,
+} from '../../utils/teamRosterUtils';
 
 const initialData = [
   {
@@ -232,7 +236,12 @@ const fullColumns = [
   { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
-function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = false }) {
+function SprintMetricsTable({
+  selectedSprints,
+  compareMode,
+  projectDevelopers = [],
+  suppressCardTitle = false,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
@@ -240,30 +249,36 @@ function SprintMetricsTable({ selectedSprints, compareMode, suppressCardTitle = 
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
   const rows = useMemo(() => {
-    const names = new Set();
-    selectedSprints.forEach((sp) => (sp.developers || []).forEach((d) => names.add(d.name)));
-    return Array.from(names).map((name) => {
+    const names = collectDeveloperNamesForSelection(selectedSprints, projectDevelopers);
+    return names.map((name) => {
       const row = { name };
       let initials = '';
       let profilePicture = null;
+      let rosterUserId = null;
       selectedSprints.forEach((sp) => {
         const d = (sp.developers || []).find((x) => x.name === name);
         if (d) {
           if (!initials) initials = d.initials || initialsFromName(name);
           if (!profilePicture) profilePicture = d.profilePicture ?? null;
+          if (d.userId != null && rosterUserId == null) rosterUserId = Number(d.userId);
         }
-        row[`${sp.id}_assigned`] = d ? d.assigned : '—';
-        row[`${sp.id}_completed`] = d ? d.completed : '—';
-        row[`${sp.id}_hours`] = d ? d.hours : '—';
-        row[`${sp.id}_onTime`] =
-          d && typeof d.onTime === 'number' ? d.onTime : '—';
-        row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : '—';
+        row[`${sp.id}_assigned`] = d ? d.assigned : 0;
+        row[`${sp.id}_completed`] = d ? d.completed : 0;
+        row[`${sp.id}_hours`] = d ? d.hours : 0;
+        row[`${sp.id}_onTime`] = d && typeof d.onTime === 'number' ? d.onTime : '—';
+        row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : 0;
       });
+      if (!profilePicture) {
+        profilePicture = resolveProfilePictureFromRoster(projectDevelopers, {
+          name,
+          userId: rosterUserId,
+        });
+      }
       row.initials = initials || initialsFromName(name);
       row.profilePicture = profilePicture;
       return row;
     });
-  }, [selectedSprints]);
+  }, [selectedSprints, projectDevelopers]);
 
   const filtered = useMemo(
     () => rows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
@@ -778,6 +793,7 @@ function FullAnalyticsTable() {
 export default function DeveloperTable({
   selectedSprints,
   compareMode,
+  projectDevelopers = [],
   suppressCardTitle = false,
 }) {
   if (selectedSprints != null) {
@@ -786,6 +802,7 @@ export default function DeveloperTable({
       <SprintMetricsTable
         selectedSprints={selectedSprints}
         compareMode={!!compareMode}
+        projectDevelopers={projectDevelopers}
         suppressCardTitle={!!suppressCardTitle}
       />
     );

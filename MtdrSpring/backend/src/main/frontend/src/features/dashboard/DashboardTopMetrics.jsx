@@ -61,8 +61,8 @@ export default function DashboardTopMetrics({
     ? {
         tasks: 'Sum of tasks across selected sprints',
         hours: 'Combined logged hours in the selection',
-        avgTasks: 'Average across unique developers in scope',
-        avgHours: 'Mean of each developer’s total worked hours in the selection',
+        avgTasks: 'Total tasks divided by developers on the project team',
+        avgHours: 'Total hours divided by developers on the project team',
       }
     : {
         tasks: 'All tasks assigned to this sprint',

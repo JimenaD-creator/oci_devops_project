@@ -7,18 +7,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { renderWithTheme } from '../../test-utils';
-import {
-  fetchTaskById,
-  fetchTaskDetailDevelopers,
-  fetchUserTasksForTask,
-  putTask,
-} from './taskDetailApi';
+import { fetchTaskDetailBundle, fetchTaskDetailDevelopers, putTask } from './taskDetailApi';
 import { TaskDetailDialog } from './TaskDetailDialog';
 
 vi.mock('./taskDetailApi', () => ({
   fetchTaskDetailDevelopers: vi.fn(),
-  fetchTaskById: vi.fn(),
-  fetchUserTasksForTask: vi.fn(),
+  fetchTaskDetailBundle: vi.fn(),
   putTask: vi.fn(),
 }));
 
@@ -44,8 +38,7 @@ afterEach(() => {
 beforeEach(() => {
   lastPutBody = null;
   fetchTaskDetailDevelopers.mockResolvedValue([{ id: 101, name: 'Dev Uno' }]);
-  fetchTaskById.mockResolvedValue(baseTask);
-  fetchUserTasksForTask.mockResolvedValue([]);
+  fetchTaskDetailBundle.mockResolvedValue({ task: baseTask, userTasks: [] });
   putTask.mockImplementation((_id, body) => {
     lastPutBody = body;
     return Promise.resolve({

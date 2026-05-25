@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Users, UserCircle } from 'lucide-react';
-import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { pageEase, AI_INSIGHTS_EMPTY } from '../ai/aiInsightsConstants';
 import { fetchSprintInsights } from '../ai/insightsApi';
@@ -23,6 +23,8 @@ import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import DashboardBlockedTasksPanel from '../dashboard/DashboardBlockedTasksPanel';
 import TeamWorkloadBreakdown from './TeamWorkloadBreakdown';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
+import { fetchProjectDevelopers } from '../dashboard/projectApi';
+import { mergeDeveloperInsightRows } from '../../utils/teamRosterUtils';
 
 export default function TeamPage({
   projectId,
@@ -33,12 +35,43 @@ export default function TeamPage({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
+  const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
-  const [developerInsightRows, setDeveloperInsightRows] = useState(null);
+  const [rawDeveloperInsightRows, setRawDeveloperInsightRows] = useState(null);
+  const [insightsGeneratedAt, setInsightsGeneratedAt] = useState(null);
   const [sprintsReady, setSprintsReady] = useState(false);
+  const [projectDevelopers, setProjectDevelopers] = useState([]);
+
+  useEffect(() => {
+    const pid =
+      projectId != null && String(projectId).trim() !== ''
+        ? String(projectId).trim()
+        : typeof localStorage !== 'undefined'
+          ? String(localStorage.getItem('currentProjectId') || '').trim()
+          : '';
+    if (!pid) {
+      setSprints([]);
+      setSelectedSprintId(null);
+      setProjectDevelopers([]);
+      setLoading(false);
+      setSprintsReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchProjectDevelopers(pid)
+      .then((list) => {
+        if (!cancelled) setProjectDevelopers(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setProjectDevelopers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     const pid =
@@ -54,40 +87,19 @@ export default function TeamPage({
       setSprintsReady(false);
       return;
     }
-    let cancelled = false;
-    setLoading(true);
-    setSprintsReady(false);
-    setSelectedSprintId(null);
-    fetchDashboardSprints(pid, { forceFresh: true })
-      .then((data) => {
-        if (cancelled) return;
-        const filtered = Array.isArray(data)
-          ? data.filter((s) => String(s.assignedProject?.id) === String(pid))
-          : [];
-        setSprints(filtered);
-        setSelectedSprintId((prev) => {
-          if (filtered.length === 0) return null;
-          if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
-          const defaultSprint = pickDefaultSelectedSprint(filtered);
-          return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSprints([]);
-          setSelectedSprintId(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setSprintsReady(true);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+    const filtered = Array.isArray(sharedSprints)
+      ? sharedSprints.filter((s) => String(s.assignedProject?.id) === String(pid))
+      : [];
+    setSprints(filtered);
+    setSelectedSprintId((prev) => {
+      if (filtered.length === 0) return null;
+      if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
+      const defaultSprint = pickDefaultSelectedSprint(filtered);
+      return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
+    });
+    setLoading(sharedLoading);
+    setSprintsReady(!sharedLoading);
+  }, [projectId, sharedSprints, sharedLoading]);
 
   useEffect(() => {
     if (loading || landingSprintId == null) return;
@@ -100,26 +112,49 @@ export default function TeamPage({
     onLandingConsumed?.();
   }, [loading, landingSprintId, sprints, onLandingConsumed]);
 
+  const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
+
+  const developerInsightRows = useMemo(() => {
+    if (rawDeveloperInsightRows === null) return [];
+    return mergeDeveloperInsightRows(projectDevelopers, rawDeveloperInsightRows);
+  }, [projectDevelopers, rawDeveloperInsightRows]);
+
+  /** Refetch AI rows when sprint KPIs / developer stats change (e.g. after task edits). */
+  const sprintInsightsRefreshKey = selectedSprint
+    ? JSON.stringify({
+        id: selectedSprint.id,
+        devs: (selectedSprint.developers || []).map((d) => [
+          d.name,
+          d.assigned,
+          d.completed,
+          d.onTime,
+          d.hours,
+        ]),
+      })
+    : '';
+
   useEffect(() => {
     if (!sprintsReady || selectedSprintId == null) {
-      setDeveloperInsightRows(null);
+      setRawDeveloperInsightRows(null);
       return undefined;
     }
     let cancelled = false;
     setInsightsLoading(true);
-    setDeveloperInsightRows(null);
+    setRawDeveloperInsightRows(null);
     fetchSprintInsights(selectedSprintId)
       .then(({ notFound, data }) => {
         if (cancelled) return;
         if (notFound || !data || data.error) {
-          setDeveloperInsightRows([]);
+          setRawDeveloperInsightRows([]);
+          setInsightsGeneratedAt(null);
           return;
         }
         const rows = data.insights?.developerInsights;
-        setDeveloperInsightRows(Array.isArray(rows) ? rows : []);
+        setRawDeveloperInsightRows(Array.isArray(rows) ? rows : []);
+        setInsightsGeneratedAt(data.generatedAt ?? null);
       })
       .catch(() => {
-        if (!cancelled) setDeveloperInsightRows([]);
+        if (!cancelled) setRawDeveloperInsightRows([]);
       })
       .finally(() => {
         if (!cancelled) setInsightsLoading(false);
@@ -127,9 +162,7 @@ export default function TeamPage({
     return () => {
       cancelled = true;
     };
-  }, [selectedSprintId, sprintsReady]);
-
-  const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
+  }, [selectedSprintId, sprintsReady, sprintInsightsRefreshKey]);
 
   if (loading) return <PageLoadingSpinner />;
 
@@ -223,20 +256,31 @@ export default function TeamPage({
       </Box>
 
       {sprints.length === 0 && (
-        <Paper sx={{ 
-          p: 4, 
-          textAlign: 'center', 
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-        }}>
+        <Paper
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
           <Typography color="textSecondary">No sprints found for this project.</Typography>
         </Paper>
       )}
 
       {selectedSprintId != null && !selectedSprint && sprints.length > 0 && (
-        <Paper sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+        <Paper
+          sx={{
+            p: 3,
+            mb: 3,
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
           <Typography color="text.secondary">
             Sprint data is still syncing. Pick another sprint in the dropdown or refresh the page.
           </Typography>
@@ -248,6 +292,7 @@ export default function TeamPage({
           <TeamWorkloadBreakdown
             sprint={selectedSprint}
             aiDeveloperInsights={developerInsightRows}
+            projectDevelopers={projectDevelopers}
           />
 
           <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
@@ -280,11 +325,22 @@ export default function TeamPage({
               </Typography>
             </Box>
             <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 1.25, lineHeight: 1.5 }}
+              >
+                Completion counts and on-time/late text are rebuilt from current assignments each
+                time this section loads.{' '}
+                {insightsGeneratedAt
+                  ? `AI narrative last generated: ${new Date(insightsGeneratedAt).toLocaleString()}.`
+                  : 'Run Generate in AI Insights to store a full sprint narrative.'}
+              </Typography>
               {insightsLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                   <CircularProgress size={28} sx={{ color: '#673AB7' }} />
                 </Box>
-              ) : developerInsightRows?.length > 0 ? (
+              ) : developerInsightRows.length > 0 ? (
                 <DeveloperInsightsTable rows={developerInsightRows} />
               ) : (
                 <Typography

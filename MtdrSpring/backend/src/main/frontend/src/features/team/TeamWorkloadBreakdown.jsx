@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { developerAvatarColors } from '../../utils/developerColors';
+import { mergeRosterWithSprintDevelopers } from '../../utils/teamRosterUtils';
 
 const HEALTHY_COLOR = '#2E7D32';
 const HEALTHY_TRACK_LIGHT = 'rgba(46, 125, 50, 0.18)';
@@ -53,7 +54,11 @@ function buildAiOverloadMap(aiRows) {
   return map;
 }
 
-export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = null }) {
+export default function TeamWorkloadBreakdown({
+  sprint,
+  aiDeveloperInsights = null,
+  projectDevelopers = [],
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
@@ -64,7 +69,10 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
   const aiAvailable = Array.isArray(aiDeveloperInsights) && aiDeveloperInsights.length > 0;
 
   const rows = useMemo(() => {
-    const devs = Array.isArray(sprint?.developers) ? sprint.developers : [];
+    const devs = mergeRosterWithSprintDevelopers(
+      projectDevelopers,
+      Array.isArray(sprint?.developers) ? sprint.developers : [],
+    );
     return devs
       .map((d) => {
         const name = String(d?.name || 'Unknown');
@@ -82,10 +90,11 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
           profilePicture: d?.profilePicture || null,
           isOverloaded: Boolean(aiEntry?.overloaded),
           aiReason: aiEntry?.insight ?? '',
+          unassigned: assigned === 0,
         };
       })
-      .sort((a, b) => b.workload - a.workload);
-  }, [sprint, aiOverloadMap]);
+      .sort((a, b) => b.workload - a.workload || String(a.name).localeCompare(String(b.name)));
+  }, [sprint, aiOverloadMap, projectDevelopers]);
 
   if (rows.length === 0) {
     return (
@@ -103,8 +112,8 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
           Workload breakdown
         </Typography>
         <Typography sx={{ fontSize: '0.95rem', color: 'text.secondary', lineHeight: 1.55 }}>
-          No developers with assignments in this sprint yet. Add people to the sprint roster or assign
-          tasks, then refresh this page.
+          No developers on the project team yet. Assign a team to this project or add members to the
+          team roster.
         </Typography>
       </Paper>
     );
@@ -227,10 +236,28 @@ export default function TeamWorkloadBreakdown({ sprint, aiDeveloperInsights = nu
                         fontSize: { xs: '0.85rem', sm: '0.9rem' },
                       }}
                     >
-                      {row.assigned} task{row.assigned === 1 ? '' : 's'}
-                      <Box component="span" sx={{ color: isDark ? '#78909C' : '#78909C', fontWeight: 600, ml: 1 }}>
-                        Completion: {row.completionRate}%
-                      </Box>
+                      {row.unassigned ? (
+                        <Box
+                          component="span"
+                          sx={{ color: isDark ? '#78909C' : '#78909C', fontWeight: 600 }}
+                        >
+                          No tasks assigned this sprint
+                        </Box>
+                      ) : (
+                        <>
+                          {row.assigned} task{row.assigned === 1 ? '' : 's'}
+                          <Box
+                            component="span"
+                            sx={{
+                              color: isDark ? '#78909C' : '#78909C',
+                              fontWeight: 600,
+                              ml: 1,
+                            }}
+                          >
+                            Completion: {row.completionRate}%
+                          </Box>
+                        </>
+                      )}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>

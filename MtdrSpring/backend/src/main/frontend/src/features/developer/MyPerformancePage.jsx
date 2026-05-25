@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Grid, Typography, Alert } from '@mui/material';
 import { motion } from 'framer-motion';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
-import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import DeveloperMetricCards from './DeveloperMetricCards';
 import {
   aggregateDeveloperPerformance,
@@ -18,6 +18,7 @@ import { pageEase } from '../tasks/constants/taskConstants';
 const ORACLE_RED = '#C74634';
 
 export default function MyPerformancePage({ projectId, currentUser }) {
+  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,26 +27,16 @@ export default function MyPerformancePage({ projectId, currentUser }) {
   const userName = currentUser?.name;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    fetchDashboardSprints(projectId)
-      .then((data) => {
-        if (!cancelled) setSprints(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSprints([]);
-          setError('Could not load performance data.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+    setLoading(sharedLoading);
+    if (sharedError) {
+      setSprints([]);
+      setError('Could not load performance data.');
+    } else {
+      setError('');
+      setSprints(Array.isArray(sharedSprints) ? sharedSprints : []);
+    }
+    if (!sharedLoading) setLoading(false);
+  }, [projectId, sharedSprints, sharedLoading, sharedError]);
 
   const metrics = useMemo(
     () => aggregateDeveloperPerformance(sprints, userId, userName),

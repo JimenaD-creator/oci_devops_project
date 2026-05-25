@@ -30,8 +30,9 @@ import {
   alignAlertMessagePercent,
   clampKpiPercentForDisplay,
   clampTrendsPercentLikeValues,
-  alignTrendsProductivityScore,
   alignKpiMetricsInText,
+  alignKpiProseForMetric,
+  alignProductivityScoreProse,
 } from './aiInsightsConstants';
 
 const getSeverity = (severityKey, isDark) => {
@@ -72,7 +73,14 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
       ? clampKpiPercentForDisplay(currentSprintMetrics[kpiKey])
       : null;
   const effectiveAlertValue = normalizedKpiMetric != null ? normalizedKpiMetric : alert.value;
-  const messageText = alignAlertMessagePercent(alert.message, effectiveAlertValue);
+  let messageText = alert.message;
+  if (currentSprintMetrics) {
+    messageText = alignKpiMetricsInText(messageText, currentSprintMetrics);
+    if (kpiKey && currentSprintMetrics[kpiKey] != null) {
+      messageText = alignKpiProseForMetric(messageText, kpiKey, currentSprintMetrics);
+    }
+  }
+  messageText = alignAlertMessagePercent(messageText, effectiveAlertValue);
   const valueIsPercentKpi = KPI_ALERT_PERCENT_KEYS.has(kpiKey);
   return (
     <Box
@@ -374,23 +382,21 @@ export function ExecutiveSummaryBlock({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const es = executiveSummary;
-  const trendsText = alignKpiMetricsInText(
-    alignTrendsProductivityScore(
-      clampTrendsPercentLikeValues(es?.trends),
-      currentSprintActualScore,
-    ),
-    currentSprintMetrics ?? {
-      productivityScore: currentSprintActualScore,
-    },
-  );
   const alignedMetrics = currentSprintMetrics ?? {
     productivityScore: currentSprintActualScore,
   };
-  const overviewText = es?.overview ? alignKpiMetricsInText(es.overview, alignedMetrics) : null;
-  const improvementAreasText = es?.improvementAreas
-    ? alignKpiMetricsInText(es.improvementAreas, alignedMetrics)
-    : null;
-  const nextStepsText = es?.nextSteps ? alignKpiMetricsInText(es.nextSteps, alignedMetrics) : null;
+  const alignEsBlock = (raw) => {
+    if (!raw) return null;
+    const clamped = clampTrendsPercentLikeValues(raw);
+    const withKpis = alignKpiMetricsInText(clamped, alignedMetrics);
+    return currentSprintActualScore != null
+      ? alignProductivityScoreProse(withKpis, currentSprintActualScore)
+      : withKpis;
+  };
+  const trendsText = alignEsBlock(es?.trends);
+  const overviewText = alignEsBlock(es?.overview);
+  const improvementAreasText = alignEsBlock(es?.improvementAreas);
+  const nextStepsText = alignEsBlock(es?.nextSteps);
   const hasEsContent = Boolean(
     es && (overviewText || trendsText || improvementAreasText || nextStepsText),
   );

@@ -4,15 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.Sprint;
 import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.model.Task;
+import com.springboot.MyTodoList.model.Team;
+import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserSprint;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.SprintRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
+import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,14 +40,30 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GeminiService {
+
+    private static final long ENRICH_RESPONSE_CACHE_MS = 45_000;
+    private final ConcurrentHashMap<String, CachedEnrichedInsights> enrichResponseCache =
+        new ConcurrentHashMap<>();
+
+    private static final class CachedEnrichedInsights {
+        final JsonNode node;
+        final long expiresAtMs;
+
+        CachedEnrichedInsights(JsonNode node, long expiresAtMs) {
+            this.node = node;
+            this.expiresAtMs = expiresAtMs;
+        }
+    }
 
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
@@ -80,6 +100,9 @@ public class GeminiService {
 
     @Autowired
     private UserSprintRepository userSprintRepository;
+
+    @Autowired
+    private TeamMembersRepository teamMembersRepository;
 
     @Autowired
     private KpiService kpiService;
@@ -325,11 +348,19 @@ public class GeminiService {
                 int completedTasks;
                 int onTimeCompletedTasks;
                 int lateCompletedTasks;
+                int unknownCompletionTiming;
                 int completedWithZeroHours;
                 long workedHours;
                 long assignedHours;
                 boolean fromSprintRosterOnly;
+                boolean fromProjectTeamOnly;
                 final List<Map<String, Object>> taskSamples = new ArrayList<>();
+            }
+            Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+            for (UserTask ut : rows) {
+                if (ut.getId() != null) {
+                    assigneeCountByTask.merge(ut.getId().getTaskId(), 1, Integer::sum);
+                }
             }
             Map<Long, Agg> byUser = new LinkedHashMap<>();
             for (UserTask ut : rows) {
@@ -358,12 +389,15 @@ public class GeminiService {
                     return x;
                 });
                 a.taskRows++;
-                String st = t.getStatus();
-                if (st != null && "DONE".equalsIgnoreCase(st.trim())) {
+                if (isUserTaskAssignmentComplete(ut)) {
                     a.completedTasks++;
-                    if (isTaskFinishedOnTime(t)) {
+                    int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                    Boolean onTime = evaluateUserTaskOnTime(ut, t, assigneeCount);
+                    if (onTime == null) {
+                        a.unknownCompletionTiming++;
+                    } else if (onTime) {
                         a.onTimeCompletedTasks++;
-                    } else if (isTaskFinishedLate(t)) {
+                    } else {
                         a.lateCompletedTasks++;
                     }
                     if (ut.getWorkedHours() == null || ut.getWorkedHours() <= 0) {
@@ -423,6 +457,45 @@ public class GeminiService {
                 }
             }
 
+            Optional<Sprint> sprintOpt = sprintRepository.findById(sprintId);
+            if (sprintOpt.isPresent()) {
+                Project project = sprintOpt.get().getAssignedProject();
+                if (project != null) {
+                    Team team = project.getAssignedTeam();
+                    if (team != null && team.getId() != null) {
+                        List<TeamMember> members = teamMembersRepository.findByTeam_Id(team.getId());
+                        if (members != null) {
+                            for (TeamMember tm : members) {
+                                User u = tm.getUser();
+                                if (u == null || !isDeveloperUser(u)) {
+                                    continue;
+                                }
+                                Long uid = u.getId();
+                                if (byUser.containsKey(uid)) {
+                                    continue;
+                                }
+                                Agg a = new Agg();
+                                a.name = u.getName() != null && !u.getName().isBlank()
+                                    ? u.getName().trim() : ("User " + uid);
+                                a.fromProjectTeamOnly = true;
+                                byUser.put(uid, a);
+                            }
+                        }
+                        User manager = team.getManager();
+                        if (manager != null && isDeveloperUser(manager)) {
+                            Long uid = manager.getId();
+                            if (!byUser.containsKey(uid)) {
+                                Agg a = new Agg();
+                                a.name = manager.getName() != null && !manager.getName().isBlank()
+                                    ? manager.getName().trim() : ("User " + uid);
+                                a.fromProjectTeamOnly = true;
+                                byUser.put(uid, a);
+                            }
+                        }
+                    }
+                }
+            }
+
             if (byUser.isEmpty()) {
                 System.err.println("[GeminiService] buildTeamWorkloadJson: no USER_TASK and no USER_SPRINT roster for sprint "
                     + sprintId);
@@ -437,11 +510,13 @@ public class GeminiService {
                 row.put("completedTasks", a.completedTasks);
                 row.put("onTimeCompletedTasks", a.onTimeCompletedTasks);
                 row.put("lateCompletedTasks", a.lateCompletedTasks);
+                row.put("unknownCompletionTiming", a.unknownCompletionTiming);
                 row.put("completedWithZeroHours", a.completedWithZeroHours);
                 row.put("workedHoursSum", a.workedHours);
                 row.put("assignedHoursSum", a.assignedHours);
                 row.put("taskSamples", a.taskSamples);
                 row.put("fromSprintRosterOnly", a.fromSprintRosterOnly);
+                row.put("fromProjectTeamOnly", a.fromProjectTeamOnly);
                 out.add(row);
             }
             return mapper.writeValueAsString(out);
@@ -449,6 +524,14 @@ public class GeminiService {
             System.err.println("[GeminiService] buildTeamWorkloadJson: " + e.getMessage());
             return "[]";
         }
+    }
+
+    private static boolean isDeveloperUser(User user) {
+        String type = user != null ? user.getType() : null;
+        if (type == null) {
+            return false;
+        }
+        return type.trim().toLowerCase(Locale.ROOT).contains("developer");
     }
 
     /**
@@ -519,6 +602,7 @@ public class GeminiService {
             m.put("startDate", start != null ? start.toString() : "");
             m.put("dueDate", due != null ? due.toString() : "");
             m.put("asOf", now.toString());
+            m.put("isEarlySnapshot", isSprintEarlyForProductivityGuide(s));
             if (s.getGoal() != null && !s.getGoal().isBlank()) {
                 m.put("sprintGoal", s.getGoal().trim());
             }
@@ -703,7 +787,7 @@ public class GeminiService {
             "\"teamParticipation\":\"...\",\"workloadBalance\":\"...\",\"productivityScore\":\"...\"}}," +
             "\"summary\":\"Brief 2-3 sentence assessment and the top priority action.\"}\n\n" +
             "## Rules\n" +
-            "- Sprint not started yet: If Sprint timeline.phase is not_started (asOf before startDate), KPIs are pre-execution baselines — not evidence the team is behind. Do NOT frame low completion, on-time delivery, or productivity as performance problems, delivery risk, or \"missing the sprint\" because work has not begun. Do NOT use 'warning' or 'critical' alerts for KPI shortfalls caused only by the calendar. predictions must be conditional and calm (e.g. revisit after the sprint starts); avoid urgent \"at current pace\" delivery judgments. actionableRecommendations: at most 0–2 items, only genuinely preparatory (clarify scope, confirm assignments, unblock true blockers from the blocked list); use [] when nothing material applies — do NOT push workload redistribution, training, or replanning narratives driven by empty or not-yet-due work. executiveSummary and summary: briefly state the sprint has not started (plain English dates), acknowledge roster/tasks as planned, and defer deep performance commentary until execution has begun.\n" +
+            "- Sprint not started yet: If Sprint timeline.phase is not_started (asOf before startDate), KPIs are pre-execution baselines — not evidence the team is behind. Do NOT frame low completion, on-time delivery, or productivity as performance problems, delivery risk, or \"missing the sprint\" because work has not begun. Do NOT use 'warning' or 'critical' alerts for KPI shortfalls caused only by the calendar. predictions must be conditional and calm (e.g. revisit after the sprint starts); avoid urgent \"at current pace\" delivery judgments. Still produce workloadRecommendations and overloaded flags when workloadBalance < 70 or planned assignments/assignedHoursSum are clearly uneven across developers — frame as planning guidance (rebalance before the sprint starts), not execution failure. actionableRecommendations: up to 3 preparatory items (workload_redistribution, planning, blockers from the blocked list); use [] only when assignments are balanced and there are no blockers. executiveSummary and summary: briefly state the sprint has not started (plain English dates), acknowledge roster/tasks as planned, and mention workload balance or overload risks when assignment data supports it.\n" +
             "- Mid-sprint (in_progress only): KPIs are a partial snapshot — still produce substantive output. Use severity 'info' for neutral early observations (e.g. pace vs time remaining, scope vs done count). Do not leave executiveSummary fields blank, omit developerInsights when team workload is non-empty, or return empty actionableRecommendations solely because the sprint has not ended or scores are low.\n" +
             "- Tasks not yet in their execution window: Each taskSamples entry may include startDate. Compare Sprint timeline.asOf to that startDate (ISO local). If asOf is strictly before a task's startDate, you MUST NOT treat that task as late, at risk, or poor execution because it is still To do/In progress/In review; do not cite it in alerts, risks, or recommendations as delay or backlog pressure. Ignore \"zero progress\" on those tasks when judging developers or workload. Recommendations must not be driven only by such not-yet-started tasks.\n" +
             "- In all narrative strings (alerts, recommendations, predictions, summaries, developer insights), "
@@ -725,19 +809,25 @@ public class GeminiService {
             "    (a) The developer still has uncompleted work in this sprint — i.e., (assignedTaskRows − completedTasks) ≥ 1. If they have already completed all their assigned work, overloaded MUST be false regardless of how many hours they logged.\n" +
             "    (b) The developer is clearly carrying more in-flight work than peers — for example: workedHoursSum is significantly above the team average (roughly 1.4x+ the team mean) AND/OR assignedTaskRows is significantly above the team average, OR assignedHoursSum (estimated load) is clearly higher than peers with a similar assignment count, OR the developer is juggling multiple blocked or urgent tasks that add real pressure.\n" +
             "  Otherwise set overloaded=false. If another developer has the same assignedTaskRows and similar workedHoursSum and assignedHoursSum, do NOT mark overloaded=true for only one of them — treat parity as not overloaded unless hours/estimates or blocked/urgent pressure clearly skew to one person. Roster-only developers and developers with zero assignment rows MUST have overloaded=false. High logged hours alone do not justify overload when there is no pending work. When the team has 2 or fewer developers, mark overloaded=true only if there is an unmistakable disparity.\n" +
-            "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure) AND mention that uncompleted work remains.\n" +
+            "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure), mention that uncompleted work remains, and name a specific teammate to receive moved tasks (use the least-loaded assignee by assignedTaskRows/assignedHoursSum).\n" +
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
             "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero. If phase is not_started, keep these neutral (planned/upcoming work only; no implied underperformance).\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
-            "- workloadRecommendations: only if workloadBalance < 70; else []. When generated, base from/to decisions on real logged hours (workedHoursSum) and open urgent work so recommendations reduce overload; avoid assigning additional tasks to developers already above team-average logged hours unless no alternative exists.\n" +
+            "- workloadRecommendations: only if workloadBalance < 70 or planned assignment counts/hours are materially uneven; else []. When generated, base from/to on assignedTaskRows and assignedHoursSum (for not_started, prefer planned load over workedHoursSum). For in_progress sprints, also use workedHoursSum and open urgent work. Avoid assigning additional tasks to the most-loaded developer when a teammate has lower planned or logged load.\n" +
             "  Never set 'to' / destination to a developer who has the highest workedHoursSum on the team workload list when another teammate has lower hours and can take work — especially do not move tasks onto someone who already logged the most hours this sprint.\n" +
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
             "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
             "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
+            "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, teamParticipation, and workloadBalance — "
+            + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
+            + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
+            + "(no baseline, expected, underperforming, sprint not started, early snapshot, little work completed yet, or similar excuses). "
+            + "You MAY add one short sentence that the score will update as the sprint runs and tasks or hours change. "
+            + "FORBIDDEN always: \"matching the KPI card above\", formula weights (40%%/30%%/20%%/10%%).\n" +
             "- summary: English; may echo executiveSummary.overview.\n" +
             "- Do not include any text outside the JSON object";
     }
@@ -854,6 +944,45 @@ public class GeminiService {
             if (insights == null || !insights.isObject()) {
                 return insights;
             }
+            String cacheKey = sprintId + "|" + insights.hashCode();
+            long now = System.currentTimeMillis();
+            CachedEnrichedInsights hit = enrichResponseCache.get(cacheKey);
+            if (hit != null && hit.expiresAtMs > now) {
+                return applyLiveDeveloperNarratives(hit.node, sprintId);
+            }
+            JsonNode enriched = enrichInsightsForResponseUncached(insights, sprintId);
+            if (enriched != null) {
+                enrichResponseCache.put(
+                    cacheKey,
+                    new CachedEnrichedInsights(enriched, now + ENRICH_RESPONSE_CACHE_MS));
+                if (enrichResponseCache.size() > 80) {
+                    enrichResponseCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
+                }
+            }
+            return applyLiveDeveloperNarratives(enriched, sprintId);
+        } catch (Exception e) {
+            System.err.println("[GeminiService] enrichInsightsForResponse: " + e.getMessage());
+            return insights;
+        }
+    }
+
+    /** Recomputes developerInsights text from DB on every response (not only at Gemini generation time). */
+    private JsonNode applyLiveDeveloperNarratives(JsonNode enriched, Long sprintId) {
+        if (enriched == null || !enriched.isObject() || sprintId == null) {
+            return enriched;
+        }
+        ObjectNode copy = ((ObjectNode) enriched).deepCopy();
+        syncDeveloperInsightNarrativesFromLiveWorkload(copy, sprintId);
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        ensureWorkloadGuidanceFromAssignments(copy, sprintId, sprint);
+        return copy;
+    }
+
+    private JsonNode enrichInsightsForResponseUncached(JsonNode insights, Long sprintId) {
+        try {
+            if (insights == null || !insights.isObject()) {
+                return insights;
+            }
             JsonNode normalized = camelCaseKeysDeep(insights);
             if (!normalized.isObject()) {
                 return insights;
@@ -868,6 +997,7 @@ public class GeminiService {
             enrichActionableRecommendationsIfEmpty(root, sprint);
             normalizeActionableRecommendationCounts(root, sprintId);
             refineWorkloadRedistributionRecommendations(root, sprintId);
+            ensureWorkloadGuidanceFromAssignments(root, sprintId, sprint);
             suppressComparativeTrendsForFirstSprint(root, sprintId);
             enrichExecutiveSummaryIfSparse(root);
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
@@ -875,10 +1005,11 @@ public class GeminiService {
             normalizeAlertSeverities(root);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
+            normalizeKpiManagerGuideProductivityScore(root, sprintId);
             prettifyHumanProseInInsights(root);
             return root;
         } catch (Exception e) {
-            System.err.println("[GeminiService] enrichInsightsForResponse: " + e.getMessage());
+            System.err.println("[GeminiService] enrichInsightsForResponseUncached: " + e.getMessage());
             return insights;
         }
     }
@@ -1174,6 +1305,162 @@ public class GeminiService {
             o.put("overloaded", false);
             dev.add(o);
         }
+    }
+
+    /**
+     * Overwrites persisted Gemini prose with facts from the current USER_TASK / TASK snapshot on every GET.
+     * Narrative style is kept similar to AI Insights, but counts and on-time/late come from live DB rows.
+     */
+    private void syncDeveloperInsightNarrativesFromLiveWorkload(ObjectNode root, Long sprintId) {
+        try {
+            JsonNode wl = mapper.readTree(buildTeamWorkloadJson(sprintId));
+            if (wl == null || !wl.isArray()) {
+                return;
+            }
+            long workedSum = 0;
+            int workedDevCount = 0;
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                if (row.path("fromSprintRosterOnly").asBoolean(false)
+                    || row.path("fromProjectTeamOnly").asBoolean(false)) {
+                    continue;
+                }
+                workedSum += row.path("workedHoursSum").asLong(0);
+                workedDevCount++;
+            }
+            long teamAvgWorked = workedDevCount > 0
+                ? Math.round((double) workedSum / workedDevCount) : 0L;
+
+            ArrayNode dev = ensureArrayField(root, "developerInsights");
+            Map<String, ObjectNode> byNameLower = new HashMap<>();
+            for (JsonNode item : dev) {
+                if (item != null && item.isObject()) {
+                    String key = item.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+                    if (!key.isEmpty()) {
+                        byNameLower.put(key, (ObjectNode) item);
+                    }
+                }
+            }
+
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                String name = row.path("developerName").asText("").trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                String key = name.toLowerCase(Locale.ROOT);
+                ObjectNode o = byNameLower.get(key);
+                if (o == null) {
+                    o = mapper.createObjectNode();
+                    o.put("developerName", name);
+                    o.put("overloaded", false);
+                    dev.add(o);
+                    byNameLower.put(key, o);
+                }
+                o.put("insight", buildLiveDeveloperInsightNarrative(row, teamAvgWorked));
+                o.put("liveDataSynced", true);
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] syncDeveloperInsightNarrativesFromLiveWorkload: " + e.getMessage());
+        }
+    }
+
+    private static String buildLiveDeveloperInsightNarrative(JsonNode row, long teamAvgWorkedHours) {
+        boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
+        boolean projectTeamOnly = row.path("fromProjectTeamOnly").asBoolean(false);
+        int completed = row.path("completedTasks").asInt(0);
+        int onTime = row.path("onTimeCompletedTasks").asInt(0);
+        int late = row.path("lateCompletedTasks").asInt(0);
+        int unknown = row.path("unknownCompletionTiming").asInt(0);
+        long worked = row.path("workedHoursSum").asLong(0);
+        int assignedRows = row.path("assignedTaskRows").asInt(0);
+
+        StringBuilder sb = new StringBuilder();
+        if (projectTeamOnly) {
+            sb.append("On the project team with no tasks assigned in this sprint.");
+        } else if (rosterOnly) {
+            sb.append("On the sprint roster with no assignment rows in the current snapshot.");
+        } else if (completed == 0 && assignedRows > 0) {
+            sb.append(String.format(
+                "%d assignment row(s) in this sprint; none marked complete in the current snapshot.",
+                assignedRows));
+        } else if (completed > 0) {
+            sb.append(String.format(
+                "Completed %d assignment%s",
+                completed,
+                completed == 1 ? "" : "s"));
+            int known = onTime + late;
+            if (known == 0 && unknown > 0) {
+                sb.append(
+                    "; completion time is not recorded yet (set USER_TASK.COMPLETED_AT or re-complete to judge on-time delivery).");
+            } else if (late == 0 && onTime > 0) {
+                sb.append(", all finished on or before the due date.");
+            } else if (onTime == 0 && late > 0) {
+                sb.append(", all finished after the deadline.");
+            } else if (late > 0 && onTime > 0) {
+                sb.append(String.format(
+                    ", with %d on time and %d after the deadline.",
+                    onTime,
+                    late));
+            }
+            if (unknown > 0 && known > 0) {
+                sb.append(String.format(
+                    " %d completed assignment%s lack a recorded completion timestamp.",
+                    unknown,
+                    unknown == 1 ? "" : "s"));
+            }
+        } else {
+            sb.append("No assignment rows in the workload snapshot for this sprint.");
+        }
+
+        String hoursPhrase = describeWorkedHoursVsTeam(worked, teamAvgWorkedHours);
+        if (!hoursPhrase.isEmpty()) {
+            sb.append(' ').append(hoursPhrase);
+        }
+        return sb.toString().trim();
+    }
+
+    private static String describeWorkedHoursVsTeam(long worked, long teamAvg) {
+        if (worked <= 0 && teamAvg <= 0) {
+            return "";
+        }
+        if (teamAvg <= 0) {
+            return worked > 0 ? "Hours logged on assignments." : "";
+        }
+        if (worked > teamAvg + Math.max(2, Math.round(teamAvg * 0.15))) {
+            return "Hours logged are above the team average.";
+        }
+        if (worked > 0 && worked < teamAvg - Math.max(2, Math.round(teamAvg * 0.15))) {
+            return "Hours logged are below the team average.";
+        }
+        return "Hours logged are within a reasonable range.";
+    }
+
+    private static boolean isUserTaskAssignmentComplete(UserTask ut) {
+        return UserTask.isCompletedAssignmentStatus(ut != null ? ut.getStatus() : null);
+    }
+
+    /**
+     * Per-assignee on-time: USER_TASK.completedAt vs task due date (calendar day).
+     * Returns null when completion time is unknown (typical legacy multi-assignee rows).
+     */
+    private static Boolean evaluateUserTaskOnTime(UserTask ut, Task t, int assigneeCount) {
+        if (t == null || t.getDueDate() == null) {
+            return null;
+        }
+        LocalDateTime doneAt = ut.getCompletedAt();
+        if (doneAt == null) {
+            if (assigneeCount <= 1 && t.getFinishDate() != null) {
+                doneAt = t.getFinishDate();
+            } else {
+                return null;
+            }
+        }
+        return !doneAt.toLocalDate().isAfter(t.getDueDate().toLocalDate());
     }
 
     private void addRecommendation(ArrayNode recs, String category, String text) {
@@ -1759,6 +2046,424 @@ public class GeminiService {
         }
     }
 
+    private static String resolveSprintPhase(Sprint sprint) {
+        if (sprint == null) {
+            return "unknown";
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = sprint.getStartDate();
+        LocalDateTime due = sprint.getDueDate();
+        if (start == null || due == null) {
+            return "unknown";
+        }
+        java.time.LocalDate today = now.toLocalDate();
+        java.time.LocalDate startDay = start.toLocalDate();
+        java.time.LocalDate dueDay = due.toLocalDate();
+        if (today.isBefore(startDay)) {
+            return "not_started";
+        }
+        if (today.isAfter(dueDay)) {
+            return "ended";
+        }
+        return "in_progress";
+    }
+
+    private static boolean isSprintEarlyForProductivityGuide(Sprint sprint) {
+        if (sprint == null) {
+            return true;
+        }
+        String phase = resolveSprintPhase(sprint);
+        if ("not_started".equals(phase)) {
+            return true;
+        }
+        if ("ended".equals(phase)) {
+            return false;
+        }
+        LocalDateTime start = sprint.getStartDate();
+        LocalDateTime due = sprint.getDueDate();
+        if (start == null || due == null) {
+            return true;
+        }
+        java.time.LocalDate today = LocalDateTime.now().toLocalDate();
+        java.time.LocalDate startDay = start.toLocalDate();
+        java.time.LocalDate dueDay = due.toLocalDate();
+        long daysTotal = java.time.temporal.ChronoUnit.DAYS.between(startDay, dueDay) + 1;
+        long daysElapsed = java.time.temporal.ChronoUnit.DAYS.between(startDay, today) + 1;
+        if (daysTotal < 1) {
+            daysTotal = 1;
+        }
+        if (daysElapsed < 1) {
+            daysElapsed = 1;
+        }
+        return daysElapsed <= 4L || ((double) daysElapsed / (double) daysTotal) <= 0.25;
+    }
+
+    private static String stripProductivityGuideInstructionEcho(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String out = text.trim();
+        out = out.replaceAll("(?i),?\\s*matching the KPI card above\\s*\\([^)]*\\)\\.?", ".");
+        out = out.replaceAll("(?i),?\\s*matching the KPI card above\\.?", ".");
+        out = out.replaceAll("(?i)\\s*\\(completion\\s*40\\s*%[^)]*workload\\s*balance\\s*10\\s*%\\)\\.?", "");
+        out = out.replaceAll("(?i)\\s*\\(completion\\s*×\\s*0\\.4[^)]*\\)\\.?", "");
+        out = out.replaceAll("\\s{2,}", " ").replaceAll("\\.\\s*\\.", ".").trim();
+        return out;
+    }
+
+    private static final Pattern PRODUCTIVITY_NEGATIVE_LABEL = Pattern.compile(
+        "\\b(weak|poor|underperform|under-performing|dragging|mixed|behind|at risk|falling short|struggling)\\b",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String softenProductivityGuidePerformanceLabels(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return PRODUCTIVITY_NEGATIVE_LABEL.matcher(text).replaceAll("").replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private static final Pattern PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE = Pattern.compile(
+        ".*\\b(?:sprint\\s+has\\s+not\\s+started|sprint\\s+not\\s+started|not\\s+started\\s+yet|"
+            + "just\\s+begun|only\\s+just\\s+begun|early\\s+snapshot|pre-execution|"
+            + "low\\s+(?:value|score|figure|percentage)[^.]{0,120}(?:expected|normal|baseline)|"
+            + "baseline\\s+from|does\\s+not\\s+mean|underperform|"
+            + "little\\s+completed\\s+work|not\\s+poor\\s+delivery\\s+yet|"
+            + "a\\s+low\\s+value\\s+is\\s+expected|few\\s+days\\s+in)\\b.*",
+        Pattern.CASE_INSENSITIVE);
+
+    /** Drops sentences that excuse a low productivityScore before the sprint is mature. */
+    private static String stripProductivityLowScoreExcuses(String text, Sprint sprint) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        if (!"not_started".equals(resolveSprintPhase(sprint)) && !isSprintEarlyForProductivityGuide(sprint)) {
+            return text;
+        }
+        String[] parts = text.split("(?<=[.!?])\\s+");
+        if (parts.length <= 1) {
+            return PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE.matcher(text).matches() ? "" : text;
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String part : parts) {
+            String s = part.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            if (!PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE.matcher(s).matches()) {
+                if (kept.length() > 0) {
+                    kept.append(' ');
+                }
+                kept.append(s);
+            }
+        }
+        String out = kept.toString().trim();
+        return out.isEmpty() ? text.trim() : out;
+    }
+
+    private static final Pattern PRODUCTIVITY_EVOLUTION_NOTE_ALREADY = Pattern.compile(
+        "\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
+            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|task\\s+(?:progress|updates?)|"
+            + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins)\\b",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String productivityEvolutionNote(Sprint sprint) {
+        String phase = resolveSprintPhase(sprint);
+        if ("not_started".equals(phase)) {
+            return "It will update once the sprint begins and tasks move through statuses, "
+                + "assignments, and logged hours feed the four KPIs.";
+        }
+        if (isSprintEarlyForProductivityGuide(sprint)) {
+            return "It will keep updating as tasks progress and completion, on-time delivery, "
+                + "participation, and workload balance change during the sprint.";
+        }
+        return "";
+    }
+
+    private static String appendProductivityEvolutionNote(String text, Sprint sprint) {
+        if (text == null || text.isBlank()) {
+            return productivityEvolutionNote(sprint);
+        }
+        String note = productivityEvolutionNote(sprint);
+        if (note.isBlank()) {
+            return text.trim();
+        }
+        String raw = text.trim();
+        if (PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(raw).find()) {
+            return raw;
+        }
+        return raw + " " + note;
+    }
+
+    /** Align %% with KPI card; keep Gemini prose like other metrics (strip prompt echoes only). */
+    private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
+        int clamped = Math.min(100, Math.max(0, scorePct));
+        if (existing == null || existing.isBlank()) {
+            return appendProductivityEvolutionNote(
+                String.format(
+                    Locale.ROOT,
+                    "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
+                        + "team participation, and workload balance into one indicator for overall sprint performance.",
+                    clamped),
+                sprint);
+        }
+        String out = stripProductivityGuideInstructionEcho(existing);
+        out = stripProductivityLowScoreExcuses(out, sprint);
+        if ("not_started".equals(resolveSprintPhase(sprint)) || isSprintEarlyForProductivityGuide(sprint)) {
+            out = softenProductivityGuidePerformanceLabels(out);
+        }
+        out = replaceProductivityScoreMentionsInProse(out, clamped);
+        return appendProductivityEvolutionNote(out, sprint);
+    }
+
+    private static final class AssignmentLoadSnap {
+        final String name;
+        final String nameLower;
+        final int assignedRows;
+        final int completed;
+        final long assignedHours;
+        final long workedHours;
+        final boolean rosterOnly;
+
+        AssignmentLoadSnap(String name, int assignedRows, int completed, long assignedHours, long workedHours,
+            boolean rosterOnly) {
+            this.name = name;
+            this.nameLower = name.trim().toLowerCase(Locale.ROOT);
+            this.assignedRows = assignedRows;
+            this.completed = completed;
+            this.assignedHours = assignedHours;
+            this.workedHours = workedHours;
+            this.rosterOnly = rosterOnly;
+        }
+
+        int pending() {
+            return Math.max(0, assignedRows - completed);
+        }
+    }
+
+    /**
+     * Ensures workload balance redistribution and overload flags exist from assignment data,
+     * including before the sprint starts (planned load only).
+     */
+    private void ensureWorkloadGuidanceFromAssignments(ObjectNode root, Long sprintId, Sprint sprint) {
+        try {
+            JsonNode wl = mapper.readTree(buildTeamWorkloadJson(sprintId));
+            if (wl == null || !wl.isArray() || wl.size() < 2) {
+                return;
+            }
+            List<AssignmentLoadSnap> snaps = new ArrayList<>();
+            for (JsonNode row : wl) {
+                if (row == null || !row.isObject()) {
+                    continue;
+                }
+                String name = row.path("developerName").asText("").trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false)
+                    || row.path("fromProjectTeamOnly").asBoolean(false);
+                snaps.add(new AssignmentLoadSnap(
+                    name,
+                    row.path("assignedTaskRows").asInt(0),
+                    row.path("completedTasks").asInt(0),
+                    row.path("assignedHoursSum").asLong(0),
+                    row.path("workedHoursSum").asLong(0),
+                    rosterOnly));
+            }
+            List<AssignmentLoadSnap> active = snaps.stream()
+                .filter(s -> !s.rosterOnly)
+                .collect(Collectors.toList());
+            List<AssignmentLoadSnap> withWork = active.stream()
+                .filter(s -> s.assignedRows > 0)
+                .collect(Collectors.toList());
+            if (withWork.size() < 2) {
+                return;
+            }
+
+            String phase = resolveSprintPhase(sprint);
+            boolean notStarted = "not_started".equals(phase);
+            double wb = sprint != null && sprint.getWorkloadBalance() != null
+                ? toPercent(sprint.getWorkloadBalance()) : -1.0;
+
+            double avgRows = withWork.stream().mapToInt(s -> s.assignedRows).average().orElse(0.0);
+            double avgHours = withWork.stream().mapToLong(s -> s.assignedHours).average().orElse(0.0);
+            AssignmentLoadSnap heaviest = withWork.stream()
+                .max(Comparator.comparingLong((AssignmentLoadSnap s) -> s.assignedHours)
+                    .thenComparingInt(s -> s.assignedRows))
+                .orElse(null);
+            AssignmentLoadSnap lightest = withWork.stream()
+                .min(Comparator.comparingLong((AssignmentLoadSnap s) -> s.assignedHours)
+                    .thenComparingInt(s -> s.assignedRows))
+                .orElse(null);
+            if (heaviest == null || lightest == null || heaviest.nameLower.equals(lightest.nameLower)) {
+                return;
+            }
+
+            int spreadRows = heaviest.assignedRows - lightest.assignedRows;
+            boolean imbalancedByKpi = wb >= 0.0 && wb < 70.0;
+            boolean imbalancedByRows = spreadRows >= 2;
+            boolean imbalancedByHours = heaviest.assignedHours >= lightest.assignedHours + 8L
+                && (avgHours <= 0.0 || heaviest.assignedHours >= avgHours * 1.35);
+            if (!imbalancedByKpi && !imbalancedByRows && !imbalancedByHours) {
+                return;
+            }
+
+            int tasksToMove = Math.max(1, spreadRows / 2);
+            String planningPrefix = notStarted
+                ? "Sprint has not started yet; planned assignments are uneven — "
+                : "";
+
+            ArrayNode workloadRecs = ensureArrayField(root, "workloadRecommendations");
+            if (workloadRecs.size() == 0) {
+                ObjectNode rec = mapper.createObjectNode();
+                rec.put("from", heaviest.name);
+                rec.put("to", lightest.name);
+                rec.put("tasksToMove", tasksToMove);
+                rec.put(
+                    "reason",
+                    String.format(
+                        "%s%s has %d planned assignment row(s) (~%d estimated hour(s)) vs %s with %d row(s) (~%d hour(s)); "
+                            + "moving ~%d task(s) before execution spreads load more evenly.",
+                        planningPrefix,
+                        heaviest.name,
+                        heaviest.assignedRows,
+                        heaviest.assignedHours,
+                        lightest.name,
+                        lightest.assignedRows,
+                        lightest.assignedHours,
+                        tasksToMove));
+                rec.put("assignmentGuidanceEnriched", true);
+                workloadRecs.add(rec);
+            }
+
+            ArrayNode actionable = ensureArrayField(root, "actionableRecommendations");
+            boolean hasWorkloadActionable = false;
+            for (JsonNode n : actionable) {
+                if (n.isObject()
+                    && "workload_redistribution".equalsIgnoreCase(n.path("category").asText(""))) {
+                    hasWorkloadActionable = true;
+                    break;
+                }
+            }
+            if (!hasWorkloadActionable) {
+                ObjectNode add = mapper.createObjectNode();
+                add.put("category", "workload_redistribution");
+                add.put(
+                    "text",
+                    String.format(
+                        "%sRebalance ~%d task(s) from %s to %s: %d planned assignment row(s) vs %d on the lighter side.",
+                        planningPrefix,
+                        tasksToMove,
+                        heaviest.name,
+                        lightest.name,
+                        heaviest.assignedRows,
+                        lightest.assignedRows));
+                add.put("assignmentGuidanceEnriched", true);
+                actionable.add(add);
+            }
+
+            ArrayNode devInsights = ensureArrayField(root, "developerInsights");
+            for (AssignmentLoadSnap s : withWork) {
+                if (s.pending() < 1) {
+                    continue;
+                }
+                boolean overloaded;
+                if (notStarted) {
+                    if (withWork.size() <= 2) {
+                        overloaded = s.nameLower.equals(heaviest.nameLower) && spreadRows >= 2;
+                    } else {
+                        overloaded = (avgRows > 0.0 && s.assignedRows >= avgRows * 1.4)
+                            || (avgHours > 0.0 && s.assignedHours >= avgHours * 1.35);
+                    }
+                } else {
+                    overloaded = (avgRows > 0.0 && s.assignedRows >= avgRows * 1.4)
+                        || (avgHours > 0.0 && s.assignedHours >= avgHours * 1.35)
+                        || (avgHours > 0.0 && s.workedHours >= avgHours * 1.4 && s.workedHours >= 8L);
+                }
+                if (!overloaded) {
+                    continue;
+                }
+                AssignmentLoadSnap receiver = withWork.stream()
+                    .filter(p -> !p.nameLower.equals(s.nameLower))
+                    .min(Comparator.comparingLong((AssignmentLoadSnap p) -> p.assignedHours)
+                        .thenComparingInt(p -> p.assignedRows))
+                    .orElse(lightest);
+                int suggestMove = Math.max(
+                    1,
+                    Math.max(spreadRows, s.assignedRows - receiver.assignedRows) / 2);
+                ObjectNode insightRow = findOrCreateDeveloperInsight(devInsights, s.name);
+                insightRow.put("overloaded", true);
+                insightRow.put("assignmentGuidanceEnriched", true);
+                insightRow.put("suggestedMoveTo", receiver.name);
+                insightRow.put("suggestedTasksToMove", suggestMove);
+                String note = notStarted
+                    ? String.format(
+                        "Planned load before sprint start: %d assignment row(s), ~%d estimated hour(s) "
+                            + "(team averages ~%.0f rows, ~%.0f hours) — consider moving ~%d task(s) to %s "
+                            + "(%d planned row(s), ~%d estimated hour(s)).",
+                        s.assignedRows,
+                        s.assignedHours,
+                        avgRows,
+                        avgHours,
+                        suggestMove,
+                        receiver.name,
+                        receiver.assignedRows,
+                        receiver.assignedHours)
+                    : String.format(
+                        "Carrying more than peers: %d open assignment row(s), ~%d estimated hour(s), "
+                            + "%d logged hour(s) — consider moving ~%d task(s) to %s "
+                            + "(%d planned row(s), ~%d estimated hour(s)).",
+                        s.pending(),
+                        s.assignedHours,
+                        s.workedHours,
+                        suggestMove,
+                        receiver.name,
+                        receiver.assignedRows,
+                        receiver.assignedHours);
+                insightRow.put("insight", note);
+            }
+
+            if (imbalancedByKpi) {
+                JsonNode guideNode = root.get("kpiManagerGuide");
+                if (guideNode != null && guideNode.isObject()) {
+                    ObjectNode guide = (ObjectNode) guideNode;
+                    JsonNode byMetricNode = guide.get("byMetric");
+                    ObjectNode byMetric = byMetricNode != null && byMetricNode.isObject()
+                        ? (ObjectNode) byMetricNode
+                        : mapper.createObjectNode();
+                    String wbText = notStarted
+                        ? String.format(
+                            "Workload balance is at %.0f%% — planned task assignments are uneven across the team. "
+                                + "Rebalance assignments before the sprint starts.",
+                            wb)
+                        : String.format(
+                            "Workload balance is at %.0f%% — task assignments are uneven; consider redistributing work.",
+                            wb);
+                    byMetric.put("workloadBalance", wbText);
+                    guide.set("byMetric", byMetric);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] ensureWorkloadGuidanceFromAssignments: " + e.getMessage());
+        }
+    }
+
+    private ObjectNode findOrCreateDeveloperInsight(ArrayNode dev, String developerName) {
+        String key = developerName.trim().toLowerCase(Locale.ROOT);
+        for (JsonNode item : dev) {
+            if (item != null && item.isObject()) {
+                String dn = item.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+                if (dn.equals(key)) {
+                    return (ObjectNode) item;
+                }
+            }
+        }
+        ObjectNode o = mapper.createObjectNode();
+        o.put("developerName", developerName.trim());
+        o.put("overloaded", false);
+        dev.add(o);
+        return o;
+    }
+
     private void suppressComparativeTrendsForFirstSprint(ObjectNode root, Long sprintId) {
         if (!isFirstSprintInProject(sprintId)) {
             return;
@@ -2022,6 +2727,56 @@ public class GeminiService {
                 + "This KPI measures how evenly tasks are distributed, not how fast each person completes them — "
                 + "use completion rate or developer insights if execution pace differs between teammates.",
             pct);
+    }
+
+    /**
+     * Overwrites stale Gemini productivity decimals (e.g. 67.9) with the canonical composite score
+     * from sprint KPI fields — same formula as the Productivity Score KPI card.
+     */
+    private void normalizeKpiManagerGuideProductivityScore(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        int ps = (int) Math.round(computeProductivityScore(sprint));
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode == null || !guideNode.isObject()) {
+            return;
+        }
+        ObjectNode guide = (ObjectNode) guideNode;
+        JsonNode byMetricNode = guide.get("byMetric");
+        ObjectNode byMetric;
+        if (byMetricNode == null || !byMetricNode.isObject()) {
+            byMetric = mapper.createObjectNode();
+            guide.set("byMetric", byMetric);
+        } else {
+            byMetric = (ObjectNode) byMetricNode;
+        }
+        String existing = byMetric.path("productivityScore").asText("");
+        byMetric.put("productivityScore", normalizeProductivityScoreGuideText(existing, ps, sprint));
+        String intro = guide.path("intro").asText("");
+        if (!intro.isBlank() && PRODUCTIVITY_SCORE_IN_INTRO.matcher(intro).find()) {
+            guide.put("intro", replaceProductivityScoreMentionsInProse(intro, ps));
+        }
+    }
+
+    private static final Pattern PRODUCTIVITY_SCORE_IN_INTRO = Pattern.compile(
+        "productiv|composite\\s+score|weighted\\s+(?:kpi|score)",
+        Pattern.CASE_INSENSITIVE);
+
+    private static String replaceProductivityScoreMentionsInProse(String text, int scorePct) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        String display = scorePct + "%";
+        String out = text.replaceAll(
+            "(?i)(productivity\\s*score[^0-9]{0,48}?)-?\\d+(?:\\.\\d+)?\\s*(?:%|points?)?",
+            "$1" + display);
+        out = out.replaceAll("(?i)^\\s*At\\s+-?\\d+(?:\\.\\d+)?\\s*%", "At " + display);
+        out = out.replaceAll(
+            "(?i)(composite[^0-9]{0,40}?)-?\\d+(?:\\.\\d+)?\\s*%?",
+            "$1" + display);
+        return out;
     }
 
     /**

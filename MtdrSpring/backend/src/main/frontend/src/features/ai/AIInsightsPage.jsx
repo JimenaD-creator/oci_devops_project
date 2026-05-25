@@ -11,39 +11,33 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
-import { fetchDashboardSprints, invalidateDashboardCache } from '../dashboard/dashboardSprintData';
+import { useProjectData } from '../../contexts/ProjectDataContext';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase } from './aiInsightsConstants';
+import {
+  productivityScoreFromSprintKpis,
+  normalizeWorkloadBalancePercent,
+} from '../kpis/productivityScoreUtils';
 import InsightCard from './InsightCard';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
+export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageActive = true }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
+  const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(0);
+  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
 
+  /** Reload persisted insights when the user opens this page again (no 15s polling). */
   useEffect(() => {
-    const onFocus = () => setRefreshToken((v) => v + 1);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') setRefreshToken((v) => v + 1);
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, []);
-
-  useEffect(() => {
-    const id = setInterval(() => setRefreshToken((v) => v + 1), 15000);
-    return () => clearInterval(id);
-  }, []);
+    if (isPageActive) {
+      setInsightsRefreshKey((k) => k + 1);
+    }
+  }, [isPageActive]);
 
   useEffect(() => {
     const pid =
@@ -53,26 +47,23 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
           ? String(localStorage.getItem('currentProjectId') || '').trim()
           : '';
     if (!pid) {
+      setSprints([]);
       setLoading(false);
       return;
     }
-    invalidateDashboardCache();
-    fetchDashboardSprints(pid, { forceFresh: true })
-      .then((data) => {
-        const filtered = Array.isArray(data)
-          ? data.filter((s) => String(s.assignedProject?.id) === String(pid))
-          : [];
-        setSprints(filtered);
-        setSelectedSprintId((prev) => {
-          if (filtered.length === 0) return null;
-          if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
-          const defaultSprint = pickDefaultSelectedSprint(filtered);
-          return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
-        });
-      })
-      .catch(() => setSprints([]))
-      .finally(() => setLoading(false));
-  }, [projectId, refreshToken]);
+    setLoading(sharedLoading);
+    const filtered = Array.isArray(sharedSprints)
+      ? sharedSprints.filter((s) => String(s.assignedProject?.id) === String(pid))
+      : [];
+    setSprints(filtered);
+    setSelectedSprintId((prev) => {
+      if (filtered.length === 0) return null;
+      if (prev != null && filtered.some((s) => Number(s.id) === Number(prev))) return prev;
+      const defaultSprint = pickDefaultSelectedSprint(filtered);
+      return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
+    });
+    if (!sharedLoading) setLoading(false);
+  }, [projectId, sharedSprints, sharedLoading]);
 
   useEffect(() => {
     if (sprints.length === 0) return;
@@ -103,37 +94,13 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
     return Math.min(100, Math.max(0, n));
   };
 
-  // Keep AI Trends aligned with KPI Analytics formula (must be declared before currentSprintKpiMetrics).
-  const productivityFromSprintWork = (sprint) => {
-    if (!sprint) return null;
-    const completionRate = Math.min(100, Math.max(0, Number(sprint?.kpis?.completionRate) || 0));
-    const onTimeDelivery = Math.min(100, Math.max(0, Number(sprint?.kpis?.onTimeDelivery) || 0));
-    const teamParticipation = Math.min(
-      100,
-      Math.max(0, Number(sprint?.kpis?.teamParticipation) || 0),
-    );
-    const rawWb = Number(sprint?.kpis?.workloadBalance);
-    const workloadBalance = Number.isFinite(rawWb)
-      ? Math.min(100, Math.max(0, Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)))
-      : 0;
-    const score = Math.round(
-      completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1,
-    );
-    return Math.min(100, Math.max(0, score));
-  };
-
   const currentSprintKpiMetrics = selectedSprint
     ? {
         completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
         onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
         teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
-        workloadBalance: (() => {
-          const rawWb = Number(selectedSprint.kpis?.workloadBalance);
-          if (!Number.isFinite(rawWb)) return 0;
-          const wb = rawWb <= 1 ? rawWb * 100 : rawWb;
-          return Math.min(100, Math.max(0, Math.round(wb)));
-        })(),
-        productivityScore: productivityFromSprintWork(selectedSprint),
+        workloadBalance: normalizeWorkloadBalancePercent(selectedSprint.kpis?.workloadBalance),
+        productivityScore: productivityScoreFromSprintKpis(selectedSprint.kpis),
       }
     : null;
 
@@ -282,10 +249,10 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
           nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
-          nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
-          currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
+          nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
+          currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
           currentSprintMetrics={currentSprintKpiMetrics}
-          refreshToken={refreshToken}
+          refreshToken={insightsRefreshKey}
           onOpenTeam={onOpenTeam}
         />
       )}

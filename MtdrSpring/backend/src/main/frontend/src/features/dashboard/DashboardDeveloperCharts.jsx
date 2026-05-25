@@ -49,9 +49,11 @@ import {
   maxCompareWorkloadStack,
   maxSingleWorkloadStack,
   buildTaskAxisDomainTicks,
+  buildCompareTaskAxisDomainTicks,
   maxSingleHoursGrouped,
   maxCompareHoursGrouped,
   buildHoursAxisDomainTicks,
+  buildCompareHoursAxisDomainTicks,
   maxSingleComboRange,
   maxCompareComboRange,
   comboHeightExtraFromRange,
@@ -214,14 +216,26 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
   return (
     <Box
       sx={{
-        ...CHART_TOOLTIP_SX,
+        ...CHART_TOOLTIP_SX(isDark),
+        p: { xs: 1.75, sm: 2.25 },
+        px: { xs: 2, sm: 2.5 },
         bgcolor: 'background.paper',
         border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
         boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
-        minWidth: 200,
+        minWidth: 220,
+        boxSizing: 'border-box',
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem', lineHeight: 1.3 }}>
+      <Typography
+        sx={{
+          fontWeight: 800,
+          color: 'text.primary',
+          fontSize: '0.95rem',
+          lineHeight: 1.35,
+          mb: 1.25,
+          pr: 0.5,
+        }}
+      >
         {row.name}
       </Typography>
       {sprintDefs.map((sp, idx) => {
@@ -232,16 +246,23 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
           <Box
             key={sp.id}
             sx={{
-              mt: idx === 0 ? 1 : 0,
-              pt: idx === 0 ? 0 : 1.25,
+              mt: idx === 0 ? 0 : 0.75,
+              pt: idx === 0 ? 0 : 1.35,
+              pb: idx === sprintDefs.length - 1 ? 0 : 0.25,
               borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
             }}
           >
-            <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
+            <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem', mb: 0.5 }}>
               {sp.shortLabel}
             </Typography>
             <Typography
-              sx={{ color: isDark ? '#9A9A9A' : sp.accentColor, fontSize: '0.84rem', mt: 0.35, fontWeight: 600 }}
+              sx={{
+                color: isDark ? '#9A9A9A' : sp.accentColor,
+                fontSize: '0.84rem',
+                lineHeight: 1.45,
+                fontWeight: 600,
+                pr: 0.25,
+              }}
             >
               Completed: {completed} · Pending: {pending} · Assigned: {assigned}
             </Typography>
@@ -262,14 +283,26 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
   return (
     <Box
       sx={{
-        ...CHART_TOOLTIP_SX,
+        ...CHART_TOOLTIP_SX(isDark),
+        p: { xs: 1.75, sm: 2.25 },
+        px: { xs: 2, sm: 2.5 },
         bgcolor: 'background.paper',
         border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
         boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
         minWidth: 220,
+        boxSizing: 'border-box',
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem', lineHeight: 1.3 }}>
+      <Typography
+        sx={{
+          fontWeight: 800,
+          color: 'text.primary',
+          fontSize: '0.95rem',
+          lineHeight: 1.35,
+          mb: 1.25,
+          pr: 0.5,
+        }}
+      >
         {row.name}
       </Typography>
       {sprintDefs.map((sp, idx) => {
@@ -278,18 +311,21 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
           <Box
             key={sp.id}
             sx={{
-              mt: idx === 0 ? 1 : 0,
-              pt: idx === 0 ? 0 : 1,
+              mt: idx === 0 ? 0 : 0.75,
+              pt: idx === 0 ? 0 : 1.35,
+              pb: idx === sprintDefs.length - 1 ? 0 : 0.25,
               borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
               display: 'flex',
               flexDirection: 'column',
-              gap: 0.35,
+              gap: 0.5,
             }}
           >
             <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem' }}>
               {sp.shortLabel}
             </Typography>
-            <Typography sx={{ color: 'text.secondary', fontSize: '0.82rem', fontWeight: 600 }}>
+            <Typography
+              sx={{ color: 'text.secondary', fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.45, pr: 0.25 }}
+            >
               Hours worked: {worked.toFixed(1)} h
             </Typography>
           </Box>
@@ -390,9 +426,9 @@ function CompareHoursBarLegend({ sprintDefs }) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 1.25,
+        gap: 0.5,
         width: '100%',
-        pb: 1.25,
+        pb: 0.25,
       }}
     >
       {!multiSprint ? (
@@ -551,7 +587,7 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
           </Typography>
         </Box>
       </Box>
-      <Box sx={{ mt: { xs: 1.3, sm: 1.55 }, '& .MuiTypography-root': { lineHeight: 1.2 } }}>
+      <Box sx={{ mt: { xs: 0.45, sm: 0.55 }, '& .MuiTypography-root': { lineHeight: 1.2 } }}>
         <CompareSprintLegend sprintDefs={sprintDefs} dense manySprints={n >= 6} />
       </Box>
     </Box>
@@ -960,11 +996,11 @@ function ChartShell({
         <Box
           sx={{
             width: '100%',
-            mb: { xs: 1.75, sm: 2.25 },
-            mt: 0.25,
-            px: { xs: 1.25, sm: 1.75 },
-            py: { xs: 1.25, sm: 1.5 },
-            borderRadius: 2,
+            mb: 1,
+            mt: 0.15,
+            px: { xs: 0.75, sm: 1 },
+            py: { xs: 0.5, sm: 0.65 },
+            borderRadius: 1.5,
             bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15, 23, 42, 0.035)',
             border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.08)'}`,
             boxSizing: 'border-box',
@@ -1011,6 +1047,75 @@ function ChartShell({
   );
 }
 
+/** @param {'tasks' | 'hours'} metric */
+function CompareDeveloperTotalsSummary({ developers, accent, isDark, metric }) {
+  const rows = useMemo(() => {
+    return [...(developers || [])]
+      .map((d) => ({
+        name: d.name,
+        completed: Math.max(0, Math.round(Number(d.completed) || 0)),
+        hours: Math.max(0, Number(d.hours) || 0),
+      }))
+      .sort((a, b) => {
+        if (metric === 'hours') {
+          return (
+            b.hours - a.hours ||
+            b.completed - a.completed ||
+            String(a.name).localeCompare(String(b.name))
+          );
+        }
+        return (
+          b.completed - a.completed ||
+          b.hours - a.hours ||
+          String(a.name).localeCompare(String(b.name))
+        );
+      });
+  }, [developers, metric]);
+
+  if (!rows.length) return null;
+
+  const valueColor = metric === 'hours' ? HOURS_FILL : COMPLETED_FILL;
+
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+        gap: 0.5,
+      }}
+    >
+      {rows.map((row) => (
+        <Box
+          key={row.name}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            py: 0.35,
+            px: 0.75,
+            borderRadius: 1,
+            bgcolor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15, 23, 42, 0.04)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.08)'}`,
+          }}
+        >
+          <Typography sx={{ fontWeight: 700, fontSize: '0.78rem', minWidth: 0, flex: 1 }}>
+            {row.name}
+          </Typography>
+          <Typography
+            component="span"
+            sx={{ fontWeight: 800, fontSize: '0.78rem', color: valueColor, whiteSpace: 'nowrap' }}
+          >
+            {metric === 'hours'
+              ? `${row.hours.toFixed(1)} h`
+              : `${row.completed} ${row.completed === 1 ? 'task' : 'tasks'}`}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Componente principal
 // ---------------------------------------------------------------------------
@@ -1024,6 +1129,7 @@ export default function DashboardDeveloperCharts({
   developers = [],
   selectedSprints = [],
   compareMode = false,
+  projectDevelopers = [],
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -1037,23 +1143,10 @@ export default function DashboardDeveloperCharts({
     [selectedSprints],
   );
 
-  useEffect(() => {
-    if (!orderedSelectedSprints?.length) return;
-    console.log(
-      '[DashboardDeveloperCharts] orderedSelectedSprints (compare usa este orden):',
-      orderedSelectedSprints.map((sp) => ({
-        id: sp?.id,
-        shortLabel: sp?.shortLabel,
-        name: sp?.name,
-      })),
-    );
-  }, [orderedSelectedSprints]);
-
   const compareModel = useMemo(() => {
-    if (!compareMode || !orderedSelectedSprints?.length || orderedSelectedSprints.length < 2)
-      return null;
-    return buildCompareDeveloperChartsModel(orderedSelectedSprints);
-  }, [compareMode, orderedSelectedSprints]);
+    if (!compareMode || orderedSelectedSprints.length < 2) return null;
+    return buildCompareDeveloperChartsModel(orderedSelectedSprints, projectDevelopers);
+  }, [compareMode, orderedSelectedSprints, projectDevelopers]);
 
   const aiSprintPayload = useMemo(
     () =>
@@ -1123,17 +1216,6 @@ export default function DashboardDeveloperCharts({
   }, [compareMode, aiSprintPayload]);
 
   // ---- cálculos de ejes y alturas (sin cambios) ----
-
-  const compareHoursAxis = useMemo(() => {
-    if (!compareModel?.hoursRows?.length || !compareModel?.sprintDefs?.length)
-      return buildHoursAxisDomainTicks(0);
-    const maxWorked = compareModel.hoursRows.reduce(
-      (outerMax, row) =>
-        Math.max(outerMax, ...compareModel.sprintDefs.map((sp) => Number(row[`hw_${sp.id}`]) || 0)),
-      0,
-    );
-    return buildHoursAxisDomainTicks(maxWorked);
-  }, [compareModel]);
 
   const workloadStack = useMemo(() => {
     return [...developers]
@@ -1211,20 +1293,61 @@ export default function DashboardDeveloperCharts({
     singleComboRange.maxHours,
   );
 
-  const compareComboRange = useMemo(
-    () =>
-      compareModel?.comboRows?.length && compareModel?.sprintDefs?.length
-        ? maxCompareComboRange(compareModel.comboRows, compareModel.sprintDefs)
-        : { maxTasks: 0, maxHours: 0 },
-    [compareModel],
-  );
-  const comboExtraCompare = comboHeightExtraFromRange(
-    compareComboRange.maxTasks,
-    compareComboRange.maxHours,
+  const compareWorkloadStack = useMemo(() => {
+    if (!compareMode || !developers.length) return [];
+    return [...developers]
+      .map((d) => {
+        const assigned = Number(d.assigned) || 0;
+        const completed = Math.min(Number(d.completed) || 0, assigned);
+        const pending = Math.max(0, assigned - completed);
+        const pctComplete = assigned > 0 ? Math.round((100 * completed) / assigned) : 0;
+        return {
+          name: d.shortName || d.name,
+          completed,
+          pending,
+          pctComplete,
+        };
+      })
+      .sort((a, b) => (b.completed ?? 0) - (a.completed ?? 0));
+  }, [compareMode, developers]);
+
+  const compareHoursGroupedRows = useMemo(() => {
+    if (!compareMode || !developers.length) return [];
+    return [...developers]
+      .map((d) => {
+        const worked = Number(d.hours) || 0;
+        const assigned = Number(d.assignedHoursEstimate) || 0;
+        return {
+          name: d.shortName || d.name,
+          hWorked: worked,
+          hAssigned: assigned,
+        };
+      })
+      .sort((a, b) => Math.max(b.hWorked, b.hAssigned) - Math.max(a.hWorked, a.hAssigned));
+  }, [compareMode, developers]);
+
+  const compareWorkloadTaskAxis = useMemo(() => {
+    if (!compareModel) return buildCompareTaskAxisDomainTicks(0);
+    const { workloadRows, sprintDefs } = compareModel;
+    const defs = [...(sprintDefs || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
+    return buildCompareTaskAxisDomainTicks(maxCompareWorkloadStack(workloadRows, defs));
+  }, [compareModel]);
+
+  const compareHoursAxis = useMemo(() => {
+    if (!compareModel) return buildCompareHoursAxisDomainTicks(0);
+    const { hoursRows, sprintDefs } = compareModel;
+    const defs = [...(sprintDefs || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
+    return buildCompareHoursAxisDomainTicks(maxCompareHoursGrouped(hoursRows, defs));
+  }, [compareModel]);
+
+  const compareHoursScaleExtra = Math.min(
+    120,
+    Math.round(0.5 * maxSingleHoursGrouped(compareHoursGroupedRows)),
   );
 
-  const hasCompareData = compareModel && compareModel.workloadRows.length > 0;
-  const hasSingleData = developers.length > 0;
+  const hasCompareData =
+    compareMode && orderedSelectedSprints.length >= 2 && developers.length > 0;
+  const hasSingleData = !compareMode && developers.length > 0;
 
   const singleSelectedSprintAccent = useMemo(() => {
     const sp = orderedSelectedSprints?.[0];
@@ -1236,54 +1359,27 @@ export default function DashboardDeveloperCharts({
     [workloadStack],
   );
 
-  const compareWorkloadTaskAxis = useMemo(() => {
-    if (!compareModel?.workloadRows?.length || !compareModel?.sprintDefs?.length)
-      return buildTaskAxisDomainTicks(0);
-    return buildTaskAxisDomainTicks(
-      maxCompareWorkloadStack(compareModel.workloadRows, compareModel.sprintDefs),
-    );
-  }, [compareModel]);
-
-  const nSprints = compareModel?.sprintDefs?.length ?? 1;
-  const WORKLOAD_COMPARE_LEGEND_EXTRA = Math.min(44, 4 + nSprints * 9);
+  const compareTotalsChartBonus = hasCompareData
+    ? Math.min(160, 36 + Math.ceil(developers.length / 2) * 28)
+    : 0;
 
   const hWorkloadCompareBase = hasCompareData
     ? Math.max(
-        300 + WORKLOAD_COMPARE_LEGEND_EXTRA,
-        Math.min(
-          680 + WORKLOAD_COMPARE_LEGEND_EXTRA,
-          240 +
-            compareModel.workloadRows.length * (38 + nSprints * 6) +
-            WORKLOAD_COMPARE_LEGEND_EXTRA,
-        ),
+        400,
+        Math.min(820, 280 + compareWorkloadStack.length * 48 + compareTotalsChartBonus),
       )
     : null;
-  const hoursScaleExtraCompare = hasCompareData
-    ? Math.min(
-        120,
-        Math.round(0.42 * maxCompareHoursGrouped(compareModel.hoursRows, compareModel.sprintDefs)),
-      )
-    : 0;
   const hHoursCompareBase = hasCompareData
     ? Math.max(
-        320 + WORKLOAD_COMPARE_LEGEND_EXTRA,
+        400,
         Math.min(
-          700 + WORKLOAD_COMPARE_LEGEND_EXTRA + hoursScaleExtraCompare,
-          250 +
-            compareModel.hoursRows.length * (38 + nSprints * 6) +
-            WORKLOAD_COMPARE_LEGEND_EXTRA +
-            hoursScaleExtraCompare,
+          820,
+          280 + compareHoursGroupedRows.length * 48 + compareHoursScaleExtra + compareTotalsChartBonus,
         ),
       )
     : null;
   const hComboCompareBase = hasCompareData
-    ? Math.max(
-        270,
-        Math.min(
-          560 + comboExtraCompare,
-          200 + compareModel.comboRows.length * (27 + nSprints * 3) + comboExtraCompare,
-        ),
-      )
+    ? Math.max(320, Math.min(520 + comboExtraSingle, 240 + forCombo.length * 38 + comboExtraSingle))
     : null;
 
   const hoursScaleExtraSingle = Math.min(
@@ -1310,11 +1406,9 @@ export default function DashboardDeveloperCharts({
     ? compareChartHeights(hComboCompareBase)
     : compareChartHeights(hComboSingleBase);
 
-  const maxBarCompareCap = nSprints <= 2 ? 40 : nSprints <= 3 ? 34 : 28;
-  const maxBarCompare = Math.max(
-    8,
-    Math.min(maxBarCompareCap, Math.floor(96 / Math.max(1, nSprints))),
-  );
+  const compareSprintCount = orderedSelectedSprints.length;
+  const compareAccent = orderedSelectedSprints[0]?.accentColor ?? '#3949AB';
+  const compareWorkloadPendingTint = alpha(compareAccent, isDark ? 0.35 : 0.42);
 
   // ---- empty state ----
 
@@ -1341,11 +1435,12 @@ export default function DashboardDeveloperCharts({
 
   // ---- modo comparación ----
 
-  if (hasCompareData) {
+  if (hasCompareData && compareModel) {
     const { sprintDefs: compareSprintDefs, workloadRows, hoursRows, comboRows } = compareModel;
     const sprintDefs = [...(compareSprintDefs || [])].sort(
       (a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b),
     );
+    const nSprints = sprintDefs.length;
     const workloadRowsWithTotals = workloadRows.map((row) => {
       const enriched = { ...row };
       sprintDefs.forEach((sp) => {
@@ -1357,45 +1452,86 @@ export default function DashboardDeveloperCharts({
     const firstAccent = sprintDefs[0]?.accentColor ?? '#3949AB';
     const comboAccent =
       sprintDefs[sprintDefs.length - 1]?.accentColor ?? sprintDefs[0]?.accentColor ?? '#7E57C2';
+    const compareWorkloadTotalsSummary = (
+      <CompareDeveloperTotalsSummary
+        developers={developers}
+        accent={firstAccent}
+        isDark={isDark}
+        metric="tasks"
+      />
+    );
+    const compareHoursTotalsSummary = (
+      <CompareDeveloperTotalsSummary
+        developers={developers}
+        accent="#FB8C00"
+        isDark={isDark}
+        metric="hours"
+      />
+    );
 
     const marginTopWorkload = Math.min(
-      280,
-      28 +
-        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 38 : 52) +
-        (nSprints <= 2 ? 14 : nSprints <= 4 ? 26 : 44),
+      168,
+      14 +
+        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 22 : 28) +
+        (nSprints <= 2 ? 6 : nSprints <= 4 ? 10 : 14),
     );
     const marginTopHours = Math.min(
-      144,
-      18 +
-        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 24 : 30) +
-        (nSprints <= 2 ? 12 : nSprints <= 4 ? 20 : 28),
+      100,
+      10 +
+        Math.ceil(nSprints / 2) * (nSprints <= 3 ? 16 : 20) +
+        (nSprints <= 2 ? 4 : nSprints <= 4 ? 8 : 12),
     );
     const marginTopComboPlot = 16;
-    const nDevRows = Math.max(workloadRows.length, hoursRows.length, comboRows.length);
-    const bottomAxisCompare = Math.min(
+    const nWorkloadHoursRows = Math.max(workloadRows.length, hoursRows.length);
+    const bottomAxisWorkloadHours = Math.min(
       92,
-      58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nDevRows - 6) * 2),
+      58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nWorkloadHoursRows - 6) * 2),
     );
-    const xAxisTickHeight = Math.min(
+    const xAxisTickHeightWorkloadHours = Math.min(
       72,
-      50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nDevRows - 5) * 2),
+      50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nWorkloadHoursRows - 5) * 2),
     );
-    const barCategoryGapCompare =
+    /** Productivity combo — layout independiente (no usar tuning de workload/hours). */
+    const nComboRows = comboRows.length;
+    const bottomAxisCombo = Math.min(
+      92,
+      58 + Math.max(0, nSprints - 3) * 6 + Math.min(14, Math.max(0, nComboRows - 6) * 2),
+    );
+    const xAxisTickHeightCombo = Math.min(
+      72,
+      50 + Math.max(0, nSprints - 4) * 6 + Math.min(8, Math.max(0, nComboRows - 5) * 2),
+    );
+    const barCategoryGapCombo =
       nSprints >= 6 ? '8%' : nSprints >= 4 ? '12%' : nSprints >= 3 ? '8%' : '5%';
-    /** Workload: wide bars, minimal gap between developers and sprint stacks. */
-    const workloadBarCategoryGap =
-      nSprints >= 6 ? '1%' : nSprints >= 4 ? '1%' : nSprints >= 3 ? '0%' : '0%';
-    const workloadBarGap = 0;
-    const maxBarWorkloadCompare = Math.max(
+    const barCategoryGapCompare = barCategoryGapCombo;
+    const maxBarCombo = Math.max(
       10,
       Math.min(
         nSprints <= 2 ? 54 : nSprints <= 3 ? 46 : nSprints <= 5 ? 38 : 32,
         Math.floor(124 / Math.max(1, nSprints)),
       ),
     );
-    const marginTopWorkloadTight = Math.max(124, marginTopWorkload + 12);
-    const lineStrokeW = nSprints > 5 ? 1.5 : 2;
-    const lineDotR = nSprints > 5 ? 2 : nSprints > 3 ? 3 : 4;
+    const lineStrokeWCombo = nSprints > 5 ? 1.5 : 2;
+    const lineDotRCombo = nSprints > 5 ? 2 : nSprints > 3 ? 3 : 4;
+    /** Workload: wide bars, minimal gap between developers and sprint stacks. */
+    const workloadBarCategoryGap =
+      nSprints >= 6 ? '1%' : nSprints >= 4 ? '1%' : nSprints >= 3 ? '0%' : '0%';
+    const workloadBarGap = 0;
+    const maxBarWorkloadCompare = Math.max(
+      14,
+      Math.min(
+        nSprints <= 2 ? 58 : nSprints <= 3 ? 50 : nSprints <= 5 ? 42 : 36,
+        Math.floor(132 / Math.max(1, nSprints)),
+      ),
+    );
+    const maxBarCompare = Math.max(
+      16,
+      Math.min(
+        nSprints <= 2 ? 40 : nSprints <= 3 ? 32 : nSprints <= 5 ? 26 : 20,
+        Math.floor(110 / Math.max(1, nSprints)),
+      ),
+    );
+    const marginTopWorkloadTight = Math.max(58, marginTopWorkload - 6);
 
     const aiEmptyText = aiError || 'Select at least 2 sprints to compare.';
 
@@ -1405,13 +1541,14 @@ export default function DashboardDeveloperCharts({
         <ChartShell
           title="Assigned workload by developer"
           description={CHART_DESC.compare.workload}
+          belowDescription={compareWorkloadTotalsSummary}
           height={hWorkload}
           accent={firstAccent}
           tint={alpha(firstAccent, isDark ? 0.12 : 0.08)}
         >
           <BarChart
             data={workloadRowsWithTotals}
-            margin={{ top: marginTopWorkloadTight, right: 56, left: 8, bottom: bottomAxisCompare }}
+            margin={{ top: marginTopWorkloadTight, right: 56, left: 8, bottom: bottomAxisWorkloadHours }}
             barCategoryGap={workloadBarCategoryGap}
             barGap={workloadBarGap}
           >
@@ -1422,7 +1559,7 @@ export default function DashboardDeveloperCharts({
               interval={0}
               angle={-32}
               textAnchor="end"
-              height={xAxisTickHeight}
+              height={xAxisTickHeightWorkloadHours}
               tickMargin={12}
               label={{
                 value: 'Developer',
@@ -1465,7 +1602,7 @@ export default function DashboardDeveloperCharts({
                 width: '100%',
                 paddingTop: 0,
                 paddingBottom: 0,
-                marginBottom: -10,
+                marginBottom: -22,
                 top: 0,
               }}
               content={() => <CompareWorkloadSymbolLegend sprintDefs={sprintDefs} />}
@@ -1529,13 +1666,14 @@ export default function DashboardDeveloperCharts({
         <ChartShell
           title="Hours worked by developer"
           description={sprintDefs.length > 1 ? undefined : CHART_DESC.compare.hours}
+          belowDescription={compareHoursTotalsSummary}
           height={hHours}
           accent="#FB8C00"
           tint={isDark ? 'rgba(251, 140, 0, 0.15)' : 'rgba(251, 140, 0, 0.1)'}
         >
           <BarChart
             data={hoursRows}
-            margin={{ top: marginTopHours, right: 12, left: 8, bottom: bottomAxisCompare }}
+            margin={{ top: marginTopHours, right: 12, left: 8, bottom: bottomAxisWorkloadHours }}
             barCategoryGap={barCategoryGapCompare}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
@@ -1545,7 +1683,7 @@ export default function DashboardDeveloperCharts({
               interval={0}
               angle={-32}
               textAnchor="end"
-              height={xAxisTickHeight}
+              height={xAxisTickHeightWorkloadHours}
               tickMargin={12}
               label={{
                 value: 'Developer',
@@ -1581,7 +1719,7 @@ export default function DashboardDeveloperCharts({
             <Legend
               verticalAlign="top"
               align="center"
-              wrapperStyle={{ ...CHART_LEGEND_STYLE, top: 6, paddingBottom: 14 }}
+              wrapperStyle={{ ...CHART_LEGEND_STYLE, top: 0, paddingBottom: 0, marginBottom: -20 }}
               content={() => <CompareHoursBarLegend sprintDefs={sprintDefs} />}
             />
             {sprintDefs.map((sp) => (
@@ -1630,8 +1768,8 @@ export default function DashboardDeveloperCharts({
         >
           <ComposedChart
             data={comboRows}
-            margin={{ top: marginTopComboPlot, right: 22, left: 10, bottom: bottomAxisCompare }}
-            barCategoryGap={barCategoryGapCompare}
+            margin={{ top: marginTopComboPlot, right: 22, left: 10, bottom: bottomAxisCombo }}
+            barCategoryGap={barCategoryGapCombo}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
@@ -1640,7 +1778,7 @@ export default function DashboardDeveloperCharts({
               interval={0}
               angle={-32}
               textAnchor="end"
-              height={xAxisTickHeight}
+              height={xAxisTickHeightCombo}
               tickMargin={12}
             />
             <YAxis
@@ -1684,7 +1822,7 @@ export default function DashboardDeveloperCharts({
                 name={`${sp.shortLabel} · tasks`}
                 fill={sp.accentColor}
                 radius={[6, 6, 0, 0]}
-                maxBarSize={Math.max(8, maxBarCompare)}
+                maxBarSize={maxBarCombo}
                 animationDuration={CHART_BAR_ANIM_MS}
                 animationEasing={CHART_BAR_EASING}
                 activeBar={false}
@@ -1698,9 +1836,9 @@ export default function DashboardDeveloperCharts({
                 dataKey={`ln_${sp.id}`}
                 name={`${sp.shortLabel} · hours`}
                 stroke={sp.accentColor}
-                strokeWidth={lineStrokeW}
+                strokeWidth={lineStrokeWCombo}
                 animationDuration={CHART_BAR_ANIM_MS}
-                dot={{ r: lineDotR, fill: sp.accentColor, strokeWidth: 0 }}
+                dot={{ r: lineDotRCombo, fill: sp.accentColor, strokeWidth: 0 }}
               />
             ))}
           </ComposedChart>

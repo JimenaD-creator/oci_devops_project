@@ -38,12 +38,14 @@ import {
   ORACLE_RED_ACTION,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
+import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
+import TaskDescriptionContent from '../../components/common/TaskDescriptionContent';
+import { sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
 import {
   deleteTaskById,
   deleteUserTasksForTask,
-  fetchTaskById,
+  fetchTaskDetailBundle,
   fetchTaskDetailDevelopers,
-  fetchUserTasksForTask,
   postUserTask,
   putTask,
 } from './taskDetailApi';
@@ -53,7 +55,8 @@ import {
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
-import { normalizeTaskStatus, userTaskRowStatus } from './utils/taskUtils';
+import { normalizeTaskStatus, userTaskRowStatus, userTaskRowTaskId } from './utils/taskUtils';
+import { assigneeDeliveryStatus } from './utils/assigneeOnTimeUtils';
 import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
@@ -319,11 +322,36 @@ function TypeGrid({ value, onChange }) {
   );
 }
 
+function userTasksForTaskId(rows, taskId) {
+  const tid = Number(taskId);
+  if (!Number.isFinite(tid)) return [];
+  return (Array.isArray(rows) ? rows : []).filter((ut) => {
+    const utTid = userTaskRowTaskId(ut);
+    return Number.isFinite(utTid) && utTid === tid;
+  });
+}
+
+function assigneeStateFromUserTasks(list) {
+  const rows = Array.isArray(list) ? list : [];
+  const ids = [
+    ...new Set(rows.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id))),
+  ];
+  const nameMap = {};
+  rows.forEach((row) => {
+    const uid = userIdFromUserTaskRow(row);
+    if (uid == null) return;
+    const nm = String(row?.user?.name ?? '').trim();
+    if (nm) nameMap[String(uid)] = nm;
+  });
+  return { ids, nameMap, rows };
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TaskDetailDialog({
   open,
   initialTask,
+  initialUserTasks,
   sprints,
   projectDevelopers,
   activeProjectId,
@@ -364,8 +392,7 @@ export function TaskDetailDialog({
   }, [task, initialTask, sprints, activeProjectId]);
 
   useEffect(() => {
-    if (!open) {
-      setPickerDevelopers([]);
+    if (!open || !editMode) {
       setPickerLoading(false);
       return;
     }
@@ -375,6 +402,7 @@ export function TaskDetailDialog({
       setPickerLoading(false);
       return;
     }
+    if (pickerDevelopers.length > 0) return;
     let cancelled = false;
     setPickerLoading(true);
     (async () => {
@@ -390,7 +418,7 @@ export function TaskDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, resolvedDeveloperProjectId]);
+  }, [open, editMode, resolvedDeveloperProjectId, pickerDevelopers.length]);
 
   const availableDevelopers = useMemo(() => {
     if (Array.isArray(pickerDevelopers) && pickerDevelopers.length > 0) return pickerDevelopers;
@@ -420,29 +448,25 @@ export function TaskDetailDialog({
       return;
     }
     if (!initialTask?.id) return;
+
+    setTask(initialTask);
+    const cached = userTasksForTaskId(initialUserTasks, initialTask.id);
+    if (cached.length > 0) {
+      const { ids, nameMap, rows } = assigneeStateFromUserTasks(cached);
+      setTaskUserTasks(rows);
+      setAssigneeNamesByUserId(nameMap);
+      setLoadedAssigneeUserIds(ids);
+    }
+
     let cancelled = false;
     setLoading(true);
     (async () => {
       try {
-        const t = await fetchTaskById(initialTask.id);
-        if (cancelled || !t) return;
-        setTask(t);
-        const utList = await fetchUserTasksForTask(t.id);
+        const { task: t, userTasks: utList } = await fetchTaskDetailBundle(initialTask.id);
         if (cancelled) return;
-        const list = Array.isArray(utList) ? utList : [];
-        setTaskUserTasks(list);
-        const ids = [
-          ...new Set(
-            list.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)),
-          ),
-        ];
-        const nameMap = {};
-        list.forEach((row) => {
-          const uid = userIdFromUserTaskRow(row);
-          if (uid == null) return;
-          const nm = String(row?.user?.name ?? '').trim();
-          if (nm) nameMap[String(uid)] = nm;
-        });
+        if (t) setTask(t);
+        const { ids, nameMap, rows } = assigneeStateFromUserTasks(utList);
+        setTaskUserTasks(rows);
         setAssigneeNamesByUserId(nameMap);
         setLoadedAssigneeUserIds(ids);
       } finally {
@@ -452,7 +476,7 @@ export function TaskDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, initialTask?.id]);
+  }, [open, initialTask?.id, initialUserTasks]);
 
   useEffect(() => {
     if (!editMode) return;
@@ -561,7 +585,7 @@ export function TaskDetailDialog({
       const payload = {
         ...taskRest,
         title: title.trim(),
-        description: (description || '').trim(),
+        description: sanitizeRichDescriptionHtml(description),
         classification,
         status,
         priority,
@@ -639,6 +663,17 @@ export function TaskDetailDialog({
     [loadedAssigneeUserIds],
   );
   const editAssigneeIds = useMemo(() => finiteUserIds(assignedUserIds), [assignedUserIds]);
+
+  const assigneeTaskMeta = useMemo(
+    () => ({
+      finishDate: task?.finishDate ?? task?.finish_date,
+      assigneeCount: taskUserTasks.length || viewAssigneeIds.length || 1,
+    }),
+    [task?.finishDate, task?.finish_date, taskUserTasks.length, viewAssigneeIds.length],
+  );
+
+  const detailLoading = open && !task;
+  const showPerAssigneeDelivery = taskUserTasks.length > 1;
 
   // Derive active status/type/priority option for view mode badges
   const statusOpt = STATUS_OPTIONS.find((o) => o.value === task?.status) ?? STATUS_OPTIONS[0];
@@ -766,14 +801,26 @@ export function TaskDetailDialog({
       <DialogContent
         sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : '#FAFAFA' }}
       >
-        {loading && !task && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress size={32} sx={{ color: ORACLE_RED }} />
+        {detailLoading && (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 8,
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={36} sx={{ color: ORACLE_RED }} />
+            <Typography variant="body2" color="text.secondary">
+              Loading task details…
+            </Typography>
           </Box>
         )}
 
         {/* ── VIEW MODE ── */}
-        {task && !editMode && (
+        {task && !editMode && !detailLoading && (
           <Stack spacing={2}>
             {/* Overview card */}
             <InfoCard accentColor={ORACLE_RED_ACTION}>
@@ -785,9 +832,9 @@ export function TaskDetailDialog({
               </Typography>
 
               <FieldLabel>Description</FieldLabel>
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2, whiteSpace: 'pre-wrap' }}>
-                {(task.description && String(task.description).trim()) || '—'}
-              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <TaskDescriptionContent description={task.description} />
+              </Box>
 
               {/* Status / Type / Priority as colored badges */}
               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -956,12 +1003,16 @@ export function TaskDetailDialog({
                   </Typography>
                 </Box>
               </Box>
+
             </InfoCard>
 
-            {/* Assignee progress card */}
-            {taskUserTasks.length > 1 && (
+            {/* On-time per developer only when several assignees share the task */}
+            {showPerAssigneeDelivery && (
               <InfoCard accentColor="#5C6BC0">
-                <SectionLabel>Assignee progress</SectionLabel>
+                <SectionLabel>Delivery by assignee</SectionLabel>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  Each row shows whether that developer finished their part on or before the due date.
+                </Typography>
                 <Stack spacing={0.75}>
                   {[...taskUserTasks]
                     .map((ut) => {
@@ -985,18 +1036,46 @@ export function TaskDetailDialog({
                         ASSIGNEE_IDENTITY_PALETTE[
                           assigneeIdentityPaletteIndex({ userId: uid, name })
                         ];
+                      const delivery = assigneeDeliveryStatus(ut, task?.dueDate, assigneeTaskMeta);
+                      const deliveryToneSx = {
+                        onTime: {
+                          color: '#1B5E20',
+                          bgcolor: isDark ? '#1A4A2A' : '#E8F5E9',
+                          border: '#43A047',
+                        },
+                        late: {
+                          color: '#B71C1C',
+                          bgcolor: isDark ? '#4A1A1A' : '#FFEBEE',
+                          border: '#E53935',
+                        },
+                        pending: {
+                          color: isDark ? '#9E9E9E' : '#616161',
+                          bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
+                          border: isDark ? '#5A5A5A' : '#BDBDBD',
+                        },
+                        unknown: {
+                          color: isDark ? '#FFB74D' : '#E65100',
+                          bgcolor: isDark ? '#4A2A1A' : '#FFF3E0',
+                          border: '#FB8C00',
+                        },
+                      };
+                      const tone = deliveryToneSx[delivery.tone] ?? deliveryToneSx.pending;
                       return (
                         <Box
                           key={`${uid ?? 'x'}-${ut?.id?.taskId ?? task.id}`}
                           sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
                             py: 0.5,
                             borderBottom: `0.5px solid ${isDark ? '#2A2C32' : '#EEEEEE'}`,
                             '&:last-of-type': { borderBottom: 'none' },
                           }}
                         >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                            }}
+                          >
                           <Box
                             sx={{
                               flex: 1,
@@ -1042,7 +1121,35 @@ export function TaskDetailDialog({
                             >
                               {statusChip.label}
                             </Box>
+                            <Box
+                              sx={{
+                                flexShrink: 0,
+                                px: 1,
+                                py: 0.6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: tone.color,
+                                bgcolor: tone.bgcolor,
+                                borderLeft: `3px solid ${tone.border}`,
+                              }}
+                            >
+                              {delivery.label}
+                            </Box>
                           </Box>
+                          {delivery.complete && delivery.completedAt && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                flexShrink: 0,
+                                color: 'text.secondary',
+                                fontSize: 11,
+                                minWidth: 72,
+                                textAlign: 'right',
+                              }}
+                            >
+                              {formatDate(delivery.completedAt)}
+                            </Typography>
+                          )}
                           {hrs > 0 && (
                             <Box
                               sx={{
@@ -1059,6 +1166,15 @@ export function TaskDetailDialog({
                             >
                               {hrs}h
                             </Box>
+                          )}
+                          </Box>
+                          {delivery.hint && (
+                            <Typography
+                              variant="caption"
+                              sx={{ display: 'block', pl: 0.5, mt: 0.35, color: isDark ? '#FFB74D' : '#E65100' }}
+                            >
+                              {delivery.hint}
+                            </Typography>
                           )}
                         </Box>
                       );
@@ -1085,14 +1201,11 @@ export function TaskDetailDialog({
                   size="small"
                   sx={fieldSx}
                 />
-                <TextField
+                <RichTextDescriptionField
                   label="Description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  fullWidth
-                  multiline
+                  onChange={setDescription}
                   minRows={3}
-                  size="small"
                   sx={fieldSx}
                 />
                 <Box>
