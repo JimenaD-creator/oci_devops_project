@@ -7,7 +7,8 @@ export const pageEase = [0.22, 1, 0.36, 1];
 const ERROR_MESSAGES = {
   QUOTA_EXCEEDED:
     'The AI quota for today has been reached. Please try again tomorrow or use a different API key.',
-  API_KEY_MISSING: 'Gemini API key is not configured on the server. Contact your administrator.',
+  API_KEY_MISSING:
+    'Gemini API key is not configured on the server. Set GEMINI_API_KEY in MtdrSpring/backend/.env and restart the backend.',
   MODEL_NOT_FOUND: 'The AI model is unavailable. Contact your administrator.',
   SPRINT_NOT_FOUND: 'This sprint was not found in the database.',
   NO_PROJECT_ASSIGNED:
@@ -198,13 +199,19 @@ export function alignAlertLoosePercents(text, actualPercent) {
   return out;
 }
 
+/** Fixes "0%as" → "0% as" after KPI % alignment (regex consumed optional %). */
+export function fixGluedPercentProse(text) {
+  if (text == null) return text;
+  return String(text).replace(/(\d+)\s*%([a-zA-Z])/g, '$1% $2');
+}
+
 function applyKpiMetricPatterns(text, key, actual) {
   const num = formatKpiMetricNumber(actual);
   const display = formatKpiMetricValue(actual);
   let result = text;
   const tight = KPI_METRIC_PATTERNS[key];
   if (tight) {
-    result = result.replace(tight, (_, prefix) => `${prefix}${num}`);
+    result = result.replace(tight, (_, prefix) => `${prefix}${display}`);
   }
   const proximity = KPI_METRIC_PROXIMITY[key];
   if (proximity) {
@@ -225,7 +232,7 @@ export function alignKpiMetricsInText(text, metrics = {}) {
     if (actual == null || !Number.isFinite(Number(actual))) return;
     result = applyKpiMetricPatterns(result, key, actual);
   });
-  return result;
+  return fixGluedPercentProse(result);
 }
 
 /**

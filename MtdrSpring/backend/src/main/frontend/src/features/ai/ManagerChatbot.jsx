@@ -12,6 +12,8 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { API_BASE } from '../sprints/constants/sprintConstants';
+import { useGeminiAiStatus } from './useGeminiAiStatus';
+import { getErrorMessage } from './aiInsightsConstants';
 
 // Icons as SVG components to avoid extra deps
 const BotIcon = () => (
@@ -90,10 +92,12 @@ const TrashIcon = () => (
 );
 
 // Renders markdown-lite: bold, bullets, line breaks
-function MessageText({ text, isDark }) {
-  const lines = text.split('\n');
+function MessageText({ text, isDark, isUser = false }) {
+  if (text == null || String(text).trim() === '') return null;
+  const lines = String(text).split('\n');
+  const textColor = isUser ? '#FFFFFF' : isDark ? '#F0F0F0' : '#1A1A1A';
   return (
-    <Box component="span" sx={{ display: 'block' }}>
+    <Box component="span" sx={{ display: 'block', color: textColor }}>
       {lines.map((line, i) => {
         const isBullet = /^[*-]\s/.test(line.trim());
         const cleaned = line.trim().replace(/^[*-]\s/, '');
@@ -108,7 +112,12 @@ function MessageText({ text, isDark }) {
             {isBullet && (
               <Box
                 component="span"
-                sx={{ position: 'absolute', left: 0, color: '#E53935', fontWeight: 700 }}
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  color: isUser ? '#FFCDD2' : '#E53935',
+                  fontWeight: 700,
+                }}
               >
                 •
               </Box>
@@ -127,7 +136,8 @@ function MessageText({ text, isDark }) {
 export default function ManagerChatbot({ projectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+  const { blocked: aiBlocked, message: aiConfigMessage } = useGeminiAiStatus();
+
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -169,7 +179,7 @@ export default function ManagerChatbot({ projectId }) {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || aiBlocked) return;
 
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -194,7 +204,9 @@ export default function ManagerChatbot({ projectId }) {
       });
 
       const data = await res.json();
-      const reply = data.error ? `⚠️ ${data.reply}` : data.reply;
+      const reply = data.error
+        ? `⚠️ ${data.reply || getErrorMessage(data.errorCode)}`
+        : data.reply;
 
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
       if (!open) setHasUnread(true);
@@ -495,13 +507,14 @@ export default function ManagerChatbot({ projectId }) {
                         <Typography
                           sx={{ fontWeight: 700, fontSize: '0.875rem', color: 'text.primary', mb: 0.5 }}
                         >
-                          How can I help?
+                          {aiBlocked ? 'AI chat unavailable' : 'How can I help?'}
                         </Typography>
                         <Typography
                           sx={{ fontSize: '0.75rem', color: isDark ? '#9A9A9A' : '#999', maxWidth: 260, mx: 'auto' }}
                         >
-                          Ask me about tasks, developers, sprint progress, or anything about your
-                          project.
+                          {aiBlocked
+                            ? aiConfigMessage || getErrorMessage('API_KEY_MISSING')
+                            : 'Ask me about tasks, developers, sprint progress, or anything about your project.'}
                         </Typography>
                       </Box>
                       <Box
@@ -578,18 +591,32 @@ export default function ManagerChatbot({ projectId }) {
                             py: 1,
                             borderRadius:
                               msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                            bgcolor: msg.role === 'user'
-                              ? 'linear-gradient(135deg, #E53935, #C62828)'
-                              : (isDark ? '#2A2C32' : '#F5F5F5'),
-                            color: msg.role === 'user' ? '#fff' : (isDark ? '#F0F0F0' : '#1A1A1A'),
+                            ...(msg.role === 'user'
+                              ? {
+                                  background: 'linear-gradient(135deg, #E53935 0%, #C62828 100%)',
+                                  color: '#FFFFFF',
+                                }
+                              : {
+                                  bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
+                                  color: isDark ? '#F0F0F0' : '#1A1A1A',
+                                }),
                             fontSize: '0.8rem',
                             lineHeight: 1.55,
-                            boxShadow: msg.role === 'user'
-                              ? (isDark ? '0 2px 8px rgba(229,57,53,0.35)' : '0 2px 8px rgba(229,57,53,0.25)')
-                              : (isDark ? '0 1px 3px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.06)'),
+                            boxShadow:
+                              msg.role === 'user'
+                                ? isDark
+                                  ? '0 2px 8px rgba(229,57,53,0.35)'
+                                  : '0 2px 8px rgba(229,57,53,0.25)'
+                                : isDark
+                                  ? '0 1px 3px rgba(0,0,0,0.15)'
+                                  : '0 1px 3px rgba(0,0,0,0.06)',
                           }}
                         >
-                          <MessageText text={msg.content} isDark={isDark} />
+                          <MessageText
+                            text={msg.content}
+                            isDark={isDark}
+                            isUser={msg.role === 'user'}
+                          />
                         </Box>
                       </Box>
                     </motion.div>
@@ -669,12 +696,16 @@ export default function ManagerChatbot({ projectId }) {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ask about your project..."
+                    placeholder={
+                      aiBlocked
+                        ? 'AI chat unavailable — configure GEMINI_API_KEY on the server'
+                        : 'Ask about your project...'
+                    }
                     multiline
                     maxRows={3}
                     fullWidth
                     size="small"
-                    disabled={loading}
+                    disabled={loading || aiBlocked}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '12px',
@@ -690,7 +721,7 @@ export default function ManagerChatbot({ projectId }) {
                   />
                   <IconButton
                     onClick={sendMessage}
-                    disabled={!input.trim() || loading}
+                    disabled={!input.trim() || loading || aiBlocked}
                     sx={{
                       width: 38,
                       height: 38,

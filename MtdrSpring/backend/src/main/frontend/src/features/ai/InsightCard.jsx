@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { API_BASE, getErrorMessage, AI_INSIGHTS_EMPTY } from './aiInsightsConstants';
 import { fetchSprintInsights } from './insightsApi';
+import { useGeminiAiStatus } from './useGeminiAiStatus';
 import {
   AlertCard,
   SectionHeading,
@@ -106,7 +107,8 @@ export default function InsightCard({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+  const { blocked: aiBlocked, message: aiConfigMessage } = useGeminiAiStatus();
+
   const [status, setStatus] = useState('idle');
   const [insights, setInsights] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -173,6 +175,11 @@ export default function InsightCard({
 
   const startGeneration = useCallback(async () => {
     if (!sprintId) return;
+    if (aiBlocked) {
+      setError(aiConfigMessage || getErrorMessage('API_KEY_MISSING'));
+      setStatus('error');
+      return;
+    }
     cancelPollRef.current = true;
     setStatus('generating');
     setError(null);
@@ -183,7 +190,12 @@ export default function InsightCard({
         method: 'POST',
         cache: 'no-store',
       });
-      if (!res.ok) throw new Error('POST failed');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(getErrorMessage(data.error) || data.message || 'Could not start AI analysis.');
+        setStatus('error');
+        return;
+      }
       cancelPollRef.current = false;
       setStatus('polling');
       pollForResults(lastGeneratedAtMsRef.current);
@@ -191,7 +203,7 @@ export default function InsightCard({
       setError('Could not start AI analysis. Check server connection.');
       setStatus('error');
     }
-  }, [sprintId, pollForResults]);
+  }, [sprintId, pollForResults, aiBlocked, aiConfigMessage]);
 
   const loadExisting = useCallback(
     async (options = {}) => {
@@ -200,7 +212,7 @@ export default function InsightCard({
       try {
         const { notFound, data } = await fetchSprintInsights(sprintId);
         if (notFound || !data) {
-          if (autoGenerate && !autoGenerateStartedRef.current.has(sprintId)) {
+          if (autoGenerate && !aiBlocked && !autoGenerateStartedRef.current.has(sprintId)) {
             autoGenerateStartedRef.current.add(sprintId);
             await startGeneration();
           } else if (!autoGenerate) {
@@ -226,7 +238,7 @@ export default function InsightCard({
         }
       }
     },
-    [sprintId, startGeneration],
+    [sprintId, startGeneration, aiBlocked],
   );
 
   useEffect(() => {
@@ -361,10 +373,16 @@ export default function InsightCard({
         </Box>
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
           {status === 'loaded' && (
-            <Tooltip title="Regenerate">
-              <IconButton onClick={handleGenerate} sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}>
+            <Tooltip title={aiBlocked ? 'AI not configured' : 'Regenerate'}>
+              <span>
+                <IconButton
+                  onClick={handleGenerate}
+                  disabled={aiBlocked}
+                  sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}
+                >
                 <RefreshCw size={20} />
               </IconButton>
+              </span>
             </Tooltip>
           )}
           {status === 'loaded' && (
@@ -407,10 +425,29 @@ export default function InsightCard({
               </Typography>
             </Box>
           )}
+          {aiBlocked && aiConfigMessage && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                p: 1.25,
+                bgcolor: isDark ? '#4A3A10' : '#FFF8E1',
+                borderRadius: 1.5,
+                border: `1px solid ${isDark ? '#8D6E14' : '#FFE082'}`,
+              }}
+            >
+              <AlertCircle size={14} color="#F57F17" style={{ marginTop: 1, flexShrink: 0 }} />
+              <Typography sx={{ fontSize: '0.9rem', color: isDark ? '#FFE082' : '#E65100', lineHeight: 1.45 }}>
+                {aiConfigMessage}
+              </Typography>
+            </Box>
+          )}
           <Button
             variant="contained"
             startIcon={<Sparkles size={18} />}
             onClick={handleGenerate}
+            disabled={aiBlocked}
             sx={{
               alignSelf: 'flex-start',
               bgcolor: '#673AB7',

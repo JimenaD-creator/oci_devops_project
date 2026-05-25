@@ -3,10 +3,10 @@ package com.springboot.MyTodoList.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.model.Task;
+import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.TaskEmbedding;
 import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -21,8 +21,8 @@ import java.util.stream.Collectors;
 @Service
 public class EmbeddingService {
 
-    @Value("${gemini.api.key:}")
-    private String geminiApiKey;
+    @Autowired
+    private GeminiApiConfiguration geminiApiConfiguration;
 
     private static final String EMBEDDING_URL =
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
@@ -100,9 +100,7 @@ public class EmbeddingService {
     // ─────────────────────────────────────────────────────────────────────────
 
     private double[] generateEmbedding(String texto) throws Exception {
-        if (geminiApiKey == null || geminiApiKey.isBlank()) {
-            throw new IllegalStateException("Gemini API key not configured.");
-        }
+        geminiApiConfiguration.requireConfigured();
 
         String body = mapper.writeValueAsString(Map.of(
             "model", "models/gemini-embedding-001",
@@ -112,7 +110,7 @@ public class EmbeddingService {
         ));
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(EMBEDDING_URL + "?key=" + geminiApiKey))
+            .uri(URI.create(EMBEDDING_URL + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(body))

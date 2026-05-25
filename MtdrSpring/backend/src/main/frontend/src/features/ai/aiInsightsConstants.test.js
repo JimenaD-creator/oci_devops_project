@@ -26,6 +26,16 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toBe('On-time delivery is at 83%.');
   });
 
+  it('keeps a space after percent (avoids "0as" in manager guide)', () => {
+    const out = alignKpiProseForMetric(
+      'Team participation is 0% as work has not yet commenced on the assigned tasks.',
+      'teamParticipation',
+      { teamParticipation: 0 },
+    );
+    expect(out).toMatch(/0%\s+as/i);
+    expect(out).not.toMatch(/0as/i);
+  });
+
   it('alignAlertLoosePercents replaces currently at', () => {
     expect(alignAlertLoosePercents('currently at 63%', 83)).toBe('currently at 83%');
   });

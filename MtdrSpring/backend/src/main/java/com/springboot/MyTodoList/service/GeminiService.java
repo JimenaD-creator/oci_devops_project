@@ -12,6 +12,7 @@ import com.springboot.MyTodoList.model.Team;
 import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserSprint;
+import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.SprintRepository;
@@ -65,8 +66,8 @@ public class GeminiService {
         }
     }
 
-    @Value("${gemini.api.key:}")
-    private String geminiApiKey;
+    @Autowired
+    private GeminiApiConfiguration geminiApiConfiguration;
 
     private static final String GEMINI_URL =
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
@@ -175,9 +176,13 @@ public class GeminiService {
 
     @Async
     public CompletableFuture<SprintInsight> generateInsightsForSprint(Long sprintId) {
-        System.out.println("[GeminiService] API key present: " + 
-    (geminiApiKey != null && !geminiApiKey.isBlank() ? 
-     "YES (length=" + geminiApiKey.length() + ")" : "NO/EMPTY"));
+        System.out.println("[GeminiService] API key present: "
+            + (geminiApiConfiguration.isConfigured() ? "YES" : "NO/EMPTY"));
+        if (!geminiApiConfiguration.isConfigured()) {
+            saveErrorInsight(sprintId, null, GeminiApiConfiguration.ERROR_CODE);
+            return CompletableFuture.failedFuture(
+                new IllegalStateException(GeminiApiConfiguration.USER_MESSAGE));
+        }
         try {
             Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
             if (sprint == null) {
@@ -238,16 +243,14 @@ public class GeminiService {
      * Returns the AI text directly — not JSON.
      */
     public String generateDeveloperPerformanceSummary(String prompt) throws Exception {
-        if (geminiApiKey == null || geminiApiKey.isBlank()) {
-            throw new IllegalStateException("Gemini API key not configured.");
-        }
+        geminiApiConfiguration.requireConfigured();
 
         String requestBody = "{\"contents\":[{\"parts\":[{\"text\":"
             + mapper.writeValueAsString(prompt)
             + "}]}],\"generationConfig\":{\"temperature\":0.5,\"maxOutputTokens\":512}}";
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiKey))
+            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -797,6 +800,7 @@ public class GeminiService {
             + "- Anti-meta: Do not quote, paraphrase, or paste long internal instructions, metric definitions, or methodology from this prompt into user-facing strings. Write naturally for a PM or engineering lead — short, concrete coaching, not spec language.\n" +
             "- alerts: severity must follow the numeric 'value' on the 0-100 scale for the five main KPIs: 'critical' only if value < 40 (or the message states a 20+ point drop across 2+ sprints), " +
             "'warning' only if 40 <= value < 60, and 'info' if value >= 60. For teamParticipation and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
+            "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: use alerts: [] OR only blocker/workload-planning alerts — never critical/warning for completionRate, onTimeDelivery, teamParticipation, or productivityScore at 0% because work has not started or just began. " +
             "For workloadBalance, values >= 70 mean reasonably balanced work distribution; 'warning' typically applies when value is below 70. For blocker-related alerts, prefer severity 'warning' when the blocked-assignment list is non-empty; do not put a 0-100 percentage in 'value' for those — omit 'value' or use the count of blocked rows. Use [] if there are no alerts.\n" +
             "- actionableRecommendations: 3-8 items when useful if phase is in_progress or ended; if phase is not_started, follow the \"Sprint not started yet\" limits above instead. If phase is in_progress and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload (respecting task startDate vs asOf), blocked-assignment list above, or KPIs — but do not add filler recommendations for tasks whose startDate is after asOf. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data, or when not_started rules cap recommendations.\n" +
             "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
@@ -821,6 +825,8 @@ public class GeminiService {
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
             "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
+            "Always put a space after a percent sign before the next word (write \"0% as\", never \"0%as\"). " +
+            "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: do not write kpiManagerGuide prose that sounds like poor execution solely because KPIs are 0 — describe planned/upcoming work neutrally. " +
             "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
             "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, teamParticipation, and workloadBalance — "
             + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
@@ -864,9 +870,7 @@ public class GeminiService {
     // ─────────────────────────────────────────────────────────────────────────
 
     private String callGemini(String prompt) throws Exception {
-    if (geminiApiKey == null || geminiApiKey.isBlank()) {
-        throw new IllegalStateException("Gemini API key not configured.");
-    }
+        geminiApiConfiguration.requireConfigured();
 
     String requestBody = "{\"contents\":[{\"parts\":[{\"text\":" +
         mapper.writeValueAsString(prompt) +
@@ -880,7 +884,7 @@ public class GeminiService {
         System.out.println("[GeminiService] Attempt " + attempt + "/" + maxRetries);
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiKey))
+            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(60)) // ← sube a 60s
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -1003,7 +1007,9 @@ public class GeminiService {
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
             injectBlockedAssignmentsSnapshot(root, sprintId);
             normalizeAlertSeverities(root);
+            filterPrematureSprintKpiAlerts(root, sprintId);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            normalizeKpiManagerGuidePercentSpacing(root);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
             normalizeKpiManagerGuideProductivityScore(root, sprintId);
             prettifyHumanProseInInsights(root);
@@ -2634,6 +2640,110 @@ public class GeminiService {
                 o.put("severity", "warning");
             }
         }
+    }
+
+    private static final Set<String> EXECUTION_KPI_ALERT_KEYS = Set.of(
+        "completionrate",
+        "ontimedelivery",
+        "teamparticipation",
+        "productivityscore"
+    );
+
+    private static final Pattern PREMATURE_EXECUTION_ALERT_PROSE = Pattern.compile(
+        "currently\\s+at\\s+0\\s*%|"
+            + "dropped\\s+significantly|"
+            + "tasks\\s+remaining\\s+in\\s+to\\s+do|"
+            + "has\\s+not\\s+yet\\s+commenced|"
+            + "work\\s+has\\s+not|"
+            + "not\\s+yet\\s+commenced",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    /**
+     * Removes critical/warning execution KPI alerts when the sprint has not started or is still early —
+     * zeros reflect the calendar, not poor delivery.
+     */
+    private void filterPrematureSprintKpiAlerts(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        String phase = resolveSprintPhase(sprint);
+        if (!"not_started".equals(phase) && !isSprintEarlyForProductivityGuide(sprint)) {
+            return;
+        }
+        JsonNode alertsNode = root.get("alerts");
+        if (alertsNode == null || !alertsNode.isArray()) {
+            return;
+        }
+        ArrayNode in = (ArrayNode) alertsNode;
+        ArrayNode out = mapper.createArrayNode();
+        for (int i = 0; i < in.size(); i++) {
+            JsonNode item = in.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpiRaw = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            String severity = o.path("severity").isTextual() ? o.get("severity").asText("").trim().toLowerCase(Locale.ROOT) : "";
+            String message = o.path("message").isTextual() ? o.get("message").asText("") : "";
+            boolean blockerThemed = kpi.contains("block") || ALERT_BLOCKER_LEXEMES.matcher(message).find();
+            if (blockerThemed) {
+                out.add(item);
+                continue;
+            }
+            boolean executionKpi = EXECUTION_KPI_ALERT_KEYS.contains(kpi);
+            boolean prematureProse = PREMATURE_EXECUTION_ALERT_PROSE.matcher(message).find();
+            double alertVal = o.has("value") && o.get("value").isNumber() ? o.get("value").asDouble() : -1.0;
+            if (executionKpi) {
+                if ("critical".equals(severity) || "warning".equals(severity)) {
+                    continue;
+                }
+                if (alertVal >= 0.0 && alertVal < 60.0) {
+                    continue;
+                }
+                if (prematureProse) {
+                    continue;
+                }
+            } else if (prematureProse && ("critical".equals(severity) || "warning".equals(severity))) {
+                continue;
+            }
+            out.add(item);
+        }
+        root.set("alerts", out);
+    }
+
+    private static final Pattern GLUED_PERCENT_LETTER = Pattern.compile("(\\d+)\\s*%([a-zA-Z])");
+
+    /** Fixes "0%as" after numeric alignment in kpiManagerGuide strings. */
+    private void normalizeKpiManagerGuidePercentSpacing(ObjectNode root) {
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode == null || !guideNode.isObject()) {
+            return;
+        }
+        ObjectNode guide = (ObjectNode) guideNode;
+        if (guide.path("intro").isTextual()) {
+            guide.put("intro", fixGluedPercentInProse(guide.get("intro").asText()));
+        }
+        JsonNode byMetricNode = guide.get("byMetric");
+        if (byMetricNode == null || !byMetricNode.isObject()) {
+            return;
+        }
+        ObjectNode byMetric = (ObjectNode) byMetricNode;
+        byMetric.fieldNames().forEachRemaining(key -> {
+            JsonNode v = byMetric.get(key);
+            if (v != null && v.isTextual()) {
+                byMetric.put(key, fixGluedPercentInProse(v.asText()));
+            }
+        });
+    }
+
+    private static String fixGluedPercentInProse(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return GLUED_PERCENT_LETTER.matcher(text).replaceAll("$1% $2");
     }
 
     /**

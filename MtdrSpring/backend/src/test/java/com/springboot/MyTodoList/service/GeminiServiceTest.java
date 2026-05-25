@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
@@ -57,6 +58,9 @@ class GeminiServiceTest {
     @Mock
     private TaskRepository taskRepository;
 
+    @Mock
+    private GeminiApiConfiguration geminiApiConfiguration;
+
     @InjectMocks
     private GeminiService geminiService;
 
@@ -81,7 +85,7 @@ class GeminiServiceTest {
 
     @Test
     void generateDeveloperVariationInsights_fallback_computesDeltasWithoutApi() throws Exception {
-        ReflectionTestUtils.setField(geminiService, "geminiApiKey", "");
+        when(geminiApiConfiguration.isConfigured()).thenReturn(false);
 
         List<Map<String, Object>> snapshots = twoSprintSnapshotsForAlice();
 

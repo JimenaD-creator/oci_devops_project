@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
+import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.service.GeminiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,9 @@ public class InsightsController {
     private GeminiService geminiService;
 
     @Autowired
+    private GeminiApiConfiguration geminiApiConfiguration;
+
+    @Autowired
     private SprintInsightRepository insightRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -43,6 +47,13 @@ public class InsightsController {
     @PostMapping("/sprint/{sprintId}/generate")
     public ResponseEntity<Map<String, Object>> generateInsights(@PathVariable Long sprintId) {
         Map<String, Object> response = new HashMap<>();
+        if (!geminiApiConfiguration.isConfigured()) {
+            response.put("status", "failed");
+            response.put("error", GeminiApiConfiguration.ERROR_CODE);
+            response.put("message", GeminiApiConfiguration.USER_MESSAGE);
+            response.put("sprintId", sprintId);
+            return ResponseEntity.unprocessableEntity().body(response);
+        }
         try {
             CompletableFuture<SprintInsight> future =
                 geminiService.generateInsightsForSprint(sprintId);
