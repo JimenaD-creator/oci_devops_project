@@ -61,6 +61,18 @@ export function TasksNewTaskDialog({
   const [fetchedDevelopers, setFetchedDevelopers] = useState(null);
   const [developersLoading, setDevelopersLoading] = useState(false);
 
+  // Crear mapa de números de sprint secuenciales
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i));
+    return map;
+  }, [sprints]);
+
+  // Obtener sprints ordenados para el select
+  const sortedSprints = useMemo(() => {
+    return [...(sprints || [])].sort((a, b) => a.id - b.id);
+  }, [sprints]);
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -408,16 +420,28 @@ export function TasksNewTaskDialog({
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Sprint</InputLabel>
-              <Select value={sprintId} onChange={(e) => setSprintId(e.target.value)} label="Sprint">
-                {sprints.map((s) => (
-                  <MenuItem
-                    key={s.id}
-                    value={String(s.id)}
-                    sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
-                  >
-                    {`Sprint ${s.id}`}
-                  </MenuItem>
-                ))}
+              <Select 
+                value={sprintId} 
+                onChange={(e) => setSprintId(e.target.value)} 
+                label="Sprint"
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  const sprintNum = sprintNumberMap.get(Number(value));
+                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
+                }}
+              >
+                {sortedSprints.map((s) => {
+                  const sprintNumber = sprintNumberMap.get(s.id);
+                  return (
+                    <MenuItem
+                      key={s.id}
+                      value={String(s.id)}
+                      sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
+                    >
+                      {sprintNumber ? `Sprint ${sprintNumber}` : `Sprint ${s.id}`}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
             <TextField

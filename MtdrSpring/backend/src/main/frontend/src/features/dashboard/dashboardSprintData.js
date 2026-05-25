@@ -252,16 +252,16 @@ function sprintTaskStatusRows(counts) {
   return { taskStatusDistribution: rows, taskStatusTotal };
 }
 
-function mapApiSprint(apiSprint) {
+function mapApiSprint(apiSprint, sprintNumber) {
   const id = apiSprint.id;
   return {
     id,
     assignedProject: apiSprint.assignedProject ?? null,
     startDate: apiSprint.startDate,
     dueDate: apiSprint.dueDate,
-    shortLabel: `Sprint ${id}`,
+    shortLabel: `Sprint ${sprintNumber}`,
     accentColor: SPRINT_CHART_COLORS[0],
-    name: `Sprint ${id}`,
+    name: `Sprint ${sprintNumber}`,
     dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     dateRangeEn: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     /** Dashboard: planned / active / completed from sprint date range (not task completion). */
@@ -283,7 +283,6 @@ function mapApiSprint(apiSprint) {
     developers: [],
   };
 }
-
 function deriveKpisFromLiveData(
   sprintId,
   _statusCounts,
@@ -545,9 +544,10 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     cachedData.projectId === pid &&
     now - cachedData.timestamp < CACHE_TTL
   ) {
-    console.log('Using cached dashboard data');
-    const mapped = cachedData.sprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
-    const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
+console.log('Using cached dashboard data');
+const sortedCached = [...cachedData.sprints].sort((a, b) => a.id - b.id);
+const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
+const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
     assignSprintAccentColors(enriched);
     return enriched;
   }
@@ -578,8 +578,8 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       timestamp: now,
       projectId: pid,
     };
-
-    const mapped = apiSprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
+const sortedSprints = [...apiSprints].sort((a, b) => a.id - b.id);
+const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
     let enriched;
     try {
       enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
@@ -843,7 +843,7 @@ export function buildCompareDeveloperChartsModel(selectedSprints) {
 
   const sprintDefs = sprints.map((sp, idx) => ({
     id: Number(sp.id),
-    shortLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
+shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 

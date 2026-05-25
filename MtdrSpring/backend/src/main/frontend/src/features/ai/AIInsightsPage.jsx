@@ -27,6 +27,18 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
 
+  // Crear mapa de números de sprint secuenciales por proyecto
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    // Ordenar sprints por ID para mantener consistencia
+    [...sprints]
+      .sort((a, b) => a.id - b.id)
+      .forEach((sprint, index) => {
+        map.set(sprint.id, index);
+      });
+    return map;
+  }, [sprints]);
+
   useEffect(() => {
     const onFocus = () => setRefreshToken((v) => v + 1);
     const onVisibility = () => {
@@ -165,6 +177,13 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
 
   if (loading) return <PageLoadingSpinner />;
 
+  // Obtener etiquetas de sprint con números secuenciales
+  const getSprintLabel = (sprintId) => {
+    if (sprintId == null) return null;
+    const sprintNum = sprintNumberMap.get(sprintId);
+    return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${sprintId}`;
+  };
+
   return (
     <Box
       component={motion.div}
@@ -256,14 +275,18 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  return `Sprint ${value}`;
+                  const sprintNum = sprintNumberMap.get(value);
+                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
                 }}
               >
-                {sprints.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    Sprint {s.id}
-                  </MenuItem>
-                ))}
+                {sprints.map((s) => {
+                  const sprintNum = sprintNumberMap.get(s.id);
+                  return (
+                    <MenuItem key={s.id} value={s.id}>
+                      {sprintNum ? `Sprint ${sprintNum}` : `Sprint ${s.id}`}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Box>
@@ -278,10 +301,10 @@ export default function AIInsightsPage({ projectId, onOpenTeam = null }) {
         <InsightCard
           key={selectedSprint.id}
           sprintId={selectedSprint.id}
-          sprintLabel={`Sprint ${selectedSprint.id}`}
+          sprintLabel={getSprintLabel(selectedSprint.id)}
           showPredictionsSection={showPredictionsSection}
           showNextSprintForecast={showNextSprintForecast}
-          nextSprintLabel={nextSprintForSelected ? `Sprint ${nextSprintForSelected.id}` : null}
+          nextSprintLabel={nextSprintForSelected ? getSprintLabel(nextSprintForSelected.id) : null}
           nextSprintActualScore={productivityFromSprintWork(nextSprintForSelected)}
           currentSprintActualScore={productivityFromSprintWork(selectedSprint)}
           currentSprintMetrics={currentSprintKpiMetrics}

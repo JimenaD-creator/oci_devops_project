@@ -75,6 +75,20 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
   const recentlyDeletedTaskIdsRef = useRef(new Set());
 
+  // Función para obtener el número secuencial de un sprint
+  const getSprintNumber = useCallback((sprintId, sprintsList) => {
+    const sortedSprints = [...sprintsList].sort((a, b) => a.id - b.id);
+    const index = sortedSprints.findIndex(s => s.id === sprintId);
+    return index >= 0 ? index + 1 : sprintId;
+  }, []);
+
+  // Función para obtener la etiqueta formateada del sprint
+  const getSprintLabel = useCallback((sprintId, sprintsList) => {
+    if (sprintId == null) return '';
+    const sprintNum = getSprintNumber(sprintId, sprintsList);
+    return `Sprint ${sprintNum}`;
+  }, [getSprintNumber]);
+
   const loadData = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
     if (!silent) {
@@ -168,6 +182,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     if (!selectedProjectId) return [];
     return (sprints || []).filter((s) => sprintProjectIdFromJson(s) === Number(selectedProjectId));
   }, [sprints, selectedProjectId]);
+
+  // Ordenar sprints para el select
+  const sortedSprintsForSelect = useMemo(() => {
+    return [...sprintsForActiveProject].sort((a, b) => a.id - b.id);
+  }, [sprintsForActiveProject]);
 
   useEffect(() => {
     if (selectedSprintId !== '' || !sprints.length) return;
@@ -436,6 +455,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                 inputProps={{ 'aria-label': 'Sprint' }}
                 onChange={(e) => setSelectedSprintId(String(e.target.value))}
                 disabled={!sprints.length}
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  const sprintNum = getSprintNumber(Number(value), sprintsForActiveProject.length ? sprintsForActiveProject : sprints);
+                  return `Sprint ${sprintNum}`;
+                }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -453,9 +477,14 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   },
                 }}
               >
-                {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>Sprint {s.id}</MenuItem>
-                ))}
+                {sortedSprintsForSelect.map((s, index) => {
+                  const sprintNumber = index + 1;
+                  return (
+                    <MenuItem key={s.id} value={String(s.id)}>
+                      Sprint {sprintNumber}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
             {!developerMode ? (

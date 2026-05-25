@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -39,6 +39,18 @@ export default function TeamPage({
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [developerInsightRows, setDeveloperInsightRows] = useState(null);
   const [sprintsReady, setSprintsReady] = useState(false);
+
+  // Crear mapa de números de sprint secuenciales por proyecto
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    // Ordenar sprints por ID para mantener consistencia
+    [...sprints]
+      .sort((a, b) => a.id - b.id)
+      .forEach((sprint, index) => {
+        map.set(sprint.id, index);
+      });
+    return map;
+  }, [sprints]);
 
   useEffect(() => {
     const pid =
@@ -208,14 +220,18 @@ export default function TeamPage({
                 displayEmpty
                 renderValue={(value) => {
                   if (value === '' || value == null) return 'Select sprint';
-                  return `Sprint ${value}`;
+                  const sprintNum = sprintNumberMap.get(value);
+                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
                 }}
               >
-                {sprints.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    Sprint {s.id}
-                  </MenuItem>
-                ))}
+                {sprints.map((s) => {
+                  const sprintNum = sprintNumberMap.get(s.id);
+                  return (
+                    <MenuItem key={s.id} value={s.id}>
+                      {sprintNum ? `Sprint ${sprintNum}` : `Sprint ${s.id}`}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Box>
@@ -248,9 +264,10 @@ export default function TeamPage({
           <TeamWorkloadBreakdown
             sprint={selectedSprint}
             aiDeveloperInsights={developerInsightRows}
+            sprintNumberMap={sprintNumberMap}
           />
 
-          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} />
+          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} sprintNumberMap={sprintNumberMap} />
 
           <Paper
             sx={{
@@ -345,7 +362,7 @@ export default function TeamPage({
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Developer radar
             </Typography>
-            <DeveloperRadarCards sprintId={selectedSprint.id} />
+            <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} />
           </Paper>
         </>
       )}

@@ -282,6 +282,18 @@ export function NewTaskDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Crear mapa de números de sprint secuenciales
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
+    return map;
+  }, [sprints]);
+
+  // Obtener sprints ordenados para el select
+  const sortedSprints = useMemo(() => {
+    return [...(sprints || [])].sort((a, b) => a.id - b.id);
+  }, [sprints]);
+
   useEffect(() => {
     if (!open) return;
     const fallbackSprintId = defaultSprintId != null ? String(defaultSprintId) : '';
@@ -518,16 +530,24 @@ export function NewTaskDialog({
                 value={sprintId}
                 onChange={(e) => setSprintId(e.target.value)}
                 label="Sprint *"
+                renderValue={(value) => {
+                  if (!value) return 'Select sprint';
+                  const sprintNum = sprintNumberMap.get(Number(value));
+                  return sprintNum ? `Sprint ${sprintNum}` : `Sprint ${value}`;
+                }}
               >
-                {(sprints || []).map((s) => (
-                  <MenuItem
-                    key={s.id}
-                    value={String(s.id)}
-                    sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
-                  >
-                    {`Sprint ${s.id}`}
-                  </MenuItem>
-                ))}
+                {sortedSprints.map((s) => {
+                  const sprintNumber = sprintNumberMap.get(s.id);
+                  return (
+                    <MenuItem
+                      key={s.id}
+                      value={String(s.id)}
+                      sx={{ fontWeight: 600, color: ORACLE_RED_ACTION }}
+                    >
+                      {sprintNumber ? `Sprint ${sprintNumber}` : `Sprint ${s.id}`}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
             <TextField
