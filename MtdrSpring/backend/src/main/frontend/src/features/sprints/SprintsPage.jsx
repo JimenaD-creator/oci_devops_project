@@ -76,15 +76,14 @@ export default function SprintsPage({ projectId }) {
   );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
-<<<<<<< HEAD
-  const sprintNumberMap = useMemo(() => {
-  const map = new Map();
-  [...sprints].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
-  return map;
-}, [sprints]);
-=======
   const { invalidateAndRefresh } = useProjectData();
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    [...sprints]
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .forEach((s, i) => map.set(s.id, i));
+    return map;
+  }, [sprints]);
   /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
   const recentlyDeletedTaskIdsRef = useRef(new Set());
 

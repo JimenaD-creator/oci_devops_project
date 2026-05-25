@@ -22,10 +22,14 @@ import {
 import InsightCard from './InsightCard';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageActive = true }) {
+export default function AIInsightsPage({
+  projectId,
+  onOpenTeam = null,
+  isPageActive = true,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);

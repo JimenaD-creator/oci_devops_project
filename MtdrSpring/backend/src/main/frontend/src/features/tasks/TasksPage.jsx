@@ -71,50 +71,21 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const recentlyDeletedTaskIdsRef = useRef(new Set());
   const { invalidateAndRefresh } = useProjectData();
 
-<<<<<<< HEAD
-  // Función para obtener el número secuencial de un sprint
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
-    const sortedSprints = [...sprintsList].sort((a, b) => a.id - b.id);
-    const index = sortedSprints.findIndex(s => s.id === sprintId);
-    return index >= 0 ? index + 1 : sprintId;
+    const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
+    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
+    return index >= 0 ? index : sprintId;
   }, []);
 
-  // Función para obtener la etiqueta formateada del sprint
-  const getSprintLabel = useCallback((sprintId, sprintsList) => {
-    if (sprintId == null) return '';
-    const sprintNum = getSprintNumber(sprintId, sprintsList);
-    return `Sprint ${sprintNum}`;
-  }, [getSprintNumber]);
+  const getSprintLabel = useCallback(
+    (sprintId, sprintsList) => {
+      if (sprintId == null) return '';
+      const sprintNum = getSprintNumber(sprintId, sprintsList);
+      return `Sprint ${sprintNum}`;
+    },
+    [getSprintNumber],
+  );
 
-  const loadData = useCallback(async (opts = {}) => {
-    const silent = opts.silent === true;
-    if (!silent) {
-      setIsLoading(true);
-      setLoadError('');
-    }
-    try {
-      const { tasksData, sprintsData, userTasksData } = await fetchTasksPageBundle(effectiveProjectId);
-      const deleted = recentlyDeletedTaskIdsRef.current;
-      const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
-        (t) => !deleted.has(taskEntityId(t)),
-      );
-      const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
-        (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
-      );
-      setRawTasks(visibleTasks);
-      setSprints(Array.isArray(sprintsData) ? sprintsData : []);
-      setUserTasks(visibleUserTasks);
-    } catch (error) {
-      console.error('Error loading tasks data:', error);
-      setRawTasks([]);
-      setSprints([]);
-      setUserTasks([]);
-      if (!silent) setLoadError('Could not load tasks. Check that the server is running and try again.');
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, [effectiveProjectId]);
-=======
   const loadData = useCallback(
     async (opts = {}) => {
       const silent = opts.silent === true;
@@ -156,7 +127,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     },
     [effectiveProjectId, invalidateAndRefresh],
   );
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
 
   useEffect(() => {
     loadData();
@@ -618,22 +588,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   },
                 }}
               >
-<<<<<<< HEAD
-                {sortedSprintsForSelect.map((s, index) => {
-                  const sprintNumber = index + 1;
-                  return (
-                    <MenuItem key={s.id} value={String(s.id)}>
-                      Sprint {sprintNumber}
-                    </MenuItem>
-                  );
-                })}
-=======
-                {(sprintsForActiveProject.length ? sprintsForActiveProject : sprints).map((s) => (
+                {sortedSprintsForSelect.map((s, index) => (
                   <MenuItem key={s.id} value={String(s.id)}>
-                    Sprint {s.id}
+                    Sprint {index}
                   </MenuItem>
                 ))}
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
               </Select>
             </FormControl>
             {!developerMode ? (
@@ -928,6 +887,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
+        readOnly={developerMode}
         onClose={closeTaskDetailDialog}
         onSaved={async (updated, meta) => {
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));

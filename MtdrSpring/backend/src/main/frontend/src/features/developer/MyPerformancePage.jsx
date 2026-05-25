@@ -1,9 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Grid, Typography, Alert } from '@mui/material';
+import {
+  Box,
+  Grid,
+  Typography,
+  Alert,
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import DeveloperMetricCards from './DeveloperMetricCards';
+import DeveloperTable from '../kpis/DeveloperTable';
+import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import {
   aggregateDeveloperPerformance,
   buildCompletedTasksBySprintChart,
@@ -14,15 +27,27 @@ import {
   HoursWorkedTrendChart,
 } from './DeveloperPerformanceCharts';
 import { pageEase } from '../tasks/constants/taskConstants';
+import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
+import {
+  pickDefaultSelectedSprint,
+  resolveActiveProjectIdNum,
+  sortSprintsForDisplay,
+} from '../sprints/utils/sprintUtils';
+import { fetchSprintsProjectDevelopers } from '../sprints/sprintsPageApi';
 
 const ORACLE_RED = '#C74634';
 
 export default function MyPerformancePage({ projectId, currentUser }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const { sprints: sharedSprints, loading: sharedLoading, error: sharedError } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedSprint, setSelectedSprint] = useState(null);
+  const [projectDevelopers, setProjectDevelopers] = useState([]);
 
+  const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
   const userId = currentUser?.id;
   const userName = currentUser?.name;
 
@@ -37,6 +62,35 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     }
     if (!sharedLoading) setLoading(false);
   }, [projectId, sharedSprints, sharedLoading, sharedError]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (effectiveProjectIdNum == null) {
+      setProjectDevelopers([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+    (async () => {
+      try {
+        const data = await fetchSprintsProjectDevelopers(effectiveProjectIdNum);
+        if (!cancelled) setProjectDevelopers(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setProjectDevelopers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectIdNum]);
+
+  const sortedSprints = useMemo(() => sortSprintsForDisplay(sprints), [sprints]);
+
+  useEffect(() => {
+    if (selectedSprint != null || !sortedSprints.length) return;
+    const picked = pickDefaultSelectedSprint(sortedSprints);
+    if (picked) setSelectedSprint(picked);
+  }, [sortedSprints, selectedSprint]);
 
   const metrics = useMemo(
     () => aggregateDeveloperPerformance(sprints, userId, userName),
@@ -113,26 +167,72 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     ];
   }, [metrics]);
 
+  const borderColor = isDark ? '#2A2C32' : '#ECECEC';
+  const cardBg = theme.palette.background.paper;
+  const sprintTableSelection = selectedSprint ? [selectedSprint] : [];
+
   if (loading) {
     return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
   return (
     <Box sx={{ maxWidth: 1200, width: '100%' }}>
-      <Box
+      <Paper
         component={motion.div}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: pageEase }}
-        sx={{ mb: 2 }}
+        elevation={0}
+        sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
       >
-        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.5px', color: 'text.primary' }}>
-          My Performance
-        </Typography>
-        <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Your delivery metrics and sprint trends across the project.
-        </Typography>
-      </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'space-between',
+            alignItems: { xs: 'stretch', sm: 'flex-start' },
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{ fontWeight: 800, letterSpacing: '-0.5px', color: 'text.primary' }}
+            >
+              My Performance
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
+              Your delivery metrics and sprint trends across the project.
+            </Typography>
+          </Box>
+          <FormControl
+            size="small"
+            sx={{ minWidth: { xs: '100%', sm: 220 }, ...pageFormFieldOutline() }}
+          >
+            <InputLabel id="my-performance-sprint-label">Sprint</InputLabel>
+            <Select
+              labelId="my-performance-sprint-label"
+              value={selectedSprint?.id != null ? String(selectedSprint.id) : ''}
+              label="Sprint"
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                const sp = sortedSprints.find((s) => Number(s.id) === id);
+                setSelectedSprint(sp || null);
+              }}
+              disabled={!sortedSprints.length}
+            >
+              {sortedSprints.map((s) => (
+                <MenuItem key={s.id} value={String(s.id)}>
+                  Sprint {s.id}
+                  {s.startDate && s.endDate
+                    ? ` · ${new Date(s.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(s.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                    : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      </Paper>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -142,7 +242,7 @@ export default function MyPerformancePage({ projectId, currentUser }) {
 
       <DeveloperMetricCards metrics={performanceCards} />
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>
           <CompletedTasksBySprintChart data={completedChartData} />
         </Grid>
@@ -150,6 +250,43 @@ export default function MyPerformancePage({ projectId, currentUser }) {
           <HoursWorkedTrendChart data={hoursChartData} />
         </Grid>
       </Grid>
+
+      {selectedSprint == null ? (
+        <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+          Select a sprint to view your productivity breakdown and radar.
+        </Typography>
+      ) : (
+        <>
+          <Box sx={{ mb: 3 }}>
+            <DeveloperTable
+              selectedSprints={sprintTableSelection}
+              compareMode={false}
+              projectDevelopers={projectDevelopers}
+              highlightDeveloperName={userName}
+            />
+          </Box>
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: 3,
+              border: `1px solid ${borderColor}`,
+              bgcolor: cardBg,
+            }}
+          >
+            <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
+              Developer radar
+            </Typography>
+            <DeveloperRadarCards
+              sprintId={selectedSprint.id}
+              layout="single"
+              developerName={userName}
+              developerUserId={userId}
+            />
+          </Paper>
+        </>
+      )}
     </Box>
   );
 }

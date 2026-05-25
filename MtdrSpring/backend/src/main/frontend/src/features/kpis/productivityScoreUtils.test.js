@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProductivityKpiAnalyticsGuideLine,
   appendProductivityEvolutionNote,
+  finalizeProductivityManagerGuideText,
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
   softenProductivityGuideForSprintPhase,
@@ -51,6 +52,16 @@ describe('productivityScoreUtils (KPI Analytics)', () => {
     expect(out).not.toMatch(/not started|expected|baseline/i);
     expect(out).toContain('Productivity Score is 9%');
     expect(out).toContain('combines the four KPIs');
+  });
+
+  it('finalizeProductivityManagerGuideText prepends score % when only evolution note remains', () => {
+    const out = finalizeProductivityManagerGuideText(
+      'It will keep updating as tasks progress and completion, on-time delivery, participation, and workload balance change during the sprint.',
+      42,
+      { phase: 'in_progress', isEarly: true },
+    );
+    expect(out).toContain('The Productivity Score is 42%');
+    expect(out).toMatch(/keep updating/i);
   });
 
   it('softenProductivityGuideForSprintPhase strips judgment labels before sprint is mature', () => {

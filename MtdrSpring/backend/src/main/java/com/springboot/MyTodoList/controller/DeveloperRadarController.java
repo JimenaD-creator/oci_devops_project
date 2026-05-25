@@ -25,6 +25,7 @@ import java.util.Locale;
 public class DeveloperRadarController {
 
     private static final class DeveloperAgg {
+        Long userId;
         String name;
         String profilePicture;
         int total;
@@ -49,6 +50,10 @@ public class DeveloperRadarController {
 
     @GetMapping("/sprint/{sprintId}/developer-radar")
     public ResponseEntity<List<Map<String, Object>>> getDeveloperRadar(@PathVariable Long sprintId) {
+        return ResponseEntity.ok(buildDeveloperRadarRows(sprintId));
+    }
+
+    private List<Map<String, Object>> buildDeveloperRadarRows(Long sprintId) {
         List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
         if (raw == null) raw = new ArrayList<>();
 
@@ -75,6 +80,7 @@ public class DeveloperRadarController {
             User u = ut.getUser();
             DeveloperAgg a = byUser.computeIfAbsent(uid, id -> {
                 DeveloperAgg x = new DeveloperAgg();
+                x.userId = id;
                 x.name = (u != null && u.getName() != null && !u.getName().isBlank())
                     ? u.getName().trim() : ("User " + id);
                 x.profilePicture = (u != null) ? u.getProfilePicture() : null;
@@ -107,7 +113,7 @@ public class DeveloperRadarController {
 
         addProjectTeamRoster(sprintId, byUser);
 
-        if (byUser.isEmpty()) return ResponseEntity.ok(Collections.emptyList());
+        if (byUser.isEmpty()) return Collections.emptyList();
 
         int maxTotal     = byUser.values().stream().mapToInt(a -> a.total).max().orElse(1);
         int maxDone      = byUser.values().stream().mapToInt(a -> a.done).max().orElse(1);
@@ -125,6 +131,7 @@ public class DeveloperRadarController {
             double volumeRatio        = maxDone > 0 ? (double) a.done / maxDone : 0;
 
             Map<String, Object> row = new LinkedHashMap<>();
+            row.put("developerUserId", a.userId);
             row.put("developerName",   a.name);
             row.put("profilePicture",  a.profilePicture);
             row.put("completionRate",  scale(completionRatio));
@@ -142,7 +149,7 @@ public class DeveloperRadarController {
             result.add(row);
         }
 
-        return ResponseEntity.ok(result);
+        return result;
     }
 
     private void addProjectTeamRoster(Long sprintId, Map<Long, DeveloperAgg> byUser) {
@@ -183,6 +190,7 @@ public class DeveloperRadarController {
 
     private static DeveloperAgg emptyAggForUser(User u, Long uid) {
         DeveloperAgg a = new DeveloperAgg();
+        a.userId = uid;
         a.name = (u.getName() != null && !u.getName().isBlank())
                 ? u.getName().trim()
                 : ("User " + uid);

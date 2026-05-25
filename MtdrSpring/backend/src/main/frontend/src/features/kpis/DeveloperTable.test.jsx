@@ -39,3 +39,16 @@ test('columns show per-person assigned tasks, completed tasks, and hours', () =>
   // On-time delivery (badge, distinct from workload bar text)
   expect(within(anaRow).getByText('100%', { selector: '.badge-base' })).toBeInTheDocument();
 });
+
+test('filterDeveloperName shows only the matching developer row', () => {
+  renderWithTheme(
+    <DeveloperTable
+      selectedSprints={[sprintSnapshot]}
+      compareMode={false}
+      suppressCardTitle
+      filterDeveloperName="Luis Pérez"
+    />,
+  );
+  expect(screen.getByText('Luis Pérez')).toBeInTheDocument();
+  expect(screen.queryByText('Ana Ruiz')).not.toBeInTheDocument();
+});

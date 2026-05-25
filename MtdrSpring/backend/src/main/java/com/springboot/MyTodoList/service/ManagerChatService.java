@@ -1,10 +1,10 @@
 package com.springboot.MyTodoList.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.*;
 import com.springboot.MyTodoList.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -21,11 +21,8 @@ import java.util.regex.Pattern;
 @Service
 public class ManagerChatService {
 
-    @Value("${gemini.api.key:}")
-    private String geminiApiKey;
-
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
+    @Autowired
+    private GeminiApiConfiguration geminiApiConfiguration;
 
     @Autowired private SprintRepository sprintRepository;
     @Autowired private TaskRepository taskRepository;
@@ -53,9 +50,10 @@ public class ManagerChatService {
     // ─────────────────────────────────────────────────────────────────────────
 
     public ManagerChatResponse chat(ManagerChatRequest req) {
-        if (geminiApiKey == null || geminiApiKey.isBlank()) {
-            return ManagerChatResponse.error("API_KEY_MISSING",
-                "Gemini API key is not configured on the server.");
+        if (!geminiApiConfiguration.isConfigured()) {
+            return ManagerChatResponse.error(
+                GeminiApiConfiguration.ERROR_CODE,
+                GeminiApiConfiguration.USER_MESSAGE);
         }
         if (req.getProjectId() == null) {
             return ManagerChatResponse.error("MISSING_PROJECT",
@@ -393,7 +391,7 @@ public class ManagerChatService {
         String requestBody = mapper.writeValueAsString(body);
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(GEMINI_URL + "?key=" + geminiApiKey))
+            .uri(URI.create(geminiApiConfiguration.getApiUrl() + "?key=" + geminiApiConfiguration.getApiKey()))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))

@@ -617,26 +617,11 @@ export async function fetchDashboardSprints(projectId, options = {}) {
 
   const now = Date.now();
 
-<<<<<<< HEAD
-  // Check cache first
-  if (
-    !forceFresh &&
-    cachedData.sprints &&
-    cachedData.tasks &&
-    cachedData.userTasks &&
-    cachedData.projectId === pid &&
-    now - cachedData.timestamp < CACHE_TTL
-  ) {
-console.log('Using cached dashboard data');
-const sortedCached = [...cachedData.sprints].sort((a, b) => a.id - b.id);
-const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
-const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
-=======
   if (isCacheValidForProject(pid, now, forceFresh)) {
     console.log('Using cached dashboard data');
-    const mapped = cachedData.sprints.map(mapApiSprint).sort((a, b) => a.id - b.id);
+    const sortedCached = [...cachedData.sprints].sort((a, b) => Number(a.id) - Number(b.id));
+    const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
     const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
->>>>>>> f72e294ddeb128ede1da4f1d0593058cdabc9d6e
     assignSprintAccentColors(enriched);
     return enriched;
   }
@@ -667,8 +652,8 @@ const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData
       timestamp: now,
       projectId: pid,
     };
-const sortedSprints = [...apiSprints].sort((a, b) => a.id - b.id);
-const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
+    const sortedSprints = [...apiSprints].sort((a, b) => Number(a.id) - Number(b.id));
+    const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
     let enriched;
     try {
       enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);

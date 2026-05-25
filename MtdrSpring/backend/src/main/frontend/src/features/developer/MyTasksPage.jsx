@@ -321,6 +321,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
+        readOnly
         onClose={() => {
           setDetailOpen(false);
           setTaskForDetail(null);
