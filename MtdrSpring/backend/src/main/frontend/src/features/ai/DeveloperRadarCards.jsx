@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Box, Typography, Paper } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Chart } from 'chart.js/auto';
+import { API_BASE } from './aiInsightsConstants';
 
 const METRICS = [
   { key: 'completionRate', label: 'Completion' },
@@ -149,7 +150,7 @@ function Avatar({ dev, color, initials }) {
   );
 }
 
-function DevCard({ dev }) {
+function DevCard({ dev, compact = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const ov = overall(dev);
@@ -168,13 +169,16 @@ function DevCard({ dev }) {
       sx={{
         border: '1px solid',
         borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)',
-        borderTop: `4px solid ${color}`,
+        ...(compact
+          ? {}
+          : { borderTop: `4px solid ${color}` }),
         borderRadius: 2,
-        p: 2.5,
+        p: compact ? 2 : 2.5,
         display: 'flex',
         flexDirection: 'column',
         gap: 1.5,
         bgcolor: isDark ? '#1C1E22' : '#FAFAFA',
+        boxShadow: 'none',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -226,8 +230,10 @@ export default function DeveloperRadarCards({
 
   useEffect(() => {
     if (sprintId == null || sprintId === '' || !Number.isFinite(Number(sprintId))) return;
-    const base = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
-    fetch(`${base}/api/insights/sprint/${sprintId}/developer-radar`, { cache: 'no-store', headers: { Accept: 'application/json' } })
+    fetch(`${API_BASE}/api/insights/sprint/${sprintId}/developer-radar`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setDevs(Array.isArray(data) ? data : []))
       .catch(() => setDevs([]));
@@ -254,9 +260,11 @@ export default function DeveloperRadarCards({
 
   return (
     <Box sx={{ mt: isSingleLayout ? 0 : 2, width: '100%' }}>
-      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 600, mb: 1.5 }}>
-        Scores normalized relative to team — higher is better within the sprint.
-      </Typography>
+      {!isSingleLayout ? (
+        <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 600, mb: 1.5 }}>
+          Scores normalized relative to team — higher is better within the sprint.
+        </Typography>
+      ) : null}
       <Box
         sx={
           isSingleLayout
@@ -264,7 +272,8 @@ export default function DeveloperRadarCards({
                 display: 'grid',
                 gridTemplateColumns: '1fr',
                 gap: 2.5,
-                maxWidth: 420,
+                width: '100%',
+                maxWidth: 380,
                 mx: 'auto',
               }
             : {
@@ -276,7 +285,7 @@ export default function DeveloperRadarCards({
         }
       >
         {visibleDevs.map((d) => (
-          <DevCard key={String(d.developerName).trim()} dev={d} />
+          <DevCard key={String(d.developerName).trim()} dev={d} compact={isSingleLayout} />
         ))}
       </Box>
     </Box>

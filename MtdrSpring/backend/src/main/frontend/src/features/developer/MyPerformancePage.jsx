@@ -17,6 +17,7 @@ import { useProjectData } from '../../contexts/ProjectDataContext';
 import DeveloperMetricCards from './DeveloperMetricCards';
 import DeveloperTable from '../kpis/DeveloperTable';
 import DeveloperRadarCards from '../ai/DeveloperRadarCards';
+import DeveloperPerformanceNarrative from './DeveloperPerformanceNarrative';
 import {
   aggregateDeveloperPerformance,
   buildCompletedTasksBySprintChart,
@@ -30,6 +31,8 @@ import { pageEase } from '../tasks/constants/taskConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import {
   pickDefaultSelectedSprint,
+  buildSprintNumberMap,
+  formatSprintLabel,
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
 } from '../sprints/utils/sprintUtils';
@@ -85,6 +88,7 @@ export default function MyPerformancePage({ projectId, currentUser }) {
   }, [effectiveProjectIdNum]);
 
   const sortedSprints = useMemo(() => sortSprintsForDisplay(sprints), [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sortedSprints), [sortedSprints]);
 
   useEffect(() => {
     if (selectedSprint != null || !sortedSprints.length) return;
@@ -223,7 +227,7 @@ export default function MyPerformancePage({ projectId, currentUser }) {
             >
               {sortedSprints.map((s) => (
                 <MenuItem key={s.id} value={String(s.id)}>
-                  Sprint {s.id}
+                  {formatSprintLabel(sprintNumberMap, s.id)}
                   {s.startDate && s.endDate
                     ? ` · ${new Date(s.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(s.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                     : ''}
@@ -276,14 +280,58 @@ export default function MyPerformancePage({ projectId, currentUser }) {
             }}
           >
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
-              Developer radar
+              Sprint snapshot
             </Typography>
-            <DeveloperRadarCards
-              sprintId={selectedSprint.id}
-              layout="single"
-              developerName={userName}
-              developerUserId={userId}
-            />
+            <Grid container spacing={{ xs: 4, md: 6 }} alignItems="stretch">
+              <Grid
+                item
+                xs={12}
+                md={5}
+                lg={4}
+                sx={{
+                  pr: { md: 4, lg: 5 },
+                  pb: { xs: 2, md: 0 },
+                }}
+              >
+                <Box
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 600, mb: 1, width: '100%' }}
+                  >
+                    Radar (vs team)
+                  </Typography>
+                  <DeveloperRadarCards
+                    sprintId={selectedSprint.id}
+                    layout="single"
+                    developerName={userName}
+                    developerUserId={userId}
+                  />
+                </Box>
+              </Grid>
+              <Grid
+                item
+                xs={12}
+                md={7}
+                lg={8}
+                sx={{
+                  pl: { md: 4, lg: 5 },
+                  pt: { xs: 3, md: 0 },
+                }}
+              >
+                <DeveloperPerformanceNarrative
+                  sprintId={selectedSprint.id}
+                  userId={userId}
+                  userName={userName}
+                />
+              </Grid>
+            </Grid>
           </Paper>
         </>
       )}

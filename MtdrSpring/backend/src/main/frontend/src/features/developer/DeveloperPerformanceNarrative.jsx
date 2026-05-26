@@ -16,6 +16,7 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
   const [warning, setWarning] = useState('');
   const [errorDetail, setErrorDetail] = useState('');
   const [error, setError] = useState('');
+  const [emptyMessage, setEmptyMessage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +28,7 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
       setError('');
       setWarning('');
       setErrorDetail('');
+      setEmptyMessage('');
       return () => {
         cancelled = true;
       };
@@ -41,6 +43,7 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
       setError('');
       setWarning('');
       setErrorDetail('');
+      setEmptyMessage('');
       return () => {
         cancelled = true;
       };
@@ -51,11 +54,14 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
     setWarning('');
     setErrorDetail('');
     setSummary('');
+    setEmptyMessage('');
 
     fetchDeveloperPerformanceSummary(sid, uid)
       .then((data) => {
         if (cancelled) return;
-        setSummary(String(data.summary ?? '').trim());
+        const text = String(data.summary ?? '').trim();
+        setSummary(text);
+        setEmptyMessage(text ? '' : String(data.message ?? '').trim());
         setWarning(data.warning ?? '');
         setErrorDetail(data.errorDetail ?? '');
       })
@@ -131,6 +137,11 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
         </Alert>
       ) : (
         <Box sx={{ flex: 1, overflow: 'auto' }}>
+          {!summary && !warning && !error ? (
+            <Typography sx={{ fontSize: '0.88rem', color: 'text.secondary' }}>
+              {emptyMessage || 'No summary available for this sprint yet.'}
+            </Typography>
+          ) : null}
           {warning ? (
             <Alert severity="info" sx={{ mb: 1.5 }}>
               {warning}
@@ -141,17 +152,19 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
               ) : null}
             </Alert>
           ) : null}
-          <Typography
-            component="div"
-            sx={{
-              fontSize: '0.92rem',
-              lineHeight: 1.65,
-              color: 'text.primary',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {summary || 'No summary available for this sprint yet.'}
-          </Typography>
+          {summary ? (
+            <Typography
+              component="div"
+              sx={{
+                fontSize: '0.92rem',
+                lineHeight: 1.65,
+                color: 'text.primary',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {summary}
+            </Typography>
+          ) : null}
         </Box>
       )}
     </Paper>

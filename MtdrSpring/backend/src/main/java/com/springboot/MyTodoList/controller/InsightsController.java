@@ -112,6 +112,16 @@ public class InsightsController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * AI personal performance narrative for one developer in a sprint (My Performance page).
+     */
+    @GetMapping("/sprint/{sprintId}/developer-performance-summary")
+    public ResponseEntity<Map<String, Object>> getDeveloperPerformanceSummary(
+            @PathVariable Long sprintId,
+            @RequestParam Long userId) {
+        return ResponseEntity.ok(geminiService.buildDeveloperPerformanceSummaryResponse(sprintId, userId));
+    }
+
     @PostMapping("/developer-variation")
     public ResponseEntity<Map<String, Object>> getDeveloperVariationInsights(
             @RequestBody Map<String, Object> body) {

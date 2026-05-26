@@ -267,6 +267,248 @@ public class GeminiService {
                    .path("text").asText("Could not generate summary.");
     }
 
+    /**
+     * Personal performance narrative for the web app (My Performance page).
+     */
+    public Map<String, Object> buildDeveloperPerformanceSummaryResponse(Long sprintId, Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        boolean configured = geminiApiConfiguration.isConfigured();
+        response.put("configured", configured);
+
+        if (sprintId == null || userId == null) {
+            response.put("error", "INVALID_REQUEST");
+            response.put("message", "Sprint and user are required.");
+            return response;
+        }
+
+        if (!configured) {
+            response.put("error", GeminiApiConfiguration.ERROR_CODE);
+            response.put("message", GeminiApiConfiguration.USER_MESSAGE);
+            return response;
+        }
+
+        List<UserTask> myTasks = userTaskRepository.findByUser_IdAndTask_AssignedSprint_Id(userId, sprintId);
+        if (myTasks == null || myTasks.isEmpty()) {
+            response.put("summary", null);
+            response.put(
+                "message",
+                "You have no task assignments in this sprint yet. Once tasks are assigned, regenerate or revisit this page.");
+            return response;
+        }
+
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        String userName = resolveDeveloperDisplayName(myTasks, userId);
+        PerformanceStats stats = aggregatePerformanceStats(myTasks);
+        String sprintContext = formatSprintContextForSummary(sprint);
+        String prompt = buildWebDeveloperPerformancePrompt(userName, stats, sprintContext, sprintId, userId);
+
+        try {
+            String summary = generateDeveloperPerformanceSummary(prompt).trim();
+            if (summary.isBlank()) {
+                summary = buildWebFallbackPerformanceSummary(userName, stats, sprintContext);
+                response.put("fallback", true);
+                response.put("warning", "AI returned an empty summary; showing a data-based summary instead.");
+            } else {
+                response.put("fallback", false);
+            }
+            response.put("summary", summary);
+            return response;
+        } catch (Exception e) {
+            System.err.println("[GeminiService] developer performance summary: " + e.getMessage());
+            response.put("summary", buildWebFallbackPerformanceSummary(userName, stats, sprintContext));
+            response.put("fallback", true);
+            response.put("warning", "AI summary is temporarily unavailable; showing a data-based summary instead.");
+            response.put("errorDetail", e.getMessage());
+            return response;
+        }
+    }
+
+    private static final class PerformanceStats {
+        int total;
+        int completed;
+        int onTime;
+        int late;
+        int blocked;
+        long hours;
+        double completionRate;
+        double onTimeRate;
+        List<Map<String, Object>> taskDetails;
+    }
+
+    private String resolveDeveloperDisplayName(List<UserTask> myTasks, Long userId) {
+        for (UserTask ut : myTasks) {
+            User u = ut.getUser();
+            if (u != null && u.getName() != null && !u.getName().isBlank()) {
+                return u.getName().trim();
+            }
+        }
+        return "User " + userId;
+    }
+
+    private PerformanceStats aggregatePerformanceStats(List<UserTask> myTasks) {
+        PerformanceStats stats = new PerformanceStats();
+        stats.taskDetails = new ArrayList<>();
+        for (UserTask ut : myTasks) {
+            Task t = ut.getTask();
+            if (t == null) {
+                continue;
+            }
+            stats.total++;
+            boolean isDone = UserTask.isCompletedAssignmentStatus(ut.getStatus())
+                || (t.getStatus() != null && "DONE".equalsIgnoreCase(t.getStatus().trim()));
+            if (isDone) {
+                stats.completed++;
+                if (t.getFinishDate() != null && t.getDueDate() != null) {
+                    if (!t.getFinishDate().isAfter(t.getDueDate())) {
+                        stats.onTime++;
+                    } else {
+                        stats.late++;
+                    }
+                }
+            }
+            if (Boolean.TRUE.equals(ut.getIsBlocked())) {
+                stats.blocked++;
+            }
+            if (ut.getWorkedHours() != null) {
+                stats.hours += ut.getWorkedHours();
+            }
+            if (stats.taskDetails.size() < 20) {
+                Map<String, Object> td = new LinkedHashMap<>();
+                td.put("title", t.getTitle() != null ? t.getTitle() : "");
+                td.put("status", t.getStatus() != null ? t.getStatus() : "");
+                td.put("userTaskStatus", ut.getStatus() != null ? ut.getStatus() : "");
+                td.put("workedHours", ut.getWorkedHours() != null ? ut.getWorkedHours() : 0);
+                if (t.getDueDate() != null) {
+                    td.put("dueDate", t.getDueDate().toString());
+                }
+                if (t.getFinishDate() != null) {
+                    td.put("finishDate", t.getFinishDate().toString());
+                }
+                if (Boolean.TRUE.equals(ut.getIsBlocked())) {
+                    td.put("blocked", true);
+                    if (ut.getBlockedReason() != null && !ut.getBlockedReason().isBlank()) {
+                        td.put("blockedReason", ut.getBlockedReason().trim());
+                    }
+                }
+                stats.taskDetails.add(td);
+            }
+        }
+        int pending = stats.total - stats.completed;
+        stats.completionRate = stats.total > 0 ? (stats.completed * 100.0 / stats.total) : 0.0;
+        stats.onTimeRate = stats.completed > 0 ? (stats.onTime * 100.0 / stats.completed) : 0.0;
+        return stats;
+    }
+
+    private String formatSprintContextForSummary(Sprint sprint) {
+        if (sprint == null) {
+            return " for this sprint";
+        }
+        String ctx = " for Sprint " + sprint.getId();
+        if (sprint.getStartDate() != null && sprint.getDueDate() != null) {
+            ctx += String.format(
+                " (%s – %s)",
+                sprint.getStartDate().toLocalDate(),
+                sprint.getDueDate().toLocalDate());
+        }
+        return ctx;
+    }
+
+    private String buildWebDeveloperPerformancePrompt(
+            String name,
+            PerformanceStats stats,
+            String sprintContext,
+            Long sprintId,
+            Long userId) {
+        int pending = stats.total - stats.completed;
+        String statsJson;
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("developerName", name);
+            payload.put("scope", sprintContext);
+            payload.put("totalAssignedTasks", stats.total);
+            payload.put("completedTasks", stats.completed);
+            payload.put("pendingTasks", pending);
+            payload.put("onTimeCompletedTasks", stats.onTime);
+            payload.put("lateCompletedTasks", stats.late);
+            payload.put("currentlyBlockedAssignments", stats.blocked);
+            payload.put("totalWorkedHours", stats.hours);
+            payload.put("completionRatePercent", Math.round(stats.completionRate));
+            payload.put("onTimeRatePercent", Math.round(stats.onTimeRate));
+            payload.put("taskDetails", stats.taskDetails);
+            payload.put("radarNote",
+                "The developer also sees a radar chart with scores normalized vs teammates in this sprint.");
+            attachRadarMetricsToPayload(payload, sprintId, userId);
+            statsJson = mapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            statsJson = "{\"developerName\":\"" + name + "\"}";
+        }
+
+        String firstName = name.contains(" ") ? name.substring(0, name.indexOf(' ')) : name;
+        return "You are an Agile coach writing a personal performance summary for a developer in a web dashboard. "
+            + "Use clear, encouraging English in 2–4 short paragraphs (max 320 words). Plain text only — no JSON, "
+            + "no markdown headings, no bullet lists.\n\n"
+            + "Developer performance data" + sprintContext + ":\n"
+            + statsJson
+            + "\n\nCover: overall completion, on-time delivery, hours logged, blocked work if any, how radar "
+            + "scores compare to the team (if provided), one concrete improvement tip, and a brief motivational close. "
+            + "Address the developer as " + firstName + ".";
+    }
+
+    private void attachRadarMetricsToPayload(Map<String, Object> payload, Long sprintId, Long userId) {
+        try {
+            Optional<SprintInsight> opt = insightRepository.findBySprintId(sprintId);
+            if (opt.isEmpty() || opt.get().getInsightsJson() == null || opt.get().getInsightsJson().isBlank()) {
+                return;
+            }
+            JsonNode root = mapper.readTree(opt.get().getInsightsJson());
+            String target = String.valueOf(payload.getOrDefault("developerName", "")).trim();
+            if (target.isEmpty()) {
+                return;
+            }
+            JsonNode devInsights = root.path("developerInsights");
+            if (devInsights.isArray()) {
+                for (JsonNode row : devInsights) {
+                    if (target.equalsIgnoreCase(row.path("developerName").asText("").trim())) {
+                        String insight = row.path("insight").asText("").trim();
+                        if (!insight.isEmpty()) {
+                            payload.put("sprintTeamInsight", insight);
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // optional enrichment
+        }
+    }
+
+    private String buildWebFallbackPerformanceSummary(String name, PerformanceStats stats, String sprintContext) {
+        int pending = stats.total - stats.completed;
+        StringBuilder sb = new StringBuilder();
+        sb.append("Performance summary for ").append(name).append(sprintContext).append("\n\n");
+        sb.append("You completed ").append(stats.completed).append(" of ").append(stats.total)
+            .append(" assigned tasks (").append(Math.round(stats.completionRate)).append("% completion rate). ");
+        if (stats.completed > 0) {
+            sb.append("On-time delivery among finished work is ").append(Math.round(stats.onTimeRate))
+                .append("% (").append(stats.onTime).append(" on time");
+            if (stats.late > 0) {
+                sb.append(", ").append(stats.late).append(" late");
+            }
+            sb.append("). ");
+        }
+        sb.append("You logged ").append(stats.hours).append(" worked hours. ");
+        if (pending > 0) {
+            sb.append(pending).append(" assignment(s) are still open. ");
+        }
+        if (stats.blocked > 0) {
+            sb.append(stats.blocked).append(" assignment(s) are blocked — flag blockers with your manager early. ");
+        }
+        sb.append(
+            "Use the radar chart beside this text to see how your participation, volume, and efficiency compare "
+                + "to teammates in this sprint.");
+        return sb.toString().trim();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ERROR PERSISTENCE
     // Saves a row with insightsJson=null and a human-readable errorMessage.
