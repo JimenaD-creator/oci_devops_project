@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -299,6 +300,64 @@ public class UserTaskService {
             logger.error("Error retrieving worked hours for userId {} taskId {}", userId, taskId, e);
             return 0;
         }
+    }
+
+    /**
+     * Blocker reports for the developer UI: own assignments with {@code isBlocked=true}
+     * and not yet completed.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listBlockedReportsForDeveloper(Long userId, Long projectId) {
+        if (userId == null || projectId == null) {
+            return List.of();
+        }
+        List<UserTask> rows = userTaskRepository.findBlockedByUserIdAndProjectId(userId, projectId);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (UserTask ut : rows) {
+            if (ut == null || !Boolean.TRUE.equals(ut.getIsBlocked())) {
+                continue;
+            }
+            if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
+                continue;
+            }
+            Task t = ut.getTask();
+            if (t == null) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("taskId", t.getId());
+            row.put(
+                "taskTitle",
+                t.getTitle() != null && !t.getTitle().isBlank() ? t.getTitle().trim() : ("Task #" + t.getId()));
+            row.put("blockedReason", ut.getBlockedReason() != null ? ut.getBlockedReason().trim() : "");
+            LocalDateTime reportedAt = t.getUpdatedAt();
+            if (reportedAt != null) {
+                row.put("reportedAt", reportedAt.toString());
+            } else {
+                row.put("reportedAt", null);
+            }
+            if (t.getAssignedSprint() != null) {
+                row.put("sprintId", t.getAssignedSprint().getId());
+            }
+            out.add(row);
+        }
+        out.sort((a, b) -> {
+            String ra = (String) a.get("reportedAt");
+            String rb = (String) b.get("reportedAt");
+            if (ra == null && rb == null) {
+                return Long.compare(
+                    ((Number) b.getOrDefault("taskId", 0L)).longValue(),
+                    ((Number) a.getOrDefault("taskId", 0L)).longValue());
+            }
+            if (ra == null) return 1;
+            if (rb == null) return -1;
+            int cmp = rb.compareTo(ra);
+            if (cmp != 0) return cmp;
+            return Long.compare(
+                ((Number) b.getOrDefault("taskId", 0L)).longValue(),
+                ((Number) a.getOrDefault("taskId", 0L)).longValue());
+        });
+        return out;
     }
 
     @Transactional

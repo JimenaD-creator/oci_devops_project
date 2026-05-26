@@ -35,6 +35,7 @@ import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import GroupIcon from '@mui/icons-material/Group';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
@@ -51,6 +52,7 @@ const TeamPage        = lazy(() => import('../features/team/TeamPage'));
 const ManagerChatbot  = lazy(() => import('../features/ai/ManagerChatbot'));
 const MyPerformancePage = lazy(() => import('../features/developer/MyPerformancePage'));
 const MyTasksPage       = lazy(() => import('../features/developer/MyTasksPage'));
+const MyBlockersPage    = lazy(() => import('../features/developer/MyBlockersPage'));
 
 const DRAWER_WIDTH = 240;
 
@@ -267,6 +269,7 @@ function App() {
   const DEVELOPER_NAV_ITEMS = [
     { text: 'My Tasks', id: 'my-tasks', icon: <AssignmentIcon /> },
     { text: 'Kanban Board', id: 'my-kanban', icon: <ViewKanbanIcon /> },
+    { text: 'My Blockers', id: 'my-blockers', icon: <ReportProblemIcon /> },
     { text: 'My Performance', id: 'my-performance', icon: <AnalyticsIcon /> },
   ];
 
@@ -643,9 +646,14 @@ function App() {
                 <MyPerformancePage projectId={selectedProjectId} currentUser={user} />
               </Box>
             )}
+            {visitedPages.has('my-blockers') && (
+              <Box sx={pageVisibilitySx('my-blockers')}>
+                <MyBlockersPage projectId={selectedProjectId} currentUser={user} />
+              </Box>
+            )}
           </Suspense>
         </ProjectDataProvider>
-        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team', 'my-tasks', 'my-kanban', 'my-performance'].includes(activePage) && (
+        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team', 'my-tasks', 'my-kanban', 'my-blockers', 'my-performance'].includes(activePage) && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <Typography variant="h6" color="textSecondary">Section under development</Typography>
           </Box>

@@ -8,6 +8,7 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import com.springboot.MyTodoList.service.UserTaskService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,19 @@ public class UserTaskController {
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Autowired
+    private UserTaskService userTaskService;
+
+    @GetMapping("/my-blockers")
+    public ResponseEntity<List<Map<String, Object>>> getMyBlockers(
+            @RequestParam Long userId,
+            @RequestParam Long projectId) {
+        if (userId == null || projectId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(userTaskService.listBlockedReportsForDeveloper(userId, projectId));
+    }
 
     @GetMapping
     public ResponseEntity<List<UserTask>> getAllUserTasks(

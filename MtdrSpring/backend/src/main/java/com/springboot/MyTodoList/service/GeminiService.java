@@ -421,7 +421,13 @@ public class GeminiService {
             Long userId) {
         int pending = stats.total - stats.completed;
         String statsJson;
+        String phase = "unknown";
+        boolean earlySnapshot = false;
         try {
+            Sprint sprint = sprintId != null ? sprintRepository.findById(sprintId).orElse(null) : null;
+            phase = resolveSprintPhase(sprint);
+            earlySnapshot = sprint != null && isSprintEarlyForProductivityGuide(sprint);
+
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("developerName", name);
             payload.put("scope", sprintContext);
@@ -437,6 +443,8 @@ public class GeminiService {
             payload.put("taskDetails", stats.taskDetails);
             payload.put("radarNote",
                 "The developer also sees a radar chart with scores normalized vs teammates in this sprint.");
+            payload.put("sprintPhase", phase);
+            payload.put("isEarlySnapshot", earlySnapshot);
             attachRadarMetricsToPayload(payload, sprintId, userId);
             statsJson = mapper.writeValueAsString(payload);
         } catch (Exception e) {
@@ -449,7 +457,14 @@ public class GeminiService {
             + "no markdown headings, no bullet lists.\n\n"
             + "Developer performance data" + sprintContext + ":\n"
             + statsJson
-            + "\n\nCover: overall completion, on-time delivery, hours logged, blocked work if any, how radar "
+            + "\n\nImportant guardrails:\n"
+            + "- If sprintPhase is \"not_started\" or isEarlySnapshot is true, treat all numbers as a planning snapshot, "
+            + "not as proof of poor performance. Do NOT say the developer is behind, underperforming, or failing; avoid words like "
+            + "\"bad\", \"poor\", \"concerning\", \"alarming\", \"critical\" about their results. Focus on what will happen once work starts, "
+            + "and frame suggestions as gentle preparation (e.g. \"once the sprint is underway, you can...\").\n"
+            + "- Even when the sprint is in progress, keep the tone supportive and coaching-oriented. Describe metrics neutrally "
+            + "and suggest 1–2 specific improvements without sounding harsh or judgmental.\n\n"
+            + "Cover: overall completion, on-time delivery, hours logged, blocked work if any, how radar "
             + "scores compare to the team (if provided), one concrete improvement tip, and a brief motivational close. "
             + "Address the developer as " + firstName + ".";
     }

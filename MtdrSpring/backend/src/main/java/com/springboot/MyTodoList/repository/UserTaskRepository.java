@@ -45,4 +45,14 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
 
     @Query("SELECT DISTINCT t.assignedSprint.id FROM UserTask ut JOIN ut.task t WHERE ut.user.id = :userId AND t.assignedSprint IS NOT NULL")
     List<Long> findDistinctSprintIdsByUserId(@Param("userId") Long userId);
+
+    /** Developer's assignments flagged blocked (for My Blockers page). */
+    @Query(
+            "SELECT ut FROM UserTask ut JOIN FETCH ut.user JOIN FETCH ut.task t "
+                    + "JOIN FETCH t.assignedSprint s "
+                    + "WHERE ut.user.id = :userId "
+                    + "AND ut.isBlocked = true "
+                    + "AND t.assignedSprint.assignedProject.id = :projectId")
+    List<UserTask> findBlockedByUserIdAndProjectId(
+            @Param("userId") Long userId, @Param("projectId") Long projectId);
 }
