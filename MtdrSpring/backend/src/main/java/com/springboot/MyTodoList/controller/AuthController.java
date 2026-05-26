@@ -5,8 +5,8 @@ import com.springboot.MyTodoList.dto.AuthLoginResponse;
 import com.springboot.MyTodoList.dto.AuthUserResponse;
 import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.User;
-import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.service.JwtService;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.util.UserRoleUtil;
 import java.util.Map;
@@ -25,15 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
-    private final ProjectRepository projectRepository;
+    private final ProjectLookupService projectLookupService;
 
     public AuthController(
             UserService userService,
             JwtService jwtService,
-            ProjectRepository projectRepository) {
+            ProjectLookupService projectLookupService) {
         this.userService = userService;
         this.jwtService = jwtService;
-        this.projectRepository = projectRepository;
+        this.projectLookupService = projectLookupService;
     }
 
     @PostMapping("/login")
@@ -57,13 +57,13 @@ public class AuthController {
         Long projectId = null;
         String projectName = null;
         if (UserRoleUtil.isManager(user.getType())) {
-            Project p = projectRepository.findByManagerId(user.getId()).orElse(null);
+            Project p = projectLookupService.findPrimaryProjectForManager(user.getId()).orElse(null);
             if (p != null) {
                 projectId = p.getId();
                 projectName = p.getName();
             }
         } else if (UserRoleUtil.isDeveloper(user.getType())) {
-            Project p = projectRepository.findByTeamMemberUserId(user.getId()).orElse(null);
+            Project p = projectLookupService.findPrimaryProjectForDeveloper(user.getId()).orElse(null);
             if (p != null) {
                 projectId = p.getId();
                 projectName = p.getName();

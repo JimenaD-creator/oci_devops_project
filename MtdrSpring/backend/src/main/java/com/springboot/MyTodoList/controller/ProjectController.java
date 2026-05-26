@@ -5,6 +5,7 @@ import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.util.UserRoleUtil;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,9 @@ public class ProjectController {
     @Autowired
     private TeamMembersRepository teamMembersRepository;
 
+    @Autowired
+    private ProjectLookupService projectLookupService;
+
     @GetMapping("/all")
     public List<Project> getAllProjects() {
         return projectRepository.findAll();
@@ -39,14 +43,14 @@ public class ProjectController {
 
     @GetMapping("/manager/{managerId}")
     public ResponseEntity<Project> getProjectByManager(@PathVariable Long managerId) {
-        return projectRepository.findByManagerId(managerId)
+        return projectLookupService.findPrimaryProjectForManager(managerId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/developer/{userId}")
     public ResponseEntity<Project> getProjectByDeveloper(@PathVariable Long userId) {
-        return projectRepository.findByTeamMemberUserId(userId)
+        return projectLookupService.findPrimaryProjectForDeveloper(userId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

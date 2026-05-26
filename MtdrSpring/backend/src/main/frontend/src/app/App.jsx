@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logout } from '../utils/auth';
+import { isAuthenticated, logout } from '../utils/auth';
 import {
   isAdminRole,
   getProfileRoleLabel,
@@ -291,7 +291,32 @@ function App() {
     setSelectedProjectName(null);
   };
 
-  if (!user) return null;
+  useEffect(() => {
+    if (user) return;
+    if (isAuthenticated()) {
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setUser({
+            ...parsed,
+            role: normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER'),
+          });
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    if (isAuthenticated()) {
+      logout();
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (!user) {
+    return <PageLoader />;
+  }
 
   const isDeveloper = isDeveloperRole(user.role);
 

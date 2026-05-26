@@ -10,8 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.dto.AuthLoginRequest;
 import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.User;
-import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.service.JwtService;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.UserService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class AuthControllerTest {
     private JwtService jwtService;
 
     @MockBean
-    private ProjectRepository projectRepository;
+    private ProjectLookupService projectLookupService;
 
     @Test
     void login_missingFields_returnsBadRequest() throws Exception {
@@ -84,7 +84,7 @@ class AuthControllerTest {
         Project project = new Project();
         project.setId(10L);
         project.setName("Acme");
-        when(projectRepository.findByTeamMemberUserId(3L)).thenReturn(Optional.of(project));
+        when(projectLookupService.findPrimaryProjectForDeveloper(3L)).thenReturn(Optional.of(project));
 
         AuthLoginRequest request = new AuthLoginRequest();
         request.setIdentifier("alice@test.com");

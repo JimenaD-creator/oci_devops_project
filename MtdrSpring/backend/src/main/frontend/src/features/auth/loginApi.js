@@ -1,6 +1,5 @@
+import { API_BASE } from '../../utils/apiBase';
 import { getAuthToken } from '../../utils/auth';
-
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 function authHeaders() {
   const headers = {};
@@ -23,6 +22,12 @@ export async function loginWithCredentials(identifier, password) {
   if (!response.ok) {
     const error = new Error('Invalid credentials');
     error.status = response.status;
+    try {
+      const body = await response.json();
+      if (body?.message) error.serverMessage = body.message;
+    } catch {
+      /* ignore */
+    }
     throw error;
   }
 

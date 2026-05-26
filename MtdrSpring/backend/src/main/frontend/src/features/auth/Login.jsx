@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setAuthenticated, logout } from '../../utils/auth';
+import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
 import {
   fetchDeveloperPrimaryProject,
   fetchManagerPrimaryProject,
@@ -82,7 +82,19 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated()) navigate('/', { replace: true });
+    if (!isAuthenticated()) return;
+    try {
+      const stored = localStorage.getItem('currentUser');
+      const parsed = stored ? JSON.parse(stored) : null;
+      const role = parsed?.role || parsed?.type || '';
+      const hasProject = Boolean(localStorage.getItem('currentProjectId'));
+      if (isDeveloperRole(role) && !hasProject) {
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    navigate('/', { replace: true });
   }, [navigate]);
 
   async function completeLogin() {
@@ -139,25 +151,19 @@ export default function Login() {
             console.error('Could not pre-load the developer project', e);
           }
         }
-        if (projectId == null) {
-          logout();
-          localStorage.removeItem('currentProjectId');
-          localStorage.removeItem('currentProjectName');
-          setFormError(
-            'Your account is not assigned to a project team. Ask an admin to add you to a team.',
-          );
-          return;
+        if (projectId != null) {
+          applyProjectFromAuth(projectId, projectName);
         }
-        applyProjectFromAuth(projectId, projectName);
         navigate('/');
       } else {
         navigate('/');
       }
     } catch (err) {
+      const serverMsg = err?.serverMessage;
       setFormError(
         !err.status
-          ? 'Could not connect to the server.'
-          : 'Invalid credentials. Please try again.',
+          ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
+          : serverMsg || 'Invalid credentials. Please try again.',
       );
     } finally {
       setIsLoading(false);

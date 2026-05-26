@@ -1,10 +1,20 @@
+import { API_BASE } from './apiBase';
+
 const LEGACY_AUTH_KEY = 'mtdr_authenticated';
 const TOKEN_KEY = 'mtdr_auth_token';
 const USER_KEY = 'currentUser';
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
 export function isAuthenticated() {
-  return Boolean(getAuthToken());
+  const token = getAuthToken();
+  if (!token) return false;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return false;
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getAuthToken() {
@@ -26,6 +36,8 @@ export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(LEGACY_AUTH_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('currentProjectId');
+  localStorage.removeItem('currentProjectName');
 }
 
 let authFetchInterceptorInstalled = false;

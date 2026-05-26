@@ -40,6 +40,8 @@ public class WebSecurityConfiguration {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/developer/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/manager/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v2/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().permitAll()
