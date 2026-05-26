@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
+import { isAuthenticated, login as setAuthenticated, clearAuthTokens } from '../../utils/auth';
 import {
   fetchDeveloperPrimaryProject,
   fetchManagerPrimaryProject,
@@ -89,6 +89,10 @@ export default function Login() {
       const role = parsed?.role || parsed?.type || '';
       const hasProject = Boolean(localStorage.getItem('currentProjectId'));
       if (isDeveloperRole(role) && !hasProject) {
+        setFormError(
+          'Your account is signed in but has no project assigned in this environment. '
+            + 'Ask your manager to add you to a project team, then sign in again.',
+        );
         return;
       }
     } catch {
@@ -106,10 +110,19 @@ export default function Login() {
 
     setIsLoading(true);
     try {
+      // Stale JWT in storage makes Spring reject POST /api/auth/login in OCI when Bearer is sent.
+      clearAuthTokens();
+
       const authData = await loginWithCredentials(email.trim(), password.trim());
+      if (!authData?.token || !authData?.user) {
+        throw Object.assign(new Error('Invalid login response'), {
+          serverMessage: 'The server returned an incomplete login response. Please redeploy the latest build.',
+        });
+      }
+
       const userData = {
         ...authData.user,
-        role: authData.user.role || 'DEVELOPER',
+        role: authData.user.role || authData.user.type || 'DEVELOPER',
       };
 
       setAuthenticated({ token: authData.token, user: userData }, rememberMe);
@@ -161,9 +174,10 @@ export default function Login() {
     } catch (err) {
       const serverMsg = err?.serverMessage;
       setFormError(
-        !err.status
-          ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
-          : serverMsg || 'Invalid credentials. Please try again.',
+        serverMsg
+          || (!err?.status
+            ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
+            : 'Invalid credentials. Please try again.'),
       );
     } finally {
       setIsLoading(false);

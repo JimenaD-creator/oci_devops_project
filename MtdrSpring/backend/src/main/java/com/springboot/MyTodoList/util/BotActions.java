@@ -141,7 +141,7 @@ public class BotActions {
         return null;
     }
 
-    private void sendMainMenuKeyboard(String introMessage) {
+    private ReplyKeyboardMarkup buildMainMenuKeyboardMarkup() {
         Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
         boolean isManager = signedInId != null && isUserManager(signedInId);
         List<KeyboardRow> rows = new ArrayList<>();
@@ -152,11 +152,25 @@ public class BotActions {
         }
         rows.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel(), BotLabels.HIDE_MAIN_SCREEN.getLabel()));
         rows.add(new KeyboardRow(BotLabels.LOG_OUT.getLabel()));
-        BotHelper.sendMessageToTelegram(chatId, introMessage, telegramClient, ReplyKeyboardMarkup
-                .builder()
+        return ReplyKeyboardMarkup.builder()
                 .keyboard(rows)
                 .resizeKeyboard(true)
-                .build());
+                .build();
+    }
+
+    private void sendMainMenuKeyboard(String introMessage) {
+        BotHelper.sendMessageToTelegram(chatId, introMessage, telegramClient, buildMainMenuKeyboardMarkup());
+    }
+
+    private void restoreMainMenuForSignedInUser() {
+        Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
+        String welcomeName = signedIn != null ? resolveUserWelcomeName(signedIn) : null;
+        sendMainMenuKeyboard(helloMyTodoBotWithDeveloperName(welcomeName));
+    }
+
+    /** After performance summary: restore keyboard only (no welcome message). */
+    private void restoreMainMenuAfterPerformance() {
+        BotHelper.sendMessageToTelegram(chatId, "📋", telegramClient, buildMainMenuKeyboardMarkup());
     }
 
     private void performSignOut() {
@@ -404,8 +418,15 @@ public class BotActions {
 
     private static String keyboardLabelForItem(ToDoItem item) {
         if (item.getTitle() != null && !item.getTitle().trim().isEmpty()) return item.getTitle().trim();
-        if (item.getDescription() != null && !item.getDescription().isEmpty()) return item.getDescription();
+        if (item.getDescription() != null && !item.getDescription().isEmpty()) {
+            return RichTextDescriptionUtil.toPlainTextSingleLine(item.getDescription());
+        }
         return "Task #" + item.getID();
+    }
+
+    private static String formatTaskDescriptionForDisplay(String description) {
+        String plain = RichTextDescriptionUtil.toPlainText(description);
+        return plain.isEmpty() ? "No description provided" : plain;
     }
 
     private static String formatTaskStatusForDisplay(String dbStatus) {
@@ -837,9 +858,7 @@ public class BotActions {
 
         int hours = userTaskService.getWorkedHours(assigneeUserId, (long) task.getID());
         String teamStatus = formatTaskStatusForDisplay(task.getStatus());
-        String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty()
-                ? task.getDescription()
-                : "No description provided";
+        String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
         String dueDateLine = formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
@@ -884,9 +903,7 @@ public class BotActions {
                 .map(BotActions::formatTaskStatusForDisplay)
                 .orElse(formatTaskStatusForDisplay(task.getStatus()));
         String teamStatus = formatTaskStatusForDisplay(task.getStatus());
-        String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty()
-                ? task.getDescription()
-                : "No description provided";
+        String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
         String dueDateLine = formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
@@ -913,8 +930,7 @@ public class BotActions {
                 .keyboard(List.of(new KeyboardRow("⬅️ Back to tasks")))
                 .resizeKeyboard(true).selective(true).build();
 
-        String taskDescription = task.getDescription() != null && !task.getDescription().isEmpty()
-                ? task.getDescription() : "No description provided";
+        String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
 
         String message = String.format(
                 "📋 *Task Details*\n\n*Title:* %s\n\n*Description:* %s\n\n*Current Status:* %s\n\n*Due date:* %s",
@@ -1178,9 +1194,7 @@ public class BotActions {
         String text = requestText != null ? requestText.trim() : "";
 
         if ("⬅️ Back to main menu".equals(text)) {
-            Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
-            String welcomeName = signedIn != null ? resolveUserWelcomeName(signedIn) : null;
-            sendMainMenuKeyboard(helloMyTodoBotWithDeveloperName(welcomeName));
+            restoreMainMenuForSignedInUser();
             stateManager.clearPendingState(chatId);
             exit = true;
             return;
@@ -1212,6 +1226,7 @@ public class BotActions {
                     "📊 You don't have any assigned tasks yet.\n\nAsk your manager to assign tasks to you in the web app.",
                     telegramClient, null);
             stateManager.clearPendingState(chatId);
+            restoreMainMenuForSignedInUser();
             exit = true;
             return;
         } else {
@@ -1347,6 +1362,8 @@ public class BotActions {
             BotHelper.sendMessageToTelegram(chatId,
                     "❌ Sorry, there was an error generating your performance summary. Please try again later.",
                     telegramClient, null);
+        } finally {
+            restoreMainMenuAfterPerformance();
         }
     }
 

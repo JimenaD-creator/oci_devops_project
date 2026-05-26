@@ -1,4 +1,4 @@
-import { API_BASE } from './apiBase';
+import { getApiBase } from './apiBase';
 
 const LEGACY_AUTH_KEY = 'mtdr_authenticated';
 const TOKEN_KEY = 'mtdr_auth_token';
@@ -31,10 +31,14 @@ export function login(authData, remember = false) {
   localStorage.setItem(USER_KEY, JSON.stringify(authData.user));
 }
 
-export function logout() {
+export function clearAuthTokens() {
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(LEGACY_AUTH_KEY);
+}
+
+export function logout() {
+  clearAuthTokens();
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('currentProjectId');
   localStorage.removeItem('currentProjectName');
@@ -68,7 +72,11 @@ function shouldAttachToken(input) {
 
   try {
     const requestUrl = new URL(rawUrl, window.location.origin);
-    const apiUrl = new URL(API_BASE || window.location.origin, window.location.origin);
+    const path = requestUrl.pathname.replace(/\/+$/, '');
+    if (path.endsWith('/api/auth/login')) {
+      return false;
+    }
+    const apiUrl = new URL(getApiBase() || window.location.origin, window.location.origin);
     return requestUrl.origin === apiUrl.origin;
   } catch {
     return false;

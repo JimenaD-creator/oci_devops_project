@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.crypto.SecretKey;
@@ -17,6 +18,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -46,11 +49,48 @@ public class WebSecurityConfiguration {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v2/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().permitAll()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .bearerTokenResolver(publicAwareBearerTokenResolver())
+                .jwt(jwt -> {}))
             .httpBasic(h -> h.disable())
             .formLogin(f -> f.disable());
             
         return http.build();
+    }
+
+    /**
+     * Ignore Bearer tokens on public auth/project lookup endpoints so a stale JWT
+     * does not block login (common in OCI when localStorage still has an old token).
+     */
+    @Bean
+    public BearerTokenResolver publicAwareBearerTokenResolver() {
+        DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
+        return new BearerTokenResolver() {
+            @Override
+            public String resolve(HttpServletRequest request) {
+                if (request == null || isPublicAuthPath(request)) {
+                    return null;
+                }
+                return delegate.resolve(request);
+            }
+        };
+    }
+
+    private static boolean isPublicAuthPath(HttpServletRequest request) {
+        String method = request.getMethod();
+        String path = request.getRequestURI();
+        if (path == null) {
+            return false;
+        }
+        if (HttpMethod.POST.matches(method) && path.endsWith("/api/auth/login")) {
+            return true;
+        }
+        if (HttpMethod.GET.matches(method)
+                && (path.matches(".*/api/projects/developer/\\d+")
+                        || path.matches(".*/api/projects/manager/\\d+"))) {
+            return true;
+        }
+        return false;
     }
 
     @Bean

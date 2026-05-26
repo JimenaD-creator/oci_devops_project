@@ -1,4 +1,4 @@
-import { API_BASE } from '../../utils/apiBase';
+import { getApiBase } from '../../utils/apiBase';
 import { getAuthToken } from '../../utils/auth';
 
 function authHeaders() {
@@ -10,8 +10,20 @@ function authHeaders() {
   return headers;
 }
 
+async function parseJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const error = new Error('Unexpected server response');
+    error.status = response.status;
+    error.serverMessage =
+      'The server returned an invalid response. If you are on OCI, redeploy the latest build or hard-refresh the page (Ctrl+Shift+R).';
+    throw error;
+  }
+  return response.json();
+}
+
 export async function loginWithCredentials(identifier, password) {
-  const response = await fetch(`${API_BASE}/api/auth/login`, {
+  const response = await fetch(`${getApiBase()}/api/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -23,19 +35,24 @@ export async function loginWithCredentials(identifier, password) {
     const error = new Error('Invalid credentials');
     error.status = response.status;
     try {
-      const body = await response.json();
+      const body = await parseJsonResponse(response);
       if (body?.message) error.serverMessage = body.message;
-    } catch {
-      /* ignore */
+    } catch (parseErr) {
+      if (parseErr?.serverMessage) {
+        error.serverMessage = parseErr.serverMessage;
+      } else if (response.status === 401) {
+        error.serverMessage =
+          'Sign-in was rejected. Try again after clearing the site cache, or ask your admin to redeploy the latest version.';
+      }
     }
     throw error;
   }
 
-  return response.json();
+  return parseJsonResponse(response);
 }
 
 export async function fetchManagerPrimaryProject(managerId) {
-  const projRes = await fetch(`${API_BASE}/api/projects/manager/${managerId}`, {
+  const projRes = await fetch(`${getApiBase()}/api/projects/manager/${managerId}`, {
     headers: authHeaders(),
   });
   if (!projRes.ok) return null;
@@ -43,7 +60,7 @@ export async function fetchManagerPrimaryProject(managerId) {
 }
 
 export async function fetchDeveloperPrimaryProject(userId) {
-  const projRes = await fetch(`${API_BASE}/api/projects/developer/${userId}`, {
+  const projRes = await fetch(`${getApiBase()}/api/projects/developer/${userId}`, {
     headers: authHeaders(),
   });
   if (!projRes.ok) return null;
