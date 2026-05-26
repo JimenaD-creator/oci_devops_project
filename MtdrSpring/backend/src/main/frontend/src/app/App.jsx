@@ -15,6 +15,7 @@ import { ProjectDataProvider } from '../contexts/ProjectDataContext';
 import PageLoadingSpinner from '../components/common/PageLoadingSpinner';
 import {
   Box,
+  Button,
   Drawer,
   List,
   ListItemButton,
@@ -111,6 +112,10 @@ function App() {
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
+  /** loading | ready | missing — avoids infinite spinner when prod DB has no team/project for user */
+  const [devProjectStatus, setDevProjectStatus] = useState(() =>
+    localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
+  );
   const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
   /** Pages already opened stay mounted (hidden) to avoid refetch on every sidebar click. */
   const [visitedPages, setVisitedPages] = useState(() => {
@@ -155,11 +160,11 @@ function App() {
       fetch(`${API_BASE}/api/projects/manager/${user.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((project) => {
-          if (project) {
-            localStorage.setItem('currentProjectId', project.id);
-            localStorage.setItem('currentProjectName', project.name);
+          if (project?.id) {
+            localStorage.setItem('currentProjectId', String(project.id));
+            localStorage.setItem('currentProjectName', project.name || '');
             setSelectedProjectId(String(project.id));
-            setSelectedProjectName(project.name);
+            setSelectedProjectName(project.name || '');
           }
         })
         .catch(() => {});
@@ -167,19 +172,35 @@ function App() {
   }, [user, selectedProjectId]);
 
   useEffect(() => {
-    if (isDeveloperRole(user?.role) && !selectedProjectId) {
-      fetch(`${API_BASE}/api/projects/developer/${user.id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((project) => {
-          if (project) {
-            localStorage.setItem('currentProjectId', project.id);
-            localStorage.setItem('currentProjectName', project.name);
-            setSelectedProjectId(String(project.id));
-            setSelectedProjectName(project.name);
-          }
-        })
-        .catch(() => {});
+    if (!isDeveloperRole(user?.role)) {
+      return;
     }
+    if (selectedProjectId) {
+      setDevProjectStatus('ready');
+      return;
+    }
+    setDevProjectStatus('loading');
+    let cancelled = false;
+    fetch(`${API_BASE}/api/projects/developer/${user.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((project) => {
+        if (cancelled) return;
+        if (project?.id) {
+          localStorage.setItem('currentProjectId', String(project.id));
+          localStorage.setItem('currentProjectName', project.name || '');
+          setSelectedProjectId(String(project.id));
+          setSelectedProjectName(project.name || '');
+          setDevProjectStatus('ready');
+        } else {
+          setDevProjectStatus('missing');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDevProjectStatus('missing');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user, selectedProjectId]);
 
   useEffect(() => {
@@ -326,7 +347,38 @@ function App() {
   }
 
   if (isDeveloper && !selectedProjectId) {
-    return <PageLoader />;
+    if (devProjectStatus === 'loading') {
+      return <PageLoader />;
+    }
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+          p: 3,
+        }}
+      >
+        <Box sx={{ textAlign: 'center', maxWidth: 440 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            No project assigned
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', mb: 2.5, fontSize: '0.9rem' }}>
+            Your user is not linked to a team with a project in this environment. In OCI/production,
+            verify the user exists in TEAM_MEMBER for the project team (local DB may differ).
+          </Typography>
+          <Button
+            variant="contained"
+            sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}
+            onClick={handleLogout}
+          >
+            Sign out
+          </Button>
+        </Box>
+      </Box>
+    );
   }
 
   const drawerBg     = '#1A1A1A';

@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.dto.AuthLoginRequest;
+import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.service.JwtService;
 import com.springboot.MyTodoList.service.UserService;
 import java.util.Optional;
@@ -35,6 +37,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtService jwtService;
+
+    @MockBean
+    private ProjectRepository projectRepository;
 
     @Test
     void login_missingFields_returnsBadRequest() throws Exception {
@@ -76,6 +81,10 @@ class AuthControllerTest {
         when(userService.authenticateByIdentifierAndPassword("alice@test.com", "ok"))
                 .thenReturn(Optional.of(user));
         when(jwtService.generateToken(user)).thenReturn("jwt-token-123");
+        Project project = new Project();
+        project.setId(10L);
+        project.setName("Acme");
+        when(projectRepository.findByTeamMemberUserId(3L)).thenReturn(Optional.of(project));
 
         AuthLoginRequest request = new AuthLoginRequest();
         request.setIdentifier("alice@test.com");
@@ -87,6 +96,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("jwt-token-123"))
                 .andExpect(jsonPath("$.user.id").value(3))
-                .andExpect(jsonPath("$.user.name").value("Alice"));
+                .andExpect(jsonPath("$.user.name").value("Alice"))
+                .andExpect(jsonPath("$.projectId").value(10))
+                .andExpect(jsonPath("$.projectName").value("Acme"));
     }
 }

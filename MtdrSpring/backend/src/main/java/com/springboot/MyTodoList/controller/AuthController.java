@@ -3,9 +3,12 @@ package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.dto.AuthLoginRequest;
 import com.springboot.MyTodoList.dto.AuthLoginResponse;
 import com.springboot.MyTodoList.dto.AuthUserResponse;
+import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.service.JwtService;
 import com.springboot.MyTodoList.service.UserService;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -22,10 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
+    private final ProjectRepository projectRepository;
 
-    public AuthController(UserService userService, JwtService jwtService) {
+    public AuthController(
+            UserService userService,
+            JwtService jwtService,
+            ProjectRepository projectRepository) {
         this.userService = userService;
         this.jwtService = jwtService;
+        this.projectRepository = projectRepository;
     }
 
     @PostMapping("/login")
@@ -46,7 +54,23 @@ public class AuthController {
         User user = authenticatedUser.get();
 
         String token = jwtService.generateToken(user);
-        return ResponseEntity.ok(new AuthLoginResponse(token, new AuthUserResponse(user)));
+        Long projectId = null;
+        String projectName = null;
+        if (UserRoleUtil.isManager(user.getType())) {
+            Project p = projectRepository.findByManagerId(user.getId()).orElse(null);
+            if (p != null) {
+                projectId = p.getId();
+                projectName = p.getName();
+            }
+        } else if (UserRoleUtil.isDeveloper(user.getType())) {
+            Project p = projectRepository.findByTeamMemberUserId(user.getId()).orElse(null);
+            if (p != null) {
+                projectId = p.getId();
+                projectName = p.getName();
+            }
+        }
+        return ResponseEntity.ok(
+                new AuthLoginResponse(token, new AuthUserResponse(user), projectId, projectName));
     }
 
     private boolean isBlank(String value) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
+import { isAuthenticated, login as setAuthenticated, logout } from '../../utils/auth';
 import {
   fetchDeveloperPrimaryProject,
   fetchManagerPrimaryProject,
@@ -102,30 +102,53 @@ export default function Login() {
 
       setAuthenticated({ token: authData.token, user: userData }, rememberMe);
 
+      const applyProjectFromAuth = (projectId, projectName) => {
+        if (projectId != null) {
+          localStorage.setItem('currentProjectId', String(projectId));
+          localStorage.setItem('currentProjectName', projectName || '');
+        }
+      };
+
       if (isAdminRole(userData.role)) {
         navigate('/project-selector');
       } else if (isManagerRole(userData.role)) {
-        try {
-          const project = await fetchManagerPrimaryProject(userData.id);
-          if (project) {
-            // Same keys as App.js avoids empty dashboard on first paint.
-            localStorage.setItem('currentProjectId', String(project.id));
-            localStorage.setItem('currentProjectName', project.name);
+        if (authData.projectId != null) {
+          applyProjectFromAuth(authData.projectId, authData.projectName);
+        } else {
+          try {
+            const project = await fetchManagerPrimaryProject(userData.id);
+            if (project?.id) {
+              applyProjectFromAuth(project.id, project.name);
+            }
+          } catch (e) {
+            console.error('Could not pre-load the manager project', e);
           }
-        } catch (e) {
-          console.error('Could not pre-load the manager project');
         }
         navigate('/');
       } else if (isDeveloperRole(userData.role)) {
-        try {
-          const project = await fetchDeveloperPrimaryProject(userData.id);
-          if (project) {
-            localStorage.setItem('currentProjectId', String(project.id));
-            localStorage.setItem('currentProjectName', project.name);
+        let projectId = authData.projectId;
+        let projectName = authData.projectName;
+        if (projectId == null) {
+          try {
+            const project = await fetchDeveloperPrimaryProject(userData.id);
+            if (project?.id) {
+              projectId = project.id;
+              projectName = project.name;
+            }
+          } catch (e) {
+            console.error('Could not pre-load the developer project', e);
           }
-        } catch (e) {
-          console.error('Could not pre-load the developer project');
         }
+        if (projectId == null) {
+          logout();
+          localStorage.removeItem('currentProjectId');
+          localStorage.removeItem('currentProjectName');
+          setFormError(
+            'Your account is not assigned to a project team. Ask an admin to add you to a team.',
+          );
+          return;
+        }
+        applyProjectFromAuth(projectId, projectName);
         navigate('/');
       } else {
         navigate('/');

@@ -1,4 +1,15 @@
+import { getAuthToken } from '../../utils/auth';
+
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+
+function authHeaders() {
+  const headers = {};
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export async function loginWithCredentials(identifier, password) {
   const response = await fetch(`${API_BASE}/api/auth/login`, {
@@ -19,13 +30,17 @@ export async function loginWithCredentials(identifier, password) {
 }
 
 export async function fetchManagerPrimaryProject(managerId) {
-  const projRes = await fetch(`${API_BASE}/api/projects/manager/${managerId}`);
+  const projRes = await fetch(`${API_BASE}/api/projects/manager/${managerId}`, {
+    headers: authHeaders(),
+  });
   if (!projRes.ok) return null;
   return projRes.json();
 }
 
 export async function fetchDeveloperPrimaryProject(userId) {
-  const projRes = await fetch(`${API_BASE}/api/projects/developer/${userId}`);
+  const projRes = await fetch(`${API_BASE}/api/projects/developer/${userId}`, {
+    headers: authHeaders(),
+  });
   if (!projRes.ok) return null;
   return projRes.json();
 }
