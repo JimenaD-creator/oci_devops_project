@@ -43,7 +43,8 @@ const ORACLE_RED = '#C74634';
 export default function MyPerformancePage({ projectId, currentUser }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError } = useProjectData();
+  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError, invalidateAndRefresh } =
+    useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -53,6 +54,12 @@ export default function MyPerformancePage({ projectId, currentUser }) {
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
   const userId = currentUser?.id;
   const userName = currentUser?.name;
+
+  useEffect(() => {
+    if (effectiveProjectIdNum != null) {
+      invalidateAndRefresh();
+    }
+  }, [effectiveProjectIdNum, userId, invalidateAndRefresh]);
 
   useEffect(() => {
     setLoading(sharedLoading);

@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +40,9 @@ public class BotStateManager {
 
     /** Survives sprint selection / task views; cleared on sign-out or {@link #clearPendingState} for full reset. */
     private final Map<Long, Long> telegramSignedInUserId = new ConcurrentHashMap<>();
+
+    /** Reply-keyboard task button text → task id while viewing a sprint task list. */
+    private final Map<Long, Map<String, Integer>> sprintTaskMenuLabels = new ConcurrentHashMap<>();
     
     // Timeout in minutes: If state is older than this, it's considered expired
     private static final long STATE_TIMEOUT_MINUTES = 30;
@@ -136,6 +141,25 @@ public class BotStateManager {
         BotUserState state = new BotUserState(chatId, null, sprintId, selectedUserId, "VIEWING_SPRINT_TASKS");
         userStates.put(chatId, state);
         logger.info("Set chat {} to viewing sprint {} tasks for user {}", chatId, sprintId, selectedUserId);
+    }
+
+    public void setSprintTaskMenuLabels(Long chatId, Map<String, Integer> labelToTaskId) {
+        if (labelToTaskId == null || labelToTaskId.isEmpty()) {
+            sprintTaskMenuLabels.remove(chatId);
+        } else {
+            sprintTaskMenuLabels.put(chatId, Collections.unmodifiableMap(new LinkedHashMap<>(labelToTaskId)));
+        }
+    }
+
+    public Integer resolveTaskIdFromMenuLabel(Long chatId, String buttonText) {
+        if (chatId == null || buttonText == null) {
+            return null;
+        }
+        Map<String, Integer> map = sprintTaskMenuLabels.get(chatId);
+        if (map == null) {
+            return null;
+        }
+        return map.get(buttonText.trim());
     }
     
     /**
@@ -349,6 +373,7 @@ public class BotStateManager {
 
     public void clearTelegramSignedIn(Long chatId) {
         telegramSignedInUserId.remove(chatId);
+        sprintTaskMenuLabels.remove(chatId);
         logger.info("Cleared sign-in for chat {}", chatId);
     }
     
@@ -360,6 +385,7 @@ public class BotStateManager {
      */
     public void clearPendingState(Long chatId) {
         userStates.remove(chatId);
+        sprintTaskMenuLabels.remove(chatId);
         myPerformanceUserId.remove(chatId);
         myPerformanceSprints.remove(chatId);
         selectingMyPerformanceScope.remove(chatId);

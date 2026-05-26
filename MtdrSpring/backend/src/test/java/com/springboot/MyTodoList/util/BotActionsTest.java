@@ -144,9 +144,7 @@ class BotActionsTest {
         assertTrue(taskListMsg.getText().contains("all team tasks"));
         assertTrue(taskListMsg.getText().contains("Sprint " + sprintId));
         String taskKeyboard = flattenKeyboard(taskListMsg);
-        assertTrue(taskKeyboard.contains("20 - "));
-        assertTrue(taskKeyboard.contains("30 - "));
-        assertTrue(taskKeyboard.contains("40 - "));
+        assertFalse(taskKeyboard.contains("20 - "));
         assertTrue(taskKeyboard.contains("Alice done"));
         assertTrue(taskKeyboard.contains("Bob done"));
         assertTrue(taskKeyboard.contains("Carol done"));
@@ -220,8 +218,8 @@ class BotActionsTest {
         assertFalse(text.contains("All Completed tasks"));
 
         String keys = flattenKeyboard(taskList);
-        assertTrue(keys.contains("1 - "));
-        assertTrue(keys.contains("2 - "));
+        assertFalse(keys.contains("1 - "));
+        assertFalse(keys.contains("2 - "));
         assertTrue(keys.contains("My first done"));
         assertTrue(keys.contains("My second done"));
         assertFalse(keys.contains("99 - "));

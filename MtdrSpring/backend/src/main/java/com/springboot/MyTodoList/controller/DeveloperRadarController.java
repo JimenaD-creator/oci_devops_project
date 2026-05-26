@@ -12,11 +12,11 @@ import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.model.UserSprint;
+import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Locale;
 
@@ -90,7 +90,7 @@ public class DeveloperRadarController {
             if (isAssignmentComplete(ut)) {
                 a.done++;
                 int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
-                Boolean onTimeFlag = evaluateAssignmentOnTime(ut, t, assigneeCount);
+                Boolean onTimeFlag = UserTaskOnTimeUtil.evaluateAssignmentOnTime(ut, t, assigneeCount);
                 if (onTimeFlag != null) {
                     if (onTimeFlag) a.onTime++;
                     else a.late++;
@@ -211,23 +211,6 @@ public class DeveloperRadarController {
         if (s == null) return false;
         String n = s.trim().toUpperCase();
         return "COMPLETED".equals(n) || "DONE".equals(n) || "COMPLETE".equals(n);
-    }
-
-    /**
-     * Per-assignee on-time: uses USER_TASK.completedAt, not TASK.finishDate (last finisher).
-     * Returns null when completion time is unknown (e.g. multi-assignee legacy rows).
-     */
-    private static Boolean evaluateAssignmentOnTime(UserTask ut, Task t, int assigneeCount) {
-        if (t.getDueDate() == null) return null;
-        LocalDateTime doneAt = ut.getCompletedAt();
-        if (doneAt == null) {
-            if (assigneeCount <= 1 && t.getFinishDate() != null) {
-                doneAt = t.getFinishDate();
-            } else {
-                return null;
-            }
-        }
-        return !doneAt.toLocalDate().isAfter(t.getDueDate().toLocalDate());
     }
 
     private int scale(double ratio) {

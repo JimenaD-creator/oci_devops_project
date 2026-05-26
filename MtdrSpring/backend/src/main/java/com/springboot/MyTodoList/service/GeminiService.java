@@ -14,6 +14,7 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserSprint;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.SprintRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
@@ -348,6 +349,14 @@ public class GeminiService {
     private PerformanceStats aggregatePerformanceStats(List<UserTask> myTasks) {
         PerformanceStats stats = new PerformanceStats();
         stats.taskDetails = new ArrayList<>();
+        Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+        for (UserTask ut : myTasks) {
+            Task t = ut.getTask();
+            if (t == null || t.getId() == null) {
+                continue;
+            }
+            assigneeCountByTask.merge(t.getId(), 1, Integer::sum);
+        }
         for (UserTask ut : myTasks) {
             Task t = ut.getTask();
             if (t == null) {
@@ -358,8 +367,10 @@ public class GeminiService {
                 || (t.getStatus() != null && "DONE".equalsIgnoreCase(t.getStatus().trim()));
             if (isDone) {
                 stats.completed++;
-                if (t.getFinishDate() != null && t.getDueDate() != null) {
-                    if (!t.getFinishDate().isAfter(t.getDueDate())) {
+                int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                Boolean onTimeFlag = UserTaskOnTimeUtil.evaluateAssignmentOnTime(ut, t, assigneeCount);
+                if (onTimeFlag != null) {
+                    if (onTimeFlag) {
                         stats.onTime++;
                     } else {
                         stats.late++;
@@ -381,7 +392,9 @@ public class GeminiService {
                 if (t.getDueDate() != null) {
                     td.put("dueDate", t.getDueDate().toString());
                 }
-                if (t.getFinishDate() != null) {
+                if (ut.getCompletedAt() != null) {
+                    td.put("completedAt", ut.getCompletedAt().toString());
+                } else if (t.getFinishDate() != null) {
                     td.put("finishDate", t.getFinishDate().toString());
                 }
                 if (Boolean.TRUE.equals(ut.getIsBlocked())) {
@@ -393,9 +406,9 @@ public class GeminiService {
                 stats.taskDetails.add(td);
             }
         }
-        int pending = stats.total - stats.completed;
         stats.completionRate = stats.total > 0 ? (stats.completed * 100.0 / stats.total) : 0.0;
-        stats.onTimeRate = stats.completed > 0 ? (stats.onTime * 100.0 / stats.completed) : 0.0;
+        int onTimeKnown = stats.onTime + stats.late;
+        stats.onTimeRate = onTimeKnown > 0 ? (stats.onTime * 100.0 / onTimeKnown) : 0.0;
         return stats;
     }
 
@@ -655,7 +668,7 @@ public class GeminiService {
                 if (isUserTaskAssignmentComplete(ut)) {
                     a.completedTasks++;
                     int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
-                    Boolean onTime = evaluateUserTaskOnTime(ut, t, assigneeCount);
+                    Boolean onTime = UserTaskOnTimeUtil.evaluateAssignmentOnTime(ut, t, assigneeCount);
                     if (onTime == null) {
                         a.unknownCompletionTiming++;
                     } else if (onTime) {
@@ -1746,25 +1759,6 @@ public class GeminiService {
 
     private static boolean isUserTaskAssignmentComplete(UserTask ut) {
         return UserTask.isCompletedAssignmentStatus(ut != null ? ut.getStatus() : null);
-    }
-
-    /**
-     * Per-assignee on-time: USER_TASK.completedAt vs task due date (calendar day).
-     * Returns null when completion time is unknown (typical legacy multi-assignee rows).
-     */
-    private static Boolean evaluateUserTaskOnTime(UserTask ut, Task t, int assigneeCount) {
-        if (t == null || t.getDueDate() == null) {
-            return null;
-        }
-        LocalDateTime doneAt = ut.getCompletedAt();
-        if (doneAt == null) {
-            if (assigneeCount <= 1 && t.getFinishDate() != null) {
-                doneAt = t.getFinishDate();
-            } else {
-                return null;
-            }
-        }
-        return !doneAt.toLocalDate().isAfter(t.getDueDate().toLocalDate());
     }
 
     private void addRecommendation(ArrayNode recs, String category, String text) {

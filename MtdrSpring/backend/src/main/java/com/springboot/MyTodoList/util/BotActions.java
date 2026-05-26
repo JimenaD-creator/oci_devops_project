@@ -6,8 +6,10 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +42,8 @@ public class BotActions {
 
     private static final Logger logger = LoggerFactory.getLogger(BotActions.class);
     private static final int TELEGRAM_BUTTON_MAX = 62;
+    /** Task title column when manager sees task + status on one row. */
+    private static final int TELEGRAM_TASK_BUTTON_MAX = 40;
     private static final Pattern USER_PICKER_ID = Pattern.compile("^👤 .+ #(\\d+)$");
 
     private String requestText;
@@ -122,11 +126,10 @@ public class BotActions {
      * Must match USER_TASK.USER_ID — never default to user #1.
      */
     private Long resolveEffectiveActingUserId() {
-        if (stateManager.isViewingSprintTasks(chatId)) {
-            Long selected = stateManager.getViewingSelectedUserId(chatId);
-            if (selected != null) {
-                return selected;
-            }
+        // VIEWING_SPRINT_TASKS and SELECTING_TASK_STATUS both store the assignee being browsed
+        Long selected = stateManager.getViewingSelectedUserId(chatId);
+        if (selected != null) {
+            return selected;
         }
         Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
         if (signedIn != null) {
@@ -139,13 +142,19 @@ public class BotActions {
     }
 
     private void sendMainMenuKeyboard(String introMessage) {
+        Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
+        boolean isManager = signedInId != null && isUserManager(signedInId);
+        List<KeyboardRow> rows = new ArrayList<>();
+        rows.add(new KeyboardRow(BotLabels.LIST_ALL_ITEMS.getLabel()));
+        rows.add(new KeyboardRow(BotLabels.ADD_NEW_ITEM.getLabel()));
+        if (!isManager) {
+            rows.add(new KeyboardRow(BotLabels.MY_PERFORMANCE.getLabel()));
+        }
+        rows.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel(), BotLabels.HIDE_MAIN_SCREEN.getLabel()));
+        rows.add(new KeyboardRow(BotLabels.LOG_OUT.getLabel()));
         BotHelper.sendMessageToTelegram(chatId, introMessage, telegramClient, ReplyKeyboardMarkup
                 .builder()
-                .keyboardRow(new KeyboardRow(BotLabels.LIST_ALL_ITEMS.getLabel()))
-                .keyboardRow(new KeyboardRow(BotLabels.ADD_NEW_ITEM.getLabel()))
-                .keyboardRow(new KeyboardRow(BotLabels.MY_PERFORMANCE.getLabel()))  // ← NUEVO
-                .keyboardRow(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel(), BotLabels.HIDE_MAIN_SCREEN.getLabel()))
-                .keyboardRow(new KeyboardRow(BotLabels.LOG_OUT.getLabel()))
+                .keyboard(rows)
                 .resizeKeyboard(true)
                 .build());
     }
@@ -335,9 +344,22 @@ public class BotActions {
         return Long.parseLong(m.group(1));
     }
 
+    /** Chronological order for sprint picker (start → due → id). */
+    private static List<Sprint> sortSprintsForTelegramMenu(List<Sprint> sprints) {
+        if (sprints == null || sprints.size() < 2) {
+            return sprints;
+        }
+        List<Sprint> sorted = new ArrayList<>(sprints);
+        sorted.sort(Comparator
+                .comparing(Sprint::getStartDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Sprint::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Sprint::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+        return sorted;
+    }
+
     private void sendSelectSprintKeyboard(String optionalNotice) {
         stateManager.setSelectingSprint(chatId);
-        List<Sprint> allSprints = sprintService.findAll();
+        List<Sprint> allSprints = sortSprintsForTelegramMenu(sprintService.findAll());
         List<Sprint> sprintsToShow = allSprints;
         Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
         if (signedInId != null && !isUserManager(signedInId)) {
@@ -410,22 +432,81 @@ public class BotActions {
         return " [" + formatTaskStatusForDisplay(item.getStatus()) + "]";
     }
 
-    /** List label: always from this assignee's USER_TASK row, never the team TASK row alone. */
-    private String statusBracketForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
+    /** Status text for one assignee (USER_TASK row when present). */
+    private String statusLabelForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
         if (assigneeUserId != null && item != null) {
             long taskId = item.getID();
             if (userTaskService.isMyAssignmentCompleted(assigneeUserId, taskId)) {
-                return " [✅ Your part done]";
+                return formatTaskStatusForDisplay("DONE");
             }
             Optional<String> mine = userTaskService.getAssignmentStatus(assigneeUserId, taskId);
             if (mine.isPresent() && mine.get() != null && !mine.get().isBlank()) {
-                return " [" + formatTaskStatusForDisplay(mine.get()) + "]";
+                return formatTaskStatusForDisplay(mine.get());
             }
             if (userTaskService.isUserAssignedToTask(assigneeUserId, taskId)) {
-                return " [" + formatTaskStatusForDisplay("TODO") + "]";
+                return formatTaskStatusForDisplay("TODO");
             }
         }
-        return statusBracketForTaskList(item);
+        if (item == null || item.getStatus() == null || item.getStatus().isBlank()) {
+            return formatTaskStatusForDisplay(null);
+        }
+        return formatTaskStatusForDisplay(item.getStatus());
+    }
+
+    /** Inline status suffix for developer single-button rows. */
+    private String statusBracketForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
+        return " [" + statusLabelForAssigneeTaskList(item, assigneeUserId) + "]";
+    }
+
+    private static String truncateTelegramButton(String text, int maxLen) {
+        if (text == null) {
+            return "";
+        }
+        if (text.length() <= maxLen) {
+            return text;
+        }
+        if (maxLen < 2) {
+            return text.substring(0, maxLen);
+        }
+        return text.substring(0, maxLen - 1) + "…";
+    }
+
+    private boolean isManagerViewingTeamMemberTasks(Long signedInUserId, Long assigneeUserId) {
+        return signedInUserId != null
+                && assigneeUserId != null
+                && isUserManager(signedInUserId)
+                && !signedInUserId.equals(assigneeUserId);
+    }
+
+    private KeyboardRow buildTaskListKeyboardRow(
+            ToDoItem item,
+            Long assigneeUserId,
+            boolean splitTaskAndStatus,
+            Set<Long> myCompletedIds,
+            boolean inDoneSection) {
+        KeyboardRow row = new KeyboardRow();
+        String title = keyboardLabelForItem(item);
+        if (splitTaskAndStatus) {
+            String taskBtn = truncateTelegramButton(title, TELEGRAM_TASK_BUTTON_MAX);
+            String statusBtn = truncateTelegramButton(
+                    statusLabelForAssigneeTaskList(item, assigneeUserId), TELEGRAM_BUTTON_MAX);
+            row.add(taskBtn);
+            row.add(statusBtn);
+        } else {
+            if (inDoneSection && myCompletedIds.contains((long) item.getID())) {
+                title = "✅ " + title;
+            }
+            String combined = title + statusBracketForAssigneeTaskList(item, assigneeUserId);
+            row.add(truncateTelegramButton(combined, TELEGRAM_BUTTON_MAX));
+        }
+        return row;
+    }
+
+    private static void registerTaskMenuLabel(Map<String, Integer> menuLabels, KeyboardRow row, ToDoItem item) {
+        if (menuLabels == null || row == null || row.isEmpty() || item == null) {
+            return;
+        }
+        menuLabels.put(row.get(0).getText().trim(), item.getID());
     }
 
     /** Display name after sign-in (DB name, else email). */
@@ -491,8 +572,13 @@ public class BotActions {
                 Long sprintId = Long.parseLong(sprintIdStr);
                 Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
                 if (signedIn != null) {
-                    stateManager.setViewingSprintTasks(chatId, sprintId, signedIn);
-                    showSprintTasksForAssignee(sprintId, signedIn);
+                    if (isUserManager(signedIn)) {
+                        stateManager.setSelectingUserInSprint(chatId, sprintId);
+                        showUserPickerForSprint(sprintId);
+                    } else {
+                        stateManager.setViewingSprintTasks(chatId, sprintId, signedIn);
+                        showSprintTasksForAssignee(sprintId, signedIn);
+                    }
                 } else {
                     stateManager.setSelectingUserInSprint(chatId, sprintId);
                     showUserPickerForSprint(sprintId);
@@ -517,8 +603,12 @@ public class BotActions {
         for (User u : users) keyboard.add(new KeyboardRow(toUserPickerButton(u)));
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
                 .keyboard(keyboard).resizeKeyboard(true).selective(true).build();
+        Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
+        boolean isManager = signedIn != null && isUserManager(signedIn);
         BotHelper.sendMessageToTelegram(chatId,
-                "👥 *Sprint " + sprintId + "* — pick your name to see **only your** assigned tasks:",
+                isManager
+                        ? ("👥 *Sprint " + sprintId + "* — pick a team member to view their assigned tasks:")
+                        : ("👥 *Sprint " + sprintId + "* — pick your name to see **only your** assigned tasks:"),
                 telegramClient, keyboardMarkup);
     }
 
@@ -539,10 +629,18 @@ public class BotActions {
         if (picked == null) { exit = true; return; }
         Long sprintId = stateManager.getSprintIdInSprintUserFlow(chatId);
         if (sprintId == null) { sendSelectSprintKeyboard(null); exit = true; return; }
-        stateManager.setVerifyingCredentialsPhoneEmail(chatId, picked, sprintId);
-        BotHelper.sendMessageToTelegram(chatId,
-                "🔐 Before accessing tasks, please verify your identity.\n\nPlease enter your phone number or email:",
-                telegramClient, null);
+        Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
+        boolean isManager = signedIn != null && isUserManager(signedIn);
+        if (isManager) {
+            // Managers are already authenticated: allow navigating team tasks read-only without impersonation
+            stateManager.setViewingSprintTasks(chatId, sprintId, picked);
+            showSprintTasksForAssignee(sprintId, picked);
+        } else {
+            stateManager.setVerifyingCredentialsPhoneEmail(chatId, picked, sprintId);
+            BotHelper.sendMessageToTelegram(chatId,
+                    "🔐 Before accessing tasks, please verify your identity.\n\nPlease enter your phone number or email:",
+                    telegramClient, null);
+        }
         exit = true;
     }
 
@@ -576,6 +674,7 @@ public class BotActions {
 
         Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
         boolean directSessionSprint = signedIn != null && signedIn.equals(assigneeUserId);
+        boolean managerTeamMemberView = isManagerViewingTeamMemberTasks(signedIn, assigneeUserId);
 
         List<KeyboardRow> keyboard = new ArrayList<>();
         if (directSessionSprint) keyboard.add(new KeyboardRow("⬅️ Back to Sprints"));
@@ -585,36 +684,43 @@ public class BotActions {
         }
         if (stateManager.isTelegramSignedIn(chatId)) keyboard.add(new KeyboardRow(BotLabels.LOG_OUT.getLabel()));
 
+        Map<String, Integer> taskMenuLabels = new LinkedHashMap<>();
         for (ToDoItem item : activeItems) {
-            KeyboardRow currentRow = new KeyboardRow();
-            String taskLabel = keyboardLabelForItem(item)
-                    + statusBracketForAssigneeTaskList(item, assigneeUserId);
-            currentRow.add(item.getID() + " - " + taskLabel);
-            keyboard.add(currentRow);
+            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView, myCompletedIds, false);
+            registerTaskMenuLabel(taskMenuLabels, row, item);
+            keyboard.add(row);
         }
         for (ToDoItem item : doneItems) {
-            KeyboardRow currentRow = new KeyboardRow();
-            String taskLabel = keyboardLabelForItem(item);
-            if (myCompletedIds.contains((long) item.getID())) {
-                taskLabel = "✅ " + taskLabel;
-            }
-            taskLabel += statusBracketForAssigneeTaskList(item, assigneeUserId);
-            currentRow.add(item.getID() + " - " + taskLabel);
-            keyboard.add(currentRow);
+            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView, myCompletedIds, true);
+            registerTaskMenuLabel(taskMenuLabels, row, item);
+            keyboard.add(row);
         }
+        stateManager.setSprintTaskMenuLabels(chatId, taskMenuLabels);
 
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
                 .keyboard(keyboard).resizeKeyboard(true).selective(true).build();
 
         final String message;
         if (mine.isEmpty()) {
-            message = isSignedInManagerFullSprintView(assigneeUserId)
-                    ? ("📋 *No tasks in Sprint " + sprintId + " yet.*\n\n⬅️ Go back to sprints.")
-                    : ("📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to "
-                    + (directSessionSprint ? "sprints." : "users or sprints."));
+            if (isSignedInManagerFullSprintView(assigneeUserId)) {
+                message = "📋 *No tasks in Sprint " + sprintId + " yet.*\n\n⬅️ Go back to sprints.";
+            } else if (managerTeamMemberView) {
+                String who = resolveUserWelcomeName(assigneeUserId);
+                String display = who != null ? who : ("User " + assigneeUserId);
+                message = "📋 *No tasks assigned to " + escapeMarkdown(display)
+                        + " in Sprint " + sprintId + "*\n\n⬅️ Go back to users or sprints.";
+            } else {
+                message = "📋 *You have no assigned tasks in Sprint " + sprintId + "*\n\n⬅️ Go back to "
+                        + (directSessionSprint ? "sprints." : "users or sprints.");
+            }
         } else if (isSignedInManagerFullSprintView(assigneeUserId)) {
             message = "📋 *Sprint " + sprintId + " — all team tasks (manager)*\n\n"
                     + "Tap a task for a read-only summary. Assignees update status from their own sign-in.";
+        } else if (managerTeamMemberView) {
+            String who = resolveUserWelcomeName(assigneeUserId);
+            String display = who != null ? who : ("User " + assigneeUserId);
+            message = "📋 *Sprint " + sprintId + " — " + escapeMarkdown(display) + "'s tasks*\n\n"
+                    + "Tap a task for a read-only summary.";
         } else {
             message = "📋 *Your tasks (Sprint " + sprintId + "):*\n\n"
                     + "Tap a task to view details or change status.";
@@ -656,6 +762,8 @@ public class BotActions {
 
         Long sprintId = stateManager.getViewingSprintId(chatId);
         Long assigneeUserId = resolveEffectiveActingUserId();
+        Long signedInViewer = stateManager.getTelegramSignedInUserId(chatId);
+        boolean viewerIsManager = signedInViewer != null && isUserManager(signedInViewer);
 
         if (sprintId == null || assigneeUserId == null) {
             logger.debug("Missing sprintId or assigneeUserId, returning to sprint selection");
@@ -675,7 +783,8 @@ public class BotActions {
             return;
         }
 
-        if (isSignedInManagerFullSprintView(assigneeUserId)) {
+        // Managers should always view tasks read-only (even when browsing team members)
+        if (viewerIsManager || isSignedInManagerFullSprintView(assigneeUserId)) {
             showTaskDetailsReadOnly(task, sprintId, assigneeUserId);
         } else if (userTaskService.isMyAssignmentCompleted(assigneeUserId, (long) taskId)) {
             showTaskDetailsCompletedForAssignee(task, sprintId, assigneeUserId);
@@ -686,20 +795,27 @@ public class BotActions {
     }
 
     private Integer extractTaskIdFromLabel(String label) {
-        if (label == null || label.isEmpty()) return null;
+        if (label == null || label.isEmpty()) {
+            return null;
+        }
+        Integer fromMenu = stateManager.resolveTaskIdFromMenuLabel(chatId, label);
+        if (fromMenu != null) {
+            logger.debug("Resolved task ID {} from menu label: {}", fromMenu, label);
+            return fromMenu;
+        }
         try {
             int dashIndex = label.indexOf(" - ");
             if (dashIndex > 0) {
                 String idStr = label.substring(0, dashIndex).trim();
                 int id = Integer.parseInt(idStr);
-                logger.debug("Successfully extracted task ID {} from label: {}", id, label);
+                logger.debug("Legacy: extracted task ID {} from label: {}", id, label);
                 return id;
             }
             int id = Integer.parseInt(label.trim());
-            logger.debug("Parsed whole string as task ID {} from label: {}", id, label);
+            logger.debug("Legacy: parsed whole string as task ID {} from label: {}", id, label);
             return id;
         } catch (Exception e) {
-            logger.debug("Could not extract task ID from label: {}", label, e);
+            logger.debug("Could not resolve task from label: {}", label);
             return null;
         }
     }
@@ -801,7 +917,7 @@ public class BotActions {
                 ? task.getDescription() : "No description provided";
 
         String message = String.format(
-                "📋 *Task Details* _(manager, read-only)_\n\n*Title:* %s\n\n*Description:* %s\n\n*Current Status:* %s\n\n*Due date:* %s\n\nAssignees change status after signing in as themselves.",
+                "📋 *Task Details*\n\n*Title:* %s\n\n*Description:* %s\n\n*Current Status:* %s\n\n*Due date:* %s",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
                 escapeMarkdown(formatTaskStatusForDisplay(task.getStatus())),
@@ -873,7 +989,10 @@ public class BotActions {
 
         if ("⬅️ Back to tasks".equals(requestText)) {
             Long sprintId = stateManager.getViewingSprintId(chatId);
-            Long assigneeUserId = resolveActingAssigneeUserId();
+            Long assigneeUserId = stateManager.getViewingSelectedUserId(chatId);
+            if (assigneeUserId == null) {
+                assigneeUserId = resolveActingAssigneeUserId();
+            }
             if (sprintId != null && assigneeUserId != null) {
                 stateManager.setViewingSprintTasks(chatId, sprintId, assigneeUserId);
                 showSprintTasksForAssignee(sprintId, assigneeUserId);
@@ -906,9 +1025,10 @@ public class BotActions {
             return;
         }
 
-        Long assigneeContext = resolveActingAssigneeUserId();
-        if (isSignedInManagerFullSprintView(assigneeContext)) {
-            BotHelper.sendMessageToTelegram(chatId, "Manager overview is read-only. Tap ⬅️ Back to tasks.", telegramClient, null);
+        Long signedInViewer = stateManager.getTelegramSignedInUserId(chatId);
+        boolean viewerIsManager = signedInViewer != null && isUserManager(signedInViewer);
+        if (viewerIsManager) {
+            BotHelper.sendMessageToTelegram(chatId, "Manager view is read-only. Tap ⬅️ Back to tasks.", telegramClient, null);
             exit = true;
             return;
         }
@@ -1000,13 +1120,20 @@ public class BotActions {
             exit = true;
             return;
         }
+        if (isUserManager(userId)) {
+            String nm = resolveUserWelcomeName(userId);
+            sendMainMenuKeyboard("📊 Performance is available for developers only.\n\n" + helloMyTodoBotWithDeveloperName(nm));
+            stateManager.clearPendingState(chatId);
+            exit = true;
+            return;
+        }
 
         // Obtener sprints donde el usuario tiene tareas
         List<Long> sprintIdsWithWork = userTaskService.findSprintIdsWithAssignmentsForUser(userId);
-        List<Sprint> allSprints = sprintService.findAll();
-        List<Sprint> mySprints = allSprints.stream()
-                .filter(s -> sprintIdsWithWork.contains(s.getId()))
-                .collect(Collectors.toList());
+        List<Sprint> mySprints = sortSprintsForTelegramMenu(
+                sprintService.findAll().stream()
+                        .filter(s -> sprintIdsWithWork.contains(s.getId()))
+                        .collect(Collectors.toList()));
 
         stateManager.setMyPerformanceUserId(chatId, userId);
         stateManager.setMyPerformanceSprints(chatId, mySprints);
@@ -1017,7 +1144,6 @@ public class BotActions {
         keyboard.add(new KeyboardRow("⬅️ Back to main menu"));
 
         if (!mySprints.isEmpty()) {
-            keyboard.add(new KeyboardRow("━━━ Select a sprint ━━━"));
             for (Sprint sprint : mySprints) {
                 String sprintLabel = "Sprint " + sprint.getId();
                 String dateRange = "";
@@ -1130,6 +1256,13 @@ public class BotActions {
             int blocked = 0;
             long totalHours = 0;
             List<Map<String, Object>> taskDetails = new ArrayList<>();
+            Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+            for (UserTask ut : myTasks) {
+                Task t = ut.getTask();
+                if (t != null && t.getId() != null) {
+                    assigneeCountByTask.merge(t.getId(), 1, Integer::sum);
+                }
+            }
 
             for (UserTask ut : myTasks) {
                 Task t = ut.getTask();
@@ -1141,8 +1274,10 @@ public class BotActions {
 
                 if (isDone) {
                     completed++;
-                    if (t.getFinishDate() != null && t.getDueDate() != null) {
-                        if (!t.getFinishDate().isAfter(t.getDueDate())) onTime++;
+                    int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                    Boolean onTimeFlag = UserTaskOnTimeUtil.evaluateAssignmentOnTime(ut, t, assigneeCount);
+                    if (onTimeFlag != null) {
+                        if (onTimeFlag) onTime++;
                         else late++;
                     }
                 }
@@ -1156,7 +1291,11 @@ public class BotActions {
                     td.put("userTaskStatus", ut.getStatus() != null ? ut.getStatus() : "");
                     td.put("workedHours", ut.getWorkedHours() != null ? ut.getWorkedHours() : 0);
                     if (t.getDueDate() != null) td.put("dueDate", t.getDueDate().toString());
-                    if (t.getFinishDate() != null) td.put("finishDate", t.getFinishDate().toString());
+                    if (ut.getCompletedAt() != null) {
+                        td.put("completedAt", ut.getCompletedAt().toString());
+                    } else if (t.getFinishDate() != null) {
+                        td.put("finishDate", t.getFinishDate().toString());
+                    }
                     if (Boolean.TRUE.equals(ut.getIsBlocked())) {
                         td.put("blocked", true);
                         if (ut.getBlockedReason() != null) td.put("blockedReason", ut.getBlockedReason());
@@ -1167,7 +1306,8 @@ public class BotActions {
 
             int pending = total - completed;
             double completionRate = total > 0 ? (completed * 100.0 / total) : 0;
-            double onTimeRate = completed > 0 ? (onTime * 100.0 / completed) : 0;
+            int onTimeKnown = onTime + late;
+            double onTimeRate = onTimeKnown > 0 ? (onTime * 100.0 / onTimeKnown) : 0;
 
             String userName = resolveUserWelcomeName(userId);
             if (userName == null) userName = "Developer";
