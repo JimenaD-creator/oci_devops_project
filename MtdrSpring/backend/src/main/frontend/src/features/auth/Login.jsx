@@ -1,12 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setAuthenticated, clearAuthTokens } from '../../utils/auth';
-import {
-  fetchDeveloperPrimaryProject,
-  fetchManagerPrimaryProject,
-  loginWithCredentials,
-} from './loginApi';
-import { isAdminRole, isDeveloperRole, isManagerRole } from '../../utils/userRoleUtils';
+import { isAuthenticated, login as setAuthenticated, clearSessionForLogin } from '../../utils/auth';
+import { redirectAfterLogin } from '../../utils/postLoginRedirect';
+import { loginWithCredentials } from './loginApi';
+import { buildUserSessionFromAuth } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
   <svg
@@ -67,7 +63,6 @@ const LockIcon = () => (
 );
 
 export default function Login() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -82,24 +77,10 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated()) return;
-    try {
-      const stored = localStorage.getItem('currentUser');
-      const parsed = stored ? JSON.parse(stored) : null;
-      const role = parsed?.role || parsed?.type || '';
-      const hasProject = Boolean(localStorage.getItem('currentProjectId'));
-      if (isDeveloperRole(role) && !hasProject) {
-        setFormError(
-          'Your account is signed in but has no project assigned in this environment. '
-            + 'Ask your manager to add you to a project team, then sign in again.',
-        );
-        return;
-      }
-    } catch {
-      /* ignore */
+    if (isAuthenticated()) {
+      redirectAfterLogin('/');
     }
-    navigate('/', { replace: true });
-  }, [navigate]);
+  }, []);
 
   async function completeLogin() {
     setFormError('');
@@ -110,8 +91,7 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      // Stale JWT in storage makes Spring reject POST /api/auth/login in OCI when Bearer is sent.
-      clearAuthTokens();
+      clearSessionForLogin();
 
       const authData = await loginWithCredentials(email.trim(), password.trim());
       if (!authData?.token || !authData?.user) {
@@ -120,58 +100,30 @@ export default function Login() {
         });
       }
 
-      const userData = {
-        ...authData.user,
-        role: authData.user.role || authData.user.type || 'DEVELOPER',
-      };
-
-      setAuthenticated({ token: authData.token, user: userData }, rememberMe);
-
-      const applyProjectFromAuth = (projectId, projectName) => {
-        if (projectId != null) {
-          localStorage.setItem('currentProjectId', String(projectId));
-          localStorage.setItem('currentProjectName', projectName || '');
-        }
-      };
-
-      if (isAdminRole(userData.role)) {
-        navigate('/project-selector');
-      } else if (isManagerRole(userData.role)) {
-        if (authData.projectId != null) {
-          applyProjectFromAuth(authData.projectId, authData.projectName);
-        } else {
-          try {
-            const project = await fetchManagerPrimaryProject(userData.id);
-            if (project?.id) {
-              applyProjectFromAuth(project.id, project.name);
-            }
-          } catch (e) {
-            console.error('Could not pre-load the manager project', e);
-          }
-        }
-        navigate('/');
-      } else if (isDeveloperRole(userData.role)) {
-        let projectId = authData.projectId;
-        let projectName = authData.projectName;
-        if (projectId == null) {
-          try {
-            const project = await fetchDeveloperPrimaryProject(userData.id);
-            if (project?.id) {
-              projectId = project.id;
-              projectName = project.name;
-            }
-          } catch (e) {
-            console.error('Could not pre-load the developer project', e);
-          }
-        }
-        if (projectId != null) {
-          applyProjectFromAuth(projectId, projectName);
-        }
-        navigate('/');
-      } else {
-        navigate('/');
+      const userData = buildUserSessionFromAuth(authData.user);
+      if (!Number.isFinite(userData.id)) {
+        throw Object.assign(new Error('Invalid login response'), {
+          serverMessage: 'Login response is missing user id. Contact your administrator.',
+        });
       }
+
+      try {
+        setAuthenticated({ token: authData.token, user: userData }, rememberMe);
+      } catch {
+        throw Object.assign(new Error('Session storage failed'), {
+          serverMessage:
+            'Could not save your session in the browser. Clear site data for this URL and try again.',
+        });
+      }
+
+      if (authData.projectId != null) {
+        localStorage.setItem('currentProjectId', String(authData.projectId));
+        localStorage.setItem('currentProjectName', authData.projectName || '');
+      }
+
+      redirectAfterLogin('/');
     } catch (err) {
+      console.error('Login failed:', err);
       const serverMsg = err?.serverMessage;
       setFormError(
         serverMsg
@@ -179,7 +131,6 @@ export default function Login() {
             ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
             : 'Invalid credentials. Please try again.'),
       );
-    } finally {
       setIsLoading(false);
     }
   }
@@ -223,6 +174,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
+                autoComplete="username"
               />
             </div>
           </div>
@@ -250,6 +202,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -278,6 +231,7 @@ export default function Login() {
 
           {formError && (
             <div
+              role="alert"
               style={{
                 backgroundColor: '#ffebee',
                 color: '#c62828',

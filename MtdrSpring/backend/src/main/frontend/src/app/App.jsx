@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, logout } from '../utils/auth';
 import {
+  isAuthenticated,
+  loadStoredUser,
+  logout,
+  persistCurrentUser,
+  resolveProfilePicture,
+} from '../utils/auth';
+import {
+  buildUserSessionFromAuth,
   isAdminRole,
   getProfileRoleLabel,
   getSidebarRoleLabel,
@@ -9,7 +16,7 @@ import {
   isManagerRole,
   normalizeUserRole,
 } from '../utils/userRoleUtils';
-import { API_BASE } from '../features/sprints/constants/sprintConstants';
+import { getApiBase } from '../utils/apiBase';
 import { useThemeMode } from '../ThemeContext';
 import { ProjectDataProvider } from '../contexts/ProjectDataContext';
 import PageLoadingSpinner from '../components/common/PageLoadingSpinner';
@@ -103,7 +110,7 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return 'dashboard';
       const parsed = JSON.parse(stored);
-      const role = normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER');
+      const role = buildUserSessionFromAuth(parsed).role;
       return isDeveloperRole(role) ? 'my-tasks' : 'dashboard';
     } catch {
       return 'dashboard';
@@ -123,7 +130,7 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return new Set(['dashboard']);
       const parsed = JSON.parse(stored);
-      const role = normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER');
+      const role = buildUserSessionFromAuth(parsed).role;
       return new Set([isDeveloperRole(role) ? 'my-tasks' : 'dashboard']);
     } catch {
       return new Set(['dashboard']);
@@ -143,21 +150,37 @@ function App() {
   }, []);
   const handleOpenAiInsightsFromTeam = useCallback(() => { setActivePage('ai-insights'); }, []);
 
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('currentUser');
-      if (!stored) return null;
-      const parsed = JSON.parse(stored);
-      return { ...parsed, role: normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER') };
-    } catch { return null; }
-  });
+  const [user, setUser] = useState(() => loadStoredUser());
 
   // profilePicture como estado independiente para refrescar el Avatar sin recargar todo
-  const [profilePicture, setProfilePicture] = useState(user?.profilePicture || null);
+  const [profilePicture, setProfilePicture] = useState(() => {
+    const u = loadStoredUser();
+    return resolveProfilePicture(u?.id, u?.profilePicture);
+  });
+
+  useEffect(() => {
+    if (!user?.id || profilePicture) return;
+    let cancelled = false;
+    fetch(`${getApiBase()}/users/${user.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((dbUser) => {
+        if (cancelled || !dbUser?.profilePicture) return;
+        const updated = { ...user, profilePicture: dbUser.profilePicture };
+        persistCurrentUser(updated);
+        setUser(updated);
+        setProfilePicture(
+          resolveProfilePicture(updated.id, updated.profilePicture),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profilePicture]);
 
   useEffect(() => {
     if (isManagerRole(user?.role) && !selectedProjectId) {
-      fetch(`${API_BASE}/api/projects/manager/${user.id}`)
+      fetch(`${getApiBase()}/api/projects/manager/${user.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((project) => {
           if (project?.id) {
@@ -181,7 +204,7 @@ function App() {
     }
     setDevProjectStatus('loading');
     let cancelled = false;
-    fetch(`${API_BASE}/api/projects/developer/${user.id}`)
+    fetch(`${getApiBase()}/api/projects/developer/${user.id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((project) => {
         if (cancelled) return;
@@ -231,12 +254,12 @@ function App() {
     if (!user?.id) return;
     try {
       setUploadingPhoto(true);
-      const res = await fetch(`${API_BASE}/api/users/${user.id}/profile-picture`, {
+      const res = await fetch(`${getApiBase()}/api/users/${user.id}/profile-picture`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error();
       const updated = { ...user, profilePicture: null };
-      localStorage.setItem('currentUser', JSON.stringify(updated));
+      persistCurrentUser(updated);
       setUser(updated);
       setProfilePicture(null);
       setSnack({ open: true, msg: 'Profile photo removed', severity: 'info' });
@@ -257,7 +280,7 @@ function App() {
       setUploadingPhoto(true);
       const base64 = await compressImage(file);
 
-      const res = await fetch(`${API_BASE}/api/users/${user.id}/profile-picture`, {
+      const res = await fetch(`${getApiBase()}/api/users/${user.id}/profile-picture`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profilePicture: base64 }),
@@ -265,9 +288,9 @@ function App() {
       if (!res.ok) throw new Error();
 
       const updated = { ...user, profilePicture: base64 };
-      localStorage.setItem('currentUser', JSON.stringify(updated));
+      persistCurrentUser(updated);
       setUser(updated);
-      setProfilePicture(base64);
+      setProfilePicture(resolveProfilePicture(updated.id, base64));
       setSnack({ open: true, msg: 'Profile photo updated!', severity: 'success' });
     } catch {
       setSnack({ open: true, msg: 'Error uploading photo', severity: 'error' });
@@ -293,22 +316,26 @@ function App() {
 
   useEffect(() => {
     if (user) return;
-    if (isAuthenticated()) {
-      try {
-        const stored = localStorage.getItem('currentUser');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setUser({
-            ...parsed,
-            role: normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER'),
-          });
-          return;
-        }
-      } catch {
-        /* fall through */
+    if (!isAuthenticated()) return;
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (!stored) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
       }
-    }
-    if (isAuthenticated()) {
+      const parsed = JSON.parse(stored);
+      if (parsed?.id == null) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+      const loaded = loadStoredUser();
+      if (loaded) {
+        setUser(loaded);
+        setProfilePicture(resolveProfilePicture(loaded.id, loaded.profilePicture));
+      }
+    } catch {
       logout();
       navigate('/login', { replace: true });
     }
@@ -386,13 +413,13 @@ function App() {
           p: 3,
         }}
       >
-        <Box sx={{ textAlign: 'center', maxWidth: 440 }}>
+        <Box sx={{ textAlign: 'center', maxWidth: 480 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            No project assigned
+            Signed in — no project assigned
           </Typography>
           <Typography sx={{ color: 'text.secondary', mb: 2.5, fontSize: '0.9rem' }}>
-            Your user is not linked to a team with a project in this environment. In OCI/production,
-            verify the user exists in TEAM_MEMBER for the project team (local DB may differ).
+            Login worked, but user ID {user.id} is not linked to a project team (TEAM_MEMBER).
+            Ask your manager to add you to a project in the web app.
           </Typography>
           <Button
             variant="contained"
@@ -625,7 +652,7 @@ function App() {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
-              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role)}</Typography>
+              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role, user.jobTitle)}</Typography>
             </Box>
 
             <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>

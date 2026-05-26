@@ -431,14 +431,34 @@ public class BotActions {
 
     private static String formatTaskStatusForDisplay(String dbStatus) {
         if (dbStatus == null || dbStatus.isBlank()) return "❔ No status set";
+        return statusIconOnly(dbStatus) + " " + formatTaskStatusTextOnly(dbStatus);
+    }
+
+    /** Single emoji for task list rows (left of title). */
+    private static String statusIconOnly(String dbStatus) {
+        if (dbStatus == null || dbStatus.isBlank()) return "❔";
         String key = dbStatus.trim().toUpperCase().replace(' ', '_').replace('-', '_');
-        if ("TODO".equals(key)) return "📝 To do";
-        if ("IN_PROGRESS".equals(key)) return "🔄 In progress";
-        if ("IN_REVIEW".equals(key)) return "👀 In review";
-        if ("DONE".equals(key) || "FINISHED".equals(key) || "COMPLETED".equals(key) || "CLOSED".equals(key)) return "✅ Done";
-        if ("BLOCKED".equals(key)) return "🚧 Blocked";
-        if ("PENDING".equals(key)) return "⏳ Pending";
-        return "📌 " + dbStatus.trim();
+        if ("TO_DO".equals(key)) key = "TODO";
+        if ("TODO".equals(key)) return "📝";
+        if ("IN_PROGRESS".equals(key)) return "🔄";
+        if ("IN_REVIEW".equals(key)) return "👀";
+        if ("DONE".equals(key) || "FINISHED".equals(key) || "COMPLETED".equals(key) || "CLOSED".equals(key)) return "✅";
+        if ("BLOCKED".equals(key)) return "🚧";
+        if ("PENDING".equals(key)) return "⏳";
+        return "📌";
+    }
+
+    private static String formatTaskStatusTextOnly(String dbStatus) {
+        if (dbStatus == null || dbStatus.isBlank()) return "No status";
+        String key = dbStatus.trim().toUpperCase().replace(' ', '_').replace('-', '_');
+        if ("TO_DO".equals(key)) key = "TODO";
+        if ("TODO".equals(key)) return "To do";
+        if ("IN_PROGRESS".equals(key)) return "In progress";
+        if ("IN_REVIEW".equals(key)) return "In review";
+        if ("DONE".equals(key) || "FINISHED".equals(key) || "COMPLETED".equals(key) || "CLOSED".equals(key)) return "Done";
+        if ("BLOCKED".equals(key)) return "Blocked";
+        if ("PENDING".equals(key)) return "Pending";
+        return dbStatus.trim();
     }
 
     private static String formatDueDateForTelegram(OffsetDateTime dt) {
@@ -448,35 +468,39 @@ public class BotActions {
         return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm xxx"));
     }
 
-    private static String statusBracketForTaskList(ToDoItem item) {
-        if (item.getStatus() == null || item.getStatus().isBlank()) return " [❔]";
-        return " [" + formatTaskStatusForDisplay(item.getStatus()) + "]";
-    }
-
-    /** Status text for one assignee (USER_TASK row when present). */
-    private String statusLabelForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
+    /** Resolved DB/USER_TASK status key for one assignee (same rules as list labels). */
+    private String resolveAssigneeStatusKey(ToDoItem item, Long assigneeUserId) {
         if (assigneeUserId != null && item != null) {
             long taskId = item.getID();
             if (userTaskService.isMyAssignmentCompleted(assigneeUserId, taskId)) {
-                return formatTaskStatusForDisplay("DONE");
+                return "DONE";
             }
             Optional<String> mine = userTaskService.getAssignmentStatus(assigneeUserId, taskId);
             if (mine.isPresent() && mine.get() != null && !mine.get().isBlank()) {
-                return formatTaskStatusForDisplay(mine.get());
+                return mine.get();
             }
             if (userTaskService.isUserAssignedToTask(assigneeUserId, taskId)) {
-                return formatTaskStatusForDisplay("TODO");
+                return "TODO";
             }
         }
         if (item == null || item.getStatus() == null || item.getStatus().isBlank()) {
-            return formatTaskStatusForDisplay(null);
+            return null;
         }
-        return formatTaskStatusForDisplay(item.getStatus());
+        return item.getStatus();
     }
 
-    /** Inline status suffix for developer single-button rows. */
-    private String statusBracketForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
-        return " [" + statusLabelForAssigneeTaskList(item, assigneeUserId) + "]";
+    private String statusIconForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
+        return statusIconOnly(resolveAssigneeStatusKey(item, assigneeUserId));
+    }
+
+    private String statusTextOnlyForAssigneeTaskList(ToDoItem item, Long assigneeUserId) {
+        return formatTaskStatusTextOnly(resolveAssigneeStatusKey(item, assigneeUserId));
+    }
+
+    private static String taskListLabelWithStatusIcon(String statusIcon, String title) {
+        String icon = statusIcon != null && !statusIcon.isBlank() ? statusIcon : "❔";
+        String name = title != null ? title.trim() : "";
+        return icon + " " + name;
     }
 
     private static String truncateTelegramButton(String text, int maxLen) {
@@ -502,22 +526,19 @@ public class BotActions {
     private KeyboardRow buildTaskListKeyboardRow(
             ToDoItem item,
             Long assigneeUserId,
-            boolean splitTaskAndStatus,
-            Set<Long> myCompletedIds,
-            boolean inDoneSection) {
+            boolean splitTaskAndStatus) {
         KeyboardRow row = new KeyboardRow();
         String title = keyboardLabelForItem(item);
+        String statusIcon = statusIconForAssigneeTaskList(item, assigneeUserId);
         if (splitTaskAndStatus) {
-            String taskBtn = truncateTelegramButton(title, TELEGRAM_TASK_BUTTON_MAX);
+            String taskBtn = truncateTelegramButton(
+                    taskListLabelWithStatusIcon(statusIcon, title), TELEGRAM_TASK_BUTTON_MAX);
             String statusBtn = truncateTelegramButton(
-                    statusLabelForAssigneeTaskList(item, assigneeUserId), TELEGRAM_BUTTON_MAX);
+                    statusTextOnlyForAssigneeTaskList(item, assigneeUserId), TELEGRAM_BUTTON_MAX);
             row.add(taskBtn);
             row.add(statusBtn);
         } else {
-            if (inDoneSection && myCompletedIds.contains((long) item.getID())) {
-                title = "✅ " + title;
-            }
-            String combined = title + statusBracketForAssigneeTaskList(item, assigneeUserId);
+            String combined = taskListLabelWithStatusIcon(statusIcon, title);
             row.add(truncateTelegramButton(combined, TELEGRAM_BUTTON_MAX));
         }
         return row;
@@ -707,12 +728,12 @@ public class BotActions {
 
         Map<String, Integer> taskMenuLabels = new LinkedHashMap<>();
         for (ToDoItem item : activeItems) {
-            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView, myCompletedIds, false);
+            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView);
             registerTaskMenuLabel(taskMenuLabels, row, item);
             keyboard.add(row);
         }
         for (ToDoItem item : doneItems) {
-            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView, myCompletedIds, true);
+            KeyboardRow row = buildTaskListKeyboardRow(item, assigneeUserId, managerTeamMemberView);
             registerTaskMenuLabel(taskMenuLabels, row, item);
             keyboard.add(row);
         }

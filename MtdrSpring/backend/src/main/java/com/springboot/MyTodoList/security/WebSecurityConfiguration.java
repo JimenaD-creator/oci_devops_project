@@ -9,6 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -33,8 +34,24 @@ public class WebSecurityConfiguration {
     public WebSecurityConfiguration(@Value("${app.jwt.secret}") String jwtSecret) {
         this.jwtSecret = jwtSecret;
     }
-    
+
+    /**
+     * Login must never run through JWT validation (stale Bearer tokens break OCI sign-in).
+     */
     @Bean
+    @Order(1)
+    public SecurityFilterChain loginSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/auth/login")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -42,7 +59,6 @@ public class WebSecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/projects/developer/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/projects/manager/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
@@ -54,25 +70,18 @@ public class WebSecurityConfiguration {
                 .jwt(jwt -> {}))
             .httpBasic(h -> h.disable())
             .formLogin(f -> f.disable());
-            
+
         return http.build();
     }
 
-    /**
-     * Ignore Bearer tokens on public auth/project lookup endpoints so a stale JWT
-     * does not block login (common in OCI when localStorage still has an old token).
-     */
     @Bean
     public BearerTokenResolver publicAwareBearerTokenResolver() {
         DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
-        return new BearerTokenResolver() {
-            @Override
-            public String resolve(HttpServletRequest request) {
-                if (request == null || isPublicAuthPath(request)) {
-                    return null;
-                }
-                return delegate.resolve(request);
+        return request -> {
+            if (request == null || isPublicAuthPath(request)) {
+                return null;
             }
+            return delegate.resolve(request);
         };
     }
 
@@ -82,7 +91,7 @@ public class WebSecurityConfiguration {
         if (path == null) {
             return false;
         }
-        if (HttpMethod.POST.matches(method) && path.endsWith("/api/auth/login")) {
+        if (HttpMethod.POST.matches(method) && path.contains("/api/auth/login")) {
             return true;
         }
         if (HttpMethod.GET.matches(method)
@@ -113,13 +122,12 @@ public class WebSecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Permitimos que el puerto 3000 de React hable con el 8080 de Spring
-        config.setAllowedOriginPatterns(Arrays.asList("*")); 
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedOriginPatterns(Arrays.asList("*"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setExposedHeaders(Arrays.asList("Authorization"));
-        config.setAllowCredentials(true);
-        
+        config.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

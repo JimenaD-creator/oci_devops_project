@@ -23,13 +23,31 @@ async function parseJsonResponse(response) {
 }
 
 export async function loginWithCredentials(identifier, password) {
-  const response = await fetch(`${getApiBase()}/api/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ identifier, password }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  let response;
+  try {
+    response = await fetch(`${getApiBase()}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifier, password }),
+      signal: controller.signal,
+    });
+  } catch (fetchErr) {
+    if (fetchErr?.name === 'AbortError') {
+      throw Object.assign(new Error('Login timeout'), {
+        serverMessage: 'The server took too long to respond. Try again in a moment.',
+      });
+    }
+    throw Object.assign(fetchErr instanceof Error ? fetchErr : new Error('Network error'), {
+      serverMessage: 'Could not reach the server. Check your connection and the OCI app URL.',
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const error = new Error('Invalid credentials');
