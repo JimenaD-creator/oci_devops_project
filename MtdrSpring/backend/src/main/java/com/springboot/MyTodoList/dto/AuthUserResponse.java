@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.dto;
 
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 
 public class AuthUserResponse {
     private Long id;
@@ -11,7 +12,7 @@ public class AuthUserResponse {
     public AuthUserResponse(User user) {
         this.id = user.getId();
         this.name = user.getName();
-        this.role = user.getType() != null ? user.getType().toUpperCase() : "DEVELOPER";
+        this.role = UserRoleUtil.normalizeDisplayType(user.getType());
         this.profilePicture = user.getProfilePicture();
     }
 

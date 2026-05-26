@@ -14,6 +14,7 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserSprint;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.SprintRepository;
@@ -743,7 +744,7 @@ public class GeminiService {
                         if (members != null) {
                             for (TeamMember tm : members) {
                                 User u = tm.getUser();
-                                if (u == null || !isDeveloperUser(u)) {
+                                if (u == null || !UserRoleUtil.isDeveloperUser(u)) {
                                     continue;
                                 }
                                 Long uid = u.getId();
@@ -758,7 +759,7 @@ public class GeminiService {
                             }
                         }
                         User manager = team.getManager();
-                        if (manager != null && isDeveloperUser(manager)) {
+                        if (manager != null && UserRoleUtil.isDeveloperUser(manager)) {
                             Long uid = manager.getId();
                             if (!byUser.containsKey(uid)) {
                                 Agg a = new Agg();
@@ -800,14 +801,6 @@ public class GeminiService {
             System.err.println("[GeminiService] buildTeamWorkloadJson: " + e.getMessage());
             return "[]";
         }
-    }
-
-    private static boolean isDeveloperUser(User user) {
-        String type = user != null ? user.getType() : null;
-        if (type == null) {
-            return false;
-        }
-        return type.trim().toLowerCase(Locale.ROOT).contains("developer");
     }
 
     /**

@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
+import {
+  isAdminRole,
+  getProfileRoleLabel,
+  getSidebarRoleLabel,
+  isDeveloperRole,
+  isManagerRole,
+  normalizeUserRole,
+} from '../utils/userRoleUtils';
 import { API_BASE } from '../features/sprints/constants/sprintConstants';
 import { useThemeMode } from '../ThemeContext';
 import { ProjectDataProvider } from '../contexts/ProjectDataContext';
@@ -94,8 +102,8 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return 'dashboard';
       const parsed = JSON.parse(stored);
-      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
-      return role === 'DEVELOPER' ? 'my-tasks' : 'dashboard';
+      const role = normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER');
+      return isDeveloperRole(role) ? 'my-tasks' : 'dashboard';
     } catch {
       return 'dashboard';
     }
@@ -110,8 +118,8 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return new Set(['dashboard']);
       const parsed = JSON.parse(stored);
-      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
-      return new Set([role === 'DEVELOPER' ? 'my-tasks' : 'dashboard']);
+      const role = normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER');
+      return new Set([isDeveloperRole(role) ? 'my-tasks' : 'dashboard']);
     } catch {
       return new Set(['dashboard']);
     }
@@ -135,7 +143,7 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return null;
       const parsed = JSON.parse(stored);
-      return { ...parsed, role: (parsed.role || parsed.type || 'DEVELOPER').toUpperCase() };
+      return { ...parsed, role: normalizeUserRole(parsed.role || parsed.type || 'DEVELOPER') };
     } catch { return null; }
   });
 
@@ -143,7 +151,7 @@ function App() {
   const [profilePicture, setProfilePicture] = useState(user?.profilePicture || null);
 
   useEffect(() => {
-    if (user?.role === 'MANAGER' && !selectedProjectId) {
+    if (isManagerRole(user?.role) && !selectedProjectId) {
       fetch(`${API_BASE}/api/projects/manager/${user.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((project) => {
@@ -159,7 +167,7 @@ function App() {
   }, [user, selectedProjectId]);
 
   useEffect(() => {
-    if (user?.role === 'DEVELOPER' && !selectedProjectId) {
+    if (isDeveloperRole(user?.role) && !selectedProjectId) {
       fetch(`${API_BASE}/api/projects/developer/${user.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((project) => {
@@ -264,7 +272,7 @@ function App() {
 
   if (!user) return null;
 
-  const isDeveloper = user.role === 'DEVELOPER';
+  const isDeveloper = isDeveloperRole(user.role);
 
   const DEVELOPER_NAV_ITEMS = [
     { text: 'My Tasks', id: 'my-tasks', icon: <AssignmentIcon /> },
@@ -279,7 +287,13 @@ function App() {
     { text: 'KPI Analytics',  icon: <AnalyticsIcon />,   id: 'analytics',   roles: ['ADMIN', 'MANAGER'] },
     { text: 'Team',           icon: <GroupIcon />,        id: 'team',        roles: ['ADMIN', 'MANAGER'] },
     { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN'] },
-  ].filter((item) => item.roles.includes(user.role));
+  ].filter((item) =>
+    item.roles.some((r) => {
+      if (r === 'ADMIN') return isAdminRole(user.role);
+      if (r === 'MANAGER') return isManagerRole(user.role);
+      return normalizeUserRole(user.role).toUpperCase() === r;
+    }),
+  );
 
   const topNavItems = isDeveloper
     ? DEVELOPER_NAV_ITEMS
@@ -303,7 +317,7 @@ function App() {
     navigate('/login', { replace: true });
   };
 
-  if (user.role === 'ADMIN' && !selectedProjectId) {
+  if (isAdminRole(user.role) && !selectedProjectId) {
     return (
       <Suspense fallback={<PageLoader />}>
         <ProjectSelector onSelect={handleSelectProject} />
@@ -355,7 +369,7 @@ function App() {
             <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
               {selectedProjectName || 'Software Manager Tool'}
             </Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role}</Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{getSidebarRoleLabel(user.role)}</Typography>
           </Box>
         </Box>
 
@@ -534,7 +548,7 @@ function App() {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
-              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{user.role}</Typography>
+              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role)}</Typography>
             </Box>
 
             <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>

@@ -12,13 +12,13 @@ import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.model.UserSprint;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/insights")
@@ -169,7 +169,7 @@ public class DeveloperRadarController {
         if (members != null) {
             for (TeamMember tm : members) {
                 User u = tm.getUser();
-                if (u == null || !isDeveloperUser(u)) {
+                if (u == null || !UserRoleUtil.isDeveloperUser(u)) {
                     continue;
                 }
                 Long uid = u.getId();
@@ -180,7 +180,7 @@ public class DeveloperRadarController {
             }
         }
         User manager = team.getManager();
-        if (manager != null && isDeveloperUser(manager)) {
+        if (manager != null && UserRoleUtil.isDeveloperUser(manager)) {
             Long uid = manager.getId();
             if (!byUser.containsKey(uid)) {
                 byUser.put(uid, emptyAggForUser(manager, uid));
@@ -196,14 +196,6 @@ public class DeveloperRadarController {
                 : ("User " + uid);
         a.profilePicture = u.getProfilePicture();
         return a;
-    }
-
-    private static boolean isDeveloperUser(User user) {
-        String type = user != null ? user.getType() : null;
-        if (type == null) {
-            return false;
-        }
-        return type.trim().toLowerCase(Locale.ROOT).contains("developer");
     }
 
     private static boolean isAssignmentComplete(UserTask ut) {

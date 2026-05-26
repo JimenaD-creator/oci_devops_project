@@ -5,9 +5,9 @@ import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.ProjectRepository;
 import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,21 +68,16 @@ public class ProjectController {
         Map<Integer, User> byId = new LinkedHashMap<>();
         for (TeamMember tm : members) {
             User user = tm.getUser();
-            if (user != null && isDeveloperUser(user)) {
+            if (user != null && UserRoleUtil.isDeveloperUser(user)) {
                 byId.put(user.getId().intValue(), user);
             }
         }
         User manager = project.getAssignedTeam().getManager();
-        if (manager != null && isDeveloperUser(manager)) {
+        if (manager != null && UserRoleUtil.isDeveloperUser(manager)) {
             byId.put(manager.getId().intValue(), manager);
         }
 
         return ResponseEntity.ok(List.copyOf(byId.values()));
     }
 
-    private boolean isDeveloperUser(User user) {
-        String type = user != null ? user.getType() : null;
-        if (type == null) return false;
-        return type.trim().toLowerCase(Locale.ROOT).contains("developer");
-    }
 }

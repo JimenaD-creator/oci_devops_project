@@ -6,6 +6,7 @@ import {
   fetchManagerPrimaryProject,
   loginWithCredentials,
 } from './loginApi';
+import { isAdminRole, isDeveloperRole, isManagerRole } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
   <svg
@@ -96,14 +97,14 @@ export default function Login() {
       const authData = await loginWithCredentials(email.trim(), password.trim());
       const userData = {
         ...authData.user,
-        role: (authData.user.role || 'DEVELOPER').toUpperCase(),
+        role: authData.user.role || 'DEVELOPER',
       };
 
       setAuthenticated({ token: authData.token, user: userData }, rememberMe);
 
-      if (userData.role === 'ADMIN') {
+      if (isAdminRole(userData.role)) {
         navigate('/project-selector');
-      } else if (userData.role === 'MANAGER') {
+      } else if (isManagerRole(userData.role)) {
         try {
           const project = await fetchManagerPrimaryProject(userData.id);
           if (project) {
@@ -115,7 +116,7 @@ export default function Login() {
           console.error('Could not pre-load the manager project');
         }
         navigate('/');
-      } else if (userData.role === 'DEVELOPER') {
+      } else if (isDeveloperRole(userData.role)) {
         try {
           const project = await fetchDeveloperPrimaryProject(userData.id);
           if (project) {
@@ -125,6 +126,8 @@ export default function Login() {
         } catch (e) {
           console.error('Could not pre-load the developer project');
         }
+        navigate('/');
+      } else {
         navigate('/');
       }
     } catch (err) {

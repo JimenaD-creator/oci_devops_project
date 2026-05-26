@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Autocomplete,
   MenuItem,
   Divider,
   Table,
@@ -28,6 +29,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddBoxIcon from '@mui/icons-material/AddBox';
+import { TEAM_MEMBER_TYPE_SUGGESTIONS } from '../../utils/userRoleUtils';
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
@@ -404,7 +406,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
                         <TableCell sx={{ fontWeight: 600, color: textColor }}>{user.name?.toUpperCase()}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.email || '---'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.phoneNumber || '---'}</TableCell>
-                        <TableCell sx={{ color: textSecondary }}>{user.role ? user.role.toUpperCase() : 'NO ROLE'}</TableCell>
+                        <TableCell sx={{ color: textSecondary }}>{user.role || 'NO ROLE'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.teamId || '---'}</TableCell>
                         <TableCell sx={{ color: textSecondary }}>
                           {(user.teamName || user.managedTeamName || '---').toUpperCase()}
@@ -611,18 +613,24 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
               sx={inputSx}
             />
-            <TextField
-              fullWidth
-              select
-              label="TYPE"
-              margin="dense"
+            <Autocomplete
+              freeSolo
+              options={TEAM_MEMBER_TYPE_SUGGESTIONS}
               value={formData.type || ''}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
-              sx={inputSx}
-            >
-              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
-            </TextField>
+              onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
+              onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="TYPE / ROLE"
+                  margin="dense"
+                  placeholder="e.g. Frontend Developer"
+                  helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
+                  sx={inputSx}
+                />
+              )}
+            />
 
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
@@ -704,18 +712,24 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
               onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
               sx={inputSx}
             />
-            <TextField
-              fullWidth
-              select
-              label="TYPE"
-              margin="dense"
+            <Autocomplete
+              freeSolo
+              options={TEAM_MEMBER_TYPE_SUGGESTIONS}
               value={formData.type || ''}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value.toUpperCase() })}
-              sx={inputSx}
-            >
-              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
-            </TextField>
+              onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
+              onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="TYPE / ROLE"
+                  margin="dense"
+                  placeholder="e.g. Backend Developer"
+                  helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
+                  sx={inputSx}
+                />
+              )}
+            />
 
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
