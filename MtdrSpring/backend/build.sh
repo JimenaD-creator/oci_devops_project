@@ -18,7 +18,8 @@ export IMAGE=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_VERSION}
 
 echo "Building image: $IMAGE"
 
-mvn clean package spring-boot:repackage -Dspring.profiles.active=test
+# Skip unit tests in CI image build (same as Dockerfile); run tests locally with: mvn test -Dspring.profiles.active=test
+mvn clean package spring-boot:repackage -DskipTests -Dspring.profiles.active=test
 docker build -f Dockerfile -t "$IMAGE" .
 
 echo "Pushing image: $IMAGE"

@@ -15,6 +15,7 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import com.springboot.MyTodoList.service.UserTaskService;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,9 @@ class UserTaskControllerTest {
 
     @MockBean
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @MockBean
+    private UserTaskService userTaskService;
 
     @Test
     void getAllUserTasks_returnsList() throws Exception {
