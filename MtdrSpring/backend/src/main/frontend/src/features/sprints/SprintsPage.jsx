@@ -55,6 +55,15 @@ import {
   fetchSprintsTasksAndAssignments,
 } from './sprintsPageApi';
 import { useProjectData } from '../../contexts/ProjectDataContext';
+import {
+  applyRecentUpdatesToTaskLists,
+  getRecentlyCreatedTasks,
+  getRecentlyCreatedUserTasks,
+  mergeUserTaskLists,
+  TASKS_MUTATED_EVENT,
+  getRecentlyDeletedTaskIdSet,
+  notifyTasksMutated,
+} from '../../utils/taskSyncEvents';
 
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
@@ -82,6 +91,8 @@ export default function SprintsPage({ projectId }) {
   const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
   /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
   const recentlyDeletedTaskIdsRef = useRef(new Set());
+  const projectDevelopersRef = useRef(projectDevelopers);
+  projectDevelopersRef.current = projectDevelopers;
 
   useEffect(() => {
     if (effectiveProjectIdNum != null) {
@@ -147,17 +158,32 @@ export default function SprintsPage({ projectId }) {
       try {
         const { sprintsList, tasksList, userTasksList } =
           await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
-        const deleted = recentlyDeletedTaskIdsRef.current;
-        const visibleTasks = (Array.isArray(tasksList) ? tasksList : []).filter(
+        const deleted = new Set([
+          ...recentlyDeletedTaskIdsRef.current,
+          ...getRecentlyDeletedTaskIdSet(),
+        ]);
+        const createdTasks = getRecentlyCreatedTasks();
+        const baseTasks = Array.isArray(tasksList) ? tasksList : [];
+        const mergedTasks = [...createdTasks, ...baseTasks].filter(
+          (task, index, arr) =>
+            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+        );
+        const visibleTasks = mergedTasks.filter(
           (t) => !deleted.has(taskEntityId(t)),
         );
-        const visibleUserTasks = (Array.isArray(userTasksList) ? userTasksList : []).filter(
-          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+        const visibleUserTasks = mergeUserTaskLists(
+          getRecentlyCreatedUserTasks(),
+          Array.isArray(userTasksList) ? userTasksList : [],
+        ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
+        const synced = applyRecentUpdatesToTaskLists(
+          visibleTasks,
+          visibleUserTasks,
+          projectDevelopersRef.current,
         );
-        const sorted = sortSprintsForDisplay(sprintsList, visibleTasks);
+        const sorted = sortSprintsForDisplay(sprintsList, synced.tasks);
         setSprints(sorted);
-        setTasks(visibleTasks);
-        setUserTasks(visibleUserTasks);
+        setTasks(synced.tasks);
+        setUserTasks(synced.userTasks);
         setSelectedSprint((prev) => {
           if (prev) {
             const stillThere = sorted.find((s) => s.id === prev.id);
@@ -175,6 +201,63 @@ export default function SprintsPage({ projectId }) {
   useEffect(() => {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
+
+  useEffect(() => {
+    if (!selectedTaskForDialog?.id) return;
+    const fresh = tasks.find((t) => Number(t.id) === Number(selectedTaskForDialog.id));
+    if (fresh) setSelectedTaskForDialog(fresh);
+  }, [tasks, selectedTaskForDialog?.id]);
+
+  useEffect(() => {
+    const onTasksMutated = (event) => {
+      if (event?.detail?.source === 'sprints-page') return;
+      if (event?.detail?.type === 'task-created' && event?.detail?.task) {
+        const created = event.detail.task;
+        setTasks((prev) => {
+          const exists = prev.some((t) => Number(t.id) === Number(created?.id));
+          if (exists) return prev;
+          const next = [created, ...prev];
+          setSprints((sp) => sortSprintsForDisplay(sp, next));
+          return next;
+        });
+        const rows = Array.isArray(event.detail.userTasks) ? event.detail.userTasks : [];
+        if (rows.length > 0) {
+          setUserTasks((prev) => mergeUserTaskLists(rows, prev));
+        }
+      }
+      if (event?.detail?.type === 'task-updated' && event?.detail?.task) {
+        const updated = event.detail.task;
+        const meta = event.detail.meta;
+        setTasks((prev) => {
+          const next = mergeUpdatedTask(prev, updated);
+          setSprints((sp) => sortSprintsForDisplay(sp, next));
+          return next;
+        });
+        setUserTasks((prev) =>
+          patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
+        );
+        setSelectedTaskForDialog((prev) =>
+          prev && Number(prev.id) === Number(updated.id) ? { ...prev, ...updated } : prev,
+        );
+      }
+      if (event?.detail?.type === 'task-deleted' && event?.detail?.taskId != null) {
+        const tid = String(event.detail.taskId);
+        recentlyDeletedTaskIdsRef.current.add(tid);
+        setTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
+        setUserTasks((prev) =>
+          prev.filter((ut) => {
+            const utTid = userTaskRowTaskId(ut);
+            return !Number.isFinite(utTid) || String(utTid) !== tid;
+          }),
+        );
+      }
+      loadData({ silent: true }).catch((e) => {
+        console.error('SprintsPage sync refresh failed:', e);
+      });
+    };
+    window.addEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
+    return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
+  }, [loadData]);
 
   const handleTaskDeleted = useCallback(
     async (taskId) => {
@@ -194,6 +277,7 @@ export default function SprintsPage({ projectId }) {
         }),
       );
       setSelectedTaskForDialog(null);
+      notifyTasksMutated({ source: 'sprints-page', type: 'task-deleted', taskId });
       try {
         await invalidateAndRefresh();
         await loadData({ silent: true, forceFresh: true });
@@ -212,11 +296,12 @@ export default function SprintsPage({ projectId }) {
         setSprints((sp) => sortSprintsForDisplay(sp, next));
         return next;
       });
+      let optimisticRows = [];
       if (createdTask?.id) {
         const byId = new Map(
           (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
         );
-        const optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
+        optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
           const matched = byId.get(Number(uid));
           return {
             task: { id: Number(createdTask.id) },
@@ -228,10 +313,17 @@ export default function SprintsPage({ projectId }) {
           };
         });
         if (optimisticRows.length > 0) {
-          setUserTasks((prev) => [...optimisticRows, ...prev]);
+          setUserTasks((prev) => mergeUserTaskLists(optimisticRows, prev));
         }
       }
       setNewTaskDialogOpen(false);
+      notifyTasksMutated({
+        source: 'sprints-page',
+        type: 'task-created',
+        taskId: createdTask?.id,
+        task: createdTask,
+        userTasks: optimisticRows,
+      });
       try {
         await invalidateAndRefresh();
         await loadData({ silent: true, forceFresh: true });
@@ -807,6 +899,13 @@ export default function SprintsPage({ projectId }) {
             patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
           );
           setSelectedTaskForDialog(null);
+          notifyTasksMutated({
+            source: 'sprints-page',
+            type: 'task-updated',
+            taskId: updated?.id,
+            task: updated,
+            meta,
+          });
           try {
             await invalidateAndRefresh();
             await loadData({ silent: true, forceFresh: true });

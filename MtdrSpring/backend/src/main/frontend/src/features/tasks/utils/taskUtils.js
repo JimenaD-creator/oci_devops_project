@@ -199,3 +199,51 @@ export function patchUserTasksAfterTaskSave(prevUserTasks, updated, meta, projec
 
   return prevUserTasks;
 }
+
+/** Apply task + assignee patch from TaskDetailDialog save or cross-page sync event. */
+export function applyTaskUpdateFromMutation(
+  prevTasks,
+  prevUserTasks,
+  updated,
+  meta,
+  projectDevelopers = [],
+) {
+  if (!updated) return { tasks: prevTasks, userTasks: prevUserTasks };
+  return {
+    tasks: mergeUpdatedTask(prevTasks, updated),
+    userTasks: patchUserTasksAfterTaskSave(prevUserTasks, updated, meta, projectDevelopers),
+  };
+}
+
+/** Change detector so TaskDetailDialog reloads when parent task fields change. */
+export function taskDetailSyncSignature(task) {
+  if (!task?.id) return '';
+  const sprintId = task.assignedSprint?.id ?? task.assignedSprint?.ID ?? '';
+  return [
+    task.id,
+    task.title,
+    task.status,
+    task.priority,
+    task.classification,
+    task.dueDate,
+    task.startDate,
+    task.assignedHours,
+    sprintId,
+    String(task.description ?? '').length,
+  ].join('|');
+}
+
+/** Change detector for assignee rows of one task (cross-page sync). */
+export function userTasksAssigneeSignature(userTasks, taskId) {
+  if (taskId == null) return '';
+  const tid = Number(taskId);
+  if (!Number.isFinite(tid)) return '';
+  return (Array.isArray(userTasks) ? userTasks : [])
+    .filter((ut) => userTaskRowTaskId(ut) === tid)
+    .map((ut) => {
+      const uid = ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId;
+      return `${uid}:${userTaskRowStatus(ut)}`;
+    })
+    .sort()
+    .join('|');
+}
