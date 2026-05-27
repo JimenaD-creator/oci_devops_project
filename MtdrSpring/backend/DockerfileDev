@@ -1,19 +1,5 @@
 FROM openjdk:22-jdk
-#COPY pom.xml /tmp/
-#COPY src /tmp/src/
-RUN mkdir -p /mtdrworkshop/creds
-COPY wallet/ /mtdrworkshop/creds
 WORKDIR /tmp/
 EXPOSE 8080
 COPY target/MyTodoList-0.0.1-SNAPSHOT.jar MyTodoList.jar
-
-ENV ui_username="admin"
-ENV ui_password="none0001"
-
-# Spring Boot binds these to spring.datasource.* (db_url / db_user are ignored).
-ENV SPRING_DATASOURCE_URL="jdbc:oracle:thin:@reacttodo2p9ml_tp?TNS_ADMIN=/mtdrworkshop/creds"
-ENV SPRING_DATASOURCE_USERNAME="MANAGER"
-ENV SPRING_DATASOURCE_PASSWORD="MxTodo#2026Pass9"
-ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME="oracle.jdbc.OracleDriver"
-
-ENTRYPOINT ["java","-jar","MyTodoList.jar"]
+ENTRYPOINT ["java", "-jar", "MyTodoList.jar"]

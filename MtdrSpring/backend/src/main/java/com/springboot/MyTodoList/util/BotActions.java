@@ -156,12 +156,22 @@ public class BotActions {
         return null;
     }
 
+    private static final String DEVELOPER_CANNOT_ADD_TASK_MSG =
+            "➕ Only managers can create tasks.\n\nAsk your manager to assign a new task in the web app.";
+
+    private void sendDeveloperCannotAddTaskMessage() {
+        BotHelper.sendMessageToTelegram(chatId, DEVELOPER_CANNOT_ADD_TASK_MSG, telegramClient, buildMainMenuKeyboardMarkup());
+        exit = true;
+    }
+
     private ReplyKeyboardMarkup buildMainMenuKeyboardMarkup() {
         Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
         boolean isManager = signedInId != null && isUserManager(signedInId);
         List<KeyboardRow> rows = new ArrayList<>();
         rows.add(new KeyboardRow(BotLabels.LIST_ALL_ITEMS.getLabel()));
-        rows.add(new KeyboardRow(BotLabels.ADD_NEW_ITEM.getLabel()));
+        if (isManager) {
+            rows.add(new KeyboardRow(BotLabels.ADD_NEW_ITEM.getLabel()));
+        }
         if (!isManager) {
             rows.add(new KeyboardRow(BotLabels.MY_PERFORMANCE.getLabel()));
         }
@@ -420,7 +430,12 @@ public class BotActions {
             return;
         }
         List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel(), BotLabels.ADD_NEW_ITEM.getLabel()));
+        boolean signedInIsManager = signedInId != null && isUserManager(signedInId);
+        if (signedInIsManager) {
+            keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel(), BotLabels.ADD_NEW_ITEM.getLabel()));
+        } else {
+            keyboard.add(new KeyboardRow(BotLabels.SHOW_MAIN_SCREEN.getLabel()));
+        }
         keyboard.add(new KeyboardRow(BotLabels.LOG_OUT.getLabel()));
         for (Sprint sprint : sprintsToShow) {
             KeyboardRow currentRow = new KeyboardRow();
@@ -1084,17 +1099,14 @@ public class BotActions {
             }
         } else if (managerFullSprint) {
             message = "📋 *Sprint " + sprintId + " — all team tasks (manager)*\n\n"
-                    + "_Left: task · Right: team status (reference only)._\n"
                     + "Tap the *task name* for a read-only summary.";
         } else if (managerTeamMemberView) {
             String who = resolveUserWelcomeName(assigneeUserId);
             String display = who != null ? who : ("User " + assigneeUserId);
             message = "📋 *Sprint " + sprintId + " — " + escapeMarkdown(display) + "'s tasks*\n\n"
-                    + "_Left: task · Right: their status (reference only)._\n"
                     + "Tap the *task name* for a read-only summary.";
         } else {
             message = "📋 *Your tasks (Sprint " + sprintId + "):*\n\n"
-                    + "_Left: task name · Right: your current status._\n"
                     + "Tap the *task name* to open details and change status there "
                     + "(use the status buttons on the next screen, not the list).";
         }
@@ -1253,8 +1265,7 @@ public class BotActions {
                         + "*Description:* %s\n\n"
                         + "*Your status:* ✅ Done\n"
                         + "*Hours you logged:* %d\n\n"
-                        + "*Team task status:* %s\n"
-                        + "_(Others may still be working on this task.)_\n\n"
+                        + "*Team task status:* %s\n\n"
                         + "*Due date:* %s",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
@@ -1849,6 +1860,12 @@ public class BotActions {
     public void fnElse() {
         if (exit) return;
         if (stateManager.isWaitingForNewTaskDescription(chatId)) {
+            Long signedInForAdd = stateManager.getTelegramSignedInUserId(chatId);
+            if (signedInForAdd != null && !isUserManager(signedInForAdd)) {
+                stateManager.clearPendingState(chatId);
+                sendDeveloperCannotAddTaskMessage();
+                return;
+            }
             String desc = requestText != null ? requestText.trim() : "";
             if (desc.isEmpty()) {
                 BotHelper.sendMessageToTelegram(chatId, "Please send a short description for your new task.", telegramClient, null);
@@ -1972,9 +1989,7 @@ public class BotActions {
             sendSelectSprintForNewTaskKeyboard();
             return;
         }
-        stateManager.setWaitingForNewTaskDescription(chatId);
-        BotHelper.sendMessageToTelegram(chatId, BotMessages.TYPE_NEW_TODO_ITEM.getMessage(), telegramClient, null);
-        exit = true;
+        sendDeveloperCannotAddTaskMessage();
     }
 
     public void fnLLM() {

@@ -315,7 +315,7 @@ public class BotStateManager {
         return true;
     }
 
-    /** After "Add New Item" or /additem: next free-text message becomes the new task description. */
+    /** After manager chooses "Add New Item" or /additem: next free-text message becomes the new task description. */
     public void setWaitingForNewTaskDescription(Long chatId) {
         setWaitingForNewTaskDescription(chatId, null, null);
     }

@@ -44,7 +44,7 @@ import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.service.UserTaskService;
 
 // Unit tests for BotActions.
-// 1. createTask — new item from the bot menu and follow-up message.
+// 1. developerCannotAddTaskFromMenu — developers are blocked from the add-task flow.
 // 2. viewCompletedTasksInSprint — manager: completed tasks for the sprint appear on the list; sprint chooser after Back.
 // 3. viewCompletedTasksForUserInSprint — developer: completed tasks for that user in the sprint.
 @ExtendWith(MockitoExtension.class)
@@ -95,27 +95,26 @@ class BotActionsTest {
         return actions;
     }
 
-    // New item from the bot menu: after Add new item, the bot accepts text as the task and clears the wait state.
+    // Developers cannot add tasks from the bot; only managers use the add-task flow.
     @Test
-    void createTask() throws Exception {
+    void developerCannotAddTaskFromMenu() throws Exception {
         long chatId = 100L;
-        stateManager.setTelegramSignedInUser(chatId, 1L);
+        Long devId = 1L;
+        stateManager.setTelegramSignedInUser(chatId, devId);
+
+        User dev = new User();
+        dev.setId(devId);
+        dev.setType("DEVELOPER");
+        when(userService.getUserById(devId)).thenReturn(Optional.of(dev));
 
         BotActions firstMessage = newBotActions();
         firstMessage.setChatId(chatId);
         firstMessage.setRequestText(BotLabels.ADD_NEW_ITEM.getLabel());
         firstMessage.fnAddItem();
 
-        assertTrue(stateManager.isWaitingForNewTaskDescription(chatId));
-
-        BotActions secondMessage = newBotActions();
-        secondMessage.setChatId(chatId);
-        secondMessage.setRequestText("Buy milk");
-        secondMessage.fnElse();
-
-        verify(todoService).addToDoItem(any(ToDoItem.class));
-        verify(telegramClient, atLeast(2)).execute(any(SendMessage.class));
         assertFalse(stateManager.isWaitingForNewTaskDescription(chatId));
+        verify(todoService, never()).addToDoItem(any(ToDoItem.class));
+        verify(telegramClient, atLeast(1)).execute(any(SendMessage.class));
     }
 
     @Test
