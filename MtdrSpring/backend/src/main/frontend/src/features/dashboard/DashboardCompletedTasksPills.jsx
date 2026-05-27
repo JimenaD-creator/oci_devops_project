@@ -1,93 +1,56 @@
 import React from 'react';
-import { Box, Chip } from '@mui/material';
+import { Chip } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 
-/** When a sprint has no accent color yet, cycle these (aligned with chart sprint colors). */
-const COMPARE_FALLBACK_ACCENTS = ['#1565C0', '#FB8C00', '#26A69A', '#8E24AA', '#5E35B1', '#0277BD'];
-
 /**
- * Task-table DONE count per sprint (`totalCompleted`), not a sum of per-dev USER_TASK rows.
+ * Completed vs assigned assignments for the current sprint selection.
  *
- * @param {{ accent?: string, count?: number, compareBySprint?: { id: number, shortLabel: string, completed: number, accentColor?: string }[], pillTestId?: string }} props
+ * @param {{ accent?: string, completed?: number, assigned?: number, count?: number, compareBySprint?: { id: number, shortLabel: string, completed: number, assigned?: number, accentColor?: string }[], pillTestId?: string }} props
  */
 export default function DashboardCompletedTasksPills({
   accent,
+  completed,
+  assigned = 0,
   count = 0,
   compareBySprint,
   pillTestId = 'dashboard-tasks-completed-pill',
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const defaultAccent = accent ?? '#3949AB';
-  const nCompare = compareBySprint?.length ?? 0;
-  if (compareBySprint?.length) {
-    return (
-      <Box
-        sx={{
-          display: 'grid',
-          width: '100%',
-          boxSizing: 'border-box',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-          gap: { xs: 0.75, sm: 1 },
-        }}
-      >
-        {compareBySprint.map((b, idx) => {
-          const chipAccent =
-            b.accentColor ||
-            COMPARE_FALLBACK_ACCENTS[idx % COMPARE_FALLBACK_ACCENTS.length] ||
-            defaultAccent;
-          return (
-            <Box key={b.id} sx={{ minWidth: 0 }}>
-              <Chip
-                data-testid={pillTestId}
-                data-sprint-id={String(b.id)}
-                size="small"
-                label={`${b.shortLabel}: ${b.completed} tasks completed`}
-                sx={{
-                  width: '100%',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize:
-                    nCompare > 4
-                      ? { xs: '0.6875rem', sm: '0.72rem' }
-                      : { xs: '0.75rem', sm: '0.8rem' },
-                  minHeight: nCompare > 4 ? { xs: 30, sm: 32 } : { xs: 32, sm: 34 },
-                  height: 'auto',
-                  py: 0.5,
-                  '& .MuiChip-label': {
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    textAlign: 'center',
-                    lineHeight: 1.25,
-                    px: 1,
-                  },
-                  borderColor: chipAccent,
-                  color: chipAccent,
-                  bgcolor: alpha(chipAccent, isDark ? 0.15 : 0.08),
-                }}
-                variant="outlined"
-              />
-            </Box>
-          );
-        })}
-      </Box>
-    );
-  }
+  const resolvedCompleted =
+    completed != null
+      ? Math.max(0, Math.round(Number(completed) || 0))
+      : compareBySprint?.length > 0
+        ? compareBySprint.reduce((sum, b) => sum + (Number(b.completed) || 0), 0)
+        : Math.max(0, Math.round(Number(count) || 0));
+  const resolvedAssigned =
+    assigned > 0
+      ? Math.max(0, Math.round(Number(assigned) || 0))
+      : compareBySprint?.length > 0
+        ? compareBySprint.reduce((sum, b) => sum + (Number(b.assigned) || 0), 0)
+        : 0;
+
+  const chipSx = {
+    fontWeight: 700,
+    fontSize: '0.8125rem',
+    height: 30,
+    borderColor: defaultAccent,
+    color: defaultAccent,
+    bgcolor: alpha(defaultAccent, isDark ? 0.15 : 0.08),
+  };
+
   return (
     <Chip
       data-testid={pillTestId}
       size="small"
-      label={`${count} tasks completed`}
-      sx={{
-        fontWeight: 700,
-        fontSize: '0.8125rem',
-        height: 30,
-        borderColor: defaultAccent,
-        color: defaultAccent,
-        bgcolor: alpha(defaultAccent, isDark ? 0.15 : 0.08),
-      }}
+      label={
+        resolvedAssigned > 0
+          ? `${resolvedCompleted} / ${resolvedAssigned} completed`
+          : `${resolvedCompleted} completed`
+      }
+      sx={chipSx}
       variant="outlined"
     />
   );

@@ -792,11 +792,13 @@ export function buildBlockedReportsForAiSprint(sp) {
 
 export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = []) {
   let totalTasks = 0;
+  let totalCompleted = 0;
   let totalHours = 0;
   const devMap = new Map();
 
   (selectedSprints || []).forEach((sp) => {
     totalTasks += Number(sp.totalTasks) || 0;
+    totalCompleted += Number(sp.totalCompleted) || 0;
     totalHours += Number(sp.totalHours) || 0;
     (sp.developers || []).forEach((d) => {
       const cur = devMap.get(d.name) || {
@@ -840,9 +842,13 @@ export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = [
     0,
   );
   const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
+  /** Unique tasks in the selection (not per-assignee sums — one task with 2 devs counts once). */
+  const totalAssigned = totalTasks;
 
   return {
     totalTasks,
+    totalAssigned,
+    totalCompleted,
     totalHours,
     uniqueDevCount,
     avgTasksPerDev,

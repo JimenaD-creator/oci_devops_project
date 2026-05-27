@@ -8,8 +8,7 @@ import { renderWithTheme } from '../../test-utils';
 import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 
 describe('DashboardCompletedTasksPills', () => {
-  describe('compare mode label list', () => {
-    // Snapshot testing: stable list of visible pill labels in compare-by-sprint mode.
+  describe('compare mode aggregated total', () => {
     test('matches snapshot', () => {
       renderWithTheme(
         <DashboardCompletedTasksPills
@@ -21,10 +20,14 @@ describe('DashboardCompletedTasksPills', () => {
           ]}
         />,
       );
-      const labels = screen
-        .getAllByTestId('dashboard-header-tasks-completed')
-        .map((el) => el.textContent);
-      expect(labels).toMatchSnapshot();
+      expect(screen.getByTestId('dashboard-header-tasks-completed').textContent).toMatchSnapshot();
+    });
+
+    test('shows completed vs assigned', () => {
+      renderWithTheme(
+        <DashboardCompletedTasksPills completed={7} assigned={12} />
+      );
+      expect(screen.getByText('7 / 12 completed')).toBeTruthy();
     });
   });
 });

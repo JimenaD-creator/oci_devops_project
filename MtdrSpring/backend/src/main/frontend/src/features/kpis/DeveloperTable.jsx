@@ -195,22 +195,22 @@ const getSharedDeveloperTableCSS = (isDark) => `
 `;
 
 const getSprintMetricsDashboardTextCSS = (isDark) => `
-  .dev-productivity-dashboard .table-title         { font-size: 1.2rem; }
-  .dev-productivity-dashboard .table-title-icon-wrap { width: 40px; height: 40px; }
-  .dev-productivity-dashboard th                   { font-size: 0.875rem; padding: 14px 16px; }
-  .dev-productivity-dashboard th.th-sprint-compare-group { font-size: 0.9375rem; }
-  .dev-productivity-dashboard .sprint-range-caption { font-size: 0.75rem; margin-top: 5px; }
-  .dev-productivity-dashboard td                   { font-size: 1rem; padding: 14px 16px; }
-  .dev-productivity-dashboard .dev-name-text       { font-size: 1rem; }
-  .dev-productivity-dashboard .badge-base          { font-size: 0.8125rem; padding: 3px 9px; }
-  .dev-productivity-dashboard .workload-text       { font-size: 0.875rem; }
-  .dev-productivity-dashboard .workload-track      { width: 104px; height: 9px; }
-  .dev-productivity-dashboard .summary-cell        { font-size: 0.9375rem; }
+  .dev-productivity-dashboard .table-title         { font-size: 1.05rem; }
+  .dev-productivity-dashboard .table-title-icon-wrap { width: 34px; height: 34px; }
+  .dev-productivity-dashboard th                   { font-size: 0.8125rem; padding: 10px 12px; }
+  .dev-productivity-dashboard th.th-sprint-compare-group { font-size: 0.875rem; }
+  .dev-productivity-dashboard .sprint-range-caption { font-size: 0.7rem; margin-top: 4px; }
+  .dev-productivity-dashboard td                   { font-size: 0.875rem; padding: 10px 12px; }
+  .dev-productivity-dashboard .dev-name-text       { font-size: 0.875rem; }
+  .dev-productivity-dashboard .badge-base          { font-size: 0.75rem; padding: 2px 7px; }
+  .dev-productivity-dashboard .workload-text       { font-size: 0.8125rem; }
+  .dev-productivity-dashboard .workload-track      { width: 88px; height: 7px; }
+  .dev-productivity-dashboard .summary-cell        { font-size: 0.875rem; }
   .dev-productivity-dashboard .search-wrapper input.search-input[type="text"] {
-    font-size: 0.875rem; padding: 9px 12px 9px 36px;
+    font-size: 0.8125rem; padding: 7px 10px 7px 32px;
   }
-  .dev-productivity-dashboard .avatar-circle       { width: 32px; height: 32px; }
-  .dev-productivity-dashboard .avatar-circle span  { font-size: 11px !important; }
+  .dev-productivity-dashboard .avatar-circle       { width: 28px; height: 28px; }
+  .dev-productivity-dashboard .avatar-circle span  { font-size: 10px !important; }
   .dev-productivity-dashboard tr.row-highlight-you td {
     background: ${isDark ? 'rgba(199, 70, 52, 0.12)' : 'rgba(199, 70, 52, 0.06)'};
   }

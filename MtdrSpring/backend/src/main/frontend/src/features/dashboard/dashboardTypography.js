@@ -8,7 +8,7 @@ export const FONT = 'inherit';
 
 /** Section headings (e.g. Project status, Developer performance) */
 export const SECTION_TITLE_SX = {
-  fontSize: '1.125rem',
+  fontSize: '1rem',
   fontWeight: 800,
   letterSpacing: '-0.02em',
   lineHeight: 1.35,
@@ -17,9 +17,9 @@ export const SECTION_TITLE_SX = {
 
 /** One line under a section title */
 export const SECTION_DESC_SX = {
-  fontSize: '0.875rem',
+  fontSize: '0.8125rem',
   fontWeight: 600,
-  lineHeight: 1.55,
+  lineHeight: 1.5,
   fontFamily: FONT,
 };
 
@@ -46,7 +46,7 @@ export const METRIC_LABEL_SX = {
 
 /** Metric card: main value */
 export const METRIC_VALUE_SX = {
-  fontSize: { xs: '1.75rem', sm: '1.875rem' },
+  fontSize: { xs: '1.5rem', sm: '1.65rem' },
   fontWeight: 800,
   lineHeight: 1.15,
   fontFamily: FONT,
@@ -62,7 +62,7 @@ export const METRIC_HELPER_SX = {
 
 /** Chart block title (inside ChartShell) */
 export const CHART_TITLE_SX = {
-  fontSize: '1.125rem',
+  fontSize: '1rem',
   fontWeight: 800,
   letterSpacing: '-0.02em',
   lineHeight: 1.35,
@@ -71,21 +71,21 @@ export const CHART_TITLE_SX = {
 
 /** Chart block description */
 export const CHART_DESC_SX = {
-  fontSize: '0.875rem',
+  fontSize: '0.8125rem',
   fontWeight: 500,
-  lineHeight: 1.55,
+  lineHeight: 1.5,
   fontFamily: FONT,
 };
 
 /** Recharts axis tick (single size; SVG text may not apply webfont uniformly) */
-export const CHART_TICK = (isDark) => ({ 
-  fontSize: 15, 
-  fill: isDark ? '#9A9A9A' : '#1A1A1A', 
-  fontWeight: 600 
+export const CHART_TICK = (isDark) => ({
+  fontSize: 13,
+  fill: isDark ? '#9A9A9A' : '#1A1A1A',
+  fontWeight: 600,
 });
 
 /** Axis titles (Hours, Tasks, etc.) — slightly larger than ticks */
-export const CHART_AXIS_LABEL = { fontSize: 16, fontWeight: 700 };
+export const CHART_AXIS_LABEL = { fontSize: 14, fontWeight: 700 };
 
 export const CHART_TOOLTIP_SX = (isDark) => ({
   borderRadius: 8,
@@ -113,12 +113,12 @@ export const RECHARTS_BAR_TOOLTIP_PROPS = {
 };
 
 /** Recharts default Legend (wrapperStyle) */
-export const CHART_LEGEND_STYLE = { fontSize: 17, fontWeight: 600, paddingTop: 8 };
+export const CHART_LEGEND_STYLE = { fontSize: 12, fontWeight: 600, paddingTop: 5 };
 
 /** Custom legend rows: label next to color swatch (MUI Typography) */
 export const CHART_LEGEND_ITEM_SX = {
-  fontSize: '1rem',
+  fontSize: '0.75rem',
   fontWeight: 600,
-  lineHeight: 1.45,
+  lineHeight: 1.35,
   fontFamily: FONT,
 };

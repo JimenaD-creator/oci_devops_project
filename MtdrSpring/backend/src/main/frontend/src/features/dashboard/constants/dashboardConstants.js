@@ -1,6 +1,10 @@
 /** Max width for the overall dashboard content column. */
 export const DASHBOARD_CONTENT_MAX_WIDTH = 1200;
 
+/** Vertical rhythm between major dashboard blocks (sections, charts). */
+export const DASHBOARD_SECTION_MB = 2;
+export const DASHBOARD_BLOCK_GAP = 2;
+
 /** Primary accent: progress bars, hero KPI, charts (no red — use indigo/blue family). */
 export const DASHBOARD_PRIMARY_ACCENT = '#1565C0';
 

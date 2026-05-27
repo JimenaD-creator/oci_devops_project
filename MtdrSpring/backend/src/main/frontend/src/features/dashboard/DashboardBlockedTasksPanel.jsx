@@ -57,10 +57,10 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
   if (cards.length === 0) return null;
 
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: 2 }}>
       <Typography
         component="h2"
-        sx={{ fontWeight: 800, fontSize: '1.15rem', color: 'text.primary', mb: 1.5 }}
+        sx={{ fontWeight: 800, fontSize: '1rem', color: 'text.primary', mb: 1 }}
       >
         Blocked tasks
       </Typography>
