@@ -1,8 +1,11 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.config.BotProps;
+import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.GeminiService;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
@@ -37,6 +40,9 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
     private UserTaskService userTaskService;
     private UserService userService;
     private GeminiService geminiService;
+    private ProjectLookupService projectLookupService;
+    private TeamRepository teamRepository;
+    private TeamMembersRepository teamMembersRepository;
 
     @Override
     public String getBotToken() {
@@ -52,7 +58,10 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
             TelegramUserMappingService telegramUserMappingService,
             UserTaskService userTaskService,
             UserService userService,
-            GeminiService geminiService
+            GeminiService geminiService,
+            ProjectLookupService projectLookupService,
+            TeamRepository teamRepository,
+            TeamMembersRepository teamMembersRepository
     ) {
         this.botProps = bp;
         this.toDoItemService = tsvc;
@@ -63,6 +72,9 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
         this.userTaskService = userTaskService;
         this.userService = userService;
         this.geminiService = geminiService;
+        this.projectLookupService = projectLookupService;
+        this.teamRepository = teamRepository;
+        this.teamMembersRepository = teamMembersRepository;
         this.telegramClient = new OkHttpTelegramClient(getBotToken());
     }
 
@@ -97,6 +109,9 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
             );
             actions.setRequestText(messageTextFromTelegram);
             actions.setChatId(chatId);
+            actions.setProjectLookupService(projectLookupService);
+            actions.setTeamRepository(teamRepository);
+            actions.setTeamMembersRepository(teamMembersRepository);
 
             if (actions.getTodoService() == null) {
                 logger.info("todosvc error");
@@ -109,6 +124,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
             actions.fnMyPerformance();
             actions.fnSelectMyPerformanceScope();
             actions.fnListAll();
+            actions.fnSelectSprintForNewTask();
+            actions.fnSelectAssigneeForNewTask();
             actions.fnSelectSprint();
             actions.fnSelectUserInSprint();
             actions.fnVerifyCredentialsPhoneEmail();

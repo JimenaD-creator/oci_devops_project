@@ -8,6 +8,7 @@ import com.springboot.MyTodoList.model.UserTaskId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -78,10 +79,20 @@ public class UserTaskService {
     public static final class UserSprintTaskListIndex {
         public final Set<Long> assignedTaskIds;
         public final Set<Long> myCompletedAssignmentTaskIds;
+        /** USER_TASK status per task id (same query as the index; avoids N+1 in the bot list). */
+        public final Map<Long, String> assignmentStatusByTaskId;
 
         public UserSprintTaskListIndex(Set<Long> assignedTaskIds, Set<Long> myCompletedAssignmentTaskIds) {
+            this(assignedTaskIds, myCompletedAssignmentTaskIds, Map.of());
+        }
+
+        public UserSprintTaskListIndex(
+                Set<Long> assignedTaskIds,
+                Set<Long> myCompletedAssignmentTaskIds,
+                Map<Long, String> assignmentStatusByTaskId) {
             this.assignedTaskIds = assignedTaskIds;
             this.myCompletedAssignmentTaskIds = myCompletedAssignmentTaskIds;
+            this.assignmentStatusByTaskId = assignmentStatusByTaskId;
         }
     }
 
@@ -93,14 +104,21 @@ public class UserTaskService {
         List<UserTask> rows = userTaskRepository.findByUser_IdAndTask_AssignedSprint_Id(userId, sprintId);
         Set<Long> assigned = new HashSet<>();
         Set<Long> completed = new HashSet<>();
+        Map<Long, String> statusByTask = new HashMap<>();
         for (UserTask ut : rows) {
             Long tid = ut.getId().getTaskId();
             assigned.add(tid);
+            if (ut.getStatus() != null) {
+                statusByTask.put(tid, ut.getStatus());
+            }
             if (assignmentStatusIsCompleted(ut.getStatus())) {
                 completed.add(tid);
             }
         }
-        return new UserSprintTaskListIndex(Collections.unmodifiableSet(assigned), Collections.unmodifiableSet(completed));
+        return new UserSprintTaskListIndex(
+                Collections.unmodifiableSet(assigned),
+                Collections.unmodifiableSet(completed),
+                Collections.unmodifiableMap(statusByTask));
     }
 
     @Transactional(readOnly = true)
@@ -226,6 +244,28 @@ public class UserTaskService {
             return false;
         }
         return assignmentStatusIsCompleted(opt.get().getStatus());
+    }
+
+    /** Assign a team member to a task (e.g. manager creating a task via Telegram). */
+    @Transactional
+    public void assignUserToTaskAsTodo(Long userId, long taskId) {
+        if (userId == null) {
+            return;
+        }
+        UserTaskId id = new UserTaskId(userId, taskId);
+        if (userTaskRepository.findById(id).isPresent()) {
+            return;
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        UserTask ut = new UserTask(user, task);
+        ut.setStatus("TODO");
+        ut.setWorkedHours(0L);
+        ut.setIsBlocked(false);
+        userTaskRepository.save(ut);
+        taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
     }
 
     @Transactional

@@ -12,6 +12,8 @@ public enum BotLabels {
 	DELETE("DELETE"),
 	MY_TODO_LIST("MY TODO LIST"),
 	MY_PERFORMANCE("📊 My Performance"),
+	SKIP_ASSIGNEE("⏭️ No assignee"),
+	CANCEL_ADD("❌ Cancel add"),
 	DASH("-");
 	
 

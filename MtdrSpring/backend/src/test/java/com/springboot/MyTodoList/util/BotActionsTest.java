@@ -28,9 +28,15 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.Sprint;
+import com.springboot.MyTodoList.model.Team;
+import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.repository.TeamRepository;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
 import com.springboot.MyTodoList.service.ToDoItemService;
@@ -56,6 +62,12 @@ class BotActionsTest {
     private SprintService sprintService;
     @Mock
     private UserService userService;
+    @Mock
+    private ProjectLookupService projectLookupService;
+    @Mock
+    private TeamRepository teamRepository;
+    @Mock
+    private TeamMembersRepository teamMembersRepository;
 
     private BotStateManager stateManager;
     private BotActions botActions;
@@ -68,7 +80,7 @@ class BotActionsTest {
 
     // BotActions wired to the mocks above.
     private BotActions newBotActions() {
-        return new BotActions(
+        BotActions actions = new BotActions(
                 telegramClient,
                 todoService,
                 null,
@@ -77,6 +89,10 @@ class BotActionsTest {
                 userTaskService,
                 sprintService,
                 userService);
+        actions.setProjectLookupService(projectLookupService);
+        actions.setTeamRepository(teamRepository);
+        actions.setTeamMembersRepository(teamMembersRepository);
+        return actions;
     }
 
     // New item from the bot menu: after Add new item, the bot accepts text as the task and clears the wait state.
@@ -99,6 +115,80 @@ class BotActionsTest {
 
         verify(todoService).addToDoItem(any(ToDoItem.class));
         verify(telegramClient, atLeast(2)).execute(any(SendMessage.class));
+        assertFalse(stateManager.isWaitingForNewTaskDescription(chatId));
+    }
+
+    @Test
+    void createTaskManagerPicksSprintAssigneeAndDescription() throws Exception {
+        long chatId = 101L;
+        Long managerId = 10L;
+        Long projectId = 1L;
+        Long sprintId = 5L;
+        Long devId = 20L;
+
+        stateManager.setTelegramSignedInUser(chatId, managerId);
+
+        User manager = new User();
+        manager.setId(managerId);
+        manager.setType("MANAGER");
+        when(userService.getUserById(managerId)).thenReturn(Optional.of(manager));
+
+        Project project = new Project();
+        project.setId(projectId);
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(project));
+
+        Sprint sprint = new Sprint();
+        sprint.setId(sprintId);
+        when(sprintService.findByProjectIdOrderByStartDateAsc(projectId)).thenReturn(List.of(sprint));
+        when(sprintService.findById(sprintId)).thenReturn(sprint);
+
+        Team team = new Team();
+        team.setId(99L);
+        when(teamRepository.findByManagerId(managerId)).thenReturn(Optional.of(team));
+
+        User dev = new User();
+        dev.setId(devId);
+        dev.setName("Alice Dev");
+        TeamMember tm = new TeamMember();
+        tm.setUser(dev);
+        when(teamMembersRepository.findByTeam_Id(99L)).thenReturn(List.of(tm));
+        when(userService.getUserById(devId)).thenReturn(Optional.of(dev));
+
+        ToDoItem saved = new ToDoItem();
+        saved.setID(777);
+        when(todoService.addToDoItem(any(ToDoItem.class))).thenAnswer(inv -> {
+            ToDoItem item = inv.getArgument(0);
+            item.setID(777);
+            return item;
+        });
+
+        BotActions add = newBotActions();
+        add.setChatId(chatId);
+        add.setRequestText(BotLabels.ADD_NEW_ITEM.getLabel());
+        add.fnAddItem();
+        assertTrue(stateManager.isSelectingSprintForNewTask(chatId));
+
+        BotActions pickSprint = newBotActions();
+        pickSprint.setChatId(chatId);
+        pickSprint.setRequestText("Sprint " + sprintId);
+        pickSprint.fnSelectSprintForNewTask();
+        assertTrue(stateManager.isSelectingAssigneeForNewTask(chatId));
+
+        BotActions pickDev = newBotActions();
+        pickDev.setChatId(chatId);
+        pickDev.setRequestText("👤 Alice Dev #" + devId);
+        pickDev.fnSelectAssigneeForNewTask();
+        assertTrue(stateManager.isWaitingForNewTaskDescription(chatId));
+
+        BotActions desc = newBotActions();
+        desc.setChatId(chatId);
+        desc.setRequestText("Ship login fix");
+        desc.fnElse();
+
+        ArgumentCaptor<ToDoItem> itemCaptor = ArgumentCaptor.forClass(ToDoItem.class);
+        verify(todoService).addToDoItem(itemCaptor.capture());
+        assertEquals(Math.toIntExact(sprintId), itemCaptor.getValue().getAssignedSprint());
+        verify(userTaskService).assignUserToTaskAsTodo(devId, 777L);
         assertFalse(stateManager.isWaitingForNewTaskDescription(chatId));
     }
 
@@ -148,8 +238,8 @@ class BotActionsTest {
         assertTrue(taskKeyboard.contains("Alice done"));
         assertTrue(taskKeyboard.contains("Bob done"));
         assertTrue(taskKeyboard.contains("Carol done"));
-        String doneBracket = " [" + "\u2705 Done" + "]";
-        assertEquals(3, taskKeyboard.split(Pattern.quote(doneBracket), -1).length - 1);
+        // Split layout: status column shows "✅ Done" per completed task (not inline in title).
+        assertEquals(4, taskKeyboard.split(Pattern.quote("\u2705 Done"), -1).length);
 
         Sprint s5 = new Sprint();
         s5.setId(5L);
@@ -225,8 +315,7 @@ class BotActionsTest {
         assertFalse(keys.contains("99 - "));
         assertFalse(keys.contains("Someone else done"));
 
-        String doneBracket = " [" + "\u2705 Done" + "]";
-        assertEquals(2, keys.split(Pattern.quote(doneBracket), -1).length - 1);
+        assertEquals(3, keys.split(Pattern.quote("\u2705 Done"), -1).length);
     }
 
     // All reply-keyboard button captions in one string (for assertions).
