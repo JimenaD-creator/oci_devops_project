@@ -197,6 +197,7 @@ class BotActionsTest {
         long chatId = 200L;
         Long sprintId = 5L;
         Long managerId = 7L;
+        Long projectId = 17L;
 
         botActions.setChatId(chatId);
         botActions.setRequestText("pw");
@@ -240,11 +241,14 @@ class BotActionsTest {
         // Split layout: status column shows "✅ Done" per completed task (not inline in title).
         assertEquals(4, taskKeyboard.split(Pattern.quote("\u2705 Done"), -1).length);
 
+        Project managerProject = new Project();
+        managerProject.setId(projectId);
         Sprint s5 = new Sprint();
         s5.setId(5L);
         Sprint s6 = new Sprint();
         s6.setId(6L);
-        when(sprintService.findAll()).thenReturn(List.of(s5, s6));
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(managerProject));
+        when(sprintService.findByProjectIdOrderByStartDateAsc(projectId)).thenReturn(List.of(s5, s6));
 
         BotActions backToSprints = newBotActions();
         backToSprints.setChatId(chatId);
@@ -315,6 +319,44 @@ class BotActionsTest {
         assertFalse(keys.contains("Someone else done"));
 
         assertEquals(3, keys.split(Pattern.quote("\u2705 Done"), -1).length);
+    }
+
+    @Test
+    void managerSprintPicker_showsOnlyOwnProjectSprints() throws Exception {
+        long chatId = 400L;
+        Long managerId = 11L;
+        Long ownProjectId = 21L;
+
+        stateManager.setTelegramSignedInUser(chatId, managerId);
+
+        User manager = new User();
+        manager.setId(managerId);
+        manager.setType("MANAGER");
+        when(userService.getUserById(managerId)).thenReturn(Optional.of(manager));
+
+        Project ownProject = new Project();
+        ownProject.setId(ownProjectId);
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(ownProject));
+
+        Sprint ownSprintA = new Sprint();
+        ownSprintA.setId(101L);
+        Sprint ownSprintB = new Sprint();
+        ownSprintB.setId(102L);
+        when(sprintService.findByProjectIdOrderByStartDateAsc(ownProjectId)).thenReturn(List.of(ownSprintA, ownSprintB));
+
+        BotActions openSprintPicker = newBotActions();
+        openSprintPicker.setChatId(chatId);
+        openSprintPicker.setRequestText(BotCommands.TODO_LIST.getCommand());
+        openSprintPicker.fnListAll();
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(telegramClient, atLeast(2)).execute(captor.capture());
+        SendMessage pickerMsg = captor.getValue();
+        String sprintPicker = flattenKeyboard(pickerMsg);
+
+        assertTrue(sprintPicker.contains("Sprint 101"));
+        assertTrue(sprintPicker.contains("Sprint 102"));
+        assertFalse(sprintPicker.contains("Sprint 201"));
     }
 
     // All reply-keyboard button captions in one string (for assertions).

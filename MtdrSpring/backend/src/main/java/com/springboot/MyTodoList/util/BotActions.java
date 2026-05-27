@@ -408,7 +408,9 @@ public class BotActions {
         List<Sprint> allSprints = sortSprintsForTelegramMenu(sprintService.findAll());
         List<Sprint> sprintsToShow = allSprints;
         Long signedInId = stateManager.getTelegramSignedInUserId(chatId);
-        if (signedInId != null && !isUserManager(signedInId)) {
+        if (signedInId != null && isUserManager(signedInId)) {
+            sprintsToShow = sprintsForManagerScope(signedInId);
+        } else if (signedInId != null) {
             List<Long> sprintIdsWithWork = userTaskService.findSprintIdsWithAssignmentsForUser(signedInId);
             Set<Long> idSet = new HashSet<>(sprintIdsWithWork);
             sprintsToShow = allSprints.stream()
@@ -453,17 +455,19 @@ public class BotActions {
         BotHelper.sendMessageToTelegram(chatId, msg, telegramClient, keyboardMarkup);
     }
 
-    private List<Sprint> sprintsForManagerAddTask(Long managerId) {
+    private List<Sprint> sprintsForManagerScope(Long managerId) {
         if (projectLookupService != null && managerId != null) {
             Optional<Project> project = projectLookupService.findPrimaryProjectForManager(managerId);
             if (project.isPresent()) {
                 List<Sprint> projectSprints = sprintService.findByProjectIdOrderByStartDateAsc(project.get().getId());
-                if (!projectSprints.isEmpty()) {
-                    return sortSprintsForTelegramMenu(projectSprints);
-                }
+                return sortSprintsForTelegramMenu(projectSprints);
             }
         }
-        return sortSprintsForTelegramMenu(sprintService.findAll());
+        return List.of();
+    }
+
+    private List<Sprint> sprintsForManagerAddTask(Long managerId) {
+        return sprintsForManagerScope(managerId);
     }
 
     private List<User> teamMembersForManager(Long managerId) {

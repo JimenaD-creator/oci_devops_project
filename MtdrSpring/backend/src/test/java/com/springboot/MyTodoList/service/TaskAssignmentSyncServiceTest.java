@@ -99,4 +99,24 @@ class TaskAssignmentSyncServiceTest {
 
         assertEquals("IN_REVIEW", saved.getStatus());
     }
+
+    @Test
+    void syncTaskStatusFromAssignments_inReviewAndInProgress_prioritizesInReview() {
+        Task task = new Task();
+        task.setId(5L);
+        task.setStatus("TODO");
+
+        UserTask inReview = new UserTask();
+        inReview.setStatus("IN_REVIEW");
+        UserTask inProgress = new UserTask();
+        inProgress.setStatus("IN_PROGRESS");
+
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+        when(userTaskRepository.findByTask_Id(5L)).thenReturn(List.of(inReview, inProgress));
+        when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Task saved = syncService.syncTaskStatusFromAssignments(5L);
+
+        assertEquals("IN_REVIEW", saved.getStatus());
+    }
 }
