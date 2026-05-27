@@ -1953,9 +1953,22 @@ public class BotActions {
                     exit = true;
                     return;
                 }
+                Long actingUserId = stateManager.getActingUserIdForBlockedReason(chatId);
+                Long sprintId = null;
+                ToDoItem blockedTask = todoService.getToDoItemById(blockedTaskId);
+                if (blockedTask != null && blockedTask.getAssignedSprint() != null) {
+                    sprintId = blockedTask.getAssignedSprint().longValue();
+                }
                 saveBlockedReason(blockedTaskId, blockedReason);
                 BotHelper.sendMessageToTelegram(chatId, "✓ Task marked as blocked with reason: " + blockedReason, telegramClient, null);
                 stateManager.clearPendingState(chatId);
+                if (actingUserId == null) {
+                    actingUserId = resolveEffectiveActingUserId();
+                }
+                if (sprintId != null && actingUserId != null) {
+                    stateManager.setViewingSprintTasks(chatId, sprintId, actingUserId);
+                    showSprintTasksForAssignee(sprintId, actingUserId);
+                }
                 exit = true;
                 return;
             }

@@ -15,7 +15,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.ToDoItemRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
@@ -343,39 +342,43 @@ public class UserTaskService {
     }
 
     /**
-     * Blocker reports for the developer UI: own assignments with {@code isBlocked=true}
-     * and not yet completed.
+     * Blocker reports for developer UI (active + resolved history where a reason was recorded).
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listBlockedReportsForDeveloper(Long userId, Long projectId) {
         if (userId == null || projectId == null) {
             return List.of();
         }
-        List<UserTask> rows = userTaskRepository.findBlockedByUserIdAndProjectId(userId, projectId);
+        List<UserTask> rows = userTaskRepository.findBlockerReportsByUserIdAndProjectId(userId, projectId);
         List<Map<String, Object>> out = new ArrayList<>();
         for (UserTask ut : rows) {
-            if (ut == null || !Boolean.TRUE.equals(ut.getIsBlocked())) {
+            if (ut == null) {
                 continue;
             }
-            if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
+            String blockedReason = ut.getBlockedReason() != null ? ut.getBlockedReason().trim() : "";
+            if (blockedReason.isBlank()) {
                 continue;
             }
             Task t = ut.getTask();
             if (t == null) {
                 continue;
             }
+            boolean assignmentCompleted = UserTask.isCompletedAssignmentStatus(ut.getStatus());
+            boolean activeBlocked = Boolean.TRUE.equals(ut.getIsBlocked()) && !assignmentCompleted;
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("taskId", t.getId());
             row.put(
                 "taskTitle",
                 t.getTitle() != null && !t.getTitle().isBlank() ? t.getTitle().trim() : ("Task #" + t.getId()));
-            row.put("blockedReason", ut.getBlockedReason() != null ? ut.getBlockedReason().trim() : "");
+            row.put("blockedReason", blockedReason);
             LocalDateTime reportedAt = t.getUpdatedAt();
             if (reportedAt != null) {
                 row.put("reportedAt", reportedAt.toString());
             } else {
                 row.put("reportedAt", null);
             }
+            row.put("resolved", !activeBlocked);
+            row.put("status", activeBlocked ? "ACTIVE" : "RESOLVED");
             if (t.getAssignedSprint() != null) {
                 row.put("sprintId", t.getAssignedSprint().getId());
             }
@@ -429,5 +432,42 @@ public class UserTaskService {
             logger.error("Error saving blocked reason for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
             throw new RuntimeException("Failed to save blocked reason", e);
         }
+    }
+
+    /**
+     * Clears the active block flag for this assignee while keeping {@code blockedReason} for history.
+     * Does not complete the assignment — the developer can keep working after the impediment is gone.
+     */
+    @Transactional
+    public UserTask resolveBlockedReport(Long userId, Long taskId) {
+        if (userId == null || taskId == null) {
+            throw new IllegalArgumentException("userId and taskId are required");
+        }
+        UserTaskId id = new UserTaskId(userId, taskId);
+        UserTask userTask = userTaskRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Assignment not found: user " + userId + " task " + taskId));
+
+        if (UserTask.isCompletedAssignmentStatus(userTask.getStatus())) {
+            if (Boolean.TRUE.equals(userTask.getIsBlocked())) {
+                userTask.setIsBlocked(false);
+                userTaskRepository.save(userTask);
+                taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+            }
+            return userTask;
+        }
+
+        if (!Boolean.TRUE.equals(userTask.getIsBlocked())) {
+            return userTask;
+        }
+
+        userTask.setIsBlocked(false);
+        String status = userTask.getStatus() != null ? userTask.getStatus().trim().toUpperCase() : "";
+        if ("BLOCKED".equals(status)) {
+            userTask.setStatus("IN_PROGRESS");
+        }
+        UserTask saved = userTaskRepository.save(userTask);
+        taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        logger.info("Blocker resolved for userId {} taskId {} (reason preserved)", userId, taskId);
+        return saved;
     }
 }

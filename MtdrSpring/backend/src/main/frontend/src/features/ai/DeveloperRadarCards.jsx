@@ -33,7 +33,7 @@ function getColor(score) {
   return '#C62828';
 }
 
-function RadarChart({ dev }) {
+function RadarChart({ dev, height = 260 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const canvasRef = useRef(null);
@@ -107,7 +107,7 @@ function RadarChart({ dev }) {
   }, [dev, gridColor, tickColor, labelColor]);
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height: 260 }}>
+    <Box sx={{ position: 'relative', width: '100%', height }}>
       <canvas ref={canvasRef} role="img" aria-label={`Radar de métricas de ${dev.developerName}`} />
       {tooltip && (
         <Box sx={{
@@ -150,7 +150,7 @@ function Avatar({ dev, color, initials }) {
   );
 }
 
-function DevCard({ dev, compact = false }) {
+function DevCard({ dev, compact = false, chartHeight = 260 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const ov = overall(dev);
@@ -197,7 +197,7 @@ function DevCard({ dev, compact = false }) {
         </Box>
       </Box>
 
-      <RadarChart dev={dev} />
+      <RadarChart dev={dev} height={chartHeight} />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.75, mt: 0.5 }}>
         {METRICS.map((m) => (
@@ -273,8 +273,7 @@ export default function DeveloperRadarCards({
                 gridTemplateColumns: '1fr',
                 gap: 2.5,
                 width: '100%',
-                maxWidth: 380,
-                mx: 'auto',
+                maxWidth: '100%',
               }
             : {
                 display: 'grid',
@@ -285,7 +284,12 @@ export default function DeveloperRadarCards({
         }
       >
         {visibleDevs.map((d) => (
-          <DevCard key={String(d.developerName).trim()} dev={d} compact={isSingleLayout} />
+          <DevCard
+            key={String(d.developerName).trim()}
+            dev={d}
+            compact={isSingleLayout}
+            chartHeight={isSingleLayout ? 280 : 260}
+          />
         ))}
       </Box>
     </Box>

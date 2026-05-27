@@ -359,6 +359,37 @@ class BotActionsTest {
         assertFalse(sprintPicker.contains("Sprint 201"));
     }
 
+    @Test
+    void blockedReasonSubmission_returnsToSprintTasks() throws Exception {
+        long chatId = 500L;
+        Long developerId = 15L;
+        Long sprintId = 9L;
+        Integer taskId = 321;
+
+        stateManager.setTelegramSignedInUser(chatId, developerId);
+        stateManager.setWaitingForBlockedReason(chatId, taskId, developerId);
+
+        ToDoItem task = new ToDoItem();
+        task.setID(taskId);
+        task.setAssignedSprint(Math.toIntExact(sprintId));
+        task.setDescription("Blocked API dependency");
+        task.setStatus("BLOCKED");
+        when(todoService.getToDoItemById(taskId)).thenReturn(task);
+        when(todoService.findByAssignedSprint(Math.toIntExact(sprintId))).thenReturn(List.of(task));
+        when(userTaskService.loadUserSprintTaskListIndex(developerId, sprintId))
+                .thenReturn(new UserTaskService.UserSprintTaskListIndex(Set.of(taskId.longValue()), Set.of()));
+
+        BotActions submitReason = newBotActions();
+        submitReason.setChatId(chatId);
+        submitReason.setRequestText("Waiting on external API credentials");
+        submitReason.fnElse();
+
+        verify(userTaskService).saveBlockedReason(developerId, taskId.longValue(), "Waiting on external API credentials");
+        assertTrue(stateManager.isViewingSprintTasks(chatId));
+        assertEquals(sprintId, stateManager.getViewingSprintId(chatId));
+        assertEquals(developerId, stateManager.getViewingSelectedUserId(chatId));
+    }
+
     // All reply-keyboard button captions in one string (for assertions).
     private static String flattenKeyboard(SendMessage msg) {
         if (!(msg.getReplyMarkup() instanceof ReplyKeyboardMarkup)) {

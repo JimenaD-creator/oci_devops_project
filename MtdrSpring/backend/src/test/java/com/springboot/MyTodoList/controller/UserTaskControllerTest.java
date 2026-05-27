@@ -116,4 +116,17 @@ class UserTaskControllerTest {
 
         mockMvc.perform(get("/api/user-tasks").param("projectId", "5")).andExpect(status().isOk());
     }
+
+    @Test
+    void resolveMyBlocker_success_returnsOk() throws Exception {
+        UserTask resolved = new UserTask();
+        when(userTaskService.resolveBlockedReport(3L, 90L)).thenReturn(resolved);
+
+        mockMvc.perform(post("/api/user-tasks/my-blockers/resolve")
+                        .param("userId", "3")
+                        .param("taskId", "90"))
+                .andExpect(status().isOk());
+
+        verify(userTaskService).resolveBlockedReport(3L, 90L);
+    }
 }
