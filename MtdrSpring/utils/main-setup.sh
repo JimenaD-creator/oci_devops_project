@@ -384,6 +384,38 @@ while ! state_done UI_PASSWORD; do
   done
 done
 
+# JWT secret for API login (all pods must share the same value)
+while ! state_done JWT_SECRET_K8S; do
+  if test -z "$JWT_SECRET_VALUE"; then
+    JWT_SECRET_VALUE=$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
+  fi
+  BASE64_JWT_SECRET=`echo -n "$JWT_SECRET_VALUE" | base64`
+  while true; do
+    if kubectl get secret jwt-secret -n mtdrworkshop >/dev/null 2>&1; then
+      state_set_done JWT_SECRET_K8S
+      break
+    fi
+    if kubectl create -n mtdrworkshop -f -; then
+      state_set_done JWT_SECRET_K8S
+      break
+    else
+      echo 'Error: Creating jwt-secret Failed.  Retrying...'
+      sleep 10
+    fi <<!
+{
+   "apiVersion": "v1",
+   "kind": "Secret",
+   "metadata": {
+      "name": "jwt-secret"
+   },
+   "data": {
+      "secret": "${BASE64_JWT_SECRET}"
+   }
+}
+!
+  done
+done
+
 
 ps -ef | grep "$MTDRWORKSHOP_LOCATION/utils" | grep -v grep
 

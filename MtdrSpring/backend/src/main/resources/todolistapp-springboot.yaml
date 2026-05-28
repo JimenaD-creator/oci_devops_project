@@ -87,7 +87,7 @@ spec:
                 secretKeyRef:
                   name: jwt-secret
                   key: secret
-                  optional: true
+                  optional: false
             - name: OCI_REGION
               value: "%OCI_REGION%"
           volumeMounts:

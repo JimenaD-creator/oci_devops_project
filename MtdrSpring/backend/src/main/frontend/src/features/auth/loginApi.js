@@ -1,5 +1,6 @@
 import { getApiBase } from '../../utils/apiBase';
-import { getAuthToken } from '../../utils/auth';
+import { apiFetch, getAuthToken } from '../../utils/auth';
+import { isDeveloperRole, isManagerRole } from '../../utils/userRoleUtils';
 
 function authHeaders() {
   const headers = {};
@@ -50,7 +51,7 @@ export async function loginWithCredentials(identifier, password) {
   }
 
   if (!response.ok) {
-    const error = new Error('Invalid credentials');
+    const error = new Error('Login failed');
     error.status = response.status;
     try {
       const body = await parseJsonResponse(response);
@@ -59,9 +60,17 @@ export async function loginWithCredentials(identifier, password) {
       if (parseErr?.serverMessage) {
         error.serverMessage = parseErr.serverMessage;
       } else if (response.status === 401) {
+        error.serverMessage = 'Invalid credentials. Please try again.';
+      } else if (response.status >= 500) {
         error.serverMessage =
-          'Sign-in was rejected. Try again after clearing the site cache, or ask your admin to redeploy the latest version.';
+          'Server error during sign-in. Restart the backend and try again.';
       }
+    }
+    if (!error.serverMessage) {
+      error.serverMessage =
+        response.status === 401
+          ? 'Invalid credentials. Please try again.'
+          : `Sign-in failed (${response.status}). Try again or contact support.`;
     }
     throw error;
   }
@@ -70,17 +79,42 @@ export async function loginWithCredentials(identifier, password) {
 }
 
 export async function fetchManagerPrimaryProject(managerId) {
-  const projRes = await fetch(`${getApiBase()}/api/projects/manager/${managerId}`, {
-    headers: authHeaders(),
-  });
+  const projRes = await apiFetch(`${getApiBase()}/api/projects/manager/${managerId}`);
   if (!projRes.ok) return null;
   return projRes.json();
 }
 
 export async function fetchDeveloperPrimaryProject(userId) {
-  const projRes = await fetch(`${getApiBase()}/api/projects/developer/${userId}`, {
-    headers: authHeaders(),
-  });
+  const projRes = await apiFetch(`${getApiBase()}/api/projects/developer/${userId}`);
   if (!projRes.ok) return null;
   return projRes.json();
+}
+
+/** After login, ensure currentProjectId is set (needed for dashboard API calls in OCI). */
+export async function resolveProjectContextAfterLogin(user, authData) {
+  if (authData?.projectId != null) {
+    return {
+      projectId: String(authData.projectId),
+      projectName: authData.projectName || '',
+    };
+  }
+  const userId = user?.id;
+  if (!userId) return { projectId: null, projectName: '' };
+
+  if (isManagerRole(user?.role)) {
+    const res = await apiFetch(`${getApiBase()}/api/projects/manager/${userId}/list`);
+    if (res.ok) {
+      const list = await res.json();
+      const first = Array.isArray(list) ? list[0] : null;
+      if (first?.id != null) {
+        return { projectId: String(first.id), projectName: first.name || '' };
+      }
+    }
+  } else if (isDeveloperRole(user?.role)) {
+    const project = await fetchDeveloperPrimaryProject(userId);
+    if (project?.id != null) {
+      return { projectId: String(project.id), projectName: project.name || '' };
+    }
+  }
+  return { projectId: null, projectName: '' };
 }

@@ -33,7 +33,7 @@ import { TEAM_MEMBER_TYPE_SUGGESTIONS } from '../../utils/userRoleUtils';
 
 const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
 
-const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
+const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
@@ -131,11 +131,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin' }) => {
   }, [mode]);
 
   useEffect(() => {
-    if (mode !== 'manager' || loading) return;
+    if (skipAutoSelect || mode !== 'manager' || loading) return;
     if (projects.length !== 1 || !onSelect || managerAutoSelectedRef.current) return;
     managerAutoSelectedRef.current = true;
     onSelect(projects[0]);
-  }, [mode, loading, projects, onSelect]);
+  }, [mode, loading, projects, onSelect, skipAutoSelect]);
 
   const openAndClear = (modalName) => {
     setFormData({});

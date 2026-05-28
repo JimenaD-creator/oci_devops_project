@@ -19,18 +19,26 @@ public class ProjectLookupService {
         if (managerId == null) {
             return Optional.empty();
         }
-        return projectRepository.findByManagerId(managerId);
+        List<Project> projects = projectRepository.findAllByManagerId(managerId);
+        return projects.isEmpty() ? Optional.empty() : Optional.of(projects.get(0));
+    }
+
+    public List<Project> findAllProjectsForManager(Long managerId) {
+        if (managerId == null) {
+            return List.of();
+        }
+        return projectRepository.findAllByManagerId(managerId);
     }
 
     public Optional<Project> findPrimaryProjectForDeveloper(Long userId) {
-        if (userId == null) {
-            return Optional.empty();
-        }
-        Optional<Project> direct = projectRepository.findByTeamMemberUserId(userId);
-        if (direct.isPresent()) {
-            return direct;
-        }
-        List<Project> projects = projectRepository.findAllProjectsForTeamMember(userId);
+        List<Project> projects = findAllProjectsForDeveloper(userId);
         return projects.isEmpty() ? Optional.empty() : Optional.of(projects.get(0));
+    }
+
+    public List<Project> findAllProjectsForDeveloper(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return projectRepository.findAllProjectsForTeamMember(userId);
     }
 }

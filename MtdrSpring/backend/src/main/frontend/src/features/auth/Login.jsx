@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { isAuthenticated, login as setAuthenticated, clearSessionForLogin } from '../../utils/auth';
 import { redirectAfterLogin } from '../../utils/postLoginRedirect';
-import { loginWithCredentials } from './loginApi';
+import { loginWithCredentials, resolveProjectContextAfterLogin } from './loginApi';
 import { buildUserSessionFromAuth } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
@@ -116,9 +116,10 @@ export default function Login() {
         });
       }
 
-      if (authData.projectId != null) {
-        localStorage.setItem('currentProjectId', String(authData.projectId));
-        localStorage.setItem('currentProjectName', authData.projectName || '');
+      const projectCtx = await resolveProjectContextAfterLogin(userData, authData);
+      if (projectCtx.projectId) {
+        localStorage.setItem('currentProjectId', projectCtx.projectId);
+        localStorage.setItem('currentProjectName', projectCtx.projectName || '');
       }
 
       redirectAfterLogin('/');

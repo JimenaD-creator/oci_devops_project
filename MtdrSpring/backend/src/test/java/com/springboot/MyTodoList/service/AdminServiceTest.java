@@ -47,7 +47,6 @@ class AdminServiceTest {
         input.getAssignedTeam().setId(1L);
 
         when(teamRepo.findById(1L)).thenReturn(Optional.of(team));
-        when(projectRepo.existsByAssignedTeamId(1L)).thenReturn(false);
         when(projectRepo.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Project saved = adminService.createProject(input);
@@ -56,15 +55,21 @@ class AdminServiceTest {
     }
 
     @Test
-    void createProject_teamAlreadyHasProject_throws() {
+    void createProject_sameTeam_canCreateSecondProject() {
+        Team team = new Team();
+        team.setId(2L);
         Project input = new Project();
+        input.setName("Project B");
         input.setAssignedTeam(new Team());
         input.getAssignedTeam().setId(2L);
 
-        when(teamRepo.findById(2L)).thenReturn(Optional.of(new Team()));
-        when(projectRepo.existsByAssignedTeamId(2L)).thenReturn(true);
+        when(teamRepo.findById(2L)).thenReturn(Optional.of(team));
+        when(projectRepo.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(RuntimeException.class, () -> adminService.createProject(input));
+        Project saved = adminService.createProject(input);
+
+        assertEquals(team, saved.getAssignedTeam());
+        assertEquals("Project B", saved.getName());
     }
 
     @Test

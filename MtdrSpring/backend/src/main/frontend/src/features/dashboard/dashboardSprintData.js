@@ -5,9 +5,8 @@ import {
   collectDeveloperNamesForSelection,
   mergeRosterWithSprintDevelopers,
 } from '../../utils/teamRosterUtils';
-
-/** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+import { getApiBase } from '../../utils/apiBase';
+import { apiFetch } from '../../utils/auth';
 
 /** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
@@ -559,8 +558,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   });
 }
 
-const fetchJsonNoCache = (url) =>
-  fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+const fetchJsonNoCache = (url) => apiFetch(url);
 
 function isCacheValidForProject(pid, now, forceFresh) {
   return (
@@ -628,9 +626,10 @@ export async function fetchDashboardSprints(projectId, options = {}) {
 
   try {
     console.log('Fetching fresh dashboard data');
-    const sprintsUrl = `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`;
-    const tasksUrl = `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`;
-    const userTasksUrl = `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`;
+    const base = getApiBase();
+    const sprintsUrl = `${base}/api/sprints?projectId=${encodeURIComponent(pid)}`;
+    const tasksUrl = `${base}/api/tasks?projectId=${encodeURIComponent(pid)}`;
+    const userTasksUrl = `${base}/api/user-tasks?projectId=${encodeURIComponent(pid)}`;
 
     const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
       fetchJsonNoCache(sprintsUrl),
@@ -638,7 +637,16 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       fetchJsonNoCache(userTasksUrl),
     ]);
 
-    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Failed to load data');
+    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) {
+      const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
+      if (status === 401 || status === 403) {
+        console.error(
+          'Dashboard API unauthorized — sign out, hard-refresh (Ctrl+Shift+R), and sign in again. ' +
+            'If this persists, redeploy the latest Docker image to OCI.',
+        );
+      }
+      throw new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
+    }
 
     const apiSprints = await sprintsRes.json();
     const apiTasks = await tasksRes.json();

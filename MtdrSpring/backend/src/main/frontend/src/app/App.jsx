@@ -119,6 +119,10 @@ function App() {
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
+  /** Manager opened "Change project" — do not auto-pick the first project again. */
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  /** null = loading; array = projects for this manager's team */
+  const [managerProjects, setManagerProjects] = useState(null);
   /** loading | ready | missing — avoids infinite spinner when prod DB has no team/project for user */
   const [devProjectStatus, setDevProjectStatus] = useState(() =>
     localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
@@ -179,20 +183,35 @@ function App() {
   }, [user, profilePicture]);
 
   useEffect(() => {
-    if (isManagerRole(user?.role) && !selectedProjectId) {
-      fetch(`${getApiBase()}/api/projects/manager/${user.id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((project) => {
-          if (project?.id) {
-            localStorage.setItem('currentProjectId', String(project.id));
-            localStorage.setItem('currentProjectName', project.name || '');
-            setSelectedProjectId(String(project.id));
-            setSelectedProjectName(project.name || '');
-          }
-        })
-        .catch(() => {});
+    if (!isManagerRole(user?.role) || !user?.id) {
+      setManagerProjects(null);
+      return;
     }
-  }, [user, selectedProjectId]);
+    let cancelled = false;
+    fetch(`${getApiBase()}/api/projects/manager/${user.id}/list`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((projects) => {
+        if (cancelled) return;
+        const list = Array.isArray(projects) ? projects : [];
+        setManagerProjects(list);
+        if (selectedProjectId || showProjectPicker) return;
+        if (list.length === 1 && list[0]?.id != null) {
+          const only = list[0];
+          localStorage.setItem('currentProjectId', String(only.id));
+          localStorage.setItem('currentProjectName', only.name || '');
+          setSelectedProjectId(String(only.id));
+          setSelectedProjectName(only.name || '');
+        } else if (list.length > 1) {
+          setShowProjectPicker(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setManagerProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role, selectedProjectId, showProjectPicker]);
 
   useEffect(() => {
     if (!isDeveloperRole(user?.role)) {
@@ -303,15 +322,27 @@ function App() {
   const handleSelectProject = (project) => {
     localStorage.setItem('currentProjectId', project.id);
     localStorage.setItem('currentProjectName', project.name);
-    setSelectedProjectId(project.id);
-    setSelectedProjectName(project.name);
+    setSelectedProjectId(String(project.id));
+    setSelectedProjectName(project.name || '');
+    setShowProjectPicker(false);
+    setActivePage('dashboard');
   };
 
   const handleChangeProject = () => {
+    if (isManagerRole(user?.role) && managerProjects && managerProjects.length <= 1) {
+      const name = managerProjects[0]?.name || selectedProjectName || 'your project';
+      setSnack({
+        open: true,
+        msg: `You only have one assigned project (${name}).`,
+        severity: 'info',
+      });
+      return;
+    }
     localStorage.removeItem('currentProjectId');
     localStorage.removeItem('currentProjectName');
     setSelectedProjectId(null);
     setSelectedProjectName(null);
+    setShowProjectPicker(true);
   };
 
   useEffect(() => {
@@ -359,14 +390,18 @@ function App() {
     { text: 'AI Insights',    icon: <AutoAwesomeIcon />, id: 'ai-insights', roles: ['ADMIN', 'MANAGER'] },
     { text: 'KPI Analytics',  icon: <AnalyticsIcon />,   id: 'analytics',   roles: ['ADMIN', 'MANAGER'] },
     { text: 'Team',           icon: <GroupIcon />,        id: 'team',        roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN'] },
-  ].filter((item) =>
-    item.roles.some((r) => {
+    { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN', 'MANAGER'] },
+  ].filter((item) => {
+    if (item.id === 'selector' && isManagerRole(user.role)) {
+      if (managerProjects == null) return false;
+      if (managerProjects.length <= 1) return false;
+    }
+    return item.roles.some((r) => {
       if (r === 'ADMIN') return isAdminRole(user.role);
       if (r === 'MANAGER') return isManagerRole(user.role);
       return normalizeUserRole(user.role).toUpperCase() === r;
-    }),
-  );
+    });
+  });
 
   const topNavItems = isDeveloper
     ? DEVELOPER_NAV_ITEMS
@@ -390,10 +425,17 @@ function App() {
     navigate('/login', { replace: true });
   };
 
-  if (isAdminRole(user.role) && !selectedProjectId) {
+  if (
+    (isAdminRole(user.role) || isManagerRole(user.role))
+    && (!selectedProjectId || showProjectPicker)
+  ) {
     return (
       <Suspense fallback={<PageLoader />}>
-        <ProjectSelector onSelect={handleSelectProject} />
+        <ProjectSelector
+          onSelect={handleSelectProject}
+          mode={isManagerRole(user.role) ? 'manager' : 'admin'}
+          skipAutoSelect={showProjectPicker}
+        />
       </Suspense>
     );
   }

@@ -41,6 +41,20 @@ steps:
       echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "dockerdiegojules" --password-stdin
 
   - type: Command
+    name: "Validate Kubernetes manifest YAML"
+    command: |
+      python3 -m pip install --quiet pyyaml
+      python3 -c "
+      import yaml
+      path = 'MtdrSpring/backend/src/main/resources/todolistapp-springboot.yaml'
+      with open(path) as f:
+          docs = list(yaml.safe_load_all(f))
+      if len(docs) < 1:
+          raise SystemExit('Manifest must contain at least one Kubernetes document')
+      print('OK: parsed', len(docs), 'documents from', path)
+      "
+
+  - type: Command
     name: "Build"
     command: |
       cd MtdrSpring

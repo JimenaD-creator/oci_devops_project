@@ -206,3 +206,24 @@ function shouldAttachToken(input) {
     return false;
   }
 }
+
+/**
+ * fetch() that always sends Bearer when a session exists (OCI-safe; do not rely only on the interceptor).
+ */
+export function apiFetch(input, init = {}) {
+  const headers = new Headers(
+    input instanceof Request ? input.headers : init.headers || {},
+  );
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+  const token = getAuthToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const nextInit = { cache: 'no-store', ...init, headers };
+  if (input instanceof Request) {
+    return fetch(new Request(input, nextInit));
+  }
+  return fetch(input, nextInit);
+}

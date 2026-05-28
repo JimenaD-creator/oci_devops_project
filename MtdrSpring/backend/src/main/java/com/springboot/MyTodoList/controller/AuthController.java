@@ -40,35 +40,40 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Identifier and password are required."));
         }
 
-        Optional<User> authenticatedUser = userService.authenticateByIdentifierAndPassword(
-                request.getIdentifier(),
-                request.getPassword());
+        try {
+            Optional<User> authenticatedUser = userService.authenticateByIdentifierAndPassword(
+                    request.getIdentifier(),
+                    request.getPassword());
 
-        if (authenticatedUser.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid credentials."));
-        }
-
-        User user = authenticatedUser.get();
-
-        String token = jwtService.generateToken(user);
-        Long projectId = null;
-        String projectName = null;
-        if (UserRoleUtil.isManager(user.getType())) {
-            Project p = projectLookupService.findPrimaryProjectForManager(user.getId()).orElse(null);
-            if (p != null) {
-                projectId = p.getId();
-                projectName = p.getName();
+            if (authenticatedUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Invalid credentials."));
             }
-        } else if (UserRoleUtil.isDeveloper(user.getType())) {
-            Project p = projectLookupService.findPrimaryProjectForDeveloper(user.getId()).orElse(null);
-            if (p != null) {
-                projectId = p.getId();
-                projectName = p.getName();
+
+            User user = authenticatedUser.get();
+
+            String token = jwtService.generateToken(user);
+            Long projectId = null;
+            String projectName = null;
+            if (UserRoleUtil.isManager(user.getType())) {
+                Project p = projectLookupService.findPrimaryProjectForManager(user.getId()).orElse(null);
+                if (p != null) {
+                    projectId = p.getId();
+                    projectName = p.getName();
+                }
+            } else if (UserRoleUtil.isDeveloper(user.getType())) {
+                Project p = projectLookupService.findPrimaryProjectForDeveloper(user.getId()).orElse(null);
+                if (p != null) {
+                    projectId = p.getId();
+                    projectName = p.getName();
+                }
             }
+            return ResponseEntity.ok(
+                    new AuthLoginResponse(token, new AuthUserResponse(user), projectId, projectName));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Login failed on the server. Please try again or contact support."));
         }
-        return ResponseEntity.ok(
-                new AuthLoginResponse(token, new AuthUserResponse(user), projectId, projectName));
     }
 
     private boolean isBlank(String value) {

@@ -17,9 +17,6 @@ public class AdminService {
         Long teamId = project.getAssignedTeam().getId();
         Team team = teamRepo.findById(teamId)
             .orElseThrow(() -> new RuntimeException("EQUIPO NO ENCONTRADO: " + teamId));
-        if (projectRepo.existsByAssignedTeamId(teamId)) {
-            throw new RuntimeException("EL EQUIPO YA TIENE UN PROYECTO");
-        }
         project.setAssignedTeam(team);
         return projectRepo.save(project);
     }
