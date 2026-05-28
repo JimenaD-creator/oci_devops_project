@@ -10,6 +10,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Button,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -31,6 +32,7 @@ import {
   sectionRgba,
 } from '../dashboard/constants/dashboardConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
+import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
 
 const pageEase = [0.22, 1, 0.36, 1];
@@ -235,7 +237,7 @@ function ProductivityScoreCard({
   );
 }
 
-export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
+export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateToTasks }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
@@ -400,6 +402,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
 
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
+  /** KPI cards need at least one sprint and one task; otherwise show full-page empty state. */
+  const shouldShowEmptyKpiView = sprints.length === 0 || tasks.length === 0;
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
   const assignedTotalInSprint = kpis.totalTasks;
   const completedTotalInSprint = kpis.completedTasks;
@@ -483,6 +487,78 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   }, [currentSprint, sprints, kpis.productivityScore, getSprintNumber]);
 
   if (loading) return <PageLoadingSpinner />;
+
+  if (shouldShowEmptyKpiView) {
+    return (
+      <Box
+        sx={{
+          maxWidth: 1200,
+          width: '100%',
+          minHeight: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 190px)' },
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 800,
+            color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
+            letterSpacing: '-0.5px',
+            mb: 3,
+          }}
+        >
+          KPI Analytics
+        </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 2,
+            py: 3,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: '100%',
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+              textAlign: 'center',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+              KPI data cannot be displayed yet
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', maxWidth: 640, mx: 'auto', mb: 3 }}>
+              There are no sprints or tasks to visualize in this project. Create a sprint and add
+              tasks to see KPI analytics here.
+            </Typography>
+            {typeof onNavigateToTasks === 'function' ? (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={onNavigateToTasks}
+                sx={{
+                  bgcolor: ORACLE_RED_ACTION,
+                  fontWeight: 700,
+                  px: 3,
+                  '&:hover': { bgcolor: '#A3321F' },
+                }}
+              >
+                Go to Tasks
+              </Button>
+            ) : null}
+          </Paper>
+        </Box>
+      </Box>
+    );
+  }
 
   // Ordenar sprints para el select
   const sortedSprintsForSelect = [...sprints].sort((a, b) => a.id - b.id);

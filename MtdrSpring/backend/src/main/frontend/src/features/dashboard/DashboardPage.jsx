@@ -38,6 +38,7 @@ import {
   DASHBOARD_CONTENT_MAX_WIDTH,
   DASHBOARD_PRIMARY_ACCENT,
   DASHBOARD_BLOCK_GAP,
+  SECTION_BRAND_DARK,
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
@@ -66,13 +67,19 @@ const AVATAR_PALETTE_DARK = [
   { bg: '#1A4A4A', color: '#80CBC4' },
 ];
 
-export default function DashboardPage({ projectId: propProjectId }) {
+export default function DashboardPage({ projectId: propProjectId, onNavigateToTasks }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const AVATAR_PALETTE = isDark ? AVATAR_PALETTE_DARK : AVATAR_PALETTE_LIGHT;
-  const { sprints: sharedSprints, loading: sharedLoading, error: dataError } = useProjectData();
+  const {
+    sprints: sharedSprints,
+    loading: sharedLoading,
+    error: dataError,
+    getRawBundle,
+  } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
+  const [projectTaskCount, setProjectTaskCount] = useState(0);
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
@@ -126,6 +133,29 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
     if (!sharedLoading) setSprintsLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setProjectTaskCount(0);
+      return;
+    }
+    if (sharedLoading) return undefined;
+
+    let cancelled = false;
+    getRawBundle()
+      .then(({ tasks }) => {
+        if (!cancelled) {
+          setProjectTaskCount(Array.isArray(tasks) ? tasks.length : 0);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProjectTaskCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, sharedLoading, getRawBundle, allSprints.length]);
 
   useEffect(() => {
     setProjectDevelopers([]);
@@ -309,6 +339,92 @@ export default function DashboardPage({ projectId: propProjectId }) {
         ? `Error al cargar datos: ${dataError.message}`
         : null);
 
+  const shouldShowEmptyDashboardView =
+    !loadErrorMessage && (allSprints.length === 0 || projectTaskCount === 0);
+
+  if (loadErrorMessage) {
+    return (
+      <Box sx={{ p: 3, maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, mx: 'auto' }}>
+        <Alert severity="error">{loadErrorMessage}</Alert>
+      </Box>
+    );
+  }
+
+  if (shouldShowEmptyDashboardView) {
+    return (
+      <Box
+        sx={{
+          maxWidth: DASHBOARD_CONTENT_MAX_WIDTH,
+          width: '100%',
+          mx: 'auto',
+          minHeight: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 190px)' },
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 800,
+            color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
+            letterSpacing: '-0.5px',
+            mb: 3,
+            px: 2,
+            pt: 3,
+          }}
+        >
+          Dashboard
+        </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 2,
+            pb: 3,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: '100%',
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+              textAlign: 'center',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+              No information to display yet
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', maxWidth: 640, mx: 'auto', mb: 3 }}>
+              There are no sprints or tasks to visualize in this project. Create a sprint and add
+              tasks to view the dashboard.
+            </Typography>
+            {typeof onNavigateToTasks === 'function' ? (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={onNavigateToTasks}
+                sx={{
+                  bgcolor: ORACLE_RED_ACTION,
+                  fontWeight: 700,
+                  px: 3,
+                  '&:hover': { bgcolor: '#A3321F' },
+                }}
+              >
+                Go to Tasks
+              </Button>
+            ) : null}
+          </Paper>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -322,17 +438,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
         position: 'relative',
       }}
     >
-      {loadErrorMessage ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {loadErrorMessage}
-        </Alert>
-      ) : null}
-      {!loadErrorMessage && !allSprints.length ? (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          No hay sprints para este proyecto. Crea sprints en la sección Sprints o verifica que el deploy en
-          OCI haya terminado correctamente.
-        </Alert>
-      ) : null}
       <ScrollReveal>
         <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2 }, mb: 1.25, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>

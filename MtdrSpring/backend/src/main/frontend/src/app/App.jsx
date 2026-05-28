@@ -154,6 +154,10 @@ function App() {
     setActivePage('team');
   }, []);
   const handleOpenAiInsightsFromTeam = useCallback(() => { setActivePage('ai-insights'); }, []);
+  const handleNavigateToProjectTasks = useCallback(() => {
+    setSprintsNavOpen(true);
+    setActivePage('sprints');
+  }, []);
 
   const [user, setUser] = useState(() => loadStoredUser());
 
@@ -743,7 +747,7 @@ function App() {
             {visitedPages.has('dashboard') && (
               <Box sx={pageVisibilitySx('dashboard')}>
                 <DashboardPage
-                  onNavigateToTasks={() => setActivePage('tasks')}
+                  onNavigateToTasks={handleNavigateToProjectTasks}
                   projectId={selectedProjectId}
                 />
               </Box>
@@ -766,6 +770,7 @@ function App() {
                 <KPIAnalytics
                   projectId={selectedProjectId}
                   onOpenAiInsights={() => setActivePage('ai-insights')}
+                  onNavigateToTasks={handleNavigateToProjectTasks}
                 />
               </Box>
             )}
