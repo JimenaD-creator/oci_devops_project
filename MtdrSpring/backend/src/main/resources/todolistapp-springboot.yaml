@@ -41,21 +41,10 @@ spec:
         app: todolistapp-springboot
         version: v1
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        seccompProfile:
-          type: RuntimeDefault
       containers:
         - name: todolistapp-springboot
           image: docker.io/dockerdiegojules/todolistapp-springboot:${IMAGE_VERSION}
           imagePullPolicy: Always
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           env:
             - name: DB_USERNAME
               value: "MANAGER"
@@ -89,16 +78,10 @@ spec:
                   optional: false
             - name: GEMINI_API_KEY
               valueFrom:
-                secretKeyRef:
-                  name: gemini-secret
-                  key: api-key
-                  optional: false
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: jwt-secret
-                  key: secret
-                  optional: false
+              secretKeyRef:
+                name: gemini-secret
+                key: api-key
+                optional: false
             - name: OCI_REGION
               value: "%OCI_REGION%"
           volumeMounts:
@@ -106,7 +89,6 @@ spec:
               mountPath: /mtdrworkshop/creds
           ports:
             - name: http
-              protocol: TCP
               containerPort: 8080
       restartPolicy: Always
       volumes:
