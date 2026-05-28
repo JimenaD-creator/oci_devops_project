@@ -10,9 +10,9 @@ const CHART_CARD_ACCENT = '#1565C0';
 
 const CHART_HEIGHT = 172;
 const PIE_OUTER_RADIUS = 62;
-/** Larger pie when shown beside scorecards (DashboardPage). */
-const CHART_HEIGHT_EMBEDDED = 300;
-const PIE_OUTER_RADIUS_EMBEDDED = 118;
+/** Beside scorecards (DashboardPage): fill card without exceeding scorecard grid. */
+const CHART_HEIGHT_EMBEDDED = 185;
+const PIE_OUTER_RADIUS_EMBEDDED = 72;
 const PIE_ANIM_MS = 1000;
 
 const cardBase = (isDark) => ({
@@ -100,8 +100,7 @@ export default function TaskStatusDistributionChart({
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
-        height: '100%',
-        flex: embedded ? 1 : undefined,
+        height: embedded ? 'auto' : '100%',
         minHeight: 0,
         boxSizing: 'border-box',
         padding: embedded ? '0.25rem 0 0 0' : cardBase(isDark).padding,
@@ -145,7 +144,7 @@ export default function TaskStatusDistributionChart({
         </div>
       ) : (
         <Typography
-          sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 1.25, px: 0.5, color: 'text.secondary' }}
+          sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 0.75, px: 0.5, color: 'text.secondary' }}
         >
           {embeddedCaption}
         </Typography>
@@ -158,7 +157,6 @@ export default function TaskStatusDistributionChart({
           height: plotHeight,
           minHeight: plotHeight,
           flexShrink: 0,
-          flex: embedded ? 1 : undefined,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -221,7 +219,7 @@ export default function TaskStatusDistributionChart({
             gap: embedded ? '0.5rem 1rem' : '0.35rem 0.75rem',
             justifyContent: 'center',
             alignItems: 'center',
-            mt: embedded ? 1.25 : 0.65,
+            mt: embedded ? 0.75 : 0.65,
             overflowX: 'auto',
             flexShrink: 0,
             width: '100%',
@@ -232,7 +230,7 @@ export default function TaskStatusDistributionChart({
               key={d.key}
               component="span"
               sx={{
-                fontSize: '1rem',
+                fontSize: embedded ? '0.8125rem' : '1rem',
                 color: 'text.primary',
                 display: 'inline-flex',
                 alignItems: 'center',
