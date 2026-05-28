@@ -78,10 +78,10 @@ spec:
                   optional: false
             - name: GEMINI_API_KEY
               valueFrom:
-              secretKeyRef:
-                name: gemini-secret
-                key: api-key
-                optional: false
+                secretKeyRef:
+                  name: gemini-secret
+                  key: api-key
+                  optional: false
             - name: OCI_REGION
               value: "%OCI_REGION%"
           volumeMounts:
