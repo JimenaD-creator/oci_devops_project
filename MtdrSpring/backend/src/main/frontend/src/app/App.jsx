@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  apiFetch,
   isAuthenticated,
   loadStoredUser,
   logout,
@@ -188,7 +189,7 @@ function App() {
       return;
     }
     let cancelled = false;
-    fetch(`${getApiBase()}/api/projects/manager/${user.id}/list`)
+    apiFetch(`${getApiBase()}/api/projects/manager/${user.id}/list`)
       .then((r) => (r.ok ? r.json() : []))
       .then((projects) => {
         if (cancelled) return;
@@ -223,7 +224,7 @@ function App() {
     }
     setDevProjectStatus('loading');
     let cancelled = false;
-    fetch(`${getApiBase()}/api/projects/developer/${user.id}`)
+    apiFetch(`${getApiBase()}/api/projects/developer/${user.id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((project) => {
         if (cancelled) return;

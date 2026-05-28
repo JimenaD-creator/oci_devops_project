@@ -13,6 +13,7 @@ import {
   Popover,
   Stack,
   Button,
+  Alert,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -69,7 +70,7 @@ export default function DashboardPage({ projectId: propProjectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const AVATAR_PALETTE = isDark ? AVATAR_PALETTE_DARK : AVATAR_PALETTE_LIGHT;
-  const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
+  const { sprints: sharedSprints, loading: sharedLoading, error: dataError } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
   const [sprintsLoading, setSprintsLoading] = useState(true);
@@ -285,9 +286,28 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
   };
 
+  if (!projectId) {
+    return (
+      <Box sx={{ p: 3, maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, mx: 'auto' }}>
+        <Alert severity="warning">
+          No hay proyecto seleccionado. Si eres manager, usa &quot;Cambiar proyecto&quot;. Si acabas de
+          iniciar sesión, cierra sesión y vuelve a entrar.
+        </Alert>
+      </Box>
+    );
+  }
+
   if (sprintsLoading) {
     return <PageLoadingSpinner />;
   }
+
+  const loadErrorMessage =
+    dataError?.userMessage ||
+    (dataError?.code === 'UNAUTHORIZED'
+      ? 'Sesión inválida o expirada. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo.'
+      : dataError?.message
+        ? `Error al cargar datos: ${dataError.message}`
+        : null);
 
   return (
     <Box
@@ -302,6 +322,17 @@ export default function DashboardPage({ projectId: propProjectId }) {
         position: 'relative',
       }}
     >
+      {loadErrorMessage ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {loadErrorMessage}
+        </Alert>
+      ) : null}
+      {!loadErrorMessage && !allSprints.length ? (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No hay sprints para este proyecto. Crea sprints en la sección Sprints o verifica que el deploy en
+          OCI haya terminado correctamente.
+        </Alert>
+      ) : null}
       <ScrollReveal>
         <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2 }, mb: 1.25, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>

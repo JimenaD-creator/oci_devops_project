@@ -60,8 +60,6 @@ public class WebSecurityConfiguration {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/projects/developer/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/projects/manager/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v2/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().permitAll()
@@ -79,28 +77,19 @@ public class WebSecurityConfiguration {
     public BearerTokenResolver publicAwareBearerTokenResolver() {
         DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
         return request -> {
-            if (request == null || isPublicAuthPath(request)) {
+            if (request == null || isLoginPath(request)) {
                 return null;
             }
             return delegate.resolve(request);
         };
     }
 
-    private static boolean isPublicAuthPath(HttpServletRequest request) {
-        String method = request.getMethod();
+    /** Never parse Bearer on login — stale tokens must not break sign-in (OCI). */
+    private static boolean isLoginPath(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path == null) {
-            return false;
-        }
-        if (HttpMethod.POST.matches(method) && path.contains("/api/auth/login")) {
-            return true;
-        }
-        if (HttpMethod.GET.matches(method)
-                && (path.matches(".*/api/projects/developer/\\d+")
-                        || path.matches(".*/api/projects/manager/\\d+"))) {
-            return true;
-        }
-        return false;
+        return path != null
+                && HttpMethod.POST.matches(request.getMethod())
+                && path.contains("/api/auth/login");
     }
 
     @Bean

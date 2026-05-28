@@ -1,4 +1,5 @@
 import { normalizeUserId } from '../../../utils/userIds';
+import { apiFetch } from '../../../utils/auth';
 import { ORACLE_RED_ACTION } from '../constants/sprintConstants';
 
 export function oracleRgba(a) {
@@ -95,8 +96,7 @@ export function resolveActiveProjectIdNum(projectIdProp) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export const fetchJsonNoStore = (url) =>
-  fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+export const fetchJsonNoStore = (url) => apiFetch(url);
 
 /**
  * Sprint dates from the API are typically midnight at day boundaries. Comparing `now` to that

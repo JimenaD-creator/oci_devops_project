@@ -639,13 +639,15 @@ export async function fetchDashboardSprints(projectId, options = {}) {
 
     if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) {
       const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
+      const err = new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
+      err.httpStatus = status;
       if (status === 401 || status === 403) {
-        console.error(
-          'Dashboard API unauthorized — sign out, hard-refresh (Ctrl+Shift+R), and sign in again. ' +
-            'If this persists, redeploy the latest Docker image to OCI.',
-        );
+        err.code = 'UNAUTHORIZED';
+        err.userMessage =
+          'No se pudieron cargar los datos. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo. ' +
+          'Si sigue igual, confirma que el deploy en OCI terminó bien y que existe el secret jwt-secret.';
       }
-      throw new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
+      throw err;
     }
 
     const apiSprints = await sprintsRes.json();
@@ -676,6 +678,9 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     return enriched;
   } catch (error) {
     console.error('Dashboard data load failed:', error);
+    if (error?.code === 'UNAUTHORIZED' || error?.httpStatus === 401 || error?.httpStatus === 403) {
+      throw error;
+    }
     return [];
   }
 }
