@@ -16,7 +16,7 @@ import {
 import { avgHoursPerDeveloper } from './dashboardSprintData';
 import { RECHARTS_BAR_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography';
 
-const CHART_H_BASE = 228;
+const CHART_H_BASE = 188;
 
 const Y_AXIS_TICK = (isDark) => ({ 
   fontSize: 12, 
@@ -98,7 +98,7 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
   const isDark = theme.palette.mode === 'dark';
   
   const n = data?.length ?? 0;
-  const chartH = Math.min(340, CHART_H_BASE + Math.max(0, n - 4) * 16);
+  const chartH = Math.min(280, CHART_H_BASE + Math.max(0, n - 4) * 14);
   const marginBottom = Math.min(64, 40 + Math.max(0, n - 4) * 6);
   const barCategoryGap = n >= 7 ? '12%' : n >= 5 ? '16%' : '24%';
   const tickFontSize = n > 7 ? 9 : n > 5 ? 10 : 11;
@@ -224,7 +224,7 @@ function SprintHoursCompareBlock({ data }) {
   const isDark = theme.palette.mode === 'dark';
   
   const n = data?.length ?? 0;
-  const chartH = Math.min(360, CHART_H_BASE + Math.max(0, n - 4) * 16);
+  const chartH = Math.min(300, CHART_H_BASE + Math.max(0, n - 4) * 14);
   const marginBottom = Math.min(72, 48 + Math.max(0, n - 4) * 6);
   const barCategoryGap = n >= 7 ? '12%' : n >= 5 ? '16%' : '24%';
   const tickFontSize = n > 7 ? 9 : n > 5 ? 10 : 11;
@@ -344,7 +344,7 @@ export default function SprintComparisonCharts({ selectedSprints = [] }) {
     <Paper
       sx={{
         p: 2.5,
-        mb: 3,
+        mb: 2,
         borderRadius: 3,
         border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
         boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',

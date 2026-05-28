@@ -1,8 +1,3 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`DashboardCompletedTasksPills > compare mode label list > matches snapshot 1`] = `
-[
-  "S1: 2 tasks completed",
-  "S2: 5 tasks completed",
-]
-`;
+exports[`DashboardCompletedTasksPills > compare mode aggregated total > matches snapshot 1`] = `"7 completed"`;

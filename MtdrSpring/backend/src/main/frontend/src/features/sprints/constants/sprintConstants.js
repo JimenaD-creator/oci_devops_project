@@ -1,5 +1,6 @@
-/** Base URL for API calls (dev proxy vs same-origin in production). */
-export const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+import { API_BASE } from '../../../utils/apiBase';
+
+export { API_BASE };
 
 /** Primary actions / brand (red, black, gray — not blue). */
 export const ORACLE_RED = '#E53935';

@@ -74,7 +74,7 @@ export function buildHoursAxisDomainTicks(maxHours) {
 
 /** Finer Y-axis ticks for compare-mode workload chart (does not affect combo/single). */
 export function buildCompareTaskAxisDomainTicks(maxStack) {
-  const padded = Math.max(maxStack * 1.1, maxStack + 1, 5);
+  const padded = Math.max(maxStack * 1.06, maxStack + 0.5, 5);
   const domainMax = Math.max(1, Math.ceil(padded));
   let step = 1;
   if (domainMax > 20) step = 2;
@@ -88,7 +88,7 @@ export function buildCompareTaskAxisDomainTicks(maxStack) {
 
 /** Finer Y-axis ticks for compare-mode hours chart (does not affect combo/single). */
 export function buildCompareHoursAxisDomainTicks(maxHours) {
-  const padded = Math.max(maxHours * 1.12, maxHours + 1.5, 6);
+  const padded = Math.max(maxHours * 1.08, maxHours + 1, 6);
   const domainMax = Math.max(1, Math.ceil(padded));
   let step = 1;
   if (domainMax > 12) step = 2;
@@ -139,7 +139,7 @@ export function comboHeightExtraFromRange(maxTasks, maxHours) {
 export function compareChartHeights(base) {
   const b = Math.max(280, base);
   return {
-    xs: Math.round(Math.max(280, b * 0.9)),
+    xs: Math.round(Math.max(260, b * 0.9)),
     sm: Math.round(b),
   };
 }

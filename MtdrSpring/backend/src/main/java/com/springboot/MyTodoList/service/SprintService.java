@@ -20,4 +20,11 @@ public class SprintService {
     public Sprint findById(Long id) {
         return sprintRepository.findById(id).orElse(null);
     }
+
+    public List<Sprint> findByProjectIdOrderByStartDateAsc(Long projectId) {
+        if (projectId == null) {
+            return List.of();
+        }
+        return sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+    }
 }

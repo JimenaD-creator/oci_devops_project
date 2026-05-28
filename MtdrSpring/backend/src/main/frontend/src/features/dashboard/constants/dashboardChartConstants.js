@@ -2,7 +2,7 @@
 export const CHART_DESC = {
   compare: {
     workload:
-      'Total completed and pending tasks per developer, summed across all selected sprints.',
+      'One stacked bar per sprint: completed (solid) with pending (lighter) on top, per developer.',
     hours:
       'Total hours worked and estimated hours per developer, summed across all selected sprints.',
     combo: 'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',

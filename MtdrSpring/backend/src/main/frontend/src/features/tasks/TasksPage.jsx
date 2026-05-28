@@ -25,7 +25,7 @@ import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
-import { developerNumericId } from '../../utils/userIds';
+import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -45,6 +45,15 @@ import { useProjectData } from '../../contexts/ProjectDataContext';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
+import {
+  applyRecentUpdatesToTaskLists,
+  getRecentlyCreatedTasks,
+  getRecentlyCreatedUserTasks,
+  mergeUserTaskLists,
+  TASKS_MUTATED_EVENT,
+  getRecentlyDeletedTaskIdSet,
+  notifyTasksMutated,
+} from '../../utils/taskSyncEvents';
 
 export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
@@ -69,6 +78,8 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
   const recentlyDeletedTaskIdsRef = useRef(new Set());
+  const projectDevelopersRef = useRef(projectDevelopers);
+  projectDevelopersRef.current = projectDevelopers;
   const { invalidateAndRefresh } = useProjectData();
 
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
@@ -104,16 +115,31 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             forceFresh: forceRefresh,
           },
         );
-        const deleted = recentlyDeletedTaskIdsRef.current;
-        const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
+        const deleted = new Set([
+          ...recentlyDeletedTaskIdsRef.current,
+          ...getRecentlyDeletedTaskIdSet(),
+        ]);
+        const createdTasks = getRecentlyCreatedTasks();
+        const baseTasks = Array.isArray(tasksData) ? tasksData : [];
+        const mergedTasks = [...createdTasks, ...baseTasks].filter(
+          (task, index, arr) =>
+            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+        );
+        const visibleTasks = mergedTasks.filter(
           (t) => !deleted.has(taskEntityId(t)),
         );
-        const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
-          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
+        const visibleUserTasks = mergeUserTaskLists(
+          getRecentlyCreatedUserTasks(),
+          Array.isArray(userTasksData) ? userTasksData : [],
+        ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
+        const synced = applyRecentUpdatesToTaskLists(
+          visibleTasks,
+          visibleUserTasks,
+          projectDevelopersRef.current,
         );
-        setRawTasks(visibleTasks);
+        setRawTasks(synced.tasks);
         setSprints(Array.isArray(sprintsData) ? sprintsData : []);
-        setUserTasks(visibleUserTasks);
+        setUserTasks(synced.userTasks);
       } catch (error) {
         console.error('Error loading tasks data:', error);
         setRawTasks([]);
@@ -130,6 +156,56 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!taskDetailOpen || !taskForDetailDialog?.id) return;
+    const fresh = rawTasks.find((t) => Number(t.id) === Number(taskForDetailDialog.id));
+    if (fresh) setTaskForDetailDialog(fresh);
+  }, [rawTasks, taskForDetailDialog?.id, taskDetailOpen]);
+
+  useEffect(() => {
+    const onTasksMutated = (event) => {
+      if (event?.detail?.source === 'tasks-page') return;
+      if (event?.detail?.type === 'task-created' && event?.detail?.task) {
+        const created = event.detail.task;
+        setRawTasks((prev) => {
+          const exists = prev.some((t) => Number(t.id) === Number(created?.id));
+          return exists ? prev : [created, ...prev];
+        });
+        const rows = Array.isArray(event.detail.userTasks) ? event.detail.userTasks : [];
+        if (rows.length > 0) {
+          setUserTasks((prev) => mergeUserTaskLists(rows, prev));
+        }
+      }
+      if (event?.detail?.type === 'task-updated' && event?.detail?.task) {
+        const updated = event.detail.task;
+        const meta = event.detail.meta;
+        setRawTasks((prev) => mergeUpdatedTask(prev, updated));
+        setUserTasks((prev) =>
+          patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
+        );
+        setTaskForDetailDialog((prev) =>
+          prev && Number(prev.id) === Number(updated.id) ? { ...prev, ...updated } : prev,
+        );
+      }
+      if (event?.detail?.type === 'task-deleted' && event?.detail?.taskId != null) {
+        const tid = String(event.detail.taskId);
+        recentlyDeletedTaskIdsRef.current.add(tid);
+        setRawTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
+        setUserTasks((prev) =>
+          prev.filter((ut) => {
+            const utTid = userTaskRowTaskId(ut);
+            return !Number.isFinite(utTid) || String(utTid) !== tid;
+          }),
+        );
+      }
+      loadData({ silent: true }).catch((e) => {
+        console.error('TasksPage sync refresh failed:', e);
+      });
+    };
+    window.addEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
+    return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
   }, [loadData]);
 
   useEffect(() => {
@@ -238,6 +314,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId),
     );
     const ns = String(newStatus || '').toUpperCase();
+    let lastUpdated = null;
+    const publishStatusUpdate = (updated, meta) => {
+      if (!updated?.id) return;
+      notifyTasksMutated({
+        source: 'tasks-page',
+        type: 'task-updated',
+        taskId: updated.id,
+        task: updated,
+        meta,
+      });
+    };
     const putTask = async () => {
       const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -246,6 +333,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       });
       if (res.ok) {
         const updated = await res.json();
+        lastUpdated = updated;
         setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
         if (assignees.length > 1 && ns !== 'DONE') {
           const canonicalUt = normalizeTaskStatus(newStatus);
@@ -262,6 +350,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     try {
       if (assignees.length === 0) {
         await putTask();
+        publishStatusUpdate(lastUpdated, undefined);
         return;
       }
       if (assignees.length === 1) {
@@ -283,9 +372,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               }),
             );
             await putTask();
+            publishStatusUpdate(lastUpdated, {
+              syncAssignmentStatuses: true,
+              assignmentStatus: 'COMPLETED',
+            });
           }
         } else {
           await putTask();
+          publishStatusUpdate(lastUpdated, {
+            syncAssignmentStatuses: true,
+            assignmentStatus: normalizeTaskStatus(newStatus),
+          });
         }
         return;
       }
@@ -293,12 +390,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         const allDone = assignees.every((ut) => isUserTaskAssigneeComplete(ut));
         if (allDone) {
           await putTask();
+          publishStatusUpdate(lastUpdated, undefined);
         } else {
           setMultiDoneTaskId(taskId);
         }
         return;
       }
       await putTask();
+      publishStatusUpdate(lastUpdated, {
+        syncAssignmentStatuses: true,
+        assignmentStatus: normalizeTaskStatus(newStatus),
+      });
     } catch (e) {
       console.error('Error updating task status:', e);
     }
@@ -347,9 +449,43 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     }
   }, [invalidateAndRefresh, loadData]);
 
-  const handleTaskCreated = useCallback(async () => {
-    await refreshSharedAfterTaskMutation();
-  }, [refreshSharedAfterTaskMutation]);
+  const handleTaskCreated = useCallback(
+    async (createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
+      setRawTasks((prev) => {
+        const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
+        return exists ? prev : [createdTask, ...prev];
+      });
+      let optimisticRows = [];
+      if (createdTask?.id) {
+        const byId = new Map(
+          (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
+        );
+        optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
+          const matched = byId.get(Number(uid));
+          return {
+            task: { id: Number(createdTask.id) },
+            user: {
+              id: Number(uid),
+              name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
+            },
+            status: assignmentStatus,
+          };
+        });
+        if (optimisticRows.length > 0) {
+          setUserTasks((prev) => mergeUserTaskLists(optimisticRows, prev));
+        }
+      }
+      notifyTasksMutated({
+        source: 'tasks-page',
+        type: 'task-created',
+        taskId: createdTask?.id,
+        task: createdTask,
+        userTasks: optimisticRows,
+      });
+      await refreshSharedAfterTaskMutation();
+    },
+    [projectDevelopers, refreshSharedAfterTaskMutation],
+  );
 
   useEffect(() => {
     if (multiDoneTaskId == null) return;
@@ -368,7 +504,25 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
       });
-      if (res.ok) await loadData({ forceRefresh: true });
+      if (res.ok) {
+        setUserTasks((prev) =>
+          prev.map((row) => {
+            const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+            const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
+            if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
+            return { ...row, status: 'COMPLETED' };
+          }),
+        );
+        const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
+        notifyTasksMutated({
+          source: 'tasks-page',
+          type: 'task-updated',
+          taskId,
+          task: taskRow ?? { id: taskId },
+          meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+        });
+        await loadData({ silent: true });
+      }
     } catch (e) {
       console.error('Error marking assignee done:', e);
     }
@@ -895,6 +1049,13 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
           );
           closeTaskDetailDialog();
+          notifyTasksMutated({
+            source: 'tasks-page',
+            type: 'task-updated',
+            taskId: updated?.id,
+            task: updated,
+            meta,
+          });
           try {
             await refreshSharedAfterTaskMutation();
           } catch (e) {
@@ -904,6 +1065,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         onDeleted={async (taskId) => {
           removeTaskFromState(taskId);
           closeTaskDetailDialog();
+          notifyTasksMutated({ source: 'tasks-page', type: 'task-deleted', taskId });
           await refreshSharedAfterTaskMutation();
         }}
       />

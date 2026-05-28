@@ -15,6 +15,7 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
+import com.springboot.MyTodoList.service.UserTaskService;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,9 @@ class UserTaskControllerTest {
 
     @MockBean
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @MockBean
+    private UserTaskService userTaskService;
 
     @Test
     void getAllUserTasks_returnsList() throws Exception {
@@ -111,5 +115,18 @@ class UserTaskControllerTest {
         when(userTaskRepository.findByProjectIdWithUserAndTask(5L)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/user-tasks").param("projectId", "5")).andExpect(status().isOk());
+    }
+
+    @Test
+    void resolveMyBlocker_success_returnsOk() throws Exception {
+        UserTask resolved = new UserTask();
+        when(userTaskService.resolveBlockedReport(3L, 90L)).thenReturn(resolved);
+
+        mockMvc.perform(post("/api/user-tasks/my-blockers/resolve")
+                        .param("userId", "3")
+                        .param("taskId", "90"))
+                .andExpect(status().isOk());
+
+        verify(userTaskService).resolveBlockedReport(3L, 90L);
     }
 }

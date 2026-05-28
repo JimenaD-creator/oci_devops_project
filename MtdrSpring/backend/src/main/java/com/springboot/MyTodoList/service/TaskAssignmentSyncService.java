@@ -58,8 +58,8 @@ public class TaskAssignmentSyncService {
 
         String newStatus;
         if (allDone)            newStatus = "DONE";
-        else if (anyInProgress) newStatus = "IN_PROGRESS";
         else if (anyInReview)   newStatus = "IN_REVIEW";
+        else if (anyInProgress) newStatus = "IN_PROGRESS";
         else if (anyDone)       newStatus = "IN_REVIEW";
         else                    newStatus = "TODO";
 

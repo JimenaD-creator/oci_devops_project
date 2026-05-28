@@ -13,6 +13,7 @@ import {
   Popover,
   Stack,
   Button,
+  Alert,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -21,7 +22,6 @@ import GroupIcon from '@mui/icons-material/Group';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
-import DashboardCompletedTasksPills from './DashboardCompletedTasksPills';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DashboardBlockedTasksPanel from './DashboardBlockedTasksPanel';
 import DeveloperTable from '../kpis/DeveloperTable';
@@ -37,6 +37,8 @@ import {
 import {
   DASHBOARD_CONTENT_MAX_WIDTH,
   DASHBOARD_PRIMARY_ACCENT,
+  DASHBOARD_BLOCK_GAP,
+  SECTION_BRAND_DARK,
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
@@ -65,13 +67,19 @@ const AVATAR_PALETTE_DARK = [
   { bg: '#1A4A4A', color: '#80CBC4' },
 ];
 
-export default function DashboardPage({ projectId: propProjectId }) {
+export default function DashboardPage({ projectId: propProjectId, onNavigateToTasks }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const AVATAR_PALETTE = isDark ? AVATAR_PALETTE_DARK : AVATAR_PALETTE_LIGHT;
-  const { sprints: sharedSprints, loading: sharedLoading } = useProjectData();
+  const {
+    sprints: sharedSprints,
+    loading: sharedLoading,
+    error: dataError,
+    getRawBundle,
+  } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
+  const [projectTaskCount, setProjectTaskCount] = useState(0);
   const [sprintsLoading, setSprintsLoading] = useState(true);
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
@@ -125,6 +133,29 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
     if (!sharedLoading) setSprintsLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setProjectTaskCount(0);
+      return;
+    }
+    if (sharedLoading) return undefined;
+
+    let cancelled = false;
+    getRawBundle()
+      .then(({ tasks }) => {
+        if (!cancelled) {
+          setProjectTaskCount(Array.isArray(tasks) ? tasks.length : 0);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProjectTaskCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, sharedLoading, getRawBundle, allSprints.length]);
 
   useEffect(() => {
     setProjectDevelopers([]);
@@ -275,32 +306,6 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
   }, [blockedNotificationItems]);
 
-  const headerTasksCompleted = useMemo(() => {
-    if (!selectedSprints?.length) return null;
-    if (compareMode) {
-      return (
-        <DashboardCompletedTasksPills
-          pillTestId="dashboard-header-tasks-completed"
-          accent={selectedSprints[0]?.accentColor ?? DASHBOARD_PRIMARY_ACCENT}
-          compareBySprint={selectedSprints.map((sp) => ({
-            id: Number(sp.id),
-            shortLabel: sp.shortLabel ?? `S${sp.id}`,
-            completed: Number(sp.totalCompleted) || 0,
-            accentColor: sp.accentColor,
-          }))}
-        />
-      );
-    }
-    if (!primarySprint) return null;
-    return (
-      <DashboardCompletedTasksPills
-        pillTestId="dashboard-header-tasks-completed"
-        accent={primarySprint.accentColor ?? DASHBOARD_PRIMARY_ACCENT}
-        count={Number(primarySprint.totalCompleted) || 0}
-      />
-    );
-  }, [selectedSprints, compareMode, primarySprint]);
-
   const toggleSprint = (id, checked) => {
     const nid = Number(id);
     setSelectedSprintIds((prev) => {
@@ -311,8 +316,113 @@ export default function DashboardPage({ projectId: propProjectId }) {
     });
   };
 
+  if (!projectId) {
+    return (
+      <Box sx={{ p: 3, maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, mx: 'auto' }}>
+        <Alert severity="warning">
+          No hay proyecto seleccionado. Si eres manager, usa &quot;Cambiar proyecto&quot;. Si acabas de
+          iniciar sesión, cierra sesión y vuelve a entrar.
+        </Alert>
+      </Box>
+    );
+  }
+
   if (sprintsLoading) {
     return <PageLoadingSpinner />;
+  }
+
+  const loadErrorMessage =
+    dataError?.userMessage ||
+    (dataError?.code === 'UNAUTHORIZED'
+      ? 'Sesión inválida o expirada. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo.'
+      : dataError?.message
+        ? `Error al cargar datos: ${dataError.message}`
+        : null);
+
+  const shouldShowEmptyDashboardView =
+    !loadErrorMessage && (allSprints.length === 0 || projectTaskCount === 0);
+
+  if (loadErrorMessage) {
+    return (
+      <Box sx={{ p: 3, maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, mx: 'auto' }}>
+        <Alert severity="error">{loadErrorMessage}</Alert>
+      </Box>
+    );
+  }
+
+  if (shouldShowEmptyDashboardView) {
+    return (
+      <Box
+        sx={{
+          maxWidth: DASHBOARD_CONTENT_MAX_WIDTH,
+          width: '100%',
+          mx: 'auto',
+          minHeight: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 190px)' },
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 800,
+            color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
+            letterSpacing: '-0.5px',
+            mb: 3,
+            px: 2,
+            pt: 3,
+          }}
+        >
+          Dashboard
+        </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 2,
+            pb: 3,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: '100%',
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+              textAlign: 'center',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+              No information to display yet
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', maxWidth: 640, mx: 'auto', mb: 3 }}>
+              There are no sprints or tasks to visualize in this project. Create a sprint and add
+              tasks to view the dashboard.
+            </Typography>
+            {typeof onNavigateToTasks === 'function' ? (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={onNavigateToTasks}
+                sx={{
+                  bgcolor: ORACLE_RED_ACTION,
+                  fontWeight: 700,
+                  px: 3,
+                  '&:hover': { bgcolor: '#A3321F' },
+                }}
+              >
+                Go to Tasks
+              </Button>
+            ) : null}
+          </Paper>
+        </Box>
+      </Box>
+    );
   }
 
   return (
@@ -329,10 +439,10 @@ export default function DashboardPage({ projectId: propProjectId }) {
       }}
     >
       <ScrollReveal>
-        <Paper elevation={0} sx={{ p: 2.5, mb: 1.5, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1.5 }}>
+        <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2 }, mb: 1.25, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>
             <Box sx={{ pr: 1, minWidth: 0, flex: 1 }}>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2, fontSize: { xs: '1.65rem', sm: '2rem', md: '2.25rem' } }}>
+              <Typography variant="h3" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2, fontSize: { xs: '1.4rem', sm: '1.65rem', md: '1.85rem' } }}>
                 Dashboard – {projectName}
               </Typography>
               {sprintDateLabel ? (
@@ -663,17 +773,13 @@ export default function DashboardPage({ projectId: propProjectId }) {
                 {teamDeveloperCount} devs
               </Typography>
             </Box>
-            {!compareMode && headerTasksCompleted}
           </Box>
-          {compareMode && headerTasksCompleted ? (
-            <Box sx={{ mt: 1.25, width: '100%' }}>{headerTasksCompleted}</Box>
-          ) : null}
         </Paper>
       </ScrollReveal>
 
       <ScrollReveal delay={0.04}>
-        <Card sx={{ borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`, mb: 2.5, bgcolor: 'background.paper' }}>
-          <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+        <Card sx={{ borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`, mb: 2, bgcolor: 'background.paper' }}>
+          <CardContent sx={{ py: 1.25, px: 1.75, '&:last-child': { pb: 1.25 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#333' }}>Completion rate</Typography>
               <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: DASHBOARD_PRIMARY_ACCENT, lineHeight: 1 }}>
@@ -687,8 +793,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
       </ScrollReveal>
 
       <ScrollReveal delay={0.07}>
-        <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
-          <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#616161', fontWeight: 600, mb: 1.25 }}>
+        <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
+          <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#616161', fontWeight: 600, mb: 1, fontSize: '0.8125rem' }}>
             Select one or more sprints below to filter the dashboard. Check additional boxes to compare sprints side by side.
           </Typography>
   <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -725,15 +831,17 @@ export default function DashboardPage({ projectId: propProjectId }) {
         sx={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, overflow: 'visible' }}
       >
         <ScrollReveal delay={0.05}>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' }, alignItems: 'stretch', gap: { xs: 3, md: 3 }, width: '100%', minWidth: 0, mb: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' }, alignItems: 'stretch', gap: DASHBOARD_BLOCK_GAP, width: '100%', minWidth: 0, mb: 2.5 }}>
             <Box sx={{ flex: { md: compareMode ? 'none' : '1 1 0' }, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.5, textAlign: 'left', width: '100%' }}>Scorecards</Typography>
-              <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left', color: 'text.secondary' }}>Quick totals and averages for the sprint(s) currently selected above.</Typography>
+              <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35, textAlign: 'left', width: '100%' }}>Scorecards</Typography>
+              <Typography sx={{ ...SECTION_DESC_SX, mb: 1, width: '100%', textAlign: 'left', color: 'text.secondary' }}>Quick totals and averages for the sprint(s) currently selected above.</Typography>
               <DashboardTopMetrics
                 showSectionHeader={false}
                 multiSprint={compareMode}
                 scorecardsFourColumn={compareMode}
                 totalTasks={selectionMetrics.totalTasks}
+                totalCompleted={selectionMetrics.totalCompleted}
+                totalAssigned={selectionMetrics.totalAssigned}
                 totalHours={selectionMetrics.totalHours}
                 avgTasksPerDev={avgTasksPerTeamDev}
                 avgHoursPerDev={avgHoursPerTeamDev}
@@ -745,9 +853,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
             </Box>
             {!compareMode ? (
               <Box sx={{ flex: { md: '1 1 0' }, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: { xs: '100%', md: 'auto' } }}>
-                <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.5, textAlign: 'left', width: '100%' }}>Project status</Typography>
-                <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, width: '100%', textAlign: 'left', color: 'text.secondary' }}>Where tasks sit in the workflow for the active sprint.</Typography>
-                <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.25 }, flex: 1, display: 'flex', flexDirection: 'column', minHeight: { xs: 260, md: 0 }, width: '100%', borderRadius: 3, border: `1px solid ${isDark ? '#1A3A5C' : '#E3F2FD'}`, borderLeft: '5px solid #1565C0', background: isDark ? 'linear-gradient(135deg, rgba(21,101,192,0.12) 0%, #1C1E22 50%)' : 'linear-gradient(135deg, rgba(21,101,192,0.07) 0%, #FFFFFF 50%)', boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(21,101,192,0.08)', boxSizing: 'border-box' }}>
+                <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35, textAlign: 'left', width: '100%' }}>Project status</Typography>
+                <Typography sx={{ ...SECTION_DESC_SX, mb: 1, width: '100%', textAlign: 'left', color: 'text.secondary' }}>Where tasks sit in the workflow for the active sprint.</Typography>
+                <Paper elevation={0} sx={{ p: { xs: 1.25, sm: 1.5 }, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignSelf: 'stretch', width: '100%', borderRadius: 3, border: `1px solid ${isDark ? '#1A3A5C' : '#E3F2FD'}`, borderLeft: '5px solid #1565C0', background: isDark ? 'linear-gradient(135deg, rgba(21,101,192,0.12) 0%, #1C1E22 50%)' : 'linear-gradient(135deg, rgba(21,101,192,0.07) 0%, #FFFFFF 50%)', boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(21,101,192,0.08)', boxSizing: 'border-box' }}>
                   <TaskStatusDistributionChart distribution={taskStatusDistribution} total={taskStatusTotal} embedded caption="Tasks in each workflow stage for this sprint." />
                 </Paper>
               </Box>
@@ -761,8 +869,8 @@ export default function DashboardPage({ projectId: propProjectId }) {
 
         <ScrollReveal delay={0.06}>
           <Box sx={{ mb: 0 }}>
-            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.5 }}>Developer performance</Typography>
-            <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, color: 'text.secondary' }}>Charts for workload, hours, and productivity by developer.</Typography>
+            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}>Developer performance</Typography>
+            <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>Charts for workload, hours, and productivity by developer.</Typography>
           </Box>
         </ScrollReveal>
         <DashboardDeveloperCharts
@@ -773,9 +881,9 @@ export default function DashboardPage({ projectId: propProjectId }) {
         />
 
         <ScrollReveal delay={0.05}>
-          <Box sx={{ mt: 4, mb: 0 }}>
-            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.5 }}>Developer productivity breakdown</Typography>
-            <Typography sx={{ ...SECTION_DESC_SX, mb: 1.5, color: 'text.secondary' }}>Detailed per-developer numbers and sprint columns when comparing.</Typography>
+          <Box sx={{ mt: 2.5, mb: 0 }}>
+            <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}>Developer productivity breakdown</Typography>
+            <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>Detailed per-developer numbers and sprint columns when comparing.</Typography>
           </Box>
         </ScrollReveal>
         <ScrollReveal delay={0.06}>

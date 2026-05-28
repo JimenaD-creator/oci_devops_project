@@ -1,13 +1,30 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logout } from '../utils/auth';
-import { API_BASE } from '../features/sprints/constants/sprintConstants';
+import {
+  apiFetch,
+  isAuthenticated,
+  loadStoredUser,
+  logout,
+  persistCurrentUser,
+  resolveProfilePicture,
+} from '../utils/auth';
+import {
+  buildUserSessionFromAuth,
+  isAdminRole,
+  getProfileRoleLabel,
+  getSidebarRoleLabel,
+  isDeveloperRole,
+  isManagerRole,
+  normalizeUserRole,
+} from '../utils/userRoleUtils';
+import { getApiBase } from '../utils/apiBase';
 import { useThemeMode } from '../ThemeContext';
 import { ProjectDataProvider } from '../contexts/ProjectDataContext';
 import PageLoadingSpinner from '../components/common/PageLoadingSpinner';
 
 import {
   Box,
+  Button,
   Drawer,
   List,
   ListItemButton,
@@ -95,8 +112,8 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return 'dashboard';
       const parsed = JSON.parse(stored);
-      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
-      return role === 'DEVELOPER' ? 'my-tasks' : 'dashboard';
+      const role = buildUserSessionFromAuth(parsed).role;
+      return isDeveloperRole(role) ? 'my-tasks' : 'dashboard';
     } catch {
       return 'dashboard';
     }
@@ -104,6 +121,14 @@ function App() {
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
   const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
   const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
+  /** Manager opened "Change project" — do not auto-pick the first project again. */
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  /** null = loading; array = projects for this manager's team */
+  const [managerProjects, setManagerProjects] = useState(null);
+  /** loading | ready | missing — avoids infinite spinner when prod DB has no team/project for user */
+  const [devProjectStatus, setDevProjectStatus] = useState(() =>
+    localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
+  );
   const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
   /** Pages already opened stay mounted (hidden) to avoid refetch on every sidebar click. */
   const [visitedPages, setVisitedPages] = useState(() => {
@@ -111,8 +136,8 @@ function App() {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return new Set(['dashboard']);
       const parsed = JSON.parse(stored);
-      const role = (parsed.role || parsed.type || 'DEVELOPER').toUpperCase();
-      return new Set([role === 'DEVELOPER' ? 'my-tasks' : 'dashboard']);
+      const role = buildUserSessionFromAuth(parsed).role;
+      return new Set([isDeveloperRole(role) ? 'my-tasks' : 'dashboard']);
     } catch {
       return new Set(['dashboard']);
     }
@@ -130,49 +155,100 @@ function App() {
     setActivePage('team');
   }, []);
   const handleOpenAiInsightsFromTeam = useCallback(() => { setActivePage('ai-insights'); }, []);
+  const handleNavigateToProjectTasks = useCallback(() => {
+    setSprintsNavOpen(true);
+    setActivePage('sprints');
+  }, []);
 
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('currentUser');
-      if (!stored) return null;
-      const parsed = JSON.parse(stored);
-      return { ...parsed, role: (parsed.role || parsed.type || 'DEVELOPER').toUpperCase() };
-    } catch { return null; }
-  });
+  const [user, setUser] = useState(() => loadStoredUser());
 
   // profilePicture como estado independiente para refrescar el Avatar sin recargar todo
-  const [profilePicture, setProfilePicture] = useState(user?.profilePicture || null);
+  const [profilePicture, setProfilePicture] = useState(() => {
+    const u = loadStoredUser();
+    return resolveProfilePicture(u?.id, u?.profilePicture);
+  });
 
   useEffect(() => {
-    if (user?.role === 'MANAGER' && !selectedProjectId) {
-      fetch(`${API_BASE}/api/projects/manager/${user.id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((project) => {
-          if (project) {
-            localStorage.setItem('currentProjectId', project.id);
-            localStorage.setItem('currentProjectName', project.name);
-            setSelectedProjectId(String(project.id));
-            setSelectedProjectName(project.name);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [user, selectedProjectId]);
+    if (!user?.id || profilePicture) return;
+    let cancelled = false;
+    fetch(`${getApiBase()}/users/${user.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((dbUser) => {
+        if (cancelled || !dbUser?.profilePicture) return;
+        const updated = { ...user, profilePicture: dbUser.profilePicture };
+        persistCurrentUser(updated);
+        setUser(updated);
+        setProfilePicture(
+          resolveProfilePicture(updated.id, updated.profilePicture),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profilePicture]);
 
   useEffect(() => {
-    if (user?.role === 'DEVELOPER' && !selectedProjectId) {
-      fetch(`${API_BASE}/api/projects/developer/${user.id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((project) => {
-          if (project) {
-            localStorage.setItem('currentProjectId', project.id);
-            localStorage.setItem('currentProjectName', project.name);
-            setSelectedProjectId(String(project.id));
-            setSelectedProjectName(project.name);
-          }
-        })
-        .catch(() => {});
+    if (!isManagerRole(user?.role) || !user?.id) {
+      setManagerProjects(null);
+      return;
     }
+    let cancelled = false;
+    apiFetch(`${getApiBase()}/api/projects/manager/${user.id}/list`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((projects) => {
+        if (cancelled) return;
+        const list = Array.isArray(projects) ? projects : [];
+        setManagerProjects(list);
+        if (selectedProjectId || showProjectPicker) return;
+        if (list.length === 1 && list[0]?.id != null) {
+          const only = list[0];
+          localStorage.setItem('currentProjectId', String(only.id));
+          localStorage.setItem('currentProjectName', only.name || '');
+          setSelectedProjectId(String(only.id));
+          setSelectedProjectName(only.name || '');
+        } else if (list.length > 1) {
+          setShowProjectPicker(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setManagerProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role, selectedProjectId, showProjectPicker]);
+
+  useEffect(() => {
+    if (!isDeveloperRole(user?.role)) {
+      return;
+    }
+    if (selectedProjectId) {
+      setDevProjectStatus('ready');
+      return;
+    }
+    setDevProjectStatus('loading');
+    let cancelled = false;
+    apiFetch(`${getApiBase()}/api/projects/developer/${user.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((project) => {
+        if (cancelled) return;
+        if (project?.id) {
+          localStorage.setItem('currentProjectId', String(project.id));
+          localStorage.setItem('currentProjectName', project.name || '');
+          setSelectedProjectId(String(project.id));
+          setSelectedProjectName(project.name || '');
+          setDevProjectStatus('ready');
+        } else {
+          setDevProjectStatus('missing');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDevProjectStatus('missing');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user, selectedProjectId]);
 
   useEffect(() => {
@@ -203,12 +279,12 @@ function App() {
     if (!user?.id) return;
     try {
       setUploadingPhoto(true);
-      const res = await fetch(`${API_BASE}/api/users/${user.id}/profile-picture`, {
+      const res = await fetch(`${getApiBase()}/api/users/${user.id}/profile-picture`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error();
       const updated = { ...user, profilePicture: null };
-      localStorage.setItem('currentUser', JSON.stringify(updated));
+      persistCurrentUser(updated);
       setUser(updated);
       setProfilePicture(null);
       setSnack({ open: true, msg: 'Profile photo removed', severity: 'info' });
@@ -229,7 +305,7 @@ function App() {
       setUploadingPhoto(true);
       const base64 = await compressImage(file);
 
-      const res = await fetch(`${API_BASE}/api/users/${user.id}/profile-picture`, {
+      const res = await fetch(`${getApiBase()}/api/users/${user.id}/profile-picture`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profilePicture: base64 }),
@@ -237,9 +313,9 @@ function App() {
       if (!res.ok) throw new Error();
 
       const updated = { ...user, profilePicture: base64 };
-      localStorage.setItem('currentUser', JSON.stringify(updated));
+      persistCurrentUser(updated);
       setUser(updated);
-      setProfilePicture(base64);
+      setProfilePicture(resolveProfilePicture(updated.id, base64));
       setSnack({ open: true, msg: 'Profile photo updated!', severity: 'success' });
     } catch {
       setSnack({ open: true, msg: 'Error uploading photo', severity: 'error' });
@@ -252,20 +328,61 @@ function App() {
   const handleSelectProject = (project) => {
     localStorage.setItem('currentProjectId', project.id);
     localStorage.setItem('currentProjectName', project.name);
-    setSelectedProjectId(project.id);
-    setSelectedProjectName(project.name);
+    setSelectedProjectId(String(project.id));
+    setSelectedProjectName(project.name || '');
+    setShowProjectPicker(false);
+    setActivePage('dashboard');
   };
 
   const handleChangeProject = () => {
+    if (isManagerRole(user?.role) && managerProjects && managerProjects.length <= 1) {
+      const name = managerProjects[0]?.name || selectedProjectName || 'your project';
+      setSnack({
+        open: true,
+        msg: `You only have one assigned project (${name}).`,
+        severity: 'info',
+      });
+      return;
+    }
     localStorage.removeItem('currentProjectId');
     localStorage.removeItem('currentProjectName');
     setSelectedProjectId(null);
     setSelectedProjectName(null);
+    setShowProjectPicker(true);
   };
 
-  if (!user) return null;
+  useEffect(() => {
+    if (user) return;
+    if (!isAuthenticated()) return;
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (!stored) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (parsed?.id == null) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+      const loaded = loadStoredUser();
+      if (loaded) {
+        setUser(loaded);
+        setProfilePicture(resolveProfilePicture(loaded.id, loaded.profilePicture));
+      }
+    } catch {
+      logout();
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
 
-  const isDeveloper = user.role === 'DEVELOPER';
+  if (!user) {
+    return <PageLoader />;
+  }
+
+  const isDeveloper = isDeveloperRole(user.role);
 
   const DEVELOPER_NAV_ITEMS = [
     { text: 'My Tasks', id: 'my-tasks', icon: <AssignmentIcon /> },
@@ -279,8 +396,18 @@ function App() {
     { text: 'AI Insights',    icon: <AutoAwesomeIcon />, id: 'ai-insights', roles: ['ADMIN', 'MANAGER'] },
     { text: 'KPI Analytics',  icon: <AnalyticsIcon />,   id: 'analytics',   roles: ['ADMIN', 'MANAGER'] },
     { text: 'Team',           icon: <GroupIcon />,        id: 'team',        roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN'] },
-  ].filter((item) => item.roles.includes(user.role));
+    { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN', 'MANAGER'] },
+  ].filter((item) => {
+    if (item.id === 'selector' && isManagerRole(user.role)) {
+      if (managerProjects == null) return false;
+      if (managerProjects.length <= 1) return false;
+    }
+    return item.roles.some((r) => {
+      if (r === 'ADMIN') return isAdminRole(user.role);
+      if (r === 'MANAGER') return isManagerRole(user.role);
+      return normalizeUserRole(user.role).toUpperCase() === r;
+    });
+  });
 
   const topNavItems = isDeveloper
     ? DEVELOPER_NAV_ITEMS
@@ -304,16 +431,54 @@ function App() {
     navigate('/login', { replace: true });
   };
 
-  if (user.role === 'ADMIN' && !selectedProjectId) {
+  if (
+    (isAdminRole(user.role) || isManagerRole(user.role))
+    && (!selectedProjectId || showProjectPicker)
+  ) {
     return (
       <Suspense fallback={<PageLoader />}>
-        <ProjectSelector onSelect={handleSelectProject} />
+        <ProjectSelector
+          onSelect={handleSelectProject}
+          mode={isManagerRole(user.role) ? 'manager' : 'admin'}
+          skipAutoSelect={showProjectPicker}
+        />
       </Suspense>
     );
   }
 
   if (isDeveloper && !selectedProjectId) {
-    return <PageLoader />;
+    if (devProjectStatus === 'loading') {
+      return <PageLoader />;
+    }
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+          p: 3,
+        }}
+      >
+        <Box sx={{ textAlign: 'center', maxWidth: 480 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Signed in — no project assigned
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', mb: 2.5, fontSize: '0.9rem' }}>
+            Login worked, but user ID {user.id} is not linked to a project team (TEAM_MEMBER).
+            Ask your manager to add you to a project in the web app.
+          </Typography>
+          <Button
+            variant="contained"
+            sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}
+            onClick={handleLogout}
+          >
+            Sign out
+          </Button>
+        </Box>
+      </Box>
+    );
   }
 
   const drawerBg     = '#1A1A1A';
@@ -356,7 +521,7 @@ function App() {
             <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
               {selectedProjectName || 'Software Manager Tool'}
             </Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{user.role}</Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{getSidebarRoleLabel(user.role)}</Typography>
           </Box>
         </Box>
 
@@ -535,7 +700,7 @@ function App() {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
-              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{user.role}</Typography>
+              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role, user.jobTitle)}</Typography>
             </Box>
 
             <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
@@ -583,7 +748,7 @@ function App() {
             {visitedPages.has('dashboard') && (
               <Box sx={pageVisibilitySx('dashboard')}>
                 <DashboardPage
-                  onNavigateToTasks={() => setActivePage('tasks')}
+                  onNavigateToTasks={handleNavigateToProjectTasks}
                   projectId={selectedProjectId}
                 />
               </Box>
@@ -606,6 +771,7 @@ function App() {
                 <KPIAnalytics
                   projectId={selectedProjectId}
                   onOpenAiInsights={() => setActivePage('ai-insights')}
+                  onNavigateToTasks={handleNavigateToProjectTasks}
                 />
               </Box>
             )}

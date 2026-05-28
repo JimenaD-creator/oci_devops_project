@@ -76,12 +76,12 @@ spec:
                   name: telegram-bot-secret
                   key: username
                   optional: false
-            - name: DEEPSEEK_API_KEY
+            - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: deepseek-secret
+                  name: gemini-secret
                   key: api-key
-                  optional: true
+                  optional: false
             - name: OCI_REGION
               value: "%OCI_REGION%"
           volumeMounts:

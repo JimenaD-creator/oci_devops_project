@@ -10,6 +10,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Button,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -31,6 +32,7 @@ import {
   sectionRgba,
 } from '../dashboard/constants/dashboardConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
+import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
 
 const pageEase = [0.22, 1, 0.36, 1];
@@ -235,7 +237,7 @@ function ProductivityScoreCard({
   );
 }
 
-export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
+export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateToTasks }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
@@ -249,18 +251,16 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
   const [kpiDataReady, setKpiDataReady] = useState(false);
 
-  // Crear mapa de números de sprint secuenciales
-  const getSprintNumber = useCallback((sprintId) => {
-    const sortedSprints = [...sprints].sort((a, b) => a.id - b.id);
-    const index = sortedSprints.findIndex(s => s.id === sprintId);
-    return index >= 0 ? index + 1 : sprintId;
-  }, [sprints]);
-
+  /** Sprint 0, 1, 2… (same labels as dashboard). */
   const getSprintLabel = useCallback((sprintId) => {
     if (sprintId == null) return '';
-    const sprintNum = getSprintNumber(sprintId);
-    return `Sprint ${sprintNum}`;
-  }, [getSprintNumber]);
+    const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
+    if (sprint?.shortLabel) return sprint.shortLabel;
+    if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
+    const sortedSprints = [...sprints].sort((a, b) => Number(a.id) - Number(b.id));
+    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
+    return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+  }, [sprints]);
 
   useEffect(() => {
     if (!kpiDataReady || loading || selectedSprintId == null) return undefined;
@@ -400,6 +400,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
 
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
+  /** KPI cards need at least one sprint and one task; otherwise show full-page empty state. */
+  const shouldShowEmptyKpiView = sprints.length === 0 || tasks.length === 0;
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
   const assignedTotalInSprint = kpis.totalTasks;
   const completedTotalInSprint = kpis.completedTasks;
@@ -451,8 +453,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     const previousScore = productivityScoreFromSprintKpis(previous?.kpis);
     const delta = currentScore - previousScore;
     
-    const previousSprintNum = getSprintNumber(previous.id);
-    
+    const previousSprintLabel = getSprintLabel(previous.id);
+
     if (delta > 0) {
       const relativePct =
         previousScore > 0 ? ((currentScore - previousScore) / previousScore) * 100 : null;
@@ -460,7 +462,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
         delta >= 20 || (previousScore > 0 && relativePct != null && relativePct >= 20);
       return {
         tone: 'up',
-        text: `Productivity increased by ${delta} point${delta === 1 ? '' : 's'} versus Sprint ${previousSprintNum} (${previousScore}% → ${currentScore}%).`,
+        text: `Productivity increased by ${delta} point${delta === 1 ? '' : 's'} versus ${previousSprintLabel} (${previousScore}% → ${currentScore}%).`,
         previousSprintId: previous.id,
         previousScore,
         currentScore,
@@ -473,16 +475,88 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       const abs = Math.abs(delta);
       return {
         tone: 'down',
-        text: `Productivity decreased by ${abs} point${abs === 1 ? '' : 's'} versus Sprint ${previousSprintNum} (${previousScore}% → ${currentScore}%).`,
+        text: `Productivity decreased by ${abs} point${abs === 1 ? '' : 's'} versus ${previousSprintLabel} (${previousScore}% → ${currentScore}%).`,
       };
     }
     return {
       tone: 'neutral',
-      text: `Productivity is stable versus Sprint ${previousSprintNum} (${currentScore}%).`,
+      text: `Productivity is stable versus ${previousSprintLabel} (${currentScore}%).`,
     };
-  }, [currentSprint, sprints, kpis.productivityScore, getSprintNumber]);
+  }, [currentSprint, sprints, kpis.productivityScore, getSprintLabel]);
 
   if (loading) return <PageLoadingSpinner />;
+
+  if (shouldShowEmptyKpiView) {
+    return (
+      <Box
+        sx={{
+          maxWidth: 1200,
+          width: '100%',
+          minHeight: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 190px)' },
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 800,
+            color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
+            letterSpacing: '-0.5px',
+            mb: 3,
+          }}
+        >
+          KPI Analytics
+        </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 2,
+            py: 3,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: '100%',
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+              textAlign: 'center',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+              KPI data cannot be displayed yet
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', maxWidth: 640, mx: 'auto', mb: 3 }}>
+              There are no sprints or tasks to visualize in this project. Create a sprint and add
+              tasks to see KPI analytics here.
+            </Typography>
+            {typeof onNavigateToTasks === 'function' ? (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={onNavigateToTasks}
+                sx={{
+                  bgcolor: ORACLE_RED_ACTION,
+                  fontWeight: 700,
+                  px: 3,
+                  '&:hover': { bgcolor: '#A3321F' },
+                }}
+              >
+                Go to Tasks
+              </Button>
+            ) : null}
+          </Paper>
+        </Box>
+      </Box>
+    );
+  }
 
   // Ordenar sprints para el select
   const sortedSprintsForSelect = [...sprints].sort((a, b) => a.id - b.id);
@@ -558,18 +632,14 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
                   displayEmpty
                   renderValue={(value) => {
                     if (value === '' || value == null) return 'Select sprint';
-                    const sprintNum = getSprintNumber(value);
-                    return `Sprint ${sprintNum}`;
+                    return getSprintLabel(value);
                   }}
                 >
-                  {sortedSprintsForSelect.map((s, index) => {
-                    const sprintNumber = index + 1;
-                    return (
-                      <MenuItem key={s.id} value={s.id}>
-                        Sprint {sprintNumber}
-                      </MenuItem>
-                    );
-                  })}
+                  {sortedSprintsForSelect.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {getSprintLabel(s.id)}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             )}

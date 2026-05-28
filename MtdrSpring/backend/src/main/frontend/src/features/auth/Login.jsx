@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, login as setAuthenticated } from '../../utils/auth';
-import {
-  fetchDeveloperPrimaryProject,
-  fetchManagerPrimaryProject,
-  loginWithCredentials,
-} from './loginApi';
+import { isAuthenticated, login as setAuthenticated, clearSessionForLogin } from '../../utils/auth';
+import { redirectAfterLogin } from '../../utils/postLoginRedirect';
+import { loginWithCredentials, resolveProjectContextAfterLogin } from './loginApi';
+import { buildUserSessionFromAuth } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -42,9 +39,8 @@ const LockIcon = () => (
 );
 
 export default function Login() {
-  const navigate = useNavigate();
-  const [email, setEmail]               = useState('');
-  const [password, setPassword]         = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe]     = useState(false);
   const [isLoading, setIsLoading]       = useState(false);
@@ -61,8 +57,10 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated()) navigate('/', { replace: true });
-  }, [navigate]);
+    if (isAuthenticated()) {
+      redirectAfterLogin('/');
+    }
+  }, []);
 
   async function completeLogin() {
     setFormError('');
@@ -72,41 +70,48 @@ export default function Login() {
     }
     setIsLoading(true);
     try {
-      const authData = await loginWithCredentials(email.trim(), password.trim());
-      const userData = {
-        ...authData.user,
-        role: (authData.user.role || 'DEVELOPER').toUpperCase(),
-      };
-      setAuthenticated({ token: authData.token, user: userData }, rememberMe);
+      clearSessionForLogin();
 
-      if (userData.role === 'ADMIN') {
-        navigate('/project-selector');
-      } else if (userData.role === 'MANAGER') {
-        try {
-          const project = await fetchManagerPrimaryProject(userData.id);
-          if (project) {
-            localStorage.setItem('currentProjectId', String(project.id));
-            localStorage.setItem('currentProjectName', project.name);
-          }
-        } catch { console.error('Could not pre-load the manager project'); }
-        navigate('/');
-      } else if (userData.role === 'DEVELOPER') {
-        try {
-          const project = await fetchDeveloperPrimaryProject(userData.id);
-          if (project) {
-            localStorage.setItem('currentProjectId', String(project.id));
-            localStorage.setItem('currentProjectName', project.name);
-          }
-        } catch { console.error('Could not pre-load the developer project'); }
-        navigate('/');
+      const authData = await loginWithCredentials(email.trim(), password.trim());
+
+      if (!authData?.token || !authData?.user) {
+        throw Object.assign(new Error('Invalid login response'), {
+          serverMessage: 'The server returned an incomplete login response. Please redeploy the latest build.',
+        });
       }
+
+      const userData = buildUserSessionFromAuth(authData.user);
+      if (!Number.isFinite(userData.id)) {
+        throw Object.assign(new Error('Invalid login response'), {
+          serverMessage: 'Login response is missing user id. Contact your administrator.',
+        });
+      }
+
+      try {
+        setAuthenticated({ token: authData.token, user: userData }, rememberMe);
+      } catch {
+        throw Object.assign(new Error('Session storage failed'), {
+          serverMessage:
+            'Could not save your session in the browser. Clear site data for this URL and try again.',
+        });
+      }
+
+      const projectCtx = await resolveProjectContextAfterLogin(userData, authData);
+      if (projectCtx.projectId) {
+        localStorage.setItem('currentProjectId', projectCtx.projectId);
+        localStorage.setItem('currentProjectName', projectCtx.projectName || '');
+      }
+
+      redirectAfterLogin('/');
     } catch (err) {
+      console.error('Login failed:', err);
+      const serverMsg = err?.serverMessage;
       setFormError(
-        !err.status
-          ? 'Could not connect to the server.'
-          : 'Invalid credentials. Please try again.',
+        serverMsg
+          || (!err?.status
+            ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
+            : 'Invalid credentials. Please try again.'),
       );
-    } finally {
       setIsLoading(false);
     }
   }
@@ -158,6 +163,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
+                autoComplete="username"
               />
             </div>
           </div>
@@ -177,6 +183,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -204,11 +211,19 @@ export default function Login() {
           </div>
 
           {formError && (
-            <div style={{
-              backgroundColor: '#ffebee', color: '#c62828',
-              padding: '10px', borderRadius: '4px', fontSize: '0.85rem',
-              marginBottom: '15px', border: '1px solid #ffcdd2', textAlign: 'center',
-            }}>
+            <div
+              role="alert"
+              style={{
+                backgroundColor: '#ffebee',
+                color: '#c62828',
+                padding: '10px',
+                borderRadius: '4px',
+                fontSize: '0.85rem',
+                marginBottom: '15px',
+                border: '1px solid #ffcdd2',
+                textAlign: 'center',
+              }}
+            >
               {formError}
             </div>
           )}
@@ -224,7 +239,7 @@ export default function Login() {
           </button>
 
           <div className="login-forgot-wrap">
-            <a
+            
               href="#forgot"
               className="login-forgot-link"
               onClick={(e) => { e.preventDefault(); setShowForgot((v) => !v); setForgotStatus('idle'); }}

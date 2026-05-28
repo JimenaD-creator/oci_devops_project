@@ -55,7 +55,14 @@ import {
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
-import { normalizeTaskStatus, userTaskRowStatus, userTaskRowTaskId } from './utils/taskUtils';
+import {
+  normalizeTaskStatus,
+  taskDetailSyncSignature,
+  userTasksAssigneeSignature,
+  userTaskRowStatus,
+  userTaskRowTaskId,
+} from './utils/taskUtils';
+import { mergeUserTaskLists } from '../../utils/taskSyncEvents';
 import { assigneeDeliveryStatus } from './utils/assigneeOnTimeUtils';
 import {
   ASSIGNEE_IDENTITY_PALETTE,
@@ -432,6 +439,12 @@ const sprintNumberMap = useMemo(() => {
     return Array.isArray(projectDevelopers) ? projectDevelopers : [];
   }, [pickerDevelopers, projectDevelopers]);
 
+  const taskSyncSig = useMemo(() => taskDetailSyncSignature(initialTask), [initialTask]);
+  const assigneeSyncSig = useMemo(
+    () => userTasksAssigneeSignature(initialUserTasks, initialTask?.id),
+    [initialUserTasks, initialTask?.id],
+  );
+
   const displayNameForAssignee = (uidRaw) => {
     const uid = normalizeUserId(uidRaw);
     if (uid == null || !Number.isFinite(uid)) return 'Unknown assignee';
@@ -471,8 +484,10 @@ const sprintNumberMap = useMemo(() => {
       try {
         const { task: t, userTasks: utList } = await fetchTaskDetailBundle(initialTask.id);
         if (cancelled) return;
-        if (t) setTask(t);
-        const { ids, nameMap, rows } = assigneeStateFromUserTasks(utList);
+        const fromParent = userTasksForTaskId(initialUserTasks, initialTask.id);
+        const mergedAssignees = mergeUserTaskLists(fromParent, Array.isArray(utList) ? utList : []);
+        if (t) setTask({ ...t, ...initialTask });
+        const { ids, nameMap, rows } = assigneeStateFromUserTasks(mergedAssignees);
         setTaskUserTasks(rows);
         setAssigneeNamesByUserId(nameMap);
         setLoadedAssigneeUserIds(ids);
@@ -483,7 +498,7 @@ const sprintNumberMap = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [open, initialTask?.id, initialUserTasks]);
+  }, [open, initialTask?.id, taskSyncSig, assigneeSyncSig, initialUserTasks]);
 
   useEffect(() => {
     if (!editMode) return;

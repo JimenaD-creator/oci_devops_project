@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,7 +26,7 @@ public class JwtService {
 
     public String generateToken(User user) {
         Instant now = Instant.now();
-        String role = user.getType() != null ? user.getType().toUpperCase() : "DEVELOPER";
+        String role = UserRoleUtil.normalizeDisplayType(user.getType());
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("mtdr-spring")

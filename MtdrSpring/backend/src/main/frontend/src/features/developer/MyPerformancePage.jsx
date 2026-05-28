@@ -289,14 +289,14 @@ export default function MyPerformancePage({ projectId, currentUser }) {
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Sprint snapshot
             </Typography>
-            <Grid container spacing={{ xs: 4, md: 6 }} alignItems="stretch">
+            <Grid container spacing={{ xs: 3, md: 3 }} alignItems="stretch">
               <Grid
                 item
                 xs={12}
-                md={5}
-                lg={4}
+                md={6}
+                lg={6}
                 sx={{
-                  pr: { md: 4, lg: 5 },
+                  pr: { md: 1.5, lg: 2 },
                   pb: { xs: 2, md: 0 },
                 }}
               >
@@ -305,8 +305,9 @@ export default function MyPerformancePage({ projectId, currentUser }) {
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
+                    alignItems: 'stretch',
                     justifyContent: 'flex-start',
+                    width: '100%',
                   }}
                 >
                   <Typography
@@ -325,10 +326,10 @@ export default function MyPerformancePage({ projectId, currentUser }) {
               <Grid
                 item
                 xs={12}
-                md={7}
-                lg={8}
+                md={6}
+                lg={6}
                 sx={{
-                  pl: { md: 4, lg: 5 },
+                  pl: { md: 1.5, lg: 2 },
                   pt: { xs: 3, md: 0 },
                 }}
               >

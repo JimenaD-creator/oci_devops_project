@@ -5,6 +5,7 @@ import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.TeamMemberRepository;
 import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.dto.UserDetailDTO;
+import com.springboot.MyTodoList.util.UserRoleUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -41,11 +42,11 @@ public class UserService {
     }
 
     public User saveUser(User user) {
-        if (user.getType() == null ||
-           (!user.getType().equalsIgnoreCase("MANAGER") && !user.getType().equalsIgnoreCase("DEVELOPER"))) {
-            throw new RuntimeException("Rol no permitido. Solo se permite MANAGER o DEVELOPER.");
+        if (!UserRoleUtil.isAllowedMemberType(user.getType())) {
+            throw new RuntimeException(
+                    "Role not allowed. Use MANAGER or a team role (e.g., front-end developer, DevOps engineer).");
         }
-        user.setType(user.getType().toUpperCase());
+        user.setType(UserRoleUtil.normalizeDisplayType(user.getType()));
         return userRepository.save(user);
     }
 
@@ -68,12 +69,15 @@ public class UserService {
             if (userDetails.getProfilePicture() != null) {
                 user.setProfilePicture(userDetails.getProfilePicture());
             }
-            if (userDetails.getType() != null &&
-               (userDetails.getType().equalsIgnoreCase("MANAGER") || userDetails.getType().equalsIgnoreCase("DEVELOPER"))) {
-                user.setType(userDetails.getType().toUpperCase());
+            if (userDetails.getType() != null) {
+                if (!UserRoleUtil.isAllowedMemberType(userDetails.getType())) {
+                    throw new RuntimeException(
+                            "Role not allowed. Use MANAGER or a team role (e.g., front-end developer, DevOps engineer).");
+                }
+                user.setType(UserRoleUtil.normalizeDisplayType(userDetails.getType()));
             }
             return userRepository.save(user);
-        }).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        }).orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     public boolean verifyUserCredentials(Long userId, String phoneOrEmail, String password) {

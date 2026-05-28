@@ -35,6 +35,8 @@ function formatAverage(n, devCount) {
  */
 export default function DashboardTopMetrics({
   totalTasks = 0,
+  totalCompleted = 0,
+  totalAssigned = 0,
   totalHours = 0,
   avgTasksPerDev = 0,
   avgHoursPerDev = 0,
@@ -57,15 +59,21 @@ export default function DashboardTopMetrics({
     return `${direction} ${Math.abs(d).toFixed(1)}${unit} vs previous sprint`;
   };
 
+  const completed = Math.max(0, Math.round(Number(totalCompleted) || 0));
+  const assigned = Math.max(0, Math.round(Number(totalAssigned) || 0));
+
+  const tasksCompletedSubtitle =
+    assigned > 0
+      ? `${completed} of ${assigned} tasks completed`
+      : `${completed} ${completed === 1 ? 'task' : 'tasks'} completed`;
+
   const help = multiSprint
     ? {
-        tasks: 'Sum of tasks across selected sprints',
         hours: 'Combined logged hours in the selection',
         avgTasks: 'Total tasks divided by developers on the project team',
         avgHours: 'Total hours divided by developers on the project team',
       }
     : {
-        tasks: 'All tasks assigned to this sprint',
         hours: 'Hours logged this sprint',
         avgTasks: 'Tasks',
         avgHours: 'Hours',
@@ -74,9 +82,9 @@ export default function DashboardTopMetrics({
   const items = [
     {
       icon: AssignmentOutlinedIcon,
-      title: 'Total tasks',
-      value: String(totalTasks),
-      subtitle: help.tasks,
+      title: 'Tasks Completed',
+      value: String(completed),
+      subtitle: tasksCompletedSubtitle,
       accent: '#1565C0',
       tint: isDark ? 'rgba(21, 101, 192, 0.12)' : 'rgba(21, 101, 192, 0.08)',
       iconBg: isDark ? 'rgba(21, 101, 192, 0.2)' : 'rgba(21, 101, 192, 0.14)',
@@ -113,7 +121,7 @@ export default function DashboardTopMetrics({
   const showTrendCharts = multiSprint && Array.isArray(avgTrendSeries) && avgTrendSeries.length > 1;
 
   return (
-    <Box sx={{ width: '100%', minWidth: 0, mb: showSectionHeader ? 4 : 0, alignSelf: 'stretch' }}>
+    <Box sx={{ width: '100%', minWidth: 0, mb: showSectionHeader ? 2 : 0, alignSelf: 'stretch' }}>
       {showSectionHeader ? (
         <Typography
           component="h2"
@@ -136,7 +144,7 @@ export default function DashboardTopMetrics({
             : {
                 gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
               }),
-          gap: { xs: scorecardsFourColumn ? 1.25 : 2.25, sm: 2.25 },
+          gap: { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
           width: '100%',
           minWidth: 0,
           justifyContent: 'start',
@@ -155,13 +163,13 @@ export default function DashboardTopMetrics({
             <Paper
               elevation={0}
               sx={{
-                px: { xs: scorecardsFourColumn ? 1.25 : 2, sm: 2 },
+                px: { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
                 py: showTrendCharts
                   ? item.title === 'Average tasks per developer' ||
                     item.title === 'Average hours per developer'
-                    ? { xs: 1.75, sm: 2.1 }
-                    : { xs: 1.1, sm: 1.3 }
-                  : { xs: scorecardsFourColumn ? 1.75 : 2.25, sm: 2.25 },
+                    ? { xs: 1.35, sm: 1.5 }
+                    : { xs: 0.9, sm: 1 }
+                  : { xs: scorecardsFourColumn ? 1.35 : 1.5, sm: 1.5 },
                 borderRadius: 3,
                 border: '1px solid',
                 borderColor: isDark ? '#2A2C32' : '#E8EAF0',
@@ -170,9 +178,9 @@ export default function DashboardTopMetrics({
                 minHeight: showTrendCharts
                   ? item.title === 'Average tasks per developer' ||
                     item.title === 'Average hours per developer'
-                    ? { xs: 260, sm: 286, md: 304 }
-                    : { xs: 142, sm: 154, md: 164 }
-                  : { xs: scorecardsFourColumn ? 176 : 168, sm: scorecardsFourColumn ? 184 : 168 },
+                    ? { xs: 210, sm: 228, md: 240 }
+                    : { xs: 118, sm: 128, md: 136 }
+                  : { xs: scorecardsFourColumn ? 148 : 140, sm: scorecardsFourColumn ? 156 : 148 },
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -237,7 +245,7 @@ export default function DashboardTopMetrics({
                     </Typography>
                     {isTrendMetric ? (
                       <Box sx={{ width: '100%', mt: 'auto', pt: 0.15 }}>
-                        <Box sx={{ width: '100%', height: 186 }}>
+                        <Box sx={{ width: '100%', height: 140 }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={avgTrendSeries}>
                               <CartesianGrid
@@ -308,33 +316,44 @@ export default function DashboardTopMetrics({
                           sx={{
                             ...METRIC_VALUE_SX,
                             color: 'text.primary',
-                            mb: 0.5,
-                            ...(scorecardsFourColumn
-                              ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
-                              : {}),
+                            mb: item.subtitle ? 0.5 : 0,
+                            ...(item.valueCompact
+                              ? {
+                                  fontSize: {
+                                    xs: scorecardsFourColumn ? '0.9rem' : '1rem',
+                                    sm: '1.05rem',
+                                  },
+                                  lineHeight: 1.35,
+                                  fontWeight: 700,
+                                }
+                              : scorecardsFourColumn
+                                ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
+                                : {}),
                           }}
                         >
                           {item.value}
                         </Typography>
                         {reserveTrendSpace ? <Box sx={{ width: '100%', height: 12 }} /> : null}
-                        <Typography
-                          sx={{
-                            ...METRIC_HELPER_SX,
-                            textAlign: 'center',
-                            mt: 'auto',
-                            pt: 0.5,
-                            px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
-                            fontSize: {
-                              xs: scorecardsFourColumn ? '0.68rem' : '0.8125rem',
-                              sm: '0.8125rem',
-                            },
-                            lineHeight: 1.35,
-                            color: 'text.secondary',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {item.subtitle}
-                        </Typography>
+                        {item.subtitle ? (
+                          <Typography
+                            sx={{
+                              ...METRIC_HELPER_SX,
+                              textAlign: 'center',
+                              mt: 'auto',
+                              pt: 0.5,
+                              px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
+                              fontSize: {
+                                xs: scorecardsFourColumn ? '0.68rem' : '0.8125rem',
+                                sm: '0.8125rem',
+                              },
+                              lineHeight: 1.35,
+                              color: 'text.secondary',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {item.subtitle}
+                          </Typography>
+                        ) : null}
                       </>
                     )}
                   </>

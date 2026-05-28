@@ -112,6 +112,30 @@ class UserServiceTest {
     }
 
     @Test
+    void saveUser_acceptsSpecializedDeveloperRole() {
+        User toSave = new User();
+        toSave.setName("FE Dev");
+        toSave.setType("frontend developer");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User saved = userService.saveUser(toSave);
+
+        assertEquals("Frontend Developer", saved.getType());
+    }
+
+    @Test
+    void saveUser_acceptsDevOpsEngineerRole() {
+        User toSave = new User();
+        toSave.setName("Ops");
+        toSave.setType("devops engineer");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User saved = userService.saveUser(toSave);
+
+        assertEquals("Devops Engineer", saved.getType());
+    }
+
+    @Test
     void getUserById_delegatesToRepository() {
         User user = sampleUser(6L, "a@b.com", null, "p", "DEVELOPER");
         when(userRepository.findById(6L)).thenReturn(Optional.of(user));

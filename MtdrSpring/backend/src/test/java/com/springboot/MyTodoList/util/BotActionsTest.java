@@ -28,9 +28,15 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import com.springboot.MyTodoList.model.Project;
 import com.springboot.MyTodoList.model.Sprint;
+import com.springboot.MyTodoList.model.Team;
+import com.springboot.MyTodoList.model.TeamMember;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.repository.TeamRepository;
+import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
 import com.springboot.MyTodoList.service.ToDoItemService;
@@ -38,7 +44,7 @@ import com.springboot.MyTodoList.service.UserService;
 import com.springboot.MyTodoList.service.UserTaskService;
 
 // Unit tests for BotActions.
-// 1. createTask — new item from the bot menu and follow-up message.
+// 1. developerCannotAddTaskFromMenu — developers are blocked from the add-task flow.
 // 2. viewCompletedTasksInSprint — manager: completed tasks for the sprint appear on the list; sprint chooser after Back.
 // 3. viewCompletedTasksForUserInSprint — developer: completed tasks for that user in the sprint.
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +62,12 @@ class BotActionsTest {
     private SprintService sprintService;
     @Mock
     private UserService userService;
+    @Mock
+    private ProjectLookupService projectLookupService;
+    @Mock
+    private TeamRepository teamRepository;
+    @Mock
+    private TeamMembersRepository teamMembersRepository;
 
     private BotStateManager stateManager;
     private BotActions botActions;
@@ -68,7 +80,7 @@ class BotActionsTest {
 
     // BotActions wired to the mocks above.
     private BotActions newBotActions() {
-        return new BotActions(
+        BotActions actions = new BotActions(
                 telegramClient,
                 todoService,
                 null,
@@ -77,28 +89,105 @@ class BotActionsTest {
                 userTaskService,
                 sprintService,
                 userService);
+        actions.setProjectLookupService(projectLookupService);
+        actions.setTeamRepository(teamRepository);
+        actions.setTeamMembersRepository(teamMembersRepository);
+        return actions;
     }
 
-    // New item from the bot menu: after Add new item, the bot accepts text as the task and clears the wait state.
+    // Developers cannot add tasks from the bot; only managers use the add-task flow.
     @Test
-    void createTask() throws Exception {
+    void developerCannotAddTaskFromMenu() throws Exception {
         long chatId = 100L;
-        stateManager.setTelegramSignedInUser(chatId, 1L);
+        Long devId = 1L;
+        stateManager.setTelegramSignedInUser(chatId, devId);
+
+        User dev = new User();
+        dev.setId(devId);
+        dev.setType("DEVELOPER");
+        when(userService.getUserById(devId)).thenReturn(Optional.of(dev));
 
         BotActions firstMessage = newBotActions();
         firstMessage.setChatId(chatId);
         firstMessage.setRequestText(BotLabels.ADD_NEW_ITEM.getLabel());
         firstMessage.fnAddItem();
 
+        assertFalse(stateManager.isWaitingForNewTaskDescription(chatId));
+        verify(todoService, never()).addToDoItem(any(ToDoItem.class));
+        verify(telegramClient, atLeast(1)).execute(any(SendMessage.class));
+    }
+
+    @Test
+    void createTaskManagerPicksSprintAssigneeAndDescription() throws Exception {
+        long chatId = 101L;
+        Long managerId = 10L;
+        Long projectId = 1L;
+        Long sprintId = 5L;
+        Long devId = 20L;
+
+        stateManager.setTelegramSignedInUser(chatId, managerId);
+
+        User manager = new User();
+        manager.setId(managerId);
+        manager.setType("MANAGER");
+        when(userService.getUserById(managerId)).thenReturn(Optional.of(manager));
+
+        Project project = new Project();
+        project.setId(projectId);
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(project));
+
+        Sprint sprint = new Sprint();
+        sprint.setId(sprintId);
+        when(sprintService.findByProjectIdOrderByStartDateAsc(projectId)).thenReturn(List.of(sprint));
+        when(sprintService.findById(sprintId)).thenReturn(sprint);
+
+        Team team = new Team();
+        team.setId(99L);
+        when(teamRepository.findByManagerId(managerId)).thenReturn(Optional.of(team));
+
+        User dev = new User();
+        dev.setId(devId);
+        dev.setName("Alice Dev");
+        TeamMember tm = new TeamMember();
+        tm.setUser(dev);
+        when(teamMembersRepository.findByTeam_Id(99L)).thenReturn(List.of(tm));
+        when(userService.getUserById(devId)).thenReturn(Optional.of(dev));
+
+        ToDoItem saved = new ToDoItem();
+        saved.setID(777);
+        when(todoService.addToDoItem(any(ToDoItem.class))).thenAnswer(inv -> {
+            ToDoItem item = inv.getArgument(0);
+            item.setID(777);
+            return item;
+        });
+
+        BotActions add = newBotActions();
+        add.setChatId(chatId);
+        add.setRequestText(BotLabels.ADD_NEW_ITEM.getLabel());
+        add.fnAddItem();
+        assertTrue(stateManager.isSelectingSprintForNewTask(chatId));
+
+        BotActions pickSprint = newBotActions();
+        pickSprint.setChatId(chatId);
+        pickSprint.setRequestText("Sprint " + sprintId);
+        pickSprint.fnSelectSprintForNewTask();
+        assertTrue(stateManager.isSelectingAssigneeForNewTask(chatId));
+
+        BotActions pickDev = newBotActions();
+        pickDev.setChatId(chatId);
+        pickDev.setRequestText("👤 Alice Dev #" + devId);
+        pickDev.fnSelectAssigneeForNewTask();
         assertTrue(stateManager.isWaitingForNewTaskDescription(chatId));
 
-        BotActions secondMessage = newBotActions();
-        secondMessage.setChatId(chatId);
-        secondMessage.setRequestText("Buy milk");
-        secondMessage.fnElse();
+        BotActions desc = newBotActions();
+        desc.setChatId(chatId);
+        desc.setRequestText("Ship login fix");
+        desc.fnElse();
 
-        verify(todoService).addToDoItem(any(ToDoItem.class));
-        verify(telegramClient, atLeast(2)).execute(any(SendMessage.class));
+        ArgumentCaptor<ToDoItem> itemCaptor = ArgumentCaptor.forClass(ToDoItem.class);
+        verify(todoService).addToDoItem(itemCaptor.capture());
+        assertEquals(Math.toIntExact(sprintId), itemCaptor.getValue().getAssignedSprint());
+        verify(userTaskService).assignUserToTaskAsTodo(devId, 777L);
         assertFalse(stateManager.isWaitingForNewTaskDescription(chatId));
     }
 
@@ -108,6 +197,7 @@ class BotActionsTest {
         long chatId = 200L;
         Long sprintId = 5L;
         Long managerId = 7L;
+        Long projectId = 17L;
 
         botActions.setChatId(chatId);
         botActions.setRequestText("pw");
@@ -148,14 +238,17 @@ class BotActionsTest {
         assertTrue(taskKeyboard.contains("Alice done"));
         assertTrue(taskKeyboard.contains("Bob done"));
         assertTrue(taskKeyboard.contains("Carol done"));
-        String doneBracket = " [" + "\u2705 Done" + "]";
-        assertEquals(3, taskKeyboard.split(Pattern.quote(doneBracket), -1).length - 1);
+        // Split layout: status column shows "✅ Done" per completed task (not inline in title).
+        assertEquals(4, taskKeyboard.split(Pattern.quote("\u2705 Done"), -1).length);
 
+        Project managerProject = new Project();
+        managerProject.setId(projectId);
         Sprint s5 = new Sprint();
         s5.setId(5L);
         Sprint s6 = new Sprint();
         s6.setId(6L);
-        when(sprintService.findAll()).thenReturn(List.of(s5, s6));
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(managerProject));
+        when(sprintService.findByProjectIdOrderByStartDateAsc(projectId)).thenReturn(List.of(s5, s6));
 
         BotActions backToSprints = newBotActions();
         backToSprints.setChatId(chatId);
@@ -225,8 +318,76 @@ class BotActionsTest {
         assertFalse(keys.contains("99 - "));
         assertFalse(keys.contains("Someone else done"));
 
-        String doneBracket = " [" + "\u2705 Done" + "]";
-        assertEquals(2, keys.split(Pattern.quote(doneBracket), -1).length - 1);
+        assertEquals(3, keys.split(Pattern.quote("\u2705 Done"), -1).length);
+    }
+
+    @Test
+    void managerSprintPicker_showsOnlyOwnProjectSprints() throws Exception {
+        long chatId = 400L;
+        Long managerId = 11L;
+        Long ownProjectId = 21L;
+
+        stateManager.setTelegramSignedInUser(chatId, managerId);
+
+        User manager = new User();
+        manager.setId(managerId);
+        manager.setType("MANAGER");
+        when(userService.getUserById(managerId)).thenReturn(Optional.of(manager));
+
+        Project ownProject = new Project();
+        ownProject.setId(ownProjectId);
+        when(projectLookupService.findPrimaryProjectForManager(managerId)).thenReturn(Optional.of(ownProject));
+
+        Sprint ownSprintA = new Sprint();
+        ownSprintA.setId(101L);
+        Sprint ownSprintB = new Sprint();
+        ownSprintB.setId(102L);
+        when(sprintService.findByProjectIdOrderByStartDateAsc(ownProjectId)).thenReturn(List.of(ownSprintA, ownSprintB));
+
+        BotActions openSprintPicker = newBotActions();
+        openSprintPicker.setChatId(chatId);
+        openSprintPicker.setRequestText(BotCommands.TODO_LIST.getCommand());
+        openSprintPicker.fnListAll();
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(telegramClient, atLeast(2)).execute(captor.capture());
+        SendMessage pickerMsg = captor.getValue();
+        String sprintPicker = flattenKeyboard(pickerMsg);
+
+        assertTrue(sprintPicker.contains("Sprint 101"));
+        assertTrue(sprintPicker.contains("Sprint 102"));
+        assertFalse(sprintPicker.contains("Sprint 201"));
+    }
+
+    @Test
+    void blockedReasonSubmission_returnsToSprintTasks() throws Exception {
+        long chatId = 500L;
+        Long developerId = 15L;
+        Long sprintId = 9L;
+        Integer taskId = 321;
+
+        stateManager.setTelegramSignedInUser(chatId, developerId);
+        stateManager.setWaitingForBlockedReason(chatId, taskId, developerId);
+
+        ToDoItem task = new ToDoItem();
+        task.setID(taskId);
+        task.setAssignedSprint(Math.toIntExact(sprintId));
+        task.setDescription("Blocked API dependency");
+        task.setStatus("BLOCKED");
+        when(todoService.getToDoItemById(taskId)).thenReturn(task);
+        when(todoService.findByAssignedSprint(Math.toIntExact(sprintId))).thenReturn(List.of(task));
+        when(userTaskService.loadUserSprintTaskListIndex(developerId, sprintId))
+                .thenReturn(new UserTaskService.UserSprintTaskListIndex(Set.of(taskId.longValue()), Set.of()));
+
+        BotActions submitReason = newBotActions();
+        submitReason.setChatId(chatId);
+        submitReason.setRequestText("Waiting on external API credentials");
+        submitReason.fnElse();
+
+        verify(userTaskService).saveBlockedReason(developerId, taskId.longValue(), "Waiting on external API credentials");
+        assertTrue(stateManager.isViewingSprintTasks(chatId));
+        assertEquals(sprintId, stateManager.getViewingSprintId(chatId));
+        assertEquals(developerId, stateManager.getViewingSelectedUserId(chatId));
     }
 
     // All reply-keyboard button captions in one string (for assertions).

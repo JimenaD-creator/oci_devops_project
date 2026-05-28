@@ -58,6 +58,24 @@ public class UserTaskController {
         return ResponseEntity.ok(userTaskService.listBlockedReportsForDeveloper(userId, projectId));
     }
 
+    @PostMapping("/my-blockers/resolve")
+    public ResponseEntity<UserTask> resolveMyBlocker(
+            @RequestParam Long userId,
+            @RequestParam Long taskId) {
+        if (userId == null || taskId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            return ResponseEntity.ok(userTaskService.resolveBlockedReport(userId, taskId));
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("resolveMyBlocker rejected: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            LOGGER.error("Error resolving blocker for userId {} taskId {}", userId, taskId, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<UserTask>> getAllUserTasks(
             @RequestParam(required = false) Long projectId) {

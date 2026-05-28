@@ -330,6 +330,38 @@ class UserTaskServiceTest {
         assertEquals(6L, captor.getValue().getId().getUserId());
     }
 
+    @Test
+    void resolveBlockedReport_clearsFlag_keepsReason_andMovesToInProgress() {
+        UserTask existing = assignment(user(5L, "Dev"), 82L);
+        existing.setIsBlocked(true);
+        existing.setBlockedReason("Waiting on credentials");
+        existing.setStatus("BLOCKED");
+        when(userTaskRepository.findById(new UserTaskId(5L, 82L))).thenReturn(Optional.of(existing));
+        when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserTask saved = userTaskService.resolveBlockedReport(5L, 82L);
+
+        assertEquals(false, saved.getIsBlocked());
+        assertEquals("Waiting on credentials", saved.getBlockedReason());
+        assertEquals("IN_PROGRESS", saved.getStatus());
+        verify(taskAssignmentSyncService).syncTaskStatusFromAssignments(82L);
+    }
+
+    @Test
+    void resolveBlockedReport_whenAlreadyUnblocked_isIdempotent() {
+        UserTask existing = assignment(user(5L, "Dev"), 83L);
+        existing.setIsBlocked(false);
+        existing.setBlockedReason("Old reason");
+        existing.setStatus("IN_PROGRESS");
+        when(userTaskRepository.findById(new UserTaskId(5L, 83L))).thenReturn(Optional.of(existing));
+
+        UserTask saved = userTaskService.resolveBlockedReport(5L, 83L);
+
+        assertEquals(existing, saved);
+        verify(userTaskRepository, never()).save(any(UserTask.class));
+        verify(taskAssignmentSyncService, never()).syncTaskStatusFromAssignments(any());
+    }
+
     private static User user(long id, String name) {
         User user = new User();
         user.setId(id);

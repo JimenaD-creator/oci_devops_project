@@ -129,13 +129,17 @@ export default function MyTasksPage({ projectId, currentUser }) {
     return sortTasksForSprintTable(mine);
   }, [tasks, selectedSprint, scopedUserTasks, currentUserId]);
 
+  const sprintUserTasksForTable = useMemo(() => {
+    const sprintTaskIds = new Set(mySprintTasks.map((t) => Number(t.id)));
+    return userTasks.filter((ut) => {
+      const tid = userTaskRowTaskId(ut);
+      return Number.isFinite(tid) && sprintTaskIds.has(tid);
+    });
+  }, [userTasks, mySprintTasks]);
+
   const tableRows = useMemo(
-    () =>
-      buildSprintTaskTableRows(mySprintTasks, scopedUserTasks, projectDevelopers, {
-        assignmentFilter: (assignments) =>
-          assignments.filter((ut) => resolveUserTaskUserId(ut) === currentUserId),
-      }),
-    [mySprintTasks, scopedUserTasks, projectDevelopers, currentUserId],
+    () => buildSprintTaskTableRows(mySprintTasks, sprintUserTasksForTable, projectDevelopers),
+    [mySprintTasks, sprintUserTasksForTable, projectDevelopers],
   );
 
   const mySprintStats = useMemo(() => {

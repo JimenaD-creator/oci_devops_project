@@ -25,7 +25,9 @@ import com.springboot.MyTodoList.model.Sprint;
  * - "WAITING_FOR_HOURS": User just marked a task as DONE and is waiting to enter hours
  * - "SELECTING_USER_IN_SPRINT": User picked a sprint; choosing which assignee's tasks to list
  * - "VIEWING_SPRINT_TASKS": Showing tasks for one assignee in a sprint
- * - "WAITING_FOR_NEW_TASK_DESCRIPTION": User chose Add New Item; next message is the task text
+ * - "SELECTING_SPRINT_FOR_NEW_TASK": Manager chose Add New Item; picking sprint for the new task
+ * - "SELECTING_ASSIGNEE_FOR_NEW_TASK": Manager picked sprint; optional assignee before description
+ * - "WAITING_FOR_NEW_TASK_DESCRIPTION": Next message is the task text (sprint/assignee stored when set)
  * - "SESSION_LOGIN_AWAITING_IDENTIFIER" / "SESSION_LOGIN_AWAITING_PASSWORD": Startup sign-in flow
  * - Signed-in user id is also stored in {@link #telegramSignedInUserId} so sprint navigation does not overwrite it.
  */
@@ -302,7 +304,9 @@ public class BotStateManager {
             return false;
         }
         /* Navigation-only states: not "pending input" for free-text handlers */
-        if ("SELECTING_SPRINT".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) || "VIEWING_SPRINT_TASKS".equals(st) ||
+        if ("SELECTING_SPRINT".equals(st) || "SELECTING_SPRINT_FOR_NEW_TASK".equals(st) ||
+            "SELECTING_ASSIGNEE_FOR_NEW_TASK".equals(st) || "SELECTING_USER_IN_SPRINT".equals(st) ||
+            "VIEWING_SPRINT_TASKS".equals(st) ||
             "VERIFYING_CREDENTIALS_PHONE_EMAIL".equals(st) || "VERIFYING_CREDENTIALS_PASSWORD".equals(st) ||
             "SELECTING_TASK_STATUS".equals(st) || "WAITING_FOR_NEW_TASK_DESCRIPTION".equals(st) ||
             "SESSION_LOGIN_AWAITING_IDENTIFIER".equals(st) || "SESSION_LOGIN_AWAITING_PASSWORD".equals(st)) {
@@ -311,16 +315,65 @@ public class BotStateManager {
         return true;
     }
 
-    /** After "Add New Item" or /additem: next free-text message becomes the new task description. */
+    /** After manager chooses "Add New Item" or /additem: next free-text message becomes the new task description. */
     public void setWaitingForNewTaskDescription(Long chatId) {
-        BotUserState state = new BotUserState(chatId, null, null, null, "WAITING_FOR_NEW_TASK_DESCRIPTION");
+        setWaitingForNewTaskDescription(chatId, null, null);
+    }
+
+    public void setWaitingForNewTaskDescription(Long chatId, Long sprintId, Long assigneeUserId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, assigneeUserId, "WAITING_FOR_NEW_TASK_DESCRIPTION");
         userStates.put(chatId, state);
-        logger.info("Set chat {} to waiting for new task description", chatId);
+        logger.info("Set chat {} to waiting for new task description (sprint={}, assignee={})", chatId, sprintId, assigneeUserId);
     }
 
     public boolean isWaitingForNewTaskDescription(Long chatId) {
         BotUserState state = userStates.get(chatId);
         return state != null && "WAITING_FOR_NEW_TASK_DESCRIPTION".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    public Long getNewTaskSprintId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null || isStateExpired(state)) {
+            return null;
+        }
+        if ("WAITING_FOR_NEW_TASK_DESCRIPTION".equals(state.getState())
+                || "SELECTING_ASSIGNEE_FOR_NEW_TASK".equals(state.getState())) {
+            return state.getSprintId();
+        }
+        return null;
+    }
+
+    public Long getNewTaskAssigneeUserId(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        if (state == null || isStateExpired(state)) {
+            return null;
+        }
+        if ("WAITING_FOR_NEW_TASK_DESCRIPTION".equals(state.getState())) {
+            return state.getSelectedUserId();
+        }
+        return null;
+    }
+
+    public void setSelectingSprintForNewTask(Long chatId) {
+        BotUserState state = new BotUserState(chatId, null, null, null, "SELECTING_SPRINT_FOR_NEW_TASK");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting sprint for new task", chatId);
+    }
+
+    public boolean isSelectingSprintForNewTask(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_SPRINT_FOR_NEW_TASK".equals(state.getState()) && !isStateExpired(state);
+    }
+
+    public void setSelectingAssigneeForNewTask(Long chatId, Long sprintId) {
+        BotUserState state = new BotUserState(chatId, null, sprintId, null, "SELECTING_ASSIGNEE_FOR_NEW_TASK");
+        userStates.put(chatId, state);
+        logger.info("Set chat {} to selecting assignee for new task in sprint {}", chatId, sprintId);
+    }
+
+    public boolean isSelectingAssigneeForNewTask(Long chatId) {
+        BotUserState state = userStates.get(chatId);
+        return state != null && "SELECTING_ASSIGNEE_FOR_NEW_TASK".equals(state.getState()) && !isStateExpired(state);
     }
 
     public void setSessionLoginAwaitingIdentifier(Long chatId) {

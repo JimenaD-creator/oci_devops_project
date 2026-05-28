@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.crypto.SecretKey;
@@ -8,6 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -19,6 +21,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -32,8 +36,21 @@ public class WebSecurityConfiguration {
     public WebSecurityConfiguration(@Value("${app.jwt.secret}") String jwtSecret) {
         this.jwtSecret = jwtSecret;
     }
-    
+
     @Bean
+    @Order(1)
+    public SecurityFilterChain loginSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/auth/login")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -41,22 +58,38 @@ public class WebSecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Rutas públicas de autenticación (sin token)
-                .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/forgot-password").permitAll()
                 .requestMatchers("/api/auth/reset-password").permitAll()
-                // Swagger UI - público
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v2/api-docs", "/v3/api-docs/**").permitAll()
-                // El resto de /api/** requieren autenticación
                 .requestMatchers("/api/**").authenticated()
-                // Cualquier otra ruta es pública
                 .anyRequest().permitAll()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .bearerTokenResolver(publicAwareBearerTokenResolver())
+                .jwt(jwt -> {}))
             .httpBasic(h -> h.disable())
             .formLogin(f -> f.disable());
-            
+
         return http.build();
+    }
+
+    @Bean
+    public BearerTokenResolver publicAwareBearerTokenResolver() {
+        DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
+        return request -> {
+            if (request == null || isLoginPath(request)) {
+                return null;
+            }
+            return delegate.resolve(request);
+        };
+    }
+
+    private static boolean isLoginPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null
+                && HttpMethod.POST.matches(request.getMethod())
+                && path.contains("/api/auth/login");
     }
 
     @Bean
@@ -79,12 +112,12 @@ public class WebSecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(Arrays.asList("*")); 
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedOriginPatterns(Arrays.asList("*"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setExposedHeaders(Arrays.asList("Authorization"));
-        config.setAllowCredentials(true);
-        
+        config.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

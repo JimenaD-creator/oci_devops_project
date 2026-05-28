@@ -5,9 +5,8 @@ import {
   collectDeveloperNamesForSelection,
   mergeRosterWithSprintDevelopers,
 } from '../../utils/teamRosterUtils';
-
-/** Match API.js / ProjectSelector: localhost ≠ 127.0.0.1 for the browser; relative URLs when served from Spring. */
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+import { getApiBase } from '../../utils/apiBase';
+import { apiFetch } from '../../utils/auth';
 
 /** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
@@ -559,8 +558,7 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
   });
 }
 
-const fetchJsonNoCache = (url) =>
-  fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+const fetchJsonNoCache = (url) => apiFetch(url);
 
 function isCacheValidForProject(pid, now, forceFresh) {
   return (
@@ -628,9 +626,10 @@ export async function fetchDashboardSprints(projectId, options = {}) {
 
   try {
     console.log('Fetching fresh dashboard data');
-    const sprintsUrl = `${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`;
-    const tasksUrl = `${API_BASE}/api/tasks?projectId=${encodeURIComponent(pid)}`;
-    const userTasksUrl = `${API_BASE}/api/user-tasks?projectId=${encodeURIComponent(pid)}`;
+    const base = getApiBase();
+    const sprintsUrl = `${base}/api/sprints?projectId=${encodeURIComponent(pid)}`;
+    const tasksUrl = `${base}/api/tasks?projectId=${encodeURIComponent(pid)}`;
+    const userTasksUrl = `${base}/api/user-tasks?projectId=${encodeURIComponent(pid)}`;
 
     const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
       fetchJsonNoCache(sprintsUrl),
@@ -638,7 +637,18 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       fetchJsonNoCache(userTasksUrl),
     ]);
 
-    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) throw new Error('Failed to load data');
+    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) {
+      const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
+      const err = new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
+      err.httpStatus = status;
+      if (status === 401 || status === 403) {
+        err.code = 'UNAUTHORIZED';
+        err.userMessage =
+          'No se pudieron cargar los datos. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo. ' +
+          'Si sigue igual, confirma que el deploy en OCI terminó bien y que existe el secret jwt-secret.';
+      }
+      throw err;
+    }
 
     const apiSprints = await sprintsRes.json();
     const apiTasks = await tasksRes.json();
@@ -668,6 +678,9 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     return enriched;
   } catch (error) {
     console.error('Dashboard data load failed:', error);
+    if (error?.code === 'UNAUTHORIZED' || error?.httpStatus === 401 || error?.httpStatus === 403) {
+      throw error;
+    }
     return [];
   }
 }
@@ -792,11 +805,13 @@ export function buildBlockedReportsForAiSprint(sp) {
 
 export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = []) {
   let totalTasks = 0;
+  let totalCompleted = 0;
   let totalHours = 0;
   const devMap = new Map();
 
   (selectedSprints || []).forEach((sp) => {
     totalTasks += Number(sp.totalTasks) || 0;
+    totalCompleted += Number(sp.totalCompleted) || 0;
     totalHours += Number(sp.totalHours) || 0;
     (sp.developers || []).forEach((d) => {
       const cur = devMap.get(d.name) || {
@@ -840,9 +855,13 @@ export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = [
     0,
   );
   const avgHoursPerDev = uniqueDevCount > 0 ? sumDevWorkedHours / uniqueDevCount : 0;
+  /** Unique tasks in the selection (not per-assignee sums — one task with 2 devs counts once). */
+  const totalAssigned = totalTasks;
 
   return {
     totalTasks,
+    totalAssigned,
+    totalCompleted,
     totalHours,
     uniqueDevCount,
     avgTasksPerDev,
