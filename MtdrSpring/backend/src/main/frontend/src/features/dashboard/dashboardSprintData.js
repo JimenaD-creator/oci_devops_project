@@ -1,5 +1,6 @@
 import { inferStatusByDate } from '../sprints/utils/sprintUtils';
 import { computeProductivityScore } from '../kpis/productivityScoreUtils';
+import { productivityScoreFromSprintKpis } from '../kpis/productivityScoreUtils';
 import { isAssigneeCompletionOnTime } from '../tasks/utils/assigneeOnTimeUtils';
 import {
   collectDeveloperNamesForSelection,
@@ -644,8 +645,7 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       if (status === 401 || status === 403) {
         err.code = 'UNAUTHORIZED';
         err.userMessage =
-          'No se pudieron cargar los datos. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo. ' +
-          'Si sigue igual, confirma que el deploy en OCI terminó bien y que existe el secret jwt-secret.';
+          'No se pudieron cargar los datos. Cierra sesión, recarga la página e inicia sesión de nuevo.';
       }
       throw err;
     }
@@ -931,6 +931,39 @@ export function sprintDbIdSortKey(sp) {
   if (Number.isFinite(n)) return n;
   const parsed = Number(String(sp?.id ?? '').match(/-?\d+/)?.[0]);
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * Team productivity score (%) per sprint — same formula as KPI Analytics.
+ * @param {object[]} selectedSprints
+ */
+export function buildTeamProductivityTrendSeries(selectedSprints) {
+  const sprints = [...(selectedSprints || [])]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = new Date(a?.startDate ?? 0).getTime();
+      const tb = new Date(b?.startDate ?? 0).getTime();
+      if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
+      return sprintDbIdSortKey(a) - sprintDbIdSortKey(b);
+    });
+
+  return sprints.map((sp, idx) => {
+    const kpis = sp.kpis ?? {};
+    const productivityScore = productivityScoreFromSprintKpis(kpis);
+    return {
+      sprintId: sp.id,
+      sprintLabel: sp.shortLabel ?? `Sprint ${idx}`,
+      accentColor: sp.accentColor,
+      productivityScore,
+      scoreDisplay: `${productivityScore}%`,
+      completionRate: Number(kpis.completionRate) || 0,
+      onTimeDelivery: Number(kpis.onTimeDelivery) || 0,
+      teamParticipation: Number(kpis.teamParticipation) || 0,
+      workloadBalance: Number(kpis.workloadBalance) || 0,
+      totalCompleted: Number(sp.totalCompleted) || 0,
+      totalTasks: Number(sp.totalTasks) || 0,
+    };
+  });
 }
 
 export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelopers = []) {

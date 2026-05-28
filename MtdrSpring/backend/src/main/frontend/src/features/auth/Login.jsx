@@ -96,7 +96,7 @@ export default function Login() {
       const authData = await loginWithCredentials(email.trim(), password.trim());
       if (!authData?.token || !authData?.user) {
         throw Object.assign(new Error('Invalid login response'), {
-          serverMessage: 'The server returned an incomplete login response. Please redeploy the latest build.',
+          serverMessage: 'The server returned an incomplete login response. Please try again.',
         });
       }
 
@@ -129,7 +129,7 @@ export default function Login() {
       setFormError(
         serverMsg
           || (!err?.status
-            ? 'Could not connect to the server. Check that the OCI app URL is reachable.'
+            ? 'Could not connect to the server. Check your network connection and try again.'
             : 'Invalid credentials. Please try again.'),
       );
       setIsLoading(false);

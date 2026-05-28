@@ -22,10 +22,12 @@ import {
   aggregateDeveloperPerformance,
   buildCompletedTasksBySprintChart,
   buildHoursWorkedTrendChart,
+  buildProductivityScoreTrendChart,
 } from './developerPerformanceData';
 import {
   CompletedTasksBySprintChart,
   HoursWorkedTrendChart,
+  ProductivityScoreTrendChart,
 } from './DeveloperPerformanceCharts';
 import { pageEase } from '../tasks/constants/taskConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
@@ -39,6 +41,15 @@ import {
 import { fetchSprintsProjectDevelopers } from '../sprints/sprintsPageApi';
 
 const ORACLE_RED = '#C74634';
+
+/** Whole hours when close to an integer; otherwise one decimal — no tasks/hour ratio. */
+function formatWorkedHoursForCard(hours) {
+  const n = Math.max(0, Number(hours) || 0);
+  if (n <= 0) return '0 h';
+  const rounded = Math.round(n);
+  if (Math.abs(n - rounded) < 0.05) return `${rounded} h`;
+  return `${n.toFixed(1)} h`;
+}
 
 export default function MyPerformancePage({ projectId, currentUser }) {
   const theme = useTheme();
@@ -118,6 +129,11 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     [sprints, userId, userName],
   );
 
+  const productivityTrendData = useMemo(
+    () => buildProductivityScoreTrendChart(sprints, userId, userName),
+    [sprints, userId, userName],
+  );
+
   const performanceCards = useMemo(() => {
     const hoursRatio =
       metrics.estimated > 0 ? Math.round((metrics.hours / metrics.estimated) * 100) : 0;
@@ -170,8 +186,8 @@ export default function MyPerformancePage({ projectId, currentUser }) {
       },
       {
         label: 'Productivity',
-        value: `${metrics.tasksPerHour}`,
-        subtitle: 'Completed tasks per hour worked',
+        value: `${metrics.completed} tasks in ${formatWorkedHoursForCard(metrics.hours)}`,
+        subtitle: 'Completed tasks and hours worked across sprints',
         progress: productivityProgress,
         accent: '#3949AB',
       },
@@ -252,6 +268,10 @@ export default function MyPerformancePage({ projectId, currentUser }) {
       ) : null}
 
       <DeveloperMetricCards metrics={performanceCards} />
+
+      <Box sx={{ mb: 2 }}>
+        <ProductivityScoreTrendChart data={productivityTrendData} />
+      </Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>

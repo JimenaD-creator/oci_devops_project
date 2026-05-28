@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -7,9 +7,9 @@ import {
   Card,
   CardContent,
   IconButton,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
+  FormControl,
+  Select,
+  MenuItem,
   Popover,
   Stack,
   Button,
@@ -47,6 +47,10 @@ import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { fetchProjectById, fetchProjectDevelopers } from './projectApi';
 import { countTeamDevelopers } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
+import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
+
+/** Select value: compare all sprints side by side. */
+const ALL_SPRINTS_FILTER = 'all';
 
 // ── Avatar palette for blocked notification items ────────────────────────────
 const AVATAR_PALETTE_LIGHT = [
@@ -81,13 +85,14 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
   const [allSprints, setAllSprints] = useState([]);
   const [projectTaskCount, setProjectTaskCount] = useState(0);
   const [sprintsLoading, setSprintsLoading] = useState(true);
-  const [selectedSprintIds, setSelectedSprintIds] = useState([]);
+  const [sprintFilter, setSprintFilter] = useState(null);
   const [currentProject, setCurrentProject] = useState(null);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const [blockedNotifAnchor, setBlockedNotifAnchor] = useState(null);
   const [seenBlockedKeysCsv, setSeenBlockedKeysCsv] = useState('');
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
+  const prevProjectIdRef = useRef(projectId);
 
   useEffect(() => {
     if (!projectId) {
@@ -121,16 +126,27 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
       setSprintsLoading(false);
       return;
     }
+    const projectChanged = prevProjectIdRef.current !== projectId;
+    prevProjectIdRef.current = projectId;
+
     setSprintsLoading(sharedLoading);
     const sprints = Array.isArray(sharedSprints) ? sharedSprints : [];
     setAllSprints(sprints);
-    setSelectedSprintIds((prev) => {
-      if (sprints.length > 0 && prev.length === 0) {
+
+    if (!sharedLoading && sprints.length > 0) {
+      setSprintFilter((prev) => {
+        if (!projectChanged && prev === ALL_SPRINTS_FILTER) return prev;
+        if (!projectChanged && prev != null && prev !== '') {
+          const id = Number(prev);
+          if (Number.isFinite(id) && sprints.some((s) => Number(s.id) === id)) return prev;
+        }
         const picked = pickDefaultSelectedSprint(sprints);
-        if (picked?.id != null) return [Number(picked.id)];
-      }
-      return prev;
-    });
+        return picked?.id != null ? String(picked.id) : ALL_SPRINTS_FILTER;
+      });
+    } else if (sprints.length === 0) {
+      setSprintFilter(null);
+    }
+
     if (!sharedLoading) setSprintsLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
 
@@ -164,47 +180,58 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
   useEffect(() => {
     setSeenBlockedKeysCsv('');
   }, [projectId]);
+
   useEffect(() => {
     if (!projectId) setSprintsLoading(false);
   }, [projectId]);
 
-  const normalizedSelectedIds = useMemo(() => {
-    if (!allSprints.length) return [];
-    const valid = new Set(allSprints.map((s) => Number(s.id)));
-    return [...new Set(selectedSprintIds.map(Number).filter(Number.isFinite))]
-      .filter((id) => valid.has(id))
-      .sort((a, b) => a - b);
-  }, [selectedSprintIds, allSprints]);
+  const sortedSprintsForFilter = useMemo(
+    () => [...allSprints].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
+    [allSprints],
+  );
 
-  useEffect(() => {
-    if (!allSprints.length || sprintsLoading) return;
-    if (normalizedSelectedIds.length === 0) {
-      const picked = pickDefaultSelectedSprint(allSprints);
-      if (picked?.id != null) setSelectedSprintIds([Number(picked.id)]);
-      return;
-    }
-    const raw = selectedSprintIds.map(Number).filter(Number.isFinite);
-    const uniqueRaw = [...new Set(raw)];
-    const normSorted = [...normalizedSelectedIds].sort((a, b) => a - b).join(',');
-    const uniqSorted = uniqueRaw
-      .slice()
-      .sort((a, b) => a - b)
-      .join(',');
-    const hasDuplicateEntries = raw.length !== uniqueRaw.length;
-    const needsPrune = uniqSorted !== normSorted;
-    if (hasDuplicateEntries || needsPrune) setSelectedSprintIds(normalizedSelectedIds);
-  }, [allSprints, sprintsLoading, selectedSprintIds, normalizedSelectedIds]);
+  const getSprintFilterLabel = useCallback(
+    (sprintId) => {
+      const sprint = allSprints.find((s) => Number(s.id) === Number(sprintId));
+      if (sprint?.shortLabel) return sprint.shortLabel;
+      if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
+      const index = sortedSprintsForFilter.findIndex((s) => Number(s.id) === Number(sprintId));
+      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+    },
+    [allSprints, sortedSprintsForFilter],
+  );
+
+  const defaultSprintSelectValue = useMemo(() => {
+    if (!sortedSprintsForFilter.length) return '';
+    const picked = pickDefaultSelectedSprint(sortedSprintsForFilter);
+    return picked?.id != null ? String(picked.id) : '';
+  }, [sortedSprintsForFilter]);
+
+  const effectiveSprintFilter = useMemo(() => {
+    if (sprintFilter != null && sprintFilter !== '') return sprintFilter;
+    return defaultSprintSelectValue || null;
+  }, [sprintFilter, defaultSprintSelectValue]);
 
   const selectedSprints = useMemo(() => {
-    const byId = new Map(allSprints.map((s) => [Number(s.id), s]));
-    return normalizedSelectedIds
-      .map((id) => byId.get(id))
-      .filter(Boolean)
-      .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
-  }, [normalizedSelectedIds, allSprints]);
+    if (!allSprints.length || !effectiveSprintFilter) return [];
+    if (effectiveSprintFilter === ALL_SPRINTS_FILTER) return sortedSprintsForFilter;
+    const id = Number(effectiveSprintFilter);
+    const sprint = allSprints.find((s) => Number(s.id) === id);
+    return sprint ? [sprint] : [];
+  }, [allSprints, effectiveSprintFilter, sortedSprintsForFilter]);
 
-  const compareMode = normalizedSelectedIds.length > 1;
+  const compareMode = effectiveSprintFilter === ALL_SPRINTS_FILTER && selectedSprints.length > 1;
   const primarySprint = selectedSprints[0];
+
+  /** MUI Select requires value to exactly match a MenuItem `value`. */
+  const sprintSelectValue = useMemo(() => {
+    if (!effectiveSprintFilter) return '';
+    if (effectiveSprintFilter === ALL_SPRINTS_FILTER) return ALL_SPRINTS_FILTER;
+    const match = sortedSprintsForFilter.find(
+      (s) => String(s.id) === String(effectiveSprintFilter),
+    );
+    return match ? String(match.id) : '';
+  }, [effectiveSprintFilter, sortedSprintsForFilter]);
 
   const { taskStatusDistribution, taskStatusTotal } = useMemo(
     () => mergeTaskStatusAcrossSprints(selectedSprints),
@@ -306,16 +333,6 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     });
   }, [blockedNotificationItems]);
 
-  const toggleSprint = (id, checked) => {
-    const nid = Number(id);
-    setSelectedSprintIds((prev) => {
-      const nums = [...new Set(prev.map(Number).filter(Number.isFinite))];
-      if (checked) return [...new Set([...nums, nid])];
-      if (nums.length <= 1) return nums;
-      return nums.filter((x) => x !== nid);
-    });
-  };
-
   if (!projectId) {
     return (
       <Box sx={{ p: 3, maxWidth: DASHBOARD_CONTENT_MAX_WIDTH, mx: 'auto' }}>
@@ -334,7 +351,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
   const loadErrorMessage =
     dataError?.userMessage ||
     (dataError?.code === 'UNAUTHORIZED'
-      ? 'Sesión inválida o expirada. Cierra sesión, recarga con Ctrl+Shift+R e inicia sesión de nuevo.'
+      ? 'Sesión inválida o expirada. Cierra sesión, recarga la página e inicia sesión de nuevo.'
       : dataError?.message
         ? `Error al cargar datos: ${dataError.message}`
         : null);
@@ -795,35 +812,76 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
       <ScrollReveal delay={0.07}>
         <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#616161', fontWeight: 600, mb: 1, fontSize: '0.8125rem' }}>
-            Select one or more sprints below to filter the dashboard. Check additional boxes to compare sprints side by side.
+            Filter the dashboard by sprint. Choose All Sprints to compare every sprint side by side, or pick one sprint for a single-sprint view.
           </Typography>
-  <FormGroup row sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-  {allSprints.map((sp, index) => {
-    const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[0];
-    const sprintNumber = index ; // Número secuencial basado en el orden
-    return (
-      <FormControlLabel
-        key={sp.id}
-        control={
-          <Checkbox
+          <Typography
+            component="label"
+            htmlFor="dashboard-sprint-filter"
+            variant="caption"
+            sx={{
+              display: 'block',
+              mb: 0.75,
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              color: isDark ? '#9A9A9A' : '#616161',
+              letterSpacing: '0.02em',
+            }}
+          >
+            Sprint
+          </Typography>
+          <FormControl
             size="small"
-            checked={selectedSprintIds.some((x) => Number(x) === Number(sp.id))}
-            onChange={(e) => toggleSprint(sp.id, e.target.checked)}
-            sx={{ '&.Mui-checked': { color: sprintColor } }}
-          />
-        }
-        label={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: sprintColor, flexShrink: 0 }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              {`Sprint ${sprintNumber}`}
-            </Typography>
-          </Box>
-        }
-      />
-    );
-  })}
-</FormGroup>
+            sx={{
+              minWidth: { xs: '100%', sm: 260 },
+              ...pageFormFieldOutline(isDark),
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: isDark ? '#3A3C42' : undefined,
+              },
+              '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: isDark ? '#5A5C62' : undefined,
+              },
+              '& .MuiSelect-select': {
+                color: isDark ? '#F0F0F0' : '#1A1A1A',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                pr: 4,
+              },
+            }}
+          >
+            <Select
+              id="dashboard-sprint-filter"
+              value={sprintSelectValue}
+              onChange={(e) => setSprintFilter(e.target.value)}
+              renderValue={(value) => {
+                if (value === ALL_SPRINTS_FILTER) return 'All Sprints';
+                return getSprintFilterLabel(value);
+              }}
+            >
+              <MenuItem value={ALL_SPRINTS_FILTER}>All Sprints</MenuItem>
+              {sortedSprintsForFilter.map((sp, index) => {
+                const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[index % SPRINT_CHART_COLORS.length];
+                return (
+                  <MenuItem key={sp.id} value={String(sp.id)}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          bgcolor: sprintColor,
+                          flexShrink: 0,
+                        }}
+                      />
+                      {getSprintFilterLabel(sp.id)}
+                    </Box>
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
         </Paper>
       </ScrollReveal>
 
@@ -870,7 +928,9 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
         <ScrollReveal delay={0.06}>
           <Box sx={{ mb: 0 }}>
             <Typography component="h2" sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}>Developer performance</Typography>
-            <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>Charts for workload, hours, and productivity by developer.</Typography>
+            <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>
+              Workload and hours by developer
+            </Typography>
           </Box>
         </ScrollReveal>
         <DashboardDeveloperCharts

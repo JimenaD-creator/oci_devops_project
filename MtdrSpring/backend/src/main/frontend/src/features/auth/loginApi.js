@@ -17,7 +17,7 @@ async function parseJsonResponse(response) {
     const error = new Error('Unexpected server response');
     error.status = response.status;
     error.serverMessage =
-      'The server returned an invalid response. If you are on OCI, redeploy the latest build or hard-refresh the page (Ctrl+Shift+R).';
+      'The server returned an invalid response. Please refresh the page and try again.';
     throw error;
   }
   return response.json();
@@ -44,7 +44,7 @@ export async function loginWithCredentials(identifier, password) {
       });
     }
     throw Object.assign(fetchErr instanceof Error ? fetchErr : new Error('Network error'), {
-      serverMessage: 'Could not reach the server. Check your connection and the OCI app URL.',
+      serverMessage: 'Could not reach the server. Check your network connection and try again.',
     });
   } finally {
     clearTimeout(timeoutId);
@@ -63,7 +63,7 @@ export async function loginWithCredentials(identifier, password) {
         error.serverMessage = 'Invalid credentials. Please try again.';
       } else if (response.status >= 500) {
         error.serverMessage =
-          'Server error during sign-in. Restart the backend and try again.';
+          'Server error during sign-in. Please try again in a moment.';
       }
     }
     if (!error.serverMessage) {

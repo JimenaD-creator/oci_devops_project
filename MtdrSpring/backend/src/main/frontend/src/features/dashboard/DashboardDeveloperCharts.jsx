@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
+  LineChart,
   Line,
   LabelList,
 } from 'recharts';
@@ -27,8 +28,8 @@ import {
 } from './dashboardTypography';
 import {
   buildCompareDeveloperChartsModel,
+  buildTeamProductivityTrendSeries,
   sprintDbIdSortKey,
-  buildBlockedReportsForAiSprint,
 } from './dashboardSprintData';
 import { DASHBOARD_SCROLL_VIEWPORT } from './ScrollReveal';
 import {
@@ -44,6 +45,7 @@ import {
   CHART_BAR_ANIM_MS,
   CHART_BAR_EASING,
   Y_AXIS_HOURS,
+  PRODUCTIVITY_SCORE_TREND,
 } from './constants/dashboardChartConstants';
 import {
   maxCompareWorkloadStack,
@@ -55,12 +57,10 @@ import {
   buildHoursAxisDomainTicks,
   buildCompareHoursAxisDomainTicks,
   maxSingleComboRange,
-  maxCompareComboRange,
   comboHeightExtraFromRange,
   compareChartHeights,
+  buildProductivityScoreAxisDomainTicks,
 } from './utils/chartUtils';
-import { API_BASE } from '../sprints/constants/sprintConstants';
-
 const MotionPaper = motion(Paper);
 
 function HorizontalBarEndLabel({
@@ -363,6 +363,45 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
           </Box>
         );
       })}
+    </Box>
+  );
+}
+
+function TeamProductivityTrendTooltip({ active, payload }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const score = Number(row.productivityScore) || 0;
+  return (
+    <Box
+      sx={{
+        ...CHART_TOOLTIP_SX(isDark),
+        p: { xs: 1.75, sm: 2 },
+        px: { xs: 2, sm: 2.25 },
+        bgcolor: 'background.paper',
+        border: `1px solid ${isDark ? '#2A2C32' : '#B0BEC5'}`,
+        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
+        minWidth: 220,
+      }}
+    >
+      <Typography sx={{ fontWeight: 800, color: row.accentColor || PRODUCTIVITY_SCORE_TREND, fontSize: '0.9rem', mb: 0.75 }}>
+        {row.sprintLabel}
+      </Typography>
+      <Typography sx={{ color: 'text.primary', fontSize: '0.95rem', fontWeight: 800, mb: 0.75 }}>
+        Productivity score: {score}%
+      </Typography>
+      <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', lineHeight: 1.45 }}>
+        Completion {row.completionRate}% · On-time {row.onTimeDelivery}% · Participation{' '}
+        {row.teamParticipation}% · Workload balance {row.workloadBalance}%
+      </Typography>
+      {row.totalTasks > 0 ? (
+        <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', mt: 0.5, lineHeight: 1.4 }}>
+          {row.totalCompleted} of {row.totalTasks} tasks completed in sprint
+        </Typography>
+      ) : null}
     </Box>
   );
 }
@@ -815,106 +854,7 @@ function SingleHoursSymbolLegend() {
 }
 
 // ---------------------------------------------------------------------------
-// AI Insights — grid 2×2 embebido dentro del ChartShell
-// ---------------------------------------------------------------------------
-
-/**
- * Muestra los insights de IA en un grid 2×2 (1 columna en mobile).
- * Se renderiza como `footer` dentro de ChartShell, debajo de la gráfica.
- */
-function AIDeveloperVariationGrid({ rows, emptyText, loading, tone = 'default' }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-  
-  const palette =
-    tone === 'workload'
-      ? { bg: isDark ? '#2D1F12' : '#FFF8F2', border: isDark ? '#4A2E1A' : '#FFE2CC', name: '#FFB74D', text: isDark ? '#E0E0E0' : '#263238' }
-      : tone === 'hours'
-        ? { bg: isDark ? '#0D2137' : '#F3F8FF', border: isDark ? '#1A3A5C' : '#DCEAFF', name: '#64B5F6', text: isDark ? '#E0E0E0' : '#1A1A1A' }
-        : tone === 'productivity'
-          ? { bg: isDark ? '#0D2616' : '#F4FBF7', border: isDark ? '#1A4A2A' : '#D7F0E1', name: '#81C784', text: isDark ? '#E0E0E0' : '#1A1A1A' }
-          : { bg: isDark ? '#1A1C20' : '#F8FCFF', border: isDark ? '#2A2C32' : '#E6EEF5', name: isDark ? '#F0F0F0' : '#1A1A1A', text: isDark ? '#E0E0E0' : '#1A1A1A' };
-  const cardPalettes =
-    tone === 'workload'
-      ? [
-          { bg: isDark ? '#2D1F12' : '#FFF1E8', border: isDark ? '#4A2E1A' : '#FFB98E', stripe: '#00897B' },
-          { bg: isDark ? '#1F1626' : '#F3E5F5', border: isDark ? '#3A2A4A' : '#CE93D8', stripe: '#7B1FA2' },
-          { bg: isDark ? '#161C26' : '#EEF3FF', border: isDark ? '#2A3A5C' : '#9DB6FF', stripe: '#3949AB' },
-          { bg: isDark ? '#0D1F1A' : '#ECFAF6', border: isDark ? '#1A4A3A' : '#89DCC1', stripe: '#00796B' },
-          { bg: isDark ? '#1A1426' : '#F9F5FF', border: isDark ? '#3A2A5C' : '#BFA2FF', stripe: '#6A1B9A' },
-        ]
-      : tone === 'hours'
-        ? [
-            { bg: isDark ? '#0D2137' : '#ECF5FF', border: isDark ? '#1A3A5C' : '#9CCDFF', stripe: '#1565C0' },
-            { bg: isDark ? '#161C2E' : '#EFF2FF', border: isDark ? '#2A3A6C' : '#A8B5FF', stripe: '#303F9F' },
-            { bg: isDark ? '#0D1F2E' : '#EAF8FF', border: isDark ? '#1A4A6C' : '#8EDCFF', stripe: '#0277BD' },
-            { bg: isDark ? '#0D1F1A' : '#F0FAF7', border: isDark ? '#1A4A3A' : '#96E1CC', stripe: '#00695C' },
-            { bg: isDark ? '#1A142E' : '#F7F1FF', border: isDark ? '#3A2A6C' : '#C8A7FF', stripe: '#7B1FA2' },
-          ]
-        : tone === 'productivity'
-          ? [
-              { bg: isDark ? '#0D2616' : '#EEF9F2', border: isDark ? '#1A4A2A' : '#9EDCB6', stripe: '#2E7D32' },
-              { bg: isDark ? '#1A2610' : '#F3FAEE', border: isDark ? '#3A4A1A' : '#B7DB88', stripe: '#558B2F' },
-              { bg: isDark ? '#0D1F1A' : '#EAF8F5', border: isDark ? '#1A4A3A' : '#93D8C6', stripe: '#00796B' },
-              { bg: isDark ? '#1A1A0D' : '#F6F8EC', border: isDark ? '#3A3A1A' : '#CFD992', stripe: '#827717' },
-              { bg: isDark ? '#161C2E' : '#EFF4FF', border: isDark ? '#2A3A6C' : '#AFC4FF', stripe: '#3949AB' },
-            ]
-          : [
-              { bg: isDark ? '#1A1C20' : '#F8FCFF', border: isDark ? '#2A2C32' : '#BCD7EC', stripe: '#1976D2' },
-              { bg: isDark ? '#1A1C26' : '#F7FAFF', border: isDark ? '#2A2C4A' : '#C5D1E8', stripe: '#5C6BC0' },
-              { bg: isDark ? '#0D1F1A' : '#F6FBFA', border: isDark ? '#1A4A3A' : '#BFE0D8', stripe: '#00897B' },
-              { bg: isDark ? '#1A1426' : '#FBF9FF', border: isDark ? '#3A2A5C' : '#D2C3EA', stripe: '#8E24AA' },
-            ];
-
-  if (!rows?.length) {
-    return (
-      <Box sx={{ px: 0.5, pt: 0.5 }}>
-        <Typography
-          sx={{ color: '#1565C0', fontSize: '0.78rem', fontStyle: 'italic', fontWeight: 600 }}
-        >
-          {loading ? 'Generating AI insights…' : emptyText}
-        </Typography>
-      </Box>
-    );
-  }
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-        gap: 0.75,
-      }}
-    >
-      {rows.map((r, idx) => {
-        const cardTone = cardPalettes[idx % cardPalettes.length];
-        return (
-          <Box
-            key={r.key}
-            sx={{
-              p: 0.55,
-              borderRadius: 0.9,
-              bgcolor: cardTone.bg,
-              border: `1px solid ${cardTone.border}`,
-              borderLeft: `4px solid ${cardTone.stripe}`,
-            }}
-          >
-            <Typography
-              sx={{ fontWeight: 700, color: cardTone.stripe, fontSize: '0.82rem', mb: 0.08 }}
-            >
-              {r.name}
-            </Typography>
-            <Typography sx={{ color: palette.text, fontSize: '0.78rem', lineHeight: 1.3 }}>
-              {r.message}
-            </Typography>
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ChartShell — acepta prop `footer` para los insights embebidos
+// ChartShell
 // ---------------------------------------------------------------------------
 
 function ChartShell({
@@ -927,8 +867,6 @@ function ChartShell({
   compact,
   belowDescription,
   headerAdornment,
-  footer,
-  footerTitle,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -1040,31 +978,6 @@ function ChartShell({
           </ResponsiveContainer>
         ) : null}
       </Box>
-
-      {/* Footer AI insights embebido */}
-      {footer != null ? (
-        <Box
-          sx={{
-            mt: 0.35,
-            pt: 0.25,
-            borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15, 23, 42, 0.08)'}`,
-          }}
-        >
-          <Typography
-            sx={{
-              fontWeight: 800,
-              fontSize: '0.7rem',
-              color: '#00897B',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              mb: 0.22,
-            }}
-          >
-            {footerTitle ?? 'AI Insights'}
-          </Typography>
-          {footer}
-        </Box>
-      ) : null}
     </MotionPaper>
   );
 }
@@ -1157,10 +1070,6 @@ export default function DashboardDeveloperCharts({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [aiProductivityRows, setAiProductivityRows] = useState([]);
-
   const orderedSelectedSprints = useMemo(
     () => [...(selectedSprints || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
     [selectedSprints],
@@ -1171,72 +1080,12 @@ export default function DashboardDeveloperCharts({
     return buildCompareDeveloperChartsModel(orderedSelectedSprints, projectDevelopers);
   }, [compareMode, orderedSelectedSprints, projectDevelopers]);
 
-  const aiSprintPayload = useMemo(
-    () =>
-      orderedSelectedSprints.map((sp) => ({
-        id: sp.id,
-        shortLabel: sp.shortLabel,
-        developers: (sp.developers || []).map((d) => ({
-          name: d.name,
-          assigned: Number(d.assigned || 0),
-          completed: Number(d.completed || 0),
-          hours: Number(d.hours || 0),
-          assignedHoursEstimate: Number(d.assignedHoursEstimate || 0),
-        })),
-        blockedReports: buildBlockedReportsForAiSprint(sp),
-      })),
-    [orderedSelectedSprints],
-  );
+  const teamProductivityTrend = useMemo(() => {
+    if (!compareMode || orderedSelectedSprints.length < 2) return [];
+    return buildTeamProductivityTrendSeries(orderedSelectedSprints);
+  }, [compareMode, orderedSelectedSprints]);
 
-  useEffect(() => {
-    if (!compareMode || aiSprintPayload.length < 2) {
-      setAiProductivityRows([]);
-      setAiLoading(false);
-      setAiError('');
-      return undefined;
-    }
-    const controller = new AbortController();
-    let cancelled = false;
-    const run = async () => {
-      setAiLoading(true);
-      setAiError('');
-      setAiProductivityRows([]);
-      try {
-        const res = await fetch(`${API_BASE}/api/insights/developer-variation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sprints: aiSprintPayload }),
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const insights = data?.insights ?? {};
-        const productivity = Array.isArray(insights.productivity) ? insights.productivity : [];
-        if (!cancelled) {
-          setAiProductivityRows(
-            productivity.map((r, idx) => ({
-              key: r?.key || `dash-productivity-${idx}`,
-              name: r?.developerName || 'Developer',
-              message: r?.message || 'No AI explanation returned.',
-            })),
-          );
-        }
-      } catch (_e) {
-        if (!cancelled) {
-          setAiError('AI insights are temporarily unavailable.');
-          setAiProductivityRows([]);
-        }
-      } finally {
-        if (!cancelled) setAiLoading(false);
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [compareMode, aiSprintPayload]);
+  const teamTrendAxis = useMemo(() => buildProductivityScoreAxisDomainTicks(), []);
 
   // ---- cálculos de ejes y alturas (sin cambios) ----
 
@@ -1404,14 +1253,8 @@ export default function DashboardDeveloperCharts({
         ),
       )
     : null;
-  const hComboCompareBase = hasCompareData
-    ? Math.max(
-        260,
-        Math.min(
-          400 + Math.round(comboExtraSingle * 0.35),
-          190 + forCombo.length * 28 + Math.round(comboExtraSingle * 0.35),
-        ),
-      )
+  const hTeamTrendCompareBase = hasCompareData
+    ? Math.max(260, Math.min(340, 220 + teamProductivityTrend.length * 28))
     : null;
 
   const hoursScaleExtraSingle = Math.min(
@@ -1434,9 +1277,8 @@ export default function DashboardDeveloperCharts({
   const hHours = hasCompareData
     ? compareChartHeights(hHoursCompareBase)
     : compareChartHeights(hHoursSingleBase);
-  const hCombo = hasCompareData
-    ? compareChartHeights(hComboCompareBase)
-    : compareChartHeights(hComboSingleBase);
+  const hTeamTrend = hasCompareData ? compareChartHeights(hTeamTrendCompareBase) : null;
+  const hCombo = hasCompareData ? null : compareChartHeights(hComboSingleBase);
 
   const compareSprintCount = orderedSelectedSprints.length;
   const compareAccent = orderedSelectedSprints[0]?.accentColor ?? '#3949AB';
@@ -1468,7 +1310,7 @@ export default function DashboardDeveloperCharts({
   // ---- modo comparación ----
 
   if (hasCompareData && compareModel) {
-    const { sprintDefs: compareSprintDefs, workloadRows, hoursRows, comboRows } = compareModel;
+    const { sprintDefs: compareSprintDefs, workloadRows, hoursRows } = compareModel;
     const sprintDefs = [...(compareSprintDefs || [])].sort(
       (a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b),
     );
@@ -1499,8 +1341,7 @@ export default function DashboardDeveloperCharts({
       return enriched;
     });
     const firstAccent = sprintDefs[0]?.accentColor ?? '#3949AB';
-    const comboAccent =
-      sprintDefs[sprintDefs.length - 1]?.accentColor ?? sprintDefs[0]?.accentColor ?? '#7E57C2';
+    const teamTrendAccent = PRODUCTIVITY_SCORE_TREND;
     const compareWorkloadTotalsSummary = (
       <CompareDeveloperTotalsSummary
         developers={developers}
@@ -1530,7 +1371,6 @@ export default function DashboardDeveloperCharts({
         Math.ceil(nSprints / 2) * (nSprints <= 3 ? 14 : 18) +
         (nSprints <= 2 ? 4 : nSprints <= 4 ? 6 : 8),
     );
-    const marginTopComboPlot = 16;
     const nWorkloadHoursRows = Math.max(workloadRows.length, hoursRows.length);
     const bottomAxisWorkloadHours = Math.min(
       78,
@@ -1540,32 +1380,7 @@ export default function DashboardDeveloperCharts({
       64,
       44 + Math.max(0, nSprints - 4) * 5 + Math.min(8, Math.max(0, nWorkloadHoursRows - 5) * 2),
     );
-    /** Productivity combo — layout independiente (no usar tuning de workload/hours). */
-    const nComboRows = comboRows.length;
-    const bottomAxisCombo = Math.min(
-      78,
-      50 + Math.max(0, nSprints - 3) * 5 + Math.min(12, Math.max(0, nComboRows - 6) * 2),
-    );
-    const xAxisTickHeightCombo = Math.min(
-      64,
-      44 + Math.max(0, nSprints - 4) * 5 + Math.min(8, Math.max(0, nComboRows - 5) * 2),
-    );
-    const barCategoryGapCombo =
-      nSprints >= 6 ? '3%' : nSprints >= 4 ? '4%' : nSprints >= 3 ? '3%' : '2%';
-    const barCategoryGapCompare = barCategoryGapCombo;
-    const compareBarGap = 0;
-    const maxBarCombo = Math.max(
-      12,
-      Math.min(
-        nSprints <= 2 ? 62 : nSprints <= 3 ? 54 : nSprints <= 5 ? 46 : 40,
-        Math.floor(158 / Math.max(1, nSprints)),
-      ),
-    );
-    const lineStrokeWCombo = nSprints > 5 ? 1.5 : 2;
-    const lineDotRCombo = nSprints > 5 ? 2 : nSprints > 3 ? 3 : 4;
-    /** Mismo diseño de barras agrupadas que Tasks vs Hours (combo). */
     const compareBarRadius = [6, 6, 0, 0];
-    const compareMaxBarSize = maxBarCombo;
     /**
      * Workload compare: 1 columna apilada por sprint (completed abajo, pending claro arriba).
      * barCategoryGap en px (no %) para que el bloque por developer quede compacto.
@@ -1579,19 +1394,24 @@ export default function DashboardDeveloperCharts({
         Math.floor(300 / Math.max(1, nSprints)),
       ),
     );
-    /** Hours compare: bloques compactos por developer (1 barra/sprint). */
-    const hoursBarCategoryGap = workloadBarCategoryGap;
-    const hoursBarGap = 0;
+    /** Hours compare: separación amplia entre developers (%) y entre barras del mismo developer. */
+    const hoursBarCategoryGap =
+      nWorkloadHoursRows >= 10
+        ? '36%'
+        : nWorkloadHoursRows >= 7
+          ? '40%'
+          : nWorkloadHoursRows >= 5
+            ? '44%'
+            : '48%';
+    const hoursBarGap = nSprints >= 6 ? 12 : nSprints >= 4 ? 14 : 16;
     const compareHoursBarSize = Math.max(
-      24,
+      18,
       Math.min(
-        nSprints <= 2 ? 58 : nSprints <= 3 ? 50 : nSprints <= 5 ? 44 : nSprints <= 7 ? 38 : 32,
-        Math.floor(300 / Math.max(1, nSprints)),
+        nSprints <= 2 ? 52 : nSprints <= 3 ? 44 : nSprints <= 5 ? 38 : nSprints <= 7 ? 32 : 28,
+        Math.floor(260 / Math.max(1, nSprints)),
       ),
     );
     const marginTopWorkloadTight = Math.max(58, marginTopWorkload - 6);
-
-    const aiEmptyText = aiError || 'Select at least 2 sprints to compare.';
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', minWidth: 0 }}>
@@ -1761,7 +1581,7 @@ export default function DashboardDeveloperCharts({
               textAnchor="end"
               height={xAxisTickHeightWorkloadHours}
               tickMargin={12}
-              padding={{ left: 4, right: 4 }}
+              padding={{ left: 16, right: 16 }}
               label={{
                 value: 'Developer',
                 position: 'insideBottom',
@@ -1826,104 +1646,89 @@ export default function DashboardDeveloperCharts({
           </BarChart>
         </ChartShell>
 
-        {/* ── Combo ── */}
+        {/* ── Team productivity trend ── */}
         <ChartShell
           compact
-          title="Developer productivity (tasks vs hours)"
-          description={CHART_DESC.compare.combo}
-          belowDescription={<CompareComboLegend sprintDefs={sprintDefs} />}
-          height={hCombo}
-          accent={comboAccent}
-          tint={alpha(comboAccent, isDark ? 0.12 : 0.08)}
-          footerTitle="AI summary: productivity (tasks vs hours) by developer"
-          footer={
-            <AIDeveloperVariationGrid
-              rows={aiProductivityRows}
-              loading={aiLoading}
-              emptyText={aiEmptyText}
-              tone="productivity"
-            />
-          }
+          title="Team productivity score trend"
+          description={CHART_DESC.compare.teamTrend}
+          height={hTeamTrend}
+          accent={teamTrendAccent}
+          tint={alpha(teamTrendAccent, isDark ? 0.12 : 0.08)}
         >
-          <ComposedChart
-            data={comboRows}
-            margin={{ top: marginTopComboPlot, right: 22, left: 10, bottom: bottomAxisCombo }}
-            barCategoryGap={barCategoryGapCombo}
-            barGap={compareBarGap}
+          <LineChart
+            data={teamProductivityTrend}
+            margin={{ top: 36, right: 20, left: 72, bottom: 52 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
-              dataKey="shortName"
+              dataKey="sprintLabel"
               tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
-              interval={0}
-              angle={-32}
-              textAnchor="end"
-              height={xAxisTickHeightCombo}
-              tickMargin={12}
-            />
-            <YAxis
-              yAxisId="tasks"
-              tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
-              width={56}
               tickMargin={8}
-              allowDecimals={false}
+              height={40}
               label={{
-                value: 'Tasks',
-                angle: -90,
-                position: 'insideLeft',
-                fill: COMPLETED_FILL,
+                value: 'Sprint',
+                position: 'bottom',
+                offset: 16,
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...CHART_AXIS_LABEL,
               }}
             />
             <YAxis
-              yAxisId="hrs"
-              orientation="right"
+              domain={teamTrendAxis.domain}
+              ticks={teamTrendAxis.ticks}
               tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
-              width={58}
-              tickMargin={8}
+              width={44}
+              tickMargin={6}
+              tickFormatter={(v) => `${Math.round(Number(v) || 0)}%`}
               label={{
-                value: Y_AXIS_HOURS,
-                angle: 90,
-                position: 'insideRight',
-                fill: HOURS_LINE,
+                value: 'Productivity score',
+                angle: -90,
+                position: 'left',
+                offset: 12,
+                fill: teamTrendAccent,
                 ...CHART_AXIS_LABEL,
+                style: { textAnchor: 'middle', fontSize: 13, fontWeight: 700 },
               }}
             />
             <Tooltip
               {...RECHARTS_BAR_TOOLTIP_PROPS}
-              shared
-              allowEscapeViewBox={{ x: true, y: true }}
-              reverseDirectionAllowInDimension={{ x: true, y: true }}
-              content={(props) => <CompareComboTooltip {...props} sprintDefs={sprintDefs} />}
+              content={(props) => <TeamProductivityTrendTooltip {...props} />}
             />
-            {sprintDefs.map((sp) => (
-              <Bar
-                key={`cb-${sp.id}`}
-                yAxisId="tasks"
-                dataKey={`cb_${sp.id}`}
-                name={`${sp.shortLabel} · tasks`}
-                fill={sp.accentColor}
-                radius={compareBarRadius}
-                maxBarSize={compareMaxBarSize}
-                animationDuration={CHART_BAR_ANIM_MS}
-                animationEasing={CHART_BAR_EASING}
-                activeBar={false}
-              ></Bar>
-            ))}
-            {sprintDefs.map((sp) => (
-              <Line
-                key={`ln-${sp.id}`}
-                yAxisId="hrs"
-                type="monotone"
-                dataKey={`ln_${sp.id}`}
-                name={`${sp.shortLabel} · hours`}
-                stroke={sp.accentColor}
-                strokeWidth={lineStrokeWCombo}
-                animationDuration={CHART_BAR_ANIM_MS}
-                dot={{ r: lineDotRCombo, fill: sp.accentColor, strokeWidth: 0 }}
+            <Line
+              type="monotone"
+              dataKey="productivityScore"
+              name="Productivity score"
+              stroke={teamTrendAccent}
+              strokeWidth={3}
+              connectNulls={false}
+              animationDuration={CHART_BAR_ANIM_MS}
+              animationEasing={CHART_BAR_EASING}
+              dot={(dotProps) => {
+                const { cx, cy, payload } = dotProps || {};
+                if (cx == null || cy == null || !Number.isFinite(payload?.productivityScore)) return null;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={5}
+                    fill={payload.accentColor || teamTrendAccent}
+                    stroke={isDark ? '#1C1E22' : '#fff'}
+                    strokeWidth={2}
+                  />
+                );
+              }}
+              activeDot={{ r: 7, strokeWidth: 2 }}
+            >
+              <LabelList
+                dataKey="productivityScore"
+                position="top"
+                fill={teamTrendAccent}
+                fontSize={12}
+                fontWeight={800}
+                formatter={(v) => `${Math.round(Number(v) || 0)}%`}
               />
-            ))}
-          </ComposedChart>
+            </Line>
+          </LineChart>
         </ChartShell>
       </Box>
     );

@@ -5,6 +5,8 @@ export const CHART_DESC = {
       'One stacked bar per sprint: completed (solid) with pending (lighter) on top, per developer.',
     hours:
       'Total hours worked and estimated hours per developer, summed across all selected sprints.',
+    teamTrend:
+      'Sprint productivity score (0–100%) across selected sprints',
     combo: 'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',
   },
   single: {
@@ -32,3 +34,6 @@ export const CHART_BAR_ANIM_MS = 950;
 export const CHART_BAR_EASING = 'ease-out';
 
 export const Y_AXIS_HOURS = 'Hours';
+
+/** Team productivity score trend line (compare mode). */
+export const PRODUCTIVITY_SCORE_TREND = '#7E57C2';

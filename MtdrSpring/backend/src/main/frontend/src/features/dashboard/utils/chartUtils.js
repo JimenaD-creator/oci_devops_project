@@ -1,5 +1,83 @@
 /** Pure helpers for dashboard developer charts. */
 
+/** Completed tasks per hour worked; null when not measurable. */
+export function computeTasksPerHour(completed, hours) {
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  if (h <= 0 || c <= 0) return null;
+  return c / h;
+}
+
+export function formatTasksPerHour(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  return Number(value).toFixed(2);
+}
+
+/** Minimum sample before showing per-developer throughput in tables. */
+export const THROUGHPUT_MIN_COMPLETED = 2;
+export const THROUGHPUT_MIN_HOURS = 2;
+
+export function isThroughputSampleReliable(completed, hours) {
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  return c >= THROUGHPUT_MIN_COMPLETED && h >= THROUGHPUT_MIN_HOURS;
+}
+
+export function formatThroughputHours(hours) {
+  const n = Math.max(0, Number(hours) || 0);
+  if (n <= 0) return '0 h';
+  const rounded = Math.round(n);
+  if (Math.abs(n - rounded) < 0.05) return `${rounded} h`;
+  return `${n.toFixed(1)} h`;
+}
+
+/** Human-readable basis for throughput (completed tasks and hours logged). */
+export function formatThroughputContext(completed, hours) {
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  return `${c} completed · ${formatThroughputHours(h)}`;
+}
+
+/**
+ * Throughput cell: ratio only when sample is large enough; always includes tooltip context.
+ */
+export function buildThroughputCellMeta(completed, hours) {
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  const reliable = isThroughputSampleReliable(c, h);
+  const ratio = computeTasksPerHour(c, h);
+  const context = formatThroughputContext(c, h);
+  return {
+    completed: c,
+    hours: h,
+    reliable,
+    ratio,
+    context,
+    display: reliable ? formatTasksPerHour(ratio) : '—',
+  };
+}
+
+export function buildProductivityScoreAxisDomainTicks() {
+  return { domain: [0, 100], ticks: [0, 20, 40, 60, 80, 100] };
+}
+
+export function buildTasksPerHourAxisDomainTicks(maxVal) {
+  const raw = Math.max(0, Number(maxVal) || 0);
+  const padded = Math.max(raw * 1.2, raw + 0.05, 0.1);
+  const domainMax = Math.ceil(padded * 20) / 20;
+  let step = 0.05;
+  if (domainMax > 0.5) step = 0.1;
+  if (domainMax > 1.2) step = 0.2;
+  const ticks = [];
+  for (let v = 0; v <= domainMax + 1e-9; v += step) {
+    ticks.push(Number(v.toFixed(2)));
+  }
+  if (ticks.length === 0 || ticks[ticks.length - 1] < domainMax) {
+    ticks.push(Number(domainMax.toFixed(2)));
+  }
+  return { domain: [0, domainMax], ticks, domainMax };
+}
+
 export function maxCompareWorkloadStack(rows, sprintDefs) {
   let m = 0;
   if (!rows?.length || !sprintDefs?.length) return m;

@@ -67,6 +67,37 @@ export function productivityScoreFromSprintKpis(kpis) {
   });
 }
 
+/**
+ * Per-developer productivity score (same weights as sprint KPI).
+ * Participation = worked hours vs estimated hours on assigned tasks.
+ * Workload balance uses relative hours share within the sprint (dashboard dev.workload).
+ */
+export function productivityScoreFromDeveloperMetrics({
+  assigned = 0,
+  completed = 0,
+  hours = 0,
+  assignedHoursEstimate = 0,
+  onTime = null,
+  workload = 0,
+} = {}) {
+  const a = Math.max(0, Number(assigned) || 0);
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
+  const completionRate = a > 0 ? Math.round((100 * c) / a) : 0;
+  const onTimeDelivery = typeof onTime === 'number' ? onTime : 0;
+  const teamParticipation =
+    estimate > 0 ? Math.min(100, Math.round((100 * h) / estimate)) : 0;
+  const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(workload) || 0)));
+
+  return computeProductivityScore({
+    completionRate,
+    onTimeDelivery,
+    teamParticipation,
+    workloadBalance,
+  });
+}
+
 /** Remove Gemini echoes of prompt instructions (KPI Analytics productivity block only). */
 export function stripProductivityGuideInstructionEcho(text) {
   if (text == null) return text;
