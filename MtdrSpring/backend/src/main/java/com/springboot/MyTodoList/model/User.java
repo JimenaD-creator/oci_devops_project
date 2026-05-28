@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "USERS")
@@ -31,6 +32,12 @@ public class User {
     @Column(name = "PROFILE_PICTURE", columnDefinition = "CLOB")
     private String profilePicture;
 
+    @Column(name = "RESET_TOKEN")
+    private String resetToken;
+
+    @Column(name = "RESET_TOKEN_EXP")
+    private LocalDateTime resetTokenExp;
+
     public User() {}
 
     public User(Long id, String number, String password) {
@@ -39,6 +46,7 @@ public class User {
         this.userpassword = password;
     }
 
+    // Getters y Setters existentes
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -50,13 +58,33 @@ public class User {
 
     public String getPhoneNumber() { return phonenumber; }
     public void setPhoneNumber(String number) { this.phonenumber = number; }
+    
+    // Método getPhonenumber (alias para compatibilidad)
+    public String getPhonenumber() { return phonenumber; }
+    public void setPhonenumber(String phonenumber) { this.phonenumber = phonenumber; }
 
     public String getUserPassword() { return userpassword; }
     public void setUserPassword(String password) { this.userpassword = password; }
+    
+    // NUEVO: Método setPassword para compatibilidad con AuthController
+    public void setPassword(String password) { 
+        this.userpassword = password; 
+    }
+    
+    // NUEVO: Método getPassword para compatibilidad
+    public String getPassword() { 
+        return this.userpassword; 
+    }
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
 
     public String getProfilePicture() { return profilePicture; }
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+
+    public String getResetToken() { return resetToken; }
+    public void setResetToken(String resetToken) { this.resetToken = resetToken; }
+
+    public LocalDateTime getResetTokenExp() { return resetTokenExp; }
+    public void setResetTokenExp(LocalDateTime resetTokenExp) { this.resetTokenExp = resetTokenExp; }
 }

@@ -6,6 +6,7 @@ import com.springboot.MyTodoList.repository.TeamMemberRepository;
 import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.dto.UserDetailDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,9 @@ public class UserService {
 
     @Autowired
     private TeamRepository teamRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -47,16 +51,11 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id) {
-        // 1. Borrar membresías del usuario en equipos
         teamMemberRepository.deleteByUserId(id);
-
-        // 2. Desasignar de cualquier equipo donde sea manager
         teamRepository.findByManagerId(id).ifPresent(team -> {
             team.setManager(null);
             teamRepository.save(team);
         });
-
-        // 3. Borrar el usuario
         userRepository.deleteById(id);
     }
 
@@ -85,9 +84,9 @@ public class UserService {
         boolean phoneMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getPhoneNumber());
         boolean emailMatches = phoneOrEmail != null && phoneOrEmail.equals(foundUser.getEmail());
         if (!phoneMatches && !emailMatches) return false;
-        if (password == null || !password.equals(foundUser.getUserPassword())) return false;
+        if (password == null) return false;
 
-        return true;
+        return passwordEncoder.matches(password, foundUser.getUserPassword());
     }
 
     public Optional<User> authenticateByIdentifierAndPassword(String identifier, String password) {
@@ -106,15 +105,12 @@ public class UserService {
             return Optional.empty();
         }
         User u = user.get();
-        if (password == null || !password.equals(u.getUserPassword())) {
+        if (password == null || !passwordEncoder.matches(password, u.getUserPassword())) {
             return Optional.empty();
         }
         return Optional.of(u);
     }
 
-    /**
-     * Looks up a user by email (case-insensitive) or exact phone, then checks password (plain-text match, same as verifyUserCredentials).
-     */
     public Optional<Long> verifyCredentialsByPhoneOrEmailAndPassword(String phoneOrEmail, String password) {
         return authenticateByIdentifierAndPassword(phoneOrEmail, password)
                 .map(User::getId);

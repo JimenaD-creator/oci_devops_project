@@ -10,9 +10,15 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    // Método existente (cambié findByEmailIgnoreCase a findByEmail para compatibilidad)
+    Optional<User> findByEmail(String email);
+    
+    // Mantener el original también para compatibilidad
     Optional<User> findByEmailIgnoreCase(String email);
+    
     Optional<User> findByPhonenumber(String phonenumber);
     Optional<User> findByNameIgnoreCase(String name);
+    Optional<User> findByResetToken(String resetToken);
 
     @Query("SELECT new com.springboot.MyTodoList.dto.UserDetailDTO(" +
            "u.id, u.name, u.email, u.phonenumber, u.type, " +
