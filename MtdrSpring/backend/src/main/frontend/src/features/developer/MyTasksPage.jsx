@@ -254,7 +254,24 @@ export default function MyTasksPage({ projectId, currentUser }) {
           </Box>
           <FormControl
             size="small"
-            sx={{ minWidth: { xs: '100%', sm: 200 }, ...pageFormFieldOutline() }}
+            sx={{
+              minWidth: { xs: '100%', sm: 200 },
+              ...pageFormFieldOutline(),
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'background.paper',
+                color: 'text.primary',
+              },
+              
+'& .MuiInputLabel-root': {
+  color: 'text.secondary',      
+},
+'& .MuiSelect-select': {
+  color: 'text.primary',       
+},
+              '& .MuiSvgIcon-root': {
+                color: 'text.secondary',
+              },
+            }}
           >
             <InputLabel id="my-tasks-sprint-label">Sprint</InputLabel>
             <Select
@@ -267,6 +284,18 @@ export default function MyTasksPage({ projectId, currentUser }) {
                 setSelectedSprint(sp || null);
               }}
               disabled={!sprints.length}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
+                    border: `1px solid ${borderColor}`,
+                    '& .MuiMenuItem-root:hover': {
+                      bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    },
+                  },
+                },
+              }}
             >
               {sprints.map((s) => (
                 <MenuItem key={s.id} value={String(s.id)}>
