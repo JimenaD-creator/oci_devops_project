@@ -5,16 +5,8 @@ import { loginWithCredentials, resolveProjectContextAfterLogin } from './loginAp
 import { buildUserSessionFromAuth } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     {open ? (
       <>
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -31,32 +23,16 @@ const EyeIcon = ({ open }) => (
 );
 
 const MailIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
     <polyline points="22,6 12,13 2,6" />
   </svg>
 );
 
 const LockIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
@@ -66,10 +42,14 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe]     = useState(false);
+  const [isLoading, setIsLoading]       = useState(false);
   const [focusedField, setFocusedField] = useState(null);
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError]       = useState('');
+
+  const [showForgot, setShowForgot]     = useState(false);
+  const [forgotEmail, setForgotEmail]   = useState('');
+  const [forgotStatus, setForgotStatus] = useState('idle');
 
   useEffect(() => {
     document.body.classList.add('login-route');
@@ -88,12 +68,12 @@ export default function Login() {
       setFormError('Please enter your email, phone number, or username and password.');
       return;
     }
-
     setIsLoading(true);
     try {
       clearSessionForLogin();
 
       const authData = await loginWithCredentials(email.trim(), password.trim());
+
       if (!authData?.token || !authData?.user) {
         throw Object.assign(new Error('Invalid login response'), {
           serverMessage: 'The server returned an incomplete login response. Please try again.',
@@ -141,6 +121,22 @@ export default function Login() {
     completeLogin();
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotStatus('loading');
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      setForgotStatus('sent');
+    } catch {
+      setForgotStatus('idle');
+    }
+  };
+
   return (
     <div className="login-page">
       <div className="login-card">
@@ -156,16 +152,8 @@ export default function Login() {
             <label className="login-label" htmlFor="login-email">
               Email, phone number, or username
             </label>
-            <div
-              className={
-                focusedField === 'email'
-                  ? 'login-input-wrapper login-input-wrapper--focused'
-                  : 'login-input-wrapper'
-              }
-            >
-              <span className="login-input-icon">
-                <MailIcon />
-              </span>
+            <div className={focusedField === 'email' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
+              <span className="login-input-icon"><MailIcon /></span>
               <input
                 id="login-email"
                 type="text"
@@ -184,16 +172,8 @@ export default function Login() {
             <label className="login-label" htmlFor="login-password">
               Password
             </label>
-            <div
-              className={
-                focusedField === 'password'
-                  ? 'login-input-wrapper login-input-wrapper--focused'
-                  : 'login-input-wrapper'
-              }
-            >
-              <span className="login-input-icon">
-                <LockIcon />
-              </span>
+            <div className={focusedField === 'password' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
+              <span className="login-input-icon"><LockIcon /></span>
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
@@ -255,15 +235,61 @@ export default function Login() {
                 <span className="login-dot login-dot--delay-1" />
                 <span className="login-dot login-dot--delay-2" />
               </span>
-            ) : (
-              'Sign in'
-            )}
+            ) : 'Sign in'}
           </button>
 
           <div className="login-forgot-wrap">
-            <a href="#forgot" className="login-forgot-link" onClick={(e) => e.preventDefault()}>
+            <a
+              href="#forgot"
+              className="login-forgot-link"
+              onClick={(e) => { e.preventDefault(); setShowForgot((v) => !v); setForgotStatus('idle'); }}
+            >
               Forgot your password?
             </a>
+
+            {showForgot && (
+              <div style={{ marginTop: 12 }}>
+                {forgotStatus === 'sent' ? (
+                  <p style={{ color: '#2e7d32', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                    If that email is registered, you will receive a password reset link shortly.
+                  </p>
+                ) : (
+                  <div>
+                    <div
+                      className={focusedField === 'forgot' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <span className="login-input-icon"><MailIcon /></span>
+                      <input
+                        type="email"
+                        className="login-input"
+                        placeholder="Your account email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        onFocus={() => setFocusedField('forgot')}
+                        onBlur={() => setFocusedField(null)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleForgotPassword(e); } }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="login-signin-btn"
+                      disabled={forgotStatus === 'loading'}
+                      style={{ marginTop: 0 }}
+                      onClick={handleForgotPassword}
+                    >
+                      {forgotStatus === 'loading' ? (
+                        <span className="login-loading-dots">
+                          <span className="login-dot" />
+                          <span className="login-dot login-dot--delay-1" />
+                          <span className="login-dot login-dot--delay-2" />
+                        </span>
+                      ) : 'Send reset link'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </form>
 

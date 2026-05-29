@@ -1,10 +1,3 @@
-/*
-## MyToDoReact version 1.0.
-##
-## Copyright (c) 2021 Oracle, Inc.
-## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
-*/
-
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -14,6 +7,7 @@ import { AppThemeProvider } from './ThemeContext';
 import Login from './features/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { installAuthFetchInterceptor } from './utils/auth';
+import ResetPasswordPage from './features/auth/ResetPasswordPage';
 
 const App = lazy(() => import('./app/App'));
 
@@ -27,6 +21,7 @@ ReactDOM.render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/*"
             element={
