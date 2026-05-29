@@ -251,7 +251,7 @@ export default function Login() {
               <div style={{ marginTop: 12 }}>
                 {forgotStatus === 'sent' ? (
                   <p style={{ color: '#2e7d32', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
-                    ✅ Si el email existe, recibirás un enlace de recuperación en breve.
+                    If that email is registered, you will receive a password reset link shortly.
                   </p>
                 ) : (
                   <div>

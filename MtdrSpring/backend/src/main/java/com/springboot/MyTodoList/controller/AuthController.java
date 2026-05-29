@@ -54,12 +54,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthLoginRequest request) {
-        logger.info("🔐 Intento de login para identifier: {}", request.getIdentifier());
-
         if (request == null || isBlank(request.getIdentifier()) || isBlank(request.getPassword())) {
             logger.warn("⚠️ Login fallido: identifier o password vacío");
             return ResponseEntity.badRequest().body(Map.of("message", "Identifier and password are required."));
         }
+
+        logger.info("🔐 Intento de login para identifier: {}", request.getIdentifier());
 
         try {
             Optional<User> authenticatedUser = userService.authenticateByIdentifierAndPassword(
@@ -91,8 +91,10 @@ public class AuthController {
             }
 
             logger.info("✅ Login exitoso para usuario: {} (ID: {})", user.getEmail(), user.getId());
-            return ResponseEntity.ok(
-                    new AuthLoginResponse(token, new AuthUserResponse(user), projectId, projectName));
+            AuthLoginResponse loginResponse = new AuthLoginResponse(token, new AuthUserResponse(user));
+            loginResponse.setProjectId(projectId);
+            loginResponse.setProjectName(projectName);
+            return ResponseEntity.ok(loginResponse);
 
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -112,7 +114,7 @@ public class AuthController {
 
         if (userOpt.isEmpty()) {
             logger.warn("⚠️ Intento de recuperación para email NO registrado: {}", email);
-            return ResponseEntity.ok(Map.of("message", "Si el email existe, recibirás un enlace en breve."));
+            return ResponseEntity.ok(Map.of("message", "If that email is registered, you will receive a reset link shortly."));
         }
 
         logger.info("✅ Email encontrado en sistema: {}", email);
@@ -135,7 +137,7 @@ public class AuthController {
         }
 
         logger.info("========================================");
-        return ResponseEntity.ok(Map.of("message", "Si el email existe, recibirás un enlace en breve."));
+        return ResponseEntity.ok(Map.of("message", "If that email is registered, you will receive a reset link shortly."));
     }
 
     @PostMapping("/reset-password")
@@ -150,20 +152,24 @@ public class AuthController {
 
         if (token == null || token.isEmpty()) {
             logger.error("❌ Token vacío en solicitud de reset");
-            return ResponseEntity.badRequest().body(Map.of("error", "Token requerido"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Token is required."));
+        }
+
+        if (newPassword == null || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters."));
         }
 
         User user = userRepository.findByResetToken(token)
                 .orElseThrow(() -> {
                     logger.error("❌ Token inválido o no encontrado: {}", token);
-                    return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token inválido");
+                    return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset token.");
                 });
 
         logger.info("✅ Token válido para usuario: {}", user.getEmail());
 
-        if (user.getResetTokenExp().isBefore(LocalDateTime.now())) {
+        if (user.getResetTokenExp() == null || user.getResetTokenExp().isBefore(LocalDateTime.now())) {
             logger.error("❌ Token expirado. Expiración: {}, Ahora: {}", user.getResetTokenExp(), LocalDateTime.now());
-            return ResponseEntity.badRequest().body(Map.of("error", "El link expiró. Solicita uno nuevo."));
+            return ResponseEntity.badRequest().body(Map.of("error", "This reset link has expired. Please request a new one."));
         }
 
         String encodedPassword = passwordEncoder.encode(newPassword);
@@ -175,7 +181,7 @@ public class AuthController {
         logger.info("✅ Contraseña actualizada exitosamente para usuario: {}", user.getEmail());
         logger.info("========================================");
 
-        return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente."));
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully."));
     }
 
     private boolean isBlank(String value) {

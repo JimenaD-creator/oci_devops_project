@@ -55,7 +55,7 @@ public class EmailService {
             logger.info("✅ MimeMessageHelper creado correctamente");
 
             helper.setTo(toEmail);
-            helper.setSubject("Recuperación de contraseña - Oracle Task Manager");
+            helper.setSubject("Password recovery - Oracle Task Manager");
             helper.setFrom(fromEmail);
             logger.info("✅ Destinatario, asunto y remitente configurados");
 
@@ -63,14 +63,14 @@ public class EmailService {
             logger.info("🔗 Link de recuperación generado: {}", resetLink);
 
             String html = "<div style='font-family:sans-serif;max-width:480px;margin:auto;padding:24px'>"
-                + "<h2 style='color:#1a1a1a'>Recuperar contraseña</h2>"
-                + "<p style='color:#444'>Recibimos una solicitud para restablecer tu contraseña.</p>"
-                + "<p style='color:#444'>Haz click en el botón para crear una nueva:</p>"
+                + "<h2 style='color:#1a1a1a'>Reset your password</h2>"
+                + "<p style='color:#444'>We received a request to reset your password.</p>"
+                + "<p style='color:#444'>Click the button below to choose a new password:</p>"
                 + "<a href='" + resetLink + "' style='display:inline-block;background:#0070f3;"
                 + "color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;"
-                + "font-weight:bold;margin:16px 0'>Restablecer contraseña</a>"
-                + "<p style='color:#888;font-size:12px;margin-top:24px'>Este link expira en 1 hora.<br>"
-                + "Si no solicitaste esto, ignora este mensaje.</p>"
+                + "font-weight:bold;margin:16px 0'>Reset password</a>"
+                + "<p style='color:#888;font-size:12px;margin-top:24px'>This link expires in 1 hour.<br>"
+                + "If you did not request this, you can ignore this email.</p>"
                 + "</div>";
             
             logger.info("📝 Contenido HTML del email generado (primeros 200 chars): {}", 
