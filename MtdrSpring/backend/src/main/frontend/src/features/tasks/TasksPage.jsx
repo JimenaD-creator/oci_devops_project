@@ -42,6 +42,7 @@ import {
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { useProjectData } from '../../contexts/ProjectDataContext';
+import { apiFetch } from '../../utils/auth';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
@@ -308,14 +309,54 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   }, [developerFilter, developerFilterOptions]);
 
   const handleStatusChange = async (taskId, newStatus) => {
-    const task = rawTasks.find((t) => t.id === taskId);
+    const tid = Number(taskId);
+    const task = rawTasks.find((t) => Number(t.id) === tid);
     if (!task) return;
-    const assignees = userTasks.filter(
-      (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId),
-    );
-    const ns = String(newStatus || '').toUpperCase();
-    let lastUpdated = null;
-    const publishStatusUpdate = (updated, meta) => {
+
+    const assignees = userTasks.filter((ut) => userTaskRowTaskId(ut) === tid);
+    const ns = normalizeTaskStatus(newStatus);
+    const previousTaskStatus = task.status;
+    const assigneeSnapshot = assignees.map((ut) => ({ ...ut }));
+
+    const userTaskStatusFor = (status) => {
+      const canonical = normalizeTaskStatus(status);
+      return canonical === 'DONE' ? 'COMPLETED' : canonical;
+    };
+
+    const applyOptimistic = (status) => {
+      const canonical = normalizeTaskStatus(status);
+      setRawTasks((prev) =>
+        prev.map((t) => (Number(t.id) === tid ? { ...t, status: canonical } : t)),
+      );
+      if (assignees.length > 0) {
+        const utStatus = userTaskStatusFor(status);
+        setUserTasks((prev) =>
+          prev.map((row) => (userTaskRowTaskId(row) === tid ? { ...row, status: utStatus } : row)),
+        );
+      }
+    };
+
+    const rollbackOptimistic = () => {
+      setRawTasks((prev) =>
+        prev.map((t) => (Number(t.id) === tid ? { ...t, status: previousTaskStatus } : t)),
+      );
+      if (assigneeSnapshot.length > 0) {
+        setUserTasks((prev) => {
+          const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+          return [...rest, ...assigneeSnapshot];
+        });
+      }
+    };
+
+    const commitServerUpdate = (updated, meta) => {
+      if (updated?.id != null) {
+        setRawTasks((prev) => mergeUpdatedTask(prev, updated));
+        if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
+          );
+        }
+      }
       if (!updated?.id) return;
       notifyTasksMutated({
         source: 'tasks-page',
@@ -325,84 +366,71 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         meta,
       });
     };
+
     const putTask = async () => {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+      const res = await apiFetch(`${API_BASE}/api/tasks/${tid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...task, status: newStatus }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        lastUpdated = updated;
-        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-        if (assignees.length > 1 && ns !== 'DONE') {
-          const canonicalUt = normalizeTaskStatus(newStatus);
-          setUserTasks((prev) =>
-            prev.map((row) => {
-              const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
-              if (rowTaskId !== Number(taskId)) return row;
-              return { ...row, status: canonicalUt };
-            }),
-          );
-        }
-      }
+      if (!res.ok) return null;
+      return res.json();
     };
+
     try {
+      if (assignees.length > 1 && ns === 'DONE' && !assignees.every((ut) => isUserTaskAssigneeComplete(ut))) {
+        setMultiDoneTaskId(tid);
+        return;
+      }
+
+      applyOptimistic(newStatus);
+
       if (assignees.length === 0) {
-        await putTask();
-        publishStatusUpdate(lastUpdated, undefined);
-        return;
-      }
-      if (assignees.length === 1) {
-        if (ns === 'DONE') {
-          const ut = assignees[0];
-          const uid = Number(ut.user?.id ?? ut.user?.ID);
-          const markDoneRes = await fetch(`${API_BASE}/api/user-tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
-          });
-          if (markDoneRes.ok) {
-            setUserTasks((prev) =>
-              prev.map((row) => {
-                const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
-                const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
-                if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
-                return { ...row, status: 'COMPLETED' };
-              }),
-            );
-            await putTask();
-            publishStatusUpdate(lastUpdated, {
-              syncAssignmentStatuses: true,
-              assignmentStatus: 'COMPLETED',
-            });
-          }
-        } else {
-          await putTask();
-          publishStatusUpdate(lastUpdated, {
-            syncAssignmentStatuses: true,
-            assignmentStatus: normalizeTaskStatus(newStatus),
-          });
+        const updated = await putTask();
+        if (!updated) {
+          rollbackOptimistic();
+          return;
         }
+        commitServerUpdate(updated, undefined);
         return;
       }
-      if (ns === 'DONE') {
-        const allDone = assignees.every((ut) => isUserTaskAssigneeComplete(ut));
-        if (allDone) {
-          await putTask();
-          publishStatusUpdate(lastUpdated, undefined);
-        } else {
-          setMultiDoneTaskId(taskId);
+
+      if (assignees.length === 1 && ns === 'DONE') {
+        const ut = assignees[0];
+        const uid = Number(ut.user?.id ?? ut.user?.ID);
+        const markDoneRes = await apiFetch(`${API_BASE}/api/user-tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: uid, taskId: tid, status: 'COMPLETED' }),
+        });
+        if (!markDoneRes.ok) {
+          rollbackOptimistic();
+          return;
         }
+        const updated = await putTask();
+        if (!updated) {
+          rollbackOptimistic();
+          return;
+        }
+        commitServerUpdate(updated, {
+          syncAssignmentStatuses: true,
+          assignmentStatus: 'COMPLETED',
+        });
         return;
       }
-      await putTask();
-      publishStatusUpdate(lastUpdated, {
+
+      const updated = await putTask();
+      if (!updated) {
+        rollbackOptimistic();
+        return;
+      }
+      commitServerUpdate(updated, {
         syncAssignmentStatuses: true,
-        assignmentStatus: normalizeTaskStatus(newStatus),
+        assignmentStatus: ns,
       });
     } catch (e) {
       console.error('Error updating task status:', e);
+      rollbackOptimistic();
     }
   };
 
@@ -499,7 +527,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const markAssigneeDone = async (taskId, ut) => {
     const uid = Number(ut.user?.id ?? ut.user?.ID);
     try {
-      const res = await fetch(`${API_BASE}/api/user-tasks`, {
+      const res = await apiFetch(`${API_BASE}/api/user-tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
