@@ -30,8 +30,10 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import { TEAM_MEMBER_TYPE_SUGGESTIONS } from '../../utils/userRoleUtils';
+import { getApiBase } from '../../utils/apiBase';
+import { apiFetch } from '../../utils/auth';
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : getApiBase() || '';
 
 const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) => {
   const theme = useTheme();
@@ -41,7 +43,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const [userDetails, setUserDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const managerAutoSelectedRef = useRef(false);
+  const pickerAutoSelectedRef = useRef(false);
   const [openModal, setOpenModal] = useState(null);
   const [formData, setFormData] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
@@ -83,28 +85,31 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     }
   };
 
-  const fetchManagerProjects = async () => {
+  const readCurrentUserId = () => {
+    try {
+      const raw = localStorage.getItem('currentUser');
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      const id = u?.id ?? u?.ID;
+      if (id == null || String(id).trim() === '') return null;
+      return String(id).trim();
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchRoleProjectsList = async (listPathSegment) => {
     setLoading(true);
     setError(null);
     try {
-      let managerId = null;
-      try {
-        const raw = localStorage.getItem('currentUser');
-        if (raw) {
-          const u = JSON.parse(raw);
-          const id = u?.id ?? u?.ID;
-          if (id != null && String(id).trim() !== '') managerId = String(id).trim();
-        }
-      } catch {
-        managerId = null;
-      }
-      if (!managerId) {
+      const userId = readCurrentUserId();
+      if (!userId) {
         setProjects([]);
-        setError('No manager ID found. Please log in again.');
+        setError('No user ID found. Please log in again.');
         return;
       }
-      const resProj = await fetch(
-        `${API_BASE}/api/projects/manager/${encodeURIComponent(managerId)}/list`,
+      const resProj = await apiFetch(
+        `${API_BASE}/api/projects/${listPathSegment}/${encodeURIComponent(userId)}/list`,
       );
       if (resProj.ok) {
         const data = await resProj.json();
@@ -122,18 +127,25 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     }
   };
 
+  const fetchManagerProjects = () => fetchRoleProjectsList('manager');
+  const fetchDeveloperProjects = () => fetchRoleProjectsList('developer');
+
   useEffect(() => {
+    pickerAutoSelectedRef.current = false;
     if (mode === 'manager') {
       fetchManagerProjects();
+    } else if (mode === 'developer') {
+      fetchDeveloperProjects();
     } else {
       fetchData();
     }
   }, [mode]);
 
   useEffect(() => {
-    if (skipAutoSelect || mode !== 'manager' || loading) return;
-    if (projects.length !== 1 || !onSelect || managerAutoSelectedRef.current) return;
-    managerAutoSelectedRef.current = true;
+    if (skipAutoSelect || loading) return;
+    if (mode !== 'manager' && mode !== 'developer') return;
+    if (projects.length !== 1 || !onSelect || pickerAutoSelectedRef.current) return;
+    pickerAutoSelectedRef.current = true;
     onSelect(projects[0]);
   }, [mode, loading, projects, onSelect, skipAutoSelect]);
 
@@ -273,7 +285,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             }}
           />
           <Typography variant="h5" sx={{ color: textSecondary }}>
-            {mode === 'manager' ? 'Select your project' : 'System Administration'}
+            {mode === 'manager' || mode === 'developer'
+              ? 'Select your project'
+              : 'System Administration'}
           </Typography>
         </Box>
 
@@ -339,10 +353,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
           <Alert severity="error" sx={{ mb: 6 }}>
             {error}
           </Alert>
-        ) : projects.length === 0 && mode === 'manager' ? (
+        ) : projects.length === 0 && (mode === 'manager' || mode === 'developer') ? (
           <Typography sx={{ textAlign: 'center', color: textSecondary, mb: 6 }}>
-            No registered projects found. If you just logged in, please refresh the page; if the 
-            issue persists, contact an administrator.
+            {mode === 'developer'
+              ? 'No projects found for your account. Ask your manager to add you to a project team.'
+              : 'No registered projects found. If you just logged in, please refresh the page; if the issue persists, contact an administrator.'}
           </Typography>
         ) : (
           <Grid container spacing={3} sx={{ mb: 8 }}>

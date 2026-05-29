@@ -42,7 +42,7 @@ import {
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { apiFetch } from '../../utils/auth';
+import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
@@ -146,8 +146,14 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         setRawTasks([]);
         setSprints([]);
         setUserTasks([]);
-        if (!silent)
-          setLoadError('Could not load tasks. Check that the server is running and try again.');
+        if (!silent) {
+          setLoadError(
+            resolveLoadErrorMessage(
+              error,
+              'Could not load tasks. Check that the server is running and try again.',
+            ),
+          );
+        }
       } finally {
         if (!silent) setIsLoading(false);
       }

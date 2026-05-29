@@ -90,6 +90,13 @@ export async function fetchDeveloperPrimaryProject(userId) {
   return projRes.json();
 }
 
+export async function fetchDeveloperProjectsList(userId) {
+  const res = await apiFetch(`${getApiBase()}/api/projects/developer/${userId}/list`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
 /** After login, ensure currentProjectId is set (needed for dashboard API calls in OCI). */
 export async function resolveProjectContextAfterLogin(user, authData) {
   if (authData?.projectId != null) {
@@ -111,9 +118,10 @@ export async function resolveProjectContextAfterLogin(user, authData) {
       }
     }
   } else if (isDeveloperRole(user?.role)) {
-    const project = await fetchDeveloperPrimaryProject(userId);
-    if (project?.id != null) {
-      return { projectId: String(project.id), projectName: project.name || '' };
+    const list = await fetchDeveloperProjectsList(userId);
+    const first = list[0];
+    if (first?.id != null) {
+      return { projectId: String(first.id), projectName: first.name || '' };
     }
   }
   return { projectId: null, projectName: '' };
