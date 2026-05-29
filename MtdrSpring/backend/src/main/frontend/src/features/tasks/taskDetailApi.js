@@ -1,4 +1,5 @@
 import { API_BASE } from '../sprints/constants/sprintConstants';
+import { apiFetch } from '../../utils/auth';
 
 export async function fetchTaskDetailDevelopers(projectId) {
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/developers`, {
@@ -60,4 +61,19 @@ export async function putTask(taskId, payload) {
 
 export async function deleteTaskById(taskId) {
   return fetch(`${API_BASE}/api/tasks/${taskId}`, { method: 'DELETE' });
+}
+
+/** Email newly added assignees after editing assignees on an existing task. */
+export async function notifyNewAssignees(taskId, newAssigneeUserIds) {
+  const ids = Array.isArray(newAssigneeUserIds)
+    ? newAssigneeUserIds.filter((id) => Number.isFinite(Number(id)) && Number(id) > 0)
+    : [];
+  if (ids.length === 0) {
+    return { ok: true };
+  }
+  return apiFetch(`${API_BASE}/api/tasks/${taskId}/notify-new-assignees`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ newAssigneeUserIds: ids }),
+  });
 }

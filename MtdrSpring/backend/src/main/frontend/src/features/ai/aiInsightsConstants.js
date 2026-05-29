@@ -203,16 +203,26 @@ function formatKpiMetricValue(rawValue) {
 }
 
 const KPI_METRIC_PATTERNS = {
-  completionRate:
+  completionRate: [
     /(completion\s*rate(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-  onTimeDelivery:
+    /(current\s+completion\s*rate\s+of\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ],
+  onTimeDelivery: [
     /(on[- ]time\s*delivery(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-  teamParticipation:
+    /(on[- ]time\s*delivery\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ],
+  teamParticipation: [
     /(team\s*participation(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-  workloadBalance:
+    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ],
+  workloadBalance: [
     /(workload\s*balance(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-  productivityScore:
+    /(workload\s*balance\s*score\s+of\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ],
+  productivityScore: [
     /(productivity\s*score(?:\s+is\s+at\s+|\s+is\s+(?:currently\s+)?|\s+stands\s+at\s+|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
+    /(the\s+productivity\s*score\s+of\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+  ],
 };
 
 /** Gemini often puts the % far from the label ("…declined…, currently at 63%"). */
@@ -223,12 +233,15 @@ const KPI_METRIC_PROXIMITY = {
   ],
   completionRate: [
     /(completion\s*rate[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(current\s+completion\s*rate\s+of\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
   teamParticipation: [
     /(team\s*participation[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
   workloadBalance: [
     /(workload\s*balance[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(workload\s*balance\s*score\s+of\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
   productivityScore: [
     /(productivity\s*score[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
@@ -260,9 +273,10 @@ function applyKpiMetricPatterns(text, key, actual) {
   const display = formatKpiMetricValue(actual);
   let result = text;
   const tight = KPI_METRIC_PATTERNS[key];
-  if (tight) {
-    result = result.replace(tight, (_, prefix) => `${prefix}${display}`);
-  }
+  const tightList = tight ? (Array.isArray(tight) ? tight : [tight]) : [];
+  tightList.forEach((pattern) => {
+    result = result.replace(pattern, (_, prefix) => `${prefix}${display}`);
+  });
   const proximity = KPI_METRIC_PROXIMITY[key];
   if (proximity) {
     proximity.forEach((pattern) => {
@@ -270,6 +284,23 @@ function applyKpiMetricPatterns(text, key, actual) {
     });
   }
   return result;
+}
+
+/**
+ * Manager guide metric blocks usually cite one KPI % — force the first % to match the card.
+ */
+export function alignSingleMetricBlock(text, metricKey, actual) {
+  if (text == null || actual == null || !Number.isFinite(Number(actual))) return text;
+  const metrics = { [metricKey]: actual };
+  let out = alignKpiProseForMetric(String(text), metricKey, metrics);
+  const display = formatKpiMetricValue(actual);
+  let replacedFirst = false;
+  out = out.replace(/(-?\d+(?:\.\d+)?)\s*%/g, (match) => {
+    if (replacedFirst) return match;
+    replacedFirst = true;
+    return display;
+  });
+  return fixGluedPercentProse(out);
 }
 
 /**

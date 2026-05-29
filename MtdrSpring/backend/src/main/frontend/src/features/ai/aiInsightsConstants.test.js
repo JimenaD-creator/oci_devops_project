@@ -3,6 +3,7 @@ import {
   alignAlertLoosePercents,
   alignKpiMetricsInText,
   alignKpiProseForMetric,
+  alignSingleMetricBlock,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -38,5 +39,21 @@ describe('aiInsightsConstants KPI alignment', () => {
 
   it('alignAlertLoosePercents replaces currently at', () => {
     expect(alignAlertLoosePercents('currently at 63%', 83)).toBe('currently at 83%');
+  });
+
+  it('alignSingleMetricBlock fixes Gemini manager-guide phrasing', () => {
+    const text =
+      'The current completion rate of 13% reflects the early stage of the sprint where most work is still in progress.';
+    const out = alignSingleMetricBlock(text, 'completionRate', 42);
+    expect(out).toContain('completion rate of 42%');
+    expect(out).not.toContain('13%');
+  });
+
+  it('alignSingleMetricBlock fixes workload balance score phrasing', () => {
+    const text =
+      'The workload balance score of 96% shows that tasks are currently distributed fairly across the team.';
+    const out = alignSingleMetricBlock(text, 'workloadBalance', 97);
+    expect(out).toContain('workload balance score of 97%');
+    expect(out).not.toContain('96%');
   });
 });

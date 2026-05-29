@@ -1,10 +1,12 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.dto.TaskCreatePayload;
+import com.springboot.MyTodoList.dto.TaskNewAssigneesPayload;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,9 @@ public class TaskController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskAssignmentNotificationService taskAssignmentNotificationService;
 
     private static String canonicalTaskStatus(String raw) {
         String n = Optional.ofNullable(raw).orElse("").trim().toUpperCase().replaceAll("[\\s-]+", "_");
@@ -72,13 +77,33 @@ public class TaskController {
             return ResponseEntity.badRequest().build();
         }
         try {
-            return ResponseEntity.ok(
-                    taskService.createTask(payload.getTask(), payload.getAssigneeUserIds()));
+            Task created = taskService.createTask(payload.getTask(), payload.getAssigneeUserIds());
+            taskAssignmentNotificationService.notifyAssigneesOnTaskCreated(
+                    created, payload.getAssigneeUserIds());
+            return ResponseEntity.ok(created);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
     }
     
+    /**
+     * Notify developers who were newly assigned when editing an existing task (assignee list changed).
+     */
+    @PostMapping("/{id}/notify-new-assignees")
+    public ResponseEntity<Void> notifyNewAssignees(
+            @PathVariable Long id, @RequestBody TaskNewAssigneesPayload payload) {
+        if (!taskRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        List<Long> newIds =
+                payload != null ? payload.normalizedNewAssigneeUserIds() : List.of();
+        if (newIds.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        taskAssignmentNotificationService.notifyNewAssigneesOnReassignment(id, newIds);
+        return ResponseEntity.accepted().build();
+    }
+
     /**
      * Update task
      */

@@ -24,6 +24,9 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${telegram.bot.name:}")
+    private String telegramBotUsername;
+
     public void sendPasswordResetEmail(String toEmail, String token) {
         logger.info("========================================");
         logger.info("📧 INICIANDO ENVÍO DE EMAIL DE RECUPERACIÓN");
@@ -116,5 +119,182 @@ public class EmailService {
             logger.error("========================================");
             throw new RuntimeException("Error al enviar email: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Notifies a developer they were assigned to a task.
+     * Failures are logged only (does not throw) so task creation is not rolled back.
+     */
+    public void sendTaskAssignmentEmail(
+            String toEmail,
+            String assigneeName,
+            String taskTitle,
+            String priority,
+            String sprintLabel,
+            String assignedByName) {
+        if (fromEmail == null || fromEmail.isEmpty()) {
+            logger.warn("Task assignment email skipped: spring.mail.username is not configured");
+            return;
+        }
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            String safeTitle = taskTitle != null ? taskTitle.trim() : "Untitled task";
+            String safeName = assigneeName != null && !assigneeName.isBlank() ? assigneeName.trim() : "there";
+            String safeAssigner =
+                    assignedByName != null && !assignedByName.isBlank() ? assignedByName.trim() : "Your manager";
+            String tasksUrl = frontendUrl != null ? frontendUrl.trim() : "";
+            String botHandle = telegramBotUsername != null ? telegramBotUsername.trim().replace("@", "") : "";
+            String telegramLine = buildTelegramInstructionPlain(botHandle);
+            String telegramLineHtml = buildTelegramInstructionHtml(botHandle);
+
+            String plainText = buildTaskAssignmentPlainText(
+                    safeName, safeAssigner, safeTitle, priority, sprintLabel, tasksUrl, telegramLine);
+            String html = buildTaskAssignmentHtml(
+                    safeName, safeAssigner, safeTitle, priority, sprintLabel, tasksUrl, telegramLineHtml);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(toEmail.trim());
+            helper.setSubject("New task assigned — Oracle Task Manager");
+            helper.setFrom(fromEmail);
+            helper.setText(plainText, html);
+
+            mailSender.send(message);
+            logger.info(
+                    "Task assignment email sent to {} (includes web portal + Telegram instructions)",
+                    toEmail);
+        } catch (Exception e) {
+            logger.error("Failed to send task assignment email to {}: {}", toEmail, e.getMessage(), e);
+        }
+    }
+
+    private static String buildTelegramInstructionPlain(String botHandle) {
+        if (botHandle != null && !botHandle.isBlank()) {
+            return "Telegram: open https://t.me/" + botHandle + " , send /start, and sign in.";
+        }
+        return "Telegram: open your team's Task Manager bot, send /start, and sign in.";
+    }
+
+    private static String buildTelegramInstructionHtml(String botHandle) {
+        if (botHandle != null && !botHandle.isBlank()) {
+            return "Open <a href=\"https://t.me/"
+                    + escapeHtml(botHandle)
+                    + "\" style=\"color:#0070f3\">@"
+                    + escapeHtml(botHandle)
+                    + "</a>, send <strong>/start</strong>, and sign in.";
+        }
+        return "Open your team&rsquo;s Task Manager bot, send <strong>/start</strong>, and sign in.";
+    }
+
+    private static String buildTaskAssignmentPlainText(
+            String assigneeName,
+            String assignerName,
+            String taskTitle,
+            String priority,
+            String sprintLabel,
+            String portalUrl,
+            String telegramLine) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("You have a new task\n\n");
+        sb.append("Hi ").append(assigneeName).append(",\n\n");
+        sb.append(assignerName).append(" assigned you to:\n");
+        sb.append(taskTitle).append("\n\n");
+        if (priority != null && !priority.isBlank()) {
+            sb.append("Priority: ").append(priority.trim()).append("\n");
+        }
+        if (sprintLabel != null && !sprintLabel.isBlank()) {
+            sb.append("Sprint: ").append(sprintLabel.trim()).append("\n");
+        }
+        sb.append("\n");
+        sb.append("WHERE TO VIEW FULL TASK DETAILS (description, dates, status)\n");
+        sb.append("============================================================\n");
+        sb.append("1) Web portal: sign in and open My Tasks");
+        if (portalUrl != null && !portalUrl.isBlank()) {
+            sb.append("\n   ").append(portalUrl);
+        }
+        sb.append("\n2) ").append(telegramLine).append("\n");
+        return sb.toString();
+    }
+
+    private String buildTaskAssignmentHtml(
+            String safeName,
+            String safeAssigner,
+            String safeTitle,
+            String priority,
+            String sprintLabel,
+            String tasksUrl,
+            String telegramLineHtml) {
+        StringBuilder details = new StringBuilder();
+        if (priority != null && !priority.isBlank()) {
+            details.append("<p style='color:#444;margin:8px 0'><strong>Priority:</strong> ")
+                    .append(escapeHtml(priority))
+                    .append("</p>");
+        }
+        if (sprintLabel != null && !sprintLabel.isBlank()) {
+            details.append("<p style='color:#444;margin:8px 0'><strong>Sprint:</strong> ")
+                    .append(escapeHtml(sprintLabel))
+                    .append("</p>");
+        }
+
+        String portalBlock =
+                "<p style='color:#1a1a1a;margin:12px 0 8px 0'><strong>1. Web portal</strong></p>"
+                        + "<p style='color:#444;margin:0 0 12px 0'>Sign in and open <strong>My Tasks</strong>"
+                        + (tasksUrl.isEmpty()
+                                ? ".</p>"
+                                : ": <a href=\""
+                                        + escapeHtml(tasksUrl)
+                                        + "\" style=\"color:#0070f3\">"
+                                        + escapeHtml(tasksUrl)
+                                        + "</a></p>");
+
+        String telegramBlock =
+                "<p style='color:#1a1a1a;margin:12px 0 8px 0'><strong>2. Telegram</strong></p>"
+                        + "<p style='color:#444;margin:0'>"
+                        + telegramLineHtml
+                        + "</p>";
+
+        return "<div style='font-family:sans-serif;max-width:520px;margin:auto;padding:24px'>"
+                + "<h2 style='color:#1a1a1a'>You have a new task</h2>"
+                + "<p style='color:#444'>Hi "
+                + escapeHtml(safeName)
+                + ",</p>"
+                + "<p style='color:#444'><strong>"
+                + escapeHtml(safeAssigner)
+                + "</strong> assigned you to:</p>"
+                + "<p style='color:#1a1a1a;font-size:18px;font-weight:600;margin:16px 0'>"
+                + escapeHtml(safeTitle)
+                + "</p>"
+                + details
+                + "<div style='border:2px solid #0070f3;border-radius:8px;padding:16px;margin:20px 0;background:#f0f7ff'>"
+                + "<p style='color:#1a1a1a;font-size:16px;font-weight:700;margin:0 0 12px 0'>"
+                + "Where to view full task details</p>"
+                + "<p style='color:#555;margin:0 0 12px 0;font-size:14px'>"
+                + "Description, dates, and status:</p>"
+                + portalBlock
+                + telegramBlock
+                + "</div>"
+                + (tasksUrl.isEmpty()
+                        ? ""
+                        : "<p style='margin:16px 0'><a href=\""
+                                + escapeHtml(tasksUrl)
+                                + "\" style='display:inline-block;background:#0070f3;color:#fff;"
+                                + "padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold'>"
+                                + "Open web portal</a></p>")
+                + "<p style='color:#888;font-size:12px;margin-top:24px'>"
+                + "If you were not expecting this assignment, contact your manager.</p>"
+                + "</div>";
+    }
+
+    private static String escapeHtml(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 }

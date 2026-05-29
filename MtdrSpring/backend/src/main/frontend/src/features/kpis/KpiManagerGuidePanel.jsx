@@ -7,6 +7,7 @@ import {
   alignKpiMetricsInText,
   alignKpiProseForMetric,
   alignProductivityScoreProse,
+  alignSingleMetricBlock,
   buildFallbackKpiManagerGuide,
   normalizeWorkloadBalanceGuideText,
 } from '../ai/aiInsightsConstants';
@@ -333,18 +334,15 @@ export default function KpiManagerGuidePanel({
               const sanitizedText = clampOver100ForDisplay(text.trim(), {
                 aggressive: key === 'teamParticipation' || key === 'productivityScore',
               });
-              const alignedText = alignKpiMetricsInText(sanitizedText, {
-                completionRate: currentSprintKpis.completionRate,
-                onTimeDelivery: currentSprintKpis.onTimeDelivery,
-                teamParticipation: currentSprintKpis.teamParticipation,
-                workloadBalance: currentSprintKpis.workloadBalance,
-                productivityScore: resolvedCurrentProductivityScore,
-              });
               const metricsForAlign = {
                 ...currentSprintKpis,
                 productivityScore: resolvedCurrentProductivityScore,
               };
-              let displayText = alignKpiProseForMetric(alignedText, key, metricsForAlign);
+              const cardValue =
+                key === 'productivityScore'
+                  ? resolvedCurrentProductivityScore
+                  : metricsForAlign[key];
+              let displayText = alignSingleMetricBlock(sanitizedText, key, cardValue);
               if (key === 'productivityScore') {
                 displayText = stripProductivityGuideInstructionEcho(displayText);
                 displayText = stripProductivityLowScoreExcuses(displayText, sprintTimeline);

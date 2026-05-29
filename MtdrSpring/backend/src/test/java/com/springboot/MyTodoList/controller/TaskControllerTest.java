@@ -21,6 +21,7 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
 import java.time.LocalDateTime;
@@ -53,6 +54,9 @@ class TaskControllerTest {
 
     @MockBean
     private TaskService taskService;
+
+    @MockBean
+    private TaskAssignmentNotificationService taskAssignmentNotificationService;
 
     @Test
     void getAllTasks_withoutProjectId_returnsAll() throws Exception {
@@ -262,6 +266,40 @@ class TaskControllerTest {
         when(taskRepository.existsById(8L)).thenReturn(false);
 
         mockMvc.perform(delete("/api/tasks/8")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void notifyNewAssignees_whenTaskMissing_returnsNotFound() throws Exception {
+        when(taskRepository.existsById(50L)).thenReturn(false);
+
+        mockMvc.perform(post("/api/tasks/50/notify-new-assignees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newAssigneeUserIds\":[2]}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void notifyNewAssignees_whenTaskExists_triggersNotification() throws Exception {
+        when(taskRepository.existsById(51L)).thenReturn(true);
+
+        mockMvc.perform(post("/api/tasks/51/notify-new-assignees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newAssigneeUserIds\":[2,3]}"))
+                .andExpect(status().isAccepted());
+
+        verify(taskAssignmentNotificationService).notifyNewAssigneesOnReassignment(51L, List.of(2L, 3L));
+    }
+
+    @Test
+    void notifyNewAssignees_emptyList_returnsNoContent() throws Exception {
+        when(taskRepository.existsById(52L)).thenReturn(true);
+
+        mockMvc.perform(post("/api/tasks/52/notify-new-assignees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newAssigneeUserIds\":[]}"))
+                .andExpect(status().isNoContent());
+
+        verify(taskAssignmentNotificationService, never()).notifyNewAssigneesOnReassignment(any(), anyList());
     }
 
     private static User user(long id) {

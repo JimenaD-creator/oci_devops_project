@@ -46,6 +46,7 @@ import {
   deleteUserTasksForTask,
   fetchTaskDetailBundle,
   fetchTaskDetailDevelopers,
+  notifyNewAssignees,
   postUserTask,
   putTask,
 } from './taskDetailApi';
@@ -571,6 +572,9 @@ const sprintNumberMap = useMemo(() => {
       const prevIds = [...finiteUserIds(loadedAssigneeUserIds)].sort();
       const assigneesChanged =
         nextIds.length !== prevIds.length || nextIds.some((id, i) => id !== prevIds[i]);
+      const newlyAddedAssigneeIds = assigneesChanged
+        ? nextIds.filter((id) => !prevIds.includes(id))
+        : [];
       const sameSet = !assigneesChanged;
       if (!sameSet) {
         const tid = task.id;
@@ -596,6 +600,13 @@ const sprintNumberMap = useMemo(() => {
           if (posts.some((r) => !r.ok)) {
             setError('Could not update assignees.');
             return;
+          }
+          if (newlyAddedAssigneeIds.length > 0) {
+            try {
+              await notifyNewAssignees(tid, newlyAddedAssigneeIds);
+            } catch {
+              /* assignment saved; email is best-effort */
+            }
           }
           setLoadedAssigneeUserIds(nextIds);
           // Avoid extra round-trip before PUT; list view refreshes via parent loadData.
