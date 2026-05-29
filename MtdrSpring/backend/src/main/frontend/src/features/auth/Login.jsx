@@ -239,7 +239,7 @@ export default function Login() {
           </button>
 
           <div className="login-forgot-wrap">
-            
+            <a
               href="#forgot"
               className="login-forgot-link"
               onClick={(e) => { e.preventDefault(); setShowForgot((v) => !v); setForgotStatus('idle'); }}
