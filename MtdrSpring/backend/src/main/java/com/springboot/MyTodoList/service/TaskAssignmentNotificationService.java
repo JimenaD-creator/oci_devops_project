@@ -34,41 +34,61 @@ public class TaskAssignmentNotificationService {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private PendingTelegramAssignmentNoticeService pendingTelegramAssignmentNoticeService;
+
     @Value("${app.notifications.task-assignment.enabled:true}")
     private boolean enabled;
 
-    @Async
     public void notifyAssigneesOnTaskCreated(Task task, List<Long> assigneeUserIds) {
-        if (task == null || task.getId() == null) {
+        if (task == null || task.getId() == null || !notificationsActive()) {
             return;
         }
-        notifyAssignees(task, distinctPositiveIds(assigneeUserIds));
+        Set<Long> distinct = distinctPositiveIds(assigneeUserIds);
+        if (distinct.isEmpty()) {
+            return;
+        }
+        String assignedBy = resolveAssignerDisplayName();
+        notifyAssigneesAsync(task, distinct, assignedBy);
     }
 
     /** Notifies only developers newly added when editing assignees on an existing task. */
-    @Async
     public void notifyNewAssigneesOnReassignment(Long taskId, List<Long> newAssigneeUserIds) {
-        if (!enabled || taskId == null) {
+        if (taskId == null || !notificationsActive()) {
             return;
         }
         Set<Long> distinct = distinctPositiveIds(newAssigneeUserIds);
         if (distinct.isEmpty()) {
             return;
         }
+        String assignedBy = resolveAssignerDisplayName();
+        notifyNewAssigneesAsync(taskId, distinct, assignedBy);
+    }
+
+    @Async
+    public void notifyAssigneesAsync(Task task, Set<Long> assigneeUserIds, String assignedBy) {
+        notifyAssignees(task, assigneeUserIds, assignedBy);
+    }
+
+    @Async
+    public void notifyNewAssigneesAsync(Long taskId, Set<Long> newAssigneeUserIds, String assignedBy) {
         Optional<Task> taskOpt = taskRepository.findById(taskId);
         if (taskOpt.isEmpty()) {
             logger.warn("Skipping reassignment emails: task {} not found", taskId);
             return;
         }
-        notifyAssignees(taskOpt.get(), distinct);
+        notifyAssignees(taskOpt.get(), newAssigneeUserIds, assignedBy);
     }
 
-    private void notifyAssignees(Task task, Set<Long> assigneeUserIds) {
-        if (!enabled || task == null || task.getId() == null || assigneeUserIds.isEmpty()) {
+    private boolean notificationsActive() {
+        return enabled || pendingTelegramAssignmentNoticeService.isEnabled();
+    }
+
+    private void notifyAssignees(Task task, Set<Long> assigneeUserIds, String assignedBy) {
+        if (!notificationsActive() || task == null || task.getId() == null || assigneeUserIds.isEmpty()) {
             return;
         }
 
-        String assignedBy = resolveAssignerDisplayName();
         String taskTitle = task.getTitle() != null ? task.getTitle().trim() : "Untitled task";
         String priority = task.getPriority() != null && !task.getPriority().isBlank()
                 ? task.getPriority().trim()
@@ -79,9 +99,17 @@ public class TaskAssignmentNotificationService {
             try {
                 User assignee = userRepository.findById(userId).orElse(null);
                 if (assignee == null) {
-                    logger.warn("Skipping assignment email: user {} not found", userId);
+                    logger.warn("Skipping assignment notification: user {} not found", userId);
                     continue;
                 }
+
+                pendingTelegramAssignmentNoticeService.enqueue(
+                        userId, task.getId(), taskTitle, assignedBy, priority, sprintLabel);
+
+                if (!enabled) {
+                    continue;
+                }
+
                 String email = assignee.getEmail();
                 if (!isValidEmail(email)) {
                     logger.info(
@@ -118,24 +146,23 @@ public class TaskAssignmentNotificationService {
         return distinct;
     }
 
+    /** Manager display name from USERS.NAME (resolved on the HTTP thread before @Async). */
     private String resolveAssignerDisplayName() {
+        Optional<Long> userId = SecurityUtils.currentUserId();
+        if (userId.isPresent()) {
+            Optional<String> dbName = userRepository.findById(userId.get()).map(User::getName).map(String::trim)
+                    .filter(n -> !n.isBlank());
+            if (dbName.isPresent()) {
+                return dbName.get();
+            }
+            logger.debug("Assigner userId={} has no NAME in USERS; using JWT or fallback", userId.get());
+        }
         return SecurityUtils.currentJwt()
-                .map(jwt -> {
-                    Object name = jwt.getClaim("name");
-                    if (name != null) {
-                        String s = String.valueOf(name).trim();
-                        if (!s.isBlank()) {
-                            return s;
-                        }
-                    }
-                    return null;
-                })
-                .orElseGet(() -> userRepository
-                        .findById(SecurityUtils.currentUserId().orElse(-1L))
-                        .map(User::getName)
-                        .filter(n -> n != null && !n.isBlank())
-                        .map(String::trim)
-                        .orElse("Your manager"));
+                .map(jwt -> jwt.getClaim("name"))
+                .map(String::valueOf)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .orElse("Your manager");
     }
 
     private static String formatSprintLabel(Sprint sprint) {

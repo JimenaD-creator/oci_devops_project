@@ -5,6 +5,7 @@ import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.GeminiService;
+import com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService;
 import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.ToDoItemService;
@@ -43,6 +44,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
     private ProjectLookupService projectLookupService;
     private TeamRepository teamRepository;
     private TeamMembersRepository teamMembersRepository;
+    private PendingTelegramAssignmentNoticeService pendingTelegramAssignmentNoticeService;
 
     @Override
     public String getBotToken() {
@@ -61,7 +63,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
             GeminiService geminiService,
             ProjectLookupService projectLookupService,
             TeamRepository teamRepository,
-            TeamMembersRepository teamMembersRepository
+            TeamMembersRepository teamMembersRepository,
+            PendingTelegramAssignmentNoticeService pendingTelegramAssignmentNoticeService
     ) {
         this.botProps = bp;
         this.toDoItemService = tsvc;
@@ -75,6 +78,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
         this.projectLookupService = projectLookupService;
         this.teamRepository = teamRepository;
         this.teamMembersRepository = teamMembersRepository;
+        this.pendingTelegramAssignmentNoticeService = pendingTelegramAssignmentNoticeService;
         this.telegramClient = new OkHttpTelegramClient(getBotToken());
     }
 
@@ -112,6 +116,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingS
             actions.setProjectLookupService(projectLookupService);
             actions.setTeamRepository(teamRepository);
             actions.setTeamMembersRepository(teamMembersRepository);
+            actions.setPendingTelegramAssignmentNoticeService(pendingTelegramAssignmentNoticeService);
 
             if (actions.getTodoService() == null) {
                 logger.info("todosvc error");

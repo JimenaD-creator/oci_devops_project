@@ -38,6 +38,8 @@ import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.GeminiService;
+import com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService;
+import com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService.PendingAssignmentNotice;
 import com.springboot.MyTodoList.service.ProjectLookupService;
 import com.springboot.MyTodoList.service.SprintService;
 import com.springboot.MyTodoList.service.TelegramUserMappingService;
@@ -71,6 +73,7 @@ public class BotActions {
     ProjectLookupService projectLookupService;
     TeamRepository teamRepository;
     TeamMembersRepository teamMembersRepository;
+    PendingTelegramAssignmentNoticeService pendingTelegramAssignmentNoticeService;
 
     public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds,
                       BotStateManager sm, TelegramUserMappingService tums, UserTaskService uts, SprintService ss) {
@@ -120,6 +123,10 @@ public class BotActions {
     public void setProjectLookupService(ProjectLookupService pls) { this.projectLookupService = pls; }
     public void setTeamRepository(TeamRepository tr) { this.teamRepository = tr; }
     public void setTeamMembersRepository(TeamMembersRepository tmr) { this.teamMembersRepository = tmr; }
+
+    public void setPendingTelegramAssignmentNoticeService(PendingTelegramAssignmentNoticeService service) {
+        this.pendingTelegramAssignmentNoticeService = service;
+    }
 
     public ToDoItemService getTodoService() { return todoService; }
     public DeepSeekService getDeepSeekService() { return deepSeekService; }
@@ -187,6 +194,31 @@ public class BotActions {
         BotHelper.sendMessageToTelegram(chatId, introMessage, telegramClient, buildMainMenuKeyboardMarkup());
     }
 
+    private void deliverPendingAssignmentNotices(Long userId) {
+        if (pendingTelegramAssignmentNoticeService == null || userId == null) {
+            return;
+        }
+        List<PendingAssignmentNotice> notices = pendingTelegramAssignmentNoticeService.drainForUser(userId);
+        List<String> messages = new ArrayList<>();
+        for (PendingAssignmentNotice notice : notices) {
+            String text = pendingTelegramAssignmentNoticeService.formatTelegramMessage(notice);
+            if (text != null && !text.isBlank()) {
+                messages.add(text);
+            }
+        }
+        if (messages.isEmpty()) {
+            return;
+        }
+        ReplyKeyboardMarkup menu = buildMainMenuKeyboardMarkup();
+        for (int i = 0; i < messages.size(); i++) {
+            if (i == messages.size() - 1) {
+                BotHelper.sendMessageToTelegram(chatId, messages.get(i), telegramClient, menu);
+            } else {
+                BotHelper.sendMessageKeepReplyKeyboard(chatId, messages.get(i), telegramClient);
+            }
+        }
+    }
+
     private void restoreMainMenuForSignedInUser() {
         Long signedIn = stateManager.getTelegramSignedInUserId(chatId);
         String welcomeName = signedIn != null ? resolveUserWelcomeName(signedIn) : null;
@@ -231,6 +263,7 @@ public class BotActions {
             Long uid = stateManager.getTelegramSignedInUserId(chatId);
             String nm = resolveUserWelcomeName(uid);
             sendMainMenuKeyboard(helloMyTodoBotWithDeveloperName(nm));
+            deliverPendingAssignmentNotices(uid);
         } else {
             beginSignInFlow();
         }
@@ -265,6 +298,7 @@ public class BotActions {
             stateManager.setTelegramSignedInUser(chatId, signedUserId);
             String welcomeName = resolveUserWelcomeName(signedUserId);
             sendMainMenuKeyboard("✅ Signed in successfully!\n\n" + helloMyTodoBotWithDeveloperName(welcomeName));
+            deliverPendingAssignmentNotices(signedUserId);
             exit = true;
             return;
         }
@@ -1390,6 +1424,7 @@ public class BotActions {
                     ? "Welcome, " + welcomeName + "! Your identity is verified."
                     : "Identity verified!";
             BotHelper.sendMessageToTelegram(chatId, verifiedIntro, telegramClient, null);
+            deliverPendingAssignmentNotices(userId);
             showSprintTasksForAssignee(sprintId, userId);
         } else {
             BotHelper.sendMessageToTelegram(chatId,
