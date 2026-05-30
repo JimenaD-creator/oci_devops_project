@@ -1394,21 +1394,21 @@ export default function DashboardDeveloperCharts({
         Math.floor(300 / Math.max(1, nSprints)),
       ),
     );
-    /** Hours compare: separación amplia entre developers (%) y entre barras del mismo developer. */
-    const hoursBarCategoryGap =
-      nWorkloadHoursRows >= 10
-        ? '36%'
-        : nWorkloadHoursRows >= 7
-          ? '40%'
-          : nWorkloadHoursRows >= 5
-            ? '44%'
-            : '48%';
-    const hoursBarGap = nSprints >= 6 ? 12 : nSprints >= 4 ? 14 : 16;
+    /**
+     * Hours compare: barras del mismo developer pegadas (barGap 0); más espacio entre developers
+     * cuando hay muchos sprints (p. ej. All Sprints).
+     */
+    const hoursBarCategoryGap = Math.min(
+      72,
+      (nSprints >= 7 ? 56 : nSprints >= 5 ? 44 : nSprints >= 4 ? 34 : nSprints >= 3 ? 26 : 18) +
+        Math.min(16, Math.max(0, nWorkloadHoursRows - 4) * 3),
+    );
+    const hoursBarGap = 0;
     const compareHoursBarSize = Math.max(
-      18,
+      20,
       Math.min(
-        nSprints <= 2 ? 52 : nSprints <= 3 ? 44 : nSprints <= 5 ? 38 : nSprints <= 7 ? 32 : 28,
-        Math.floor(260 / Math.max(1, nSprints)),
+        nSprints <= 2 ? 56 : nSprints <= 3 ? 48 : nSprints <= 5 ? 40 : nSprints <= 7 ? 34 : 28,
+        Math.floor(300 / Math.max(1, nSprints)),
       ),
     );
     const marginTopWorkloadTight = Math.max(58, marginTopWorkload - 6);
@@ -1568,7 +1568,7 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={hoursRowsKeyed}
-            margin={{ top: marginTopHours, right: 12, left: 8, bottom: bottomAxisWorkloadHours }}
+            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHours }}
             barCategoryGap={hoursBarCategoryGap}
             barGap={hoursBarGap}
           >
@@ -1581,7 +1581,7 @@ export default function DashboardDeveloperCharts({
               textAnchor="end"
               height={xAxisTickHeightWorkloadHours}
               tickMargin={12}
-              padding={{ left: 16, right: 16 }}
+              padding={{ left: 4, right: 4 }}
               label={{
                 value: 'Developer',
                 position: 'insideBottom',

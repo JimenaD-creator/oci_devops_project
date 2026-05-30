@@ -7,9 +7,8 @@ import {
   Card,
   CardContent,
   IconButton,
-  FormControl,
-  Select,
-  MenuItem,
+  FormControlLabel,
+  Checkbox,
   Popover,
   Stack,
   Button,
@@ -46,11 +45,7 @@ import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { fetchProjectById, fetchProjectDevelopers } from './projectApi';
 import { countTeamDevelopers } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
-import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { resolveLoadErrorMessage } from '../../utils/auth';
-
-/** Select value: compare all sprints side by side. */
-const ALL_SPRINTS_FILTER = 'all';
 
 /** Oracle red used for block-notification emphasis on the dashboard bell. */
 const BLOCK_NOTIF_RED = '#C74126';
@@ -84,7 +79,8 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
   } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
-  const [sprintFilter, setSprintFilter] = useState(null);
+  /** Sprint ids (strings) selected for dashboard metrics — one or more. */
+  const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const [blockedNotifAnchor, setBlockedNotifAnchor] = useState(null);
@@ -126,17 +122,18 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     setAllSprints(sprints);
 
     if (!sharedLoading && sprints.length > 0) {
-      setSprintFilter((prev) => {
-        if (!projectChanged && prev === ALL_SPRINTS_FILTER) return prev;
-        if (!projectChanged && prev != null && prev !== '') {
-          const id = Number(prev);
-          if (Number.isFinite(id) && sprints.some((s) => Number(s.id) === id)) return prev;
+      const sorted = [...sprints].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
+      setSelectedSprintIds((prev) => {
+        if (!projectChanged && prev.length > 0) {
+          const valid = prev.filter((id) => sorted.some((s) => String(s.id) === String(id)));
+          if (valid.length > 0) return valid;
         }
-        const picked = pickDefaultSelectedSprint(sprints);
-        return picked?.id != null ? String(picked.id) : ALL_SPRINTS_FILTER;
+        const picked = pickDefaultSelectedSprint(sorted);
+        const defaultId = picked?.id ?? sorted[0]?.id;
+        return defaultId != null ? [String(defaultId)] : [];
       });
     } else if (sprints.length === 0 && !sharedLoading) {
-      setSprintFilter(null);
+      setSelectedSprintIds([]);
     }
   }, [projectId, sharedSprints, sharedLoading]);
 
@@ -160,37 +157,68 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     [allSprints, sortedSprintsForFilter],
   );
 
-  const defaultSprintSelectValue = useMemo(() => {
-    if (!sortedSprintsForFilter.length) return '';
-    const picked = pickDefaultSelectedSprint(sortedSprintsForFilter);
-    return picked?.id != null ? String(picked.id) : '';
-  }, [sortedSprintsForFilter]);
-
-  const effectiveSprintFilter = useMemo(() => {
-    if (sprintFilter != null && sprintFilter !== '') return sprintFilter;
-    return defaultSprintSelectValue || null;
-  }, [sprintFilter, defaultSprintSelectValue]);
-
   const selectedSprints = useMemo(() => {
-    if (!allSprints.length || !effectiveSprintFilter) return [];
-    if (effectiveSprintFilter === ALL_SPRINTS_FILTER) return sortedSprintsForFilter;
-    const id = Number(effectiveSprintFilter);
-    const sprint = allSprints.find((s) => Number(s.id) === id);
-    return sprint ? [sprint] : [];
-  }, [allSprints, effectiveSprintFilter, sortedSprintsForFilter]);
+    if (!sortedSprintsForFilter.length || !selectedSprintIds.length) return [];
+    const idSet = new Set(selectedSprintIds.map(String));
+    return sortedSprintsForFilter.filter((s) => idSet.has(String(s.id)));
+  }, [sortedSprintsForFilter, selectedSprintIds]);
 
-  const compareMode = effectiveSprintFilter === ALL_SPRINTS_FILTER && selectedSprints.length > 1;
+  const compareMode = selectedSprints.length > 1;
   const primarySprint = selectedSprints[0];
 
-  /** MUI Select requires value to exactly match a MenuItem `value`. */
-  const sprintSelectValue = useMemo(() => {
-    if (!effectiveSprintFilter) return '';
-    if (effectiveSprintFilter === ALL_SPRINTS_FILTER) return ALL_SPRINTS_FILTER;
-    const match = sortedSprintsForFilter.find(
-      (s) => String(s.id) === String(effectiveSprintFilter),
-    );
-    return match ? String(match.id) : '';
-  }, [effectiveSprintFilter, sortedSprintsForFilter]);
+  const allSprintsSelected = useMemo(
+    () =>
+      sortedSprintsForFilter.length > 0 &&
+      sortedSprintsForFilter.every((s) => selectedSprintIds.includes(String(s.id))),
+    [sortedSprintsForFilter, selectedSprintIds],
+  );
+
+  const someSprintsSelected = selectedSprintIds.length > 0 && !allSprintsSelected;
+
+  const orderSprintIds = useCallback(
+    (ids) => {
+      const set = new Set(ids.map(String));
+      return sortedSprintsForFilter.map((s) => String(s.id)).filter((id) => set.has(id));
+    },
+    [sortedSprintsForFilter],
+  );
+
+  const handleSelectAllSprints = useCallback(() => {
+    setSelectedSprintIds(sortedSprintsForFilter.map((s) => String(s.id)));
+  }, [sortedSprintsForFilter]);
+
+  const handleSelectDefaultSprintOnly = useCallback(() => {
+    const picked = pickDefaultSelectedSprint(sortedSprintsForFilter);
+    const id = picked?.id ?? sortedSprintsForFilter[0]?.id;
+    if (id != null) setSelectedSprintIds([String(id)]);
+  }, [sortedSprintsForFilter]);
+
+  const handleAllSprintsToggle = useCallback(
+    (checked) => {
+      if (checked) {
+        handleSelectAllSprints();
+      } else {
+        handleSelectDefaultSprintOnly();
+      }
+    },
+    [handleSelectAllSprints, handleSelectDefaultSprintOnly],
+  );
+
+  const toggleSprintId = useCallback(
+    (idStr) => {
+      setSelectedSprintIds((prev) => {
+        const set = new Set(prev.map(String));
+        if (set.has(idStr)) {
+          if (set.size <= 1) return prev;
+          set.delete(idStr);
+        } else {
+          set.add(idStr);
+        }
+        return orderSprintIds([...set]);
+      });
+    },
+    [orderSprintIds],
+  );
 
   const { taskStatusDistribution, taskStatusTotal } = useMemo(
     () => mergeTaskStatusAcrossSprints(selectedSprints),
@@ -763,11 +791,11 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
       <ScrollReveal delay={0.07}>
         <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Typography variant="body2" sx={{ color: isDark ? '#9A9A9A' : '#616161', fontWeight: 600, mb: 1, fontSize: '0.8125rem' }}>
-            Filter the dashboard by sprint. Choose All Sprints to compare every sprint side by side, or pick one sprint for a single-sprint view.
+            Select one or more sprints. &quot;All Sprints&quot; compares every sprint; you can also pick
+            any combination (e.g. Sprint 1 and Sprint 3).
           </Typography>
           <Typography
-            component="label"
-            htmlFor="dashboard-sprint-filter"
+            id="dashboard-sprint-filter-label"
             variant="caption"
             sx={{
               display: 'block',
@@ -778,61 +806,107 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
               letterSpacing: '0.02em',
             }}
           >
-            Sprint
           </Typography>
-          <FormControl
-            size="small"
+          <Box
+            role="group"
+            aria-labelledby="dashboard-sprint-filter-label"
             sx={{
-              minWidth: { xs: '100%', sm: 260 },
-              ...pageFormFieldOutline(isDark),
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: isDark ? '#3A3C42' : undefined,
-              },
-              '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: isDark ? '#5A5C62' : undefined,
-              },
-              '& .MuiSelect-select': {
-                color: isDark ? '#F0F0F0' : '#1A1A1A',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                pr: 4,
-              },
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: { xs: 0.5, sm: 1.25 },
+              rowGap: 0.5,
             }}
           >
-            <Select
-              id="dashboard-sprint-filter"
-              value={sprintSelectValue}
-              onChange={(e) => setSprintFilter(e.target.value)}
-              renderValue={(value) => {
-                if (value === ALL_SPRINTS_FILTER) return 'All Sprints';
-                return getSprintFilterLabel(value);
+            <FormControlLabel
+              sx={{
+                m: 0,
+                mr: { xs: 0.5, sm: 1 },
+                flexShrink: 0,
+                '& .MuiFormControlLabel-label': {
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  color: 'text.primary',
+                },
               }}
-            >
-              <MenuItem value={ALL_SPRINTS_FILTER}>All Sprints</MenuItem>
-              {sortedSprintsForFilter.map((sp, index) => {
-                const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[index % SPRINT_CHART_COLORS.length];
-                return (
-                  <MenuItem key={sp.id} value={String(sp.id)}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              control={
+                <Checkbox
+                  checked={allSprintsSelected}
+                  indeterminate={someSprintsSelected}
+                  onChange={(e) => handleAllSprintsToggle(e.target.checked)}
+                  size="small"
+                  sx={{
+                    py: 0.25,
+                    color: isDark ? '#757575' : '#9E9E9E',
+                    '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: ORACLE_RED_ACTION },
+                  }}
+                />
+              }
+              label="All Sprints"
+            />
+            <Box
+              aria-hidden
+              sx={{
+                width: '1px',
+                height: 22,
+                bgcolor: isDark ? '#3A3C42' : '#E0E0E0',
+                flexShrink: 0,
+                display: { xs: 'none', sm: 'block' },
+              }}
+            />
+            {sortedSprintsForFilter.map((sp, index) => {
+              const sprintColor = sp.accentColor ?? SPRINT_CHART_COLORS[index % SPRINT_CHART_COLORS.length];
+              const idStr = String(sp.id);
+              const checked = selectedSprintIds.includes(idStr);
+              return (
+                <FormControlLabel
+                  key={sp.id}
+                  sx={{
+                    m: 0,
+                    flexShrink: 0,
+                    '& .MuiFormControlLabel-label': { fontSize: '0.8125rem' },
+                  }}
+                  control={
+                    <Checkbox
+                      checked={checked}
+                      onChange={() => toggleSprintId(idStr)}
+                      size="small"
+                      sx={{
+                        py: 0.25,
+                        color: isDark ? '#757575' : '#9E9E9E',
+                        '&.Mui-checked': { color: sprintColor },
+                      }}
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.625 }}>
                       <Box
                         component="span"
                         sx={{
-                          width: 10,
-                          height: 10,
+                          width: 9,
+                          height: 9,
                           borderRadius: '50%',
                           bgcolor: sprintColor,
                           flexShrink: 0,
                         }}
                       />
-                      {getSprintFilterLabel(sp.id)}
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.8125rem',
+                          color: 'text.primary',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {getSprintFilterLabel(sp.id)}
+                      </Typography>
                     </Box>
-                  </MenuItem>
-                );
-              })}
-            </Select>
-          </FormControl>
+                  }
+                />
+              );
+            })}
+          </Box>
         </Paper>
       </ScrollReveal>
 
