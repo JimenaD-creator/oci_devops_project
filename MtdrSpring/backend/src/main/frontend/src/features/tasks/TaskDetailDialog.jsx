@@ -38,15 +38,12 @@ import {
   ORACLE_RED_ACTION,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
-import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
-import TaskDescriptionContent from '../../components/common/TaskDescriptionContent';
-import { sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
 import {
   deleteTaskById,
   deleteUserTasksForTask,
-  fetchTaskDetailBundle,
+  fetchTaskById,
   fetchTaskDetailDevelopers,
-  notifyNewAssignees,
+  fetchUserTasksForTask,
   postUserTask,
   putTask,
 } from './taskDetailApi';
@@ -56,15 +53,7 @@ import {
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
-import {
-  normalizeTaskStatus,
-  taskDetailSyncSignature,
-  userTasksAssigneeSignature,
-  userTaskRowStatus,
-  userTaskRowTaskId,
-} from './utils/taskUtils';
-import { mergeUserTaskLists } from '../../utils/taskSyncEvents';
-import { assigneeDeliveryStatus } from './utils/assigneeOnTimeUtils';
+import { normalizeTaskStatus, userTaskRowStatus } from './utils/taskUtils';
 import {
   ASSIGNEE_IDENTITY_PALETTE,
   assigneeIdentityPaletteIndex,
@@ -330,43 +319,17 @@ function TypeGrid({ value, onChange }) {
   );
 }
 
-function userTasksForTaskId(rows, taskId) {
-  const tid = Number(taskId);
-  if (!Number.isFinite(tid)) return [];
-  return (Array.isArray(rows) ? rows : []).filter((ut) => {
-    const utTid = userTaskRowTaskId(ut);
-    return Number.isFinite(utTid) && utTid === tid;
-  });
-}
-
-function assigneeStateFromUserTasks(list) {
-  const rows = Array.isArray(list) ? list : [];
-  const ids = [
-    ...new Set(rows.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id))),
-  ];
-  const nameMap = {};
-  rows.forEach((row) => {
-    const uid = userIdFromUserTaskRow(row);
-    if (uid == null) return;
-    const nm = String(row?.user?.name ?? '').trim();
-    if (nm) nameMap[String(uid)] = nm;
-  });
-  return { ids, nameMap, rows };
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TaskDetailDialog({
   open,
   initialTask,
-  initialUserTasks,
   sprints,
   projectDevelopers,
   activeProjectId,
   onClose,
   onSaved,
   onDeleted,
-  readOnly = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -397,7 +360,7 @@ export function TaskDetailDialog({
 
 const sprintNumberMap = useMemo(() => {
   const map = new Map();
-  [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
+  [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i));
   return map;
 }, [sprints]);
   const resolvedDeveloperProjectId = useMemo(() => {
@@ -407,7 +370,8 @@ const sprintNumberMap = useMemo(() => {
   }, [task, initialTask, sprints, activeProjectId]);
 
   useEffect(() => {
-    if (!open || !editMode) {
+    if (!open) {
+      setPickerDevelopers([]);
       setPickerLoading(false);
       return;
     }
@@ -417,7 +381,6 @@ const sprintNumberMap = useMemo(() => {
       setPickerLoading(false);
       return;
     }
-    if (pickerDevelopers.length > 0) return;
     let cancelled = false;
     setPickerLoading(true);
     (async () => {
@@ -433,18 +396,12 @@ const sprintNumberMap = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [open, editMode, resolvedDeveloperProjectId, pickerDevelopers.length]);
+  }, [open, resolvedDeveloperProjectId]);
 
   const availableDevelopers = useMemo(() => {
     if (Array.isArray(pickerDevelopers) && pickerDevelopers.length > 0) return pickerDevelopers;
     return Array.isArray(projectDevelopers) ? projectDevelopers : [];
   }, [pickerDevelopers, projectDevelopers]);
-
-  const taskSyncSig = useMemo(() => taskDetailSyncSignature(initialTask), [initialTask]);
-  const assigneeSyncSig = useMemo(
-    () => userTasksAssigneeSignature(initialUserTasks, initialTask?.id),
-    [initialUserTasks, initialTask?.id],
-  );
 
   const displayNameForAssignee = (uidRaw) => {
     const uid = normalizeUserId(uidRaw);
@@ -469,27 +426,29 @@ const sprintNumberMap = useMemo(() => {
       return;
     }
     if (!initialTask?.id) return;
-
-    setTask(initialTask);
-    const cached = userTasksForTaskId(initialUserTasks, initialTask.id);
-    if (cached.length > 0) {
-      const { ids, nameMap, rows } = assigneeStateFromUserTasks(cached);
-      setTaskUserTasks(rows);
-      setAssigneeNamesByUserId(nameMap);
-      setLoadedAssigneeUserIds(ids);
-    }
-
     let cancelled = false;
     setLoading(true);
     (async () => {
       try {
-        const { task: t, userTasks: utList } = await fetchTaskDetailBundle(initialTask.id);
+        const t = await fetchTaskById(initialTask.id);
+        if (cancelled || !t) return;
+        setTask(t);
+        const utList = await fetchUserTasksForTask(t.id);
         if (cancelled) return;
-        const fromParent = userTasksForTaskId(initialUserTasks, initialTask.id);
-        const mergedAssignees = mergeUserTaskLists(fromParent, Array.isArray(utList) ? utList : []);
-        if (t) setTask({ ...t, ...initialTask });
-        const { ids, nameMap, rows } = assigneeStateFromUserTasks(mergedAssignees);
-        setTaskUserTasks(rows);
+        const list = Array.isArray(utList) ? utList : [];
+        setTaskUserTasks(list);
+        const ids = [
+          ...new Set(
+            list.map(userIdFromUserTaskRow).filter((id) => id != null && Number.isFinite(id)),
+          ),
+        ];
+        const nameMap = {};
+        list.forEach((row) => {
+          const uid = userIdFromUserTaskRow(row);
+          if (uid == null) return;
+          const nm = String(row?.user?.name ?? '').trim();
+          if (nm) nameMap[String(uid)] = nm;
+        });
         setAssigneeNamesByUserId(nameMap);
         setLoadedAssigneeUserIds(ids);
       } finally {
@@ -499,7 +458,7 @@ const sprintNumberMap = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [open, initialTask?.id, taskSyncSig, assigneeSyncSig, initialUserTasks]);
+  }, [open, initialTask?.id]);
 
   useEffect(() => {
     if (!editMode) return;
@@ -530,12 +489,7 @@ const sprintNumberMap = useMemo(() => {
     setAssignedUserIds(finiteUserIds(loadedAssigneeUserIds));
   };
 
-  useEffect(() => {
-    if (readOnly && editMode) setEditMode(false);
-  }, [readOnly, editMode]);
-
   const handleStartEdit = () => {
-    if (readOnly) return;
     if (!task) return;
     applyTaskToForm(task);
     setEditMode(true);
@@ -572,9 +526,6 @@ const sprintNumberMap = useMemo(() => {
       const prevIds = [...finiteUserIds(loadedAssigneeUserIds)].sort();
       const assigneesChanged =
         nextIds.length !== prevIds.length || nextIds.some((id, i) => id !== prevIds[i]);
-      const newlyAddedAssigneeIds = assigneesChanged
-        ? nextIds.filter((id) => !prevIds.includes(id))
-        : [];
       const sameSet = !assigneesChanged;
       if (!sameSet) {
         const tid = task.id;
@@ -601,13 +552,6 @@ const sprintNumberMap = useMemo(() => {
             setError('Could not update assignees.');
             return;
           }
-          if (newlyAddedAssigneeIds.length > 0) {
-            try {
-              await notifyNewAssignees(tid, newlyAddedAssigneeIds);
-            } catch {
-              /* assignment saved; email is best-effort */
-            }
-          }
           setLoadedAssigneeUserIds(nextIds);
           // Avoid extra round-trip before PUT; list view refreshes via parent loadData.
           setTaskUserTasks(
@@ -623,7 +567,7 @@ const sprintNumberMap = useMemo(() => {
       const payload = {
         ...taskRest,
         title: title.trim(),
-        description: sanitizeRichDescriptionHtml(description),
+        description: (description || '').trim(),
         classification,
         status,
         priority,
@@ -702,17 +646,6 @@ const sprintNumberMap = useMemo(() => {
   );
   const editAssigneeIds = useMemo(() => finiteUserIds(assignedUserIds), [assignedUserIds]);
 
-  const assigneeTaskMeta = useMemo(
-    () => ({
-      finishDate: task?.finishDate ?? task?.finish_date,
-      assigneeCount: taskUserTasks.length || viewAssigneeIds.length || 1,
-    }),
-    [task?.finishDate, task?.finish_date, taskUserTasks.length, viewAssigneeIds.length],
-  );
-
-  const detailLoading = open && !task;
-  const showPerAssigneeDelivery = taskUserTasks.length > 1;
-
   // Derive active status/type/priority option for view mode badges
   const statusOpt = STATUS_OPTIONS.find((o) => o.value === task?.status) ?? STATUS_OPTIONS[0];
   const typeOpt = TYPE_OPTIONS.find((o) => o.value === task?.classification) ?? TYPE_OPTIONS[0];
@@ -780,7 +713,7 @@ const sprintNumberMap = useMemo(() => {
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-            {!readOnly && !editMode && task && (
+            {!editMode && task && (
               <>
                 <Button
                   variant="contained"
@@ -796,6 +729,7 @@ const sprintNumberMap = useMemo(() => {
                     borderRadius: '8px',
                     border: '1px solid rgba(255,255,255,0.35)',
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' },
+                    display: { xs: 'none', sm: 'inline-flex' },
                   }}
                 >
                   Edit
@@ -839,26 +773,14 @@ const sprintNumberMap = useMemo(() => {
       <DialogContent
         sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : '#FAFAFA' }}
       >
-        {detailLoading && (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              py: 8,
-              gap: 2,
-            }}
-          >
-            <CircularProgress size={36} sx={{ color: ORACLE_RED }} />
-            <Typography variant="body2" color="text.secondary">
-              Loading task details…
-            </Typography>
+        {loading && !task && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress size={32} sx={{ color: ORACLE_RED }} />
           </Box>
         )}
 
         {/* ── VIEW MODE ── */}
-        {task && !editMode && !detailLoading && (
+        {task && !editMode && (
           <Stack spacing={2}>
             {/* Overview card */}
             <InfoCard accentColor={ORACLE_RED_ACTION}>
@@ -870,9 +792,9 @@ const sprintNumberMap = useMemo(() => {
               </Typography>
 
               <FieldLabel>Description</FieldLabel>
-              <Box sx={{ mb: 2 }}>
-                <TaskDescriptionContent description={task.description} />
-              </Box>
+              <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2, whiteSpace: 'pre-wrap' }}>
+                {(task.description && String(task.description).trim()) || '—'}
+              </Typography>
 
               {/* Status / Type / Priority as colored badges */}
               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -1043,16 +965,12 @@ const sprintNumberMap = useMemo(() => {
                   </Typography>
                 </Box>
               </Box>
-
             </InfoCard>
 
-            {/* On-time per developer only when several assignees share the task */}
-            {showPerAssigneeDelivery && (
+            {/* Assignee progress card */}
+            {taskUserTasks.length > 1 && (
               <InfoCard accentColor="#5C6BC0">
-                <SectionLabel>Delivery by assignee</SectionLabel>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  Each row shows whether that developer finished their part on or before the due date.
-                </Typography>
+                <SectionLabel>Assignee progress</SectionLabel>
                 <Stack spacing={0.75}>
                   {[...taskUserTasks]
                     .map((ut) => {
@@ -1076,46 +994,18 @@ const sprintNumberMap = useMemo(() => {
                         ASSIGNEE_IDENTITY_PALETTE[
                           assigneeIdentityPaletteIndex({ userId: uid, name })
                         ];
-                      const delivery = assigneeDeliveryStatus(ut, task?.dueDate, assigneeTaskMeta);
-                      const deliveryToneSx = {
-                        onTime: {
-                          color: '#1B5E20',
-                          bgcolor: isDark ? '#1A4A2A' : '#E8F5E9',
-                          border: '#43A047',
-                        },
-                        late: {
-                          color: '#B71C1C',
-                          bgcolor: isDark ? '#4A1A1A' : '#FFEBEE',
-                          border: '#E53935',
-                        },
-                        pending: {
-                          color: isDark ? '#9E9E9E' : '#616161',
-                          bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
-                          border: isDark ? '#5A5A5A' : '#BDBDBD',
-                        },
-                        unknown: {
-                          color: isDark ? '#FFB74D' : '#E65100',
-                          bgcolor: isDark ? '#4A2A1A' : '#FFF3E0',
-                          border: '#FB8C00',
-                        },
-                      };
-                      const tone = deliveryToneSx[delivery.tone] ?? deliveryToneSx.pending;
                       return (
                         <Box
                           key={`${uid ?? 'x'}-${ut?.id?.taskId ?? task.id}`}
                           sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
                             py: 0.5,
                             borderBottom: `0.5px solid ${isDark ? '#2A2C32' : '#EEEEEE'}`,
                             '&:last-of-type': { borderBottom: 'none' },
                           }}
                         >
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
-                            }}
-                          >
                           <Box
                             sx={{
                               flex: 1,
@@ -1161,35 +1051,7 @@ const sprintNumberMap = useMemo(() => {
                             >
                               {statusChip.label}
                             </Box>
-                            <Box
-                              sx={{
-                                flexShrink: 0,
-                                px: 1,
-                                py: 0.6,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: tone.color,
-                                bgcolor: tone.bgcolor,
-                                borderLeft: `3px solid ${tone.border}`,
-                              }}
-                            >
-                              {delivery.label}
-                            </Box>
                           </Box>
-                          {delivery.complete && delivery.completedAt && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                flexShrink: 0,
-                                color: 'text.secondary',
-                                fontSize: 11,
-                                minWidth: 72,
-                                textAlign: 'right',
-                              }}
-                            >
-                              {formatDate(delivery.completedAt)}
-                            </Typography>
-                          )}
                           {hrs > 0 && (
                             <Box
                               sx={{
@@ -1206,15 +1068,6 @@ const sprintNumberMap = useMemo(() => {
                             >
                               {hrs}h
                             </Box>
-                          )}
-                          </Box>
-                          {delivery.hint && (
-                            <Typography
-                              variant="caption"
-                              sx={{ display: 'block', pl: 0.5, mt: 0.35, color: isDark ? '#FFB74D' : '#E65100' }}
-                            >
-                              {delivery.hint}
-                            </Typography>
                           )}
                         </Box>
                       );
@@ -1241,11 +1094,14 @@ const sprintNumberMap = useMemo(() => {
                   size="small"
                   sx={fieldSx}
                 />
-                <RichTextDescriptionField
+                <TextField
                   label="Description"
                   value={description}
-                  onChange={setDescription}
+                  onChange={(e) => setDescription(e.target.value)}
+                  fullWidth
+                  multiline
                   minRows={3}
+                  size="small"
                   sx={fieldSx}
                 />
                 <Box>

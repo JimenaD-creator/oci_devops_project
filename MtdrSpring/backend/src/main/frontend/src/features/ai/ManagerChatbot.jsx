@@ -254,7 +254,7 @@ export default function ManagerChatbot({ projectId }) {
   return (
     <>
       {/* Floating button */}
-      <Box sx={{ position: 'fixed', bottom: 28, right: 28, zIndex: 1300 }}>
+      <Box sx={{ position: 'fixed', bottom: { xs: 76, sm: 28 }, right: 28, zIndex: 1300 }}>
         <AnimatePresence>
           {!open && (
             <motion.div
@@ -316,14 +316,14 @@ export default function ManagerChatbot({ projectId }) {
             >
               <Box
                 sx={{
-                  width: 380,
-                  height: 560,
-                  borderRadius: '20px',
+                  width: { xs: 'calc(100vw - 56px)', sm: 380 },
+                  height: { xs: '75vh', sm: 560 },
+                  borderRadius: { xs: '16px 0 0 16px', sm: '20px' },
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
                   bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
-                  boxShadow: isDark 
+                  boxShadow: isDark
                     ? '0 24px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15)'
                     : '0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
                   border: `1px solid ${isDark ? 'rgba(229,57,53,0.2)' : 'rgba(229,57,53,0.12)'}`,

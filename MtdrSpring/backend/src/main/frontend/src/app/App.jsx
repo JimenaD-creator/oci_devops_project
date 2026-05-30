@@ -41,6 +41,8 @@ import {
   Tooltip,
   Snackbar,
   Alert,
+  BottomNavigation,
+  BottomNavigationAction,
 } from '@mui/material';
 // Icons
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -59,6 +61,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import MenuIcon from '@mui/icons-material/Menu';
 
 // Lazy load pages
 const SprintsPage     = lazy(() => import('../features/sprints/SprintsPage'));
@@ -145,6 +148,9 @@ function App() {
       return new Set(['dashboard']);
     }
   });
+
+  // Estado para el drawer móvil
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // ── Foto de perfil ───────────────────────────────────────────────────────────
   const fileInputRef = useRef(null);
@@ -470,6 +476,217 @@ function App() {
     navigate('/login', { replace: true });
   };
 
+  // Contenido compartido del drawer
+  const drawerContent = (
+    <>
+      {/* Header del drawer */}
+      <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${drawerBorder}` }}>
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
+            {selectedProjectName || 'Software Manager Tool'}
+          </Typography>
+          <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{getSidebarRoleLabel(user.role)}</Typography>
+        </Box>
+      </Box>
+
+      {/* Nav items */}
+      <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }} component="nav">
+        {topNavItems.map((item) => (
+          <ListItemButton
+            key={item.id}
+            onClick={() => {
+              item.id === 'selector' ? handleChangeProject() : setActivePage(item.id);
+              setMobileDrawerOpen(false);
+            }}
+            sx={{
+              borderRadius: '8px', mb: 0.5, py: 1.1,
+              backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
+              '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
+              transition: 'background-color 0.15s ease',
+            }}
+          >
+            <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText
+              primary={item.text}
+              primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+            />
+          </ListItemButton>
+        ))}
+
+        {!isDeveloper ? (
+          <>
+            <ListItemButton
+              onClick={() => setSprintsNavOpen((o) => !o)}
+              sx={{
+                borderRadius: '8px', mb: 0.5, py: 1.1,
+                backgroundColor: sprintsSectionActive ? '#E53935' : 'transparent',
+                '&:hover': { backgroundColor: sprintsSectionActive ? '#C62828' : '#2A2A2A' },
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              <ListItemIcon sx={{ color: sprintsSectionActive ? 'white' : '#777', minWidth: 38 }}>
+                <AssignmentIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Sprints"
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: sprintsSectionActive ? 600 : 400 }}
+              />
+              {sprintsNavOpen
+                ? <ExpandLess sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+                : <ExpandMore sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+              }
+            </ListItemButton>
+
+            <Collapse in={sprintsNavOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                {SPRINTS_SUBITEMS.map((sub) => {
+                  const subActive = activePage === sub.id;
+                  return (
+                    <ListItemButton
+                      key={sub.id}
+                      onClick={() => { setActivePage(sub.id); setMobileDrawerOpen(false); }}
+                      sx={{
+                        pl: 3, py: 1, borderRadius: '8px', mb: 0.25,
+                        backgroundColor: subActive ? 'rgba(229,57,53,0.35)' : 'transparent',
+                        '&:hover': { backgroundColor: subActive ? 'rgba(229,57,53,0.45)' : '#2A2A2A' },
+                      }}
+                    >
+                      <ListItemIcon sx={{ color: subActive ? '#fff' : '#999', minWidth: 36 }}>
+                        {sub.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={sub.text}
+                        primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: subActive ? 600 : 400 }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            </Collapse>
+          </>
+        ) : null}
+
+        {secondaryNavItems.map((item) => (
+          <ListItemButton
+            key={item.id}
+            onClick={() => {
+              item.id === 'selector' ? handleChangeProject() : setActivePage(item.id);
+              setMobileDrawerOpen(false);
+            }}
+            sx={{
+              borderRadius: '8px', mb: 0.5, py: 1.1,
+              backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
+              '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
+              transition: 'background-color 0.15s ease',
+            }}
+          >
+            <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText
+              primary={item.text}
+              primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+            />
+          </ListItemButton>
+        ))}
+      </List>
+
+      {/* Footer del drawer */}
+      <Box sx={{ borderTop: `1px solid ${drawerBorder}` }}>
+        <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontSize: '0.72rem', color: '#666' }}>
+            {darkMode ? 'Dark mode' : 'Light mode'}
+          </Typography>
+          <Tooltip title={darkMode ? 'Switch to light' : 'Switch to dark'} placement="right">
+            <IconButton
+              size="small"
+              onClick={toggleDark}
+              sx={{
+                color: darkMode ? '#FDD835' : '#90A4AE',
+                bgcolor: darkMode ? 'rgba(253,216,53,0.12)' : 'rgba(144,164,174,0.12)',
+                '&:hover': { bgcolor: darkMode ? 'rgba(253,216,53,0.22)' : 'rgba(144,164,174,0.22)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {darkMode ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Tooltip title="Change profile photo" placement="right">
+            <Box
+              onClick={handlePhotoClick}
+              sx={{
+                position: 'relative', width: 34, height: 34, cursor: 'pointer', flexShrink: 0,
+                '&:hover .cam-overlay': { opacity: 1 },
+              }}
+            >
+              {uploadingPhoto ? (
+                <Box sx={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CircularProgress size={20} sx={{ color: '#E53935' }} />
+                </Box>
+              ) : (
+                <>
+                  <Avatar
+                    src={profilePicture || undefined}
+                    sx={{ bgcolor: '#E53935', width: 34, height: 34, fontSize: '0.75rem', fontWeight: 700 }}
+                  >
+                    {!profilePicture && getInitials(user.name)}
+                  </Avatar>
+                  <Box
+                    className="cam-overlay"
+                    sx={{
+                      position: 'absolute', inset: 0, borderRadius: '50%',
+                      bgcolor: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', opacity: 0, transition: 'opacity 0.18s ease',
+                    }}
+                  >
+                    <PhotoCameraIcon sx={{ fontSize: 14, color: '#fff' }} />
+                  </Box>
+                </>
+              )}
+            </Box>
+          </Tooltip>
+
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
+            <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role, user.jobTitle)}</Typography>
+          </Box>
+
+          <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={() => setMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          >
+            <MenuItem onClick={handlePhotoClick} sx={{ gap: 1 }}>
+              <PhotoCameraIcon fontSize="small" sx={{ color: '#888' }} />
+              Change photo
+            </MenuItem>
+            {profilePicture && (
+              <MenuItem onClick={handleRemovePhoto} sx={{ gap: 1, color: '#E53935' }}>
+                <DeleteOutlineIcon fontSize="small" />
+                Remove photo
+              </MenuItem>
+            )}
+            <MenuItem onClick={handleLogout}>Sign out</MenuItem>
+          </Menu>
+        </Box>
+      </Box>
+    </>
+  );
+
+  const drawerBg     = '#1A1A1A';
+  const drawerBorder = '#2A2A2A';
+
   if (
     (isAdminRole(user.role) || isManagerRole(user.role))
     && (!selectedProjectId || showProjectPicker)
@@ -534,9 +751,6 @@ function App() {
     return <PageLoader />;
   }
 
-  const drawerBg     = '#1A1A1A';
-  const drawerBorder = '#2A2A2A';
-
   return (
     <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', bgcolor: 'background.default' }}>
 
@@ -549,12 +763,13 @@ function App() {
         onChange={handleFileChange}
       />
 
-      {/* ─── Sidebar ─────────────────────────────────────── */}
+      {/* ─── Sidebar permanente (desktop) ─────────────────────────────────────── */}
       <Drawer
         variant="permanent"
         sx={{
           width: DRAWER_WIDTH,
           flexShrink: 0,
+          display: { xs: 'none', sm: 'block' },
           '& .MuiDrawer-paper': {
             width: DRAWER_WIDTH,
             boxSizing: 'border-box',
@@ -568,219 +783,26 @@ function App() {
           },
         }}
       >
-        {/* Header del drawer */}
-        <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${drawerBorder}` }}>
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
-              {selectedProjectName || 'Software Manager Tool'}
-            </Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{getSidebarRoleLabel(user.role)}</Typography>
-          </Box>
-        </Box>
+        {drawerContent}
+      </Drawer>
 
-        {/* Nav items */}
-        <List sx={{ px: 1.5, mt: 1.5, flexGrow: 1 }} component="nav">
-          {topNavItems.map((item) => (
-            <ListItemButton
-              key={item.id}
-              onClick={() => item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)}
-              sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
-                backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
-                '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
-                transition: 'background-color 0.15s ease',
-              }}
-            >
-              <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.text}
-                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
-              />
-            </ListItemButton>
-          ))}
-
-          {!isDeveloper ? (
-          <>
-          {/* Sprints colapsable */}
-          <ListItemButton
-            onClick={() => setSprintsNavOpen((o) => !o)}
-            sx={{
-              borderRadius: '8px', mb: 0.5, py: 1.1,
-              backgroundColor: sprintsSectionActive ? '#E53935' : 'transparent',
-              '&:hover': { backgroundColor: sprintsSectionActive ? '#C62828' : '#2A2A2A' },
-              transition: 'background-color 0.15s ease',
-            }}
-          >
-            <ListItemIcon sx={{ color: sprintsSectionActive ? 'white' : '#777', minWidth: 38 }}>
-              <AssignmentIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Sprints"
-              primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: sprintsSectionActive ? 600 : 400 }}
-            />
-            {sprintsNavOpen
-              ? <ExpandLess sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
-              : <ExpandMore sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
-            }
-          </ListItemButton>
-
-          <Collapse in={sprintsNavOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {SPRINTS_SUBITEMS.map((sub) => {
-                const subActive = activePage === sub.id;
-                return (
-                  <ListItemButton
-                    key={sub.id}
-                    onClick={() => setActivePage(sub.id)}
-                    sx={{
-                      pl: 3, py: 1, borderRadius: '8px', mb: 0.25,
-                      backgroundColor: subActive ? 'rgba(229,57,53,0.35)' : 'transparent',
-                      '&:hover': { backgroundColor: subActive ? 'rgba(229,57,53,0.45)' : '#2A2A2A' },
-                    }}
-                  >
-                    <ListItemIcon sx={{ color: subActive ? '#fff' : '#999', minWidth: 36 }}>
-                      {sub.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={sub.text}
-                      primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: subActive ? 600 : 400 }}
-                    />
-                  </ListItemButton>
-                );
-              })}
-            </List>
-          </Collapse>
-          </>
-          ) : null}
-
-          {secondaryNavItems.map((item) => (
-            <ListItemButton
-              key={item.id}
-              onClick={() => item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)}
-              sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
-                backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
-                '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
-                transition: 'background-color 0.15s ease',
-              }}
-            >
-              <ListItemIcon sx={{ color: activePage === item.id ? 'white' : '#777', minWidth: 38 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.text}
-                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-
-        {/* ─── Footer del drawer ─── */}
-        <Box sx={{ borderTop: `1px solid ${drawerBorder}` }}>
-          {/* Botón dark mode */}
-          <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography sx={{ fontSize: '0.72rem', color: '#666' }}>
-              {darkMode ? 'Dark mode' : 'Light mode'}
-            </Typography>
-            <Tooltip title={darkMode ? 'Switch to light' : 'Switch to dark'} placement="right">
-              <IconButton
-                size="small"
-                onClick={toggleDark}
-                sx={{
-                  color: darkMode ? '#FDD835' : '#90A4AE',
-                  bgcolor: darkMode ? 'rgba(253,216,53,0.12)' : 'rgba(144,164,174,0.12)',
-                  '&:hover': {
-                    bgcolor: darkMode ? 'rgba(253,216,53,0.22)' : 'rgba(144,164,174,0.22)',
-                  },
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {darkMode ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-          </Box>
-
-          {/* Info usuario */}
-          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {/* Avatar con overlay de cámara al hover */}
-            <Tooltip title="Change profile photo" placement="right">
-              <Box
-                onClick={handlePhotoClick}
-                sx={{
-                  position: 'relative',
-                  width: 34,
-                  height: 34,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  '&:hover .cam-overlay': { opacity: 1 },
-                }}
-              >
-                {uploadingPhoto ? (
-                  <Box sx={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CircularProgress size={20} sx={{ color: '#E53935' }} />
-                  </Box>
-                ) : (
-                  <>
-                    <Avatar
-                      src={profilePicture || undefined}
-                      sx={{ bgcolor: '#E53935', width: 34, height: 34, fontSize: '0.75rem', fontWeight: 700 }}
-                    >
-                      {!profilePicture && getInitials(user.name)}
-                    </Avatar>
-                    {/* Overlay oscuro con ícono de cámara */}
-                    <Box
-                      className="cam-overlay"
-                      sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        borderRadius: '50%',
-                        bgcolor: 'rgba(0,0,0,0.55)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 0,
-                        transition: 'opacity 0.18s ease',
-                      }}
-                    >
-                      <PhotoCameraIcon sx={{ fontSize: 14, color: '#fff' }} />
-                    </Box>
-                  </>
-                )}
-              </Box>
-            </Tooltip>
-
-            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
-              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role, user.jobTitle)}</Typography>
-            </Box>
-
-            <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
-
-            <Menu
-              anchorEl={menuAnchor}
-              open={Boolean(menuAnchor)}
-              onClose={() => setMenuAnchor(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-              <MenuItem onClick={handlePhotoClick} sx={{ gap: 1 }}>
-                <PhotoCameraIcon fontSize="small" sx={{ color: '#888' }} />
-                Change photo
-              </MenuItem>
-              {profilePicture && (
-                <MenuItem onClick={handleRemovePhoto} sx={{ gap: 1, color: '#E53935' }}>
-                  <DeleteOutlineIcon fontSize="small" />
-                  Remove photo
-                </MenuItem>
-              )}
-              <MenuItem onClick={handleLogout}>Sign out</MenuItem>
-            </Menu>
-          </Box>
-        </Box>
+      {/* ─── Drawer temporal para móvil ──────────────────────────────────────── */}
+      <Drawer
+        variant="temporary"
+        open={mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': {
+            width: DRAWER_WIDTH,
+            boxSizing: 'border-box',
+            backgroundColor: drawerBg,
+            color: '#FFF',
+            borderRight: 'none',
+          },
+        }}
+      >
+        {drawerContent}
       </Drawer>
 
       {/* ─── Contenido principal ─────────────────────────── */}
@@ -788,10 +810,13 @@ function App() {
         component="main"
         sx={{
           position: 'fixed',
-          top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
+          top: 0, right: 0, bottom: 0,
+          left: { xs: 0, sm: `${DRAWER_WIDTH}px` },
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          pt: 2, px: 4, pb: 4,
+          pt: 2,
+          px: { xs: 2, sm: 4 },
+          pb: { xs: 10, sm: 4 },
           boxSizing: 'border-box',
           bgcolor: 'background.default',
         }}
@@ -878,6 +903,55 @@ function App() {
             <Typography variant="h6" color="textSecondary">Section under development</Typography>
           </Box>
         )}
+      </Box>
+
+      {/* ─── Bottom navigation (solo móvil) ──────────────────────────────────── */}
+      <Box
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          position: 'fixed',
+          bottom: 0, left: 0, right: 0,
+          zIndex: 1200,
+          borderTop: '1px solid #2A2A2A',
+          bgcolor: '#1A1A1A',
+        }}
+      >
+        <BottomNavigation
+          value={activePage}
+          onChange={(_, val) => {
+            if (val === '__menu__') {
+              setMobileDrawerOpen(true);
+            } else {
+              setActivePage(val);
+            }
+          }}
+          sx={{ bgcolor: 'transparent', height: 60 }}
+        >
+          {(isDeveloper ? [
+            { label: 'My Tasks',  value: 'my-tasks',  icon: <AssignmentIcon /> },
+            { label: 'Kanban',    value: 'my-kanban', icon: <ViewKanbanIcon /> },
+            { label: 'Blockers',  value: 'my-blockers', icon: <ReportProblemIcon /> },
+            { label: 'Menu',      value: '__menu__',  icon: <MenuIcon /> },
+          ] : [
+            { label: 'Dashboard', value: 'dashboard',   icon: <DashboardIcon /> },
+            { label: 'Tasks',     value: 'tasks',        icon: <ViewKanbanIcon /> },
+            { label: 'Sprints',   value: 'sprints',      icon: <AssignmentIcon /> },
+            { label: 'Menu',      value: '__menu__',     icon: <MenuIcon /> },
+          ]).map((item) => (
+            <BottomNavigationAction
+              key={item.value}
+              label={item.label}
+              value={item.value}
+              icon={item.icon}
+              sx={{
+                color: '#666',
+                minWidth: 0,
+                '&.Mui-selected': { color: '#E53935' },
+                '& .MuiBottomNavigationAction-label': { fontSize: '0.65rem' },
+              }}
+            />
+          ))}
+        </BottomNavigation>
       </Box>
 
       {!isDeveloper ? (

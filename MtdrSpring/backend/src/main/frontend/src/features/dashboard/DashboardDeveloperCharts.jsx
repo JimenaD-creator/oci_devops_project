@@ -2,6 +2,8 @@ import React, { useMemo, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
+
 import {
   BarChart,
   Bar,
@@ -1069,6 +1071,8 @@ export default function DashboardDeveloperCharts({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
+const yAxisWidth = isMobile ? 120 : 168;
   
   const orderedSelectedSprints = useMemo(
     () => [...(selectedSprints || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
@@ -1750,7 +1754,7 @@ export default function DashboardDeveloperCharts({
         <BarChart
           layout="vertical"
           data={workloadStack}
-          margin={{ top: 48, right: 90, left: 4, bottom: 56 }}
+          margin={{ top: 48, right: isMobile ? 60 : 90, left: 0, bottom: 56 }}
           barCategoryGap="10%"
         >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
@@ -1773,7 +1777,7 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={168}
+width={yAxisWidth}
             tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
@@ -1867,7 +1871,7 @@ export default function DashboardDeveloperCharts({
         <BarChart
           layout="vertical"
           data={hoursGroupedRows}
-          margin={{ top: 48, right: 24, left: 4, bottom: 56 }}
+          margin={{ top: 48, right: 24, left: 0, bottom: 56 }}
           barCategoryGap="10%"
         >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
@@ -1889,7 +1893,7 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={168}
+width={yAxisWidth}
             tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
@@ -1955,7 +1959,9 @@ export default function DashboardDeveloperCharts({
         accent="#7E57C2"
         tint={isDark ? 'rgba(126, 87, 194, 0.12)' : 'rgba(126, 87, 194, 0.08)'}
       >
-        <ComposedChart data={forCombo} margin={{ top: 12, right: 22, left: 10, bottom: 82 }}>
+        <ComposedChart data={forCombo} 
+        margin={{ top: 12, right: isMobile ? 48 : 22, left: isMobile ? 0 : 10, bottom: 82 }}
+>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis
             dataKey="shortName"

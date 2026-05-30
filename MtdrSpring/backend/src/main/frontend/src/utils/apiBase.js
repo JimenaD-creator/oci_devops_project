@@ -5,7 +5,8 @@
  */
 export function getApiBase() {
   if (process.env.NODE_ENV === 'development') {
-    return process.env.REACT_APP_API_URL || 'http://localhost:8080';
+    return process.env.REACT_APP_API_URL || `http://${window.location.hostname}:8080`;
+
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;

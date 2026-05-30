@@ -580,34 +580,57 @@ export function TasksNewTaskDialog({
         </Stack>
       </DialogContent>
       <DialogActions
-        sx={{ 
-          px: 2.5, 
-          pb: 2.25, 
-          pt: 1.5, 
+        sx={{
+          px: 2.5,
+          pb: 2.25,
+          pt: 1.5,
           borderTop: '1px solid',
-          borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)'
+          borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: { xs: 1, sm: 0 },
         }}
       >
-        <Button
-          onClick={handleClose}
-          sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
-          disabled={saving}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          variant="contained"
+        <Typography
           sx={{
-            bgcolor: ORACLE_RED,
-            textTransform: 'none',
-            fontWeight: 700,
-            '&:hover': { bgcolor: '#A83B2D' },
+            fontSize: 12,
+            color: 'text.disabled',
+            flex: { sm: 1 },
+            textAlign: { xs: 'center', sm: 'left' },
           }}
         >
-          {saving ? 'Creating...' : 'Create task'}
-        </Button>
+          Fields marked with{' '}
+          <Box component="span" sx={{ color: ORACLE_RED, fontWeight: 700 }}>*</Box>{' '}
+          are required
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'stretch', sm: 'flex-end' } }}>
+          <Button
+            onClick={handleClose}
+            disabled={saving}
+            sx={{
+              flex: { xs: 1, sm: 'none' },
+              color: 'text.secondary',
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            variant="contained"
+            sx={{
+              flex: { xs: 1, sm: 'none' },
+              bgcolor: ORACLE_RED,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#A83B2D' },
+            }}
+          >
+            {saving ? 'Creating...' : 'Create task'}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
