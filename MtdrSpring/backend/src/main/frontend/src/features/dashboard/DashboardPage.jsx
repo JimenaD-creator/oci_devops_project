@@ -647,80 +647,49 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                           {n.taskTitle}
                         </Typography>
 
-                        {/* Block card */}
-                        <Box sx={{ borderRadius: '10px', overflow: 'hidden', border: `0.5px solid ${isDark ? '#7F3030' : '#F09595'}` }}>
-                          {/* Card header — solid red */}
-                          <Box
+                        {/* Block status line */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                          <LockOutlinedIcon
+                            sx={{ fontSize: 13, color: '#C74126' }}
+                          />
+                          <Typography
                             sx={{
-                              bgcolor: '#C74126',
-                              px: 1.25,
-                              py: 0.75,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 1,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#C74126',
+                              letterSpacing: '0.03em',
+                              textTransform: 'uppercase',
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <LockOutlinedIcon
-                                sx={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}
-                              />
-                              <Typography
-                                sx={{
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: 'rgba(255,255,255,0.95)',
-                                  letterSpacing: '0.03em',
-                                  textTransform: 'uppercase',
-                                }}
-                              >
-                                Blocked
-                              </Typography>
+                            Reason
+                          </Typography>
+                          {compareMode && n.sprintLabel && (
+                            <Box
+                              sx={{
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: isDark ? '#9A9A9A' : '#757575',
+                                px: 0.75,
+                                py: '1px',
+                                borderRadius: '4px',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {n.sprintLabel}
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              {compareMode && n.sprintLabel && (
-                                <Box
-                                  sx={{
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    color: 'rgba(255,255,255,0.8)',
-                                    bgcolor: 'rgba(0,0,0,0.18)',
-                                    px: 0.875,
-                                    py: '1px',
-                                    borderRadius: '20px',
-                                    lineHeight: 1.5,
-                                  }}
-                                >
-                                  {n.sprintLabel}
-                                </Box>
-                              )}
-                              <Typography
-                                sx={{
-                                  fontSize: 11,
-                                  color: 'rgba(255,255,255,0.75)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 0.4,
-                                }}
-                              >
-                                <LockOutlinedIcon sx={{ fontSize: 11 }} />
-                                {formatBlockedSinceAge(n.blockedSince)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          {/* Card body — light red */}
-                          <Box sx={{ bgcolor: isDark ? '#4A1A1A' : '#FCEBEB', px: 1.25, py: 1 }}>
-                            {n.blockedReason ? (
-                              <Typography sx={{ fontSize: 12, color: isDark ? '#EF9A9A' : '#501313', fontStyle: 'italic', lineHeight: 1.45 }}>
-                                "{n.blockedReason}"
-                              </Typography>
-                            ) : (
-                              <Typography sx={{ fontSize: 12, color: isDark ? '#EF9A9A' : '#791F1F', lineHeight: 1.45 }}>
-                                No reason provided.
-                              </Typography>
-                            )}
-                          </Box>
+                          )}
                         </Box>
+
+                        {/* Blocked reason */}
+                        {n.blockedReason ? (
+                          <Typography sx={{ fontSize: 12, color: isDark ? '#E0E0E0' : '#424242', fontStyle: 'italic', lineHeight: 1.45, pl: 2.25 }}>
+                            "{n.blockedReason}"
+                          </Typography>
+                        ) : (
+                          <Typography sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#999999', lineHeight: 1.45, pl: 2.25 }}>
+                            No reason provided.
+                          </Typography>
+                        )}
                       </Box>
                     );
                   })
