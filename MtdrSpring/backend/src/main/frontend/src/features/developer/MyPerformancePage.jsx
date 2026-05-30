@@ -22,7 +22,7 @@ import {
   aggregateDeveloperPerformance,
   buildCompletedTasksBySprintChart,
   buildHoursWorkedTrendChart,
-  buildProductivityScoreTrendChart,
+  buildProductivityScoreComparisonTrend,
 } from './developerPerformanceData';
 import {
   CompletedTasksBySprintChart,
@@ -129,9 +129,12 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     [sprints, userId, userName],
   );
 
-  const productivityTrendData = useMemo(
-    () => buildProductivityScoreTrendChart(sprints, userId, userName),
-    [sprints, userId, userName],
+  const productivityComparison = useMemo(
+    () =>
+      buildProductivityScoreComparisonTrend(sprints, projectDevelopers, userId, userName, {
+        highlightColor: ORACLE_RED,
+      }),
+    [sprints, projectDevelopers, userId, userName],
   );
 
   const performanceCards = useMemo(() => {
@@ -270,7 +273,11 @@ export default function MyPerformancePage({ projectId, currentUser }) {
       <DeveloperMetricCards metrics={performanceCards} />
 
       <Box sx={{ mb: 2 }}>
-        <ProductivityScoreTrendChart data={productivityTrendData} />
+        <ProductivityScoreTrendChart
+          data={productivityComparison.chartData}
+          series={productivityComparison.series}
+          compareMode={productivityComparison.series.length > 0}
+        />
       </Box>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>

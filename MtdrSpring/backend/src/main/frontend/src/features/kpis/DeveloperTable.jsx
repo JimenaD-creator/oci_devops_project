@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
-import { Box, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { APP_FONT_FAMILY } from '../../theme';
 import { developerAvatarColors } from '../../utils/developerColors';
@@ -8,19 +7,11 @@ import {
   collectDeveloperNamesForSelection,
   resolveProfilePictureFromRoster,
 } from '../../utils/teamRosterUtils';
-import {
-  buildThroughputCellMeta,
-  computeTasksPerHour,
-  formatTasksPerHour,
-  isThroughputSampleReliable,
-  THROUGHPUT_MIN_COMPLETED,
-  THROUGHPUT_MIN_HOURS,
-} from '../dashboard/utils/chartUtils';
-import { kpiMuiTooltipComponentsProps } from './KpiTooltipParts';
+import { participationRateFromDeveloperHours } from './productivityScoreUtils';
 
-const THROUGHPUT_COLUMN_LABEL = 'Completed / hr';
-const THROUGHPUT_COLUMN_HINT =
-  'Completed tasks ÷ hours logged. Hover a cell for the underlying counts.';
+const PARTICIPATION_COLUMN_LABEL = 'Participation';
+const PARTICIPATION_COLUMN_HINT =
+  'Hours logged ÷ estimated hours on assigned tasks (20% of productivity score).';
 
 const initialData = [
   {
@@ -261,32 +252,6 @@ function normalizeDeveloperName(name) {
   return String(name ?? '').trim().toLowerCase();
 }
 
-function ThroughputTooltipBody({ meta }) {
-  const { reliable, context, ratio, completed, hours } = meta;
-  if (completed <= 0 && hours <= 0) {
-    return (
-      <Typography sx={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
-        No completed tasks or hours logged in this sprint.
-      </Typography>
-    );
-  }
-  return (
-    <Box sx={{ maxWidth: 240 }}>
-      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.45 }}>{context}</Typography>
-      {reliable ? (
-        <Typography sx={{ fontSize: '0.78rem', mt: 0.75, lineHeight: 1.45, opacity: 0.92 }}>
-          {formatTasksPerHour(ratio)} completed per hour logged
-        </Typography>
-      ) : (
-        <Typography sx={{ fontSize: '0.78rem', mt: 0.75, lineHeight: 1.45, opacity: 0.85 }}>
-          Rate hidden — need at least {THROUGHPUT_MIN_COMPLETED} completed tasks and{' '}
-          {THROUGHPUT_MIN_HOURS} h logged for a stable throughput.
-        </Typography>
-      )}
-    </Box>
-  );
-}
-
 function SprintMetricsTable({
   selectedSprints,
   compareMode,
@@ -324,12 +289,12 @@ function SprintMetricsTable({
         row[`${sp.id}_assigned`] = d ? d.assigned : 0;
         row[`${sp.id}_completed`] = d ? d.completed : 0;
         row[`${sp.id}_hours`] = d ? d.hours : 0;
-        const spCompleted = d ? Number(d.completed) || 0 : 0;
         const spHours = d ? Number(d.hours) || 0 : 0;
-        row[`${sp.id}_tasksPerHour`] = isThroughputSampleReliable(spCompleted, spHours)
-          ? computeTasksPerHour(spCompleted, spHours)
-          : null;
         row[`${sp.id}_onTime`] = d && typeof d.onTime === 'number' ? d.onTime : '—';
+        const spEstimate = d ? Number(d.assignedHoursEstimate) || 0 : 0;
+        row[`${sp.id}_participation`] = d
+          ? participationRateFromDeveloperHours(spHours, spEstimate)
+          : null;
         row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : 0;
       });
       if (!profilePicture) {
@@ -406,40 +371,6 @@ function SprintMetricsTable({
     return `${Number.isInteger(n) ? n : n.toFixed(1)}h`;
   };
 
-  const teamThroughputForSprint = (spId) => {
-    let completed = 0;
-    let hours = 0;
-    sorted.forEach((r) => {
-      completed += Number(r[`${spId}_completed`]) || 0;
-      hours += Number(r[`${spId}_hours`]) || 0;
-    });
-    return { completed, hours };
-  };
-
-  const renderThroughputCell = (completed, hours) => {
-    const meta = buildThroughputCellMeta(completed, hours);
-    return (
-      <Tooltip
-        arrow
-        placement="top"
-        title={<ThroughputTooltipBody meta={meta} />}
-        slotProps={kpiMuiTooltipComponentsProps(isDark)}
-      >
-        <span
-          className={meta.reliable ? 'cell-strong' : 'cell-muted'}
-          style={{
-            cursor: 'help',
-            borderBottom: meta.reliable
-              ? '1px dotted rgba(199, 70, 52, 0.45)'
-              : '1px dotted rgba(128, 128, 128, 0.35)',
-          }}
-        >
-          {meta.display}
-        </span>
-      </Tooltip>
-    );
-  };
-
   const workloadAvgForSprint = (spId) => {
     const nums = sorted.map((r) => r[`${spId}_workload`]).filter((v) => typeof v === 'number');
     if (!nums.length) return null;
@@ -452,8 +383,22 @@ function SprintMetricsTable({
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
 
+  const participationAvgForSprint = (spId) => {
+    const nums = sorted
+      .map((r) => r[`${spId}_participation`])
+      .filter((v) => typeof v === 'number');
+    if (!nums.length) return null;
+    return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
+  };
+
   const renderHours = (v) => (typeof v === 'number' ? `${v}h` : v);
   const renderOnTimeCell = (v) =>
+    typeof v === 'number' ? (
+      <Badge val={v} green={90} yellow={70} />
+    ) : (
+      <span className="cell-muted">—</span>
+    );
+  const renderParticipationCell = (v) =>
     typeof v === 'number' ? (
       <Badge val={v} green={90} yellow={70} />
     ) : (
@@ -557,22 +502,22 @@ function SprintMetricsTable({
                           </div>
                         </th>,
                         <th
-                          key={`${sp.id}-tph`}
-                          className="sortable"
-                          title={THROUGHPUT_COLUMN_HINT}
-                          onClick={() => toggleSort(`${sp.id}_tasksPerHour`)}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {THROUGHPUT_COLUMN_LABEL} {sortIcon(`${sp.id}_tasksPerHour`)}
-                          </div>
-                        </th>,
-                        <th
                           key={`${sp.id}-ot`}
                           className="sortable"
                           onClick={() => toggleSort(`${sp.id}_onTime`)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
+                          </div>
+                        </th>,
+                        <th
+                          key={`${sp.id}-part`}
+                          className="sortable"
+                          title={PARTICIPATION_COLUMN_HINT}
+                          onClick={() => toggleSort(`${sp.id}_participation`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
                           </div>
                         </th>,
                         <th key={`${sp.id}-w`}>
@@ -610,18 +555,18 @@ function SprintMetricsTable({
                             Total Hours {sortIcon(`${sp.id}_hours`)}
                           </div>
                         </th>
-                        <th
-                          className="sortable"
-                          title={THROUGHPUT_COLUMN_HINT}
-                          onClick={() => toggleSort(`${sp.id}_tasksPerHour`)}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {THROUGHPUT_COLUMN_LABEL} {sortIcon(`${sp.id}_tasksPerHour`)}
-                          </div>
-                        </th>
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_onTime`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
+                          </div>
+                        </th>
+                        <th
+                          className="sortable"
+                          title={PARTICIPATION_COLUMN_HINT}
+                          onClick={() => toggleSort(`${sp.id}_participation`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
                           </div>
                         </th>
                         <th>
@@ -689,14 +634,11 @@ function SprintMetricsTable({
                             <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">
                               {renderHours(r[`${sp.id}_hours`])}
                             </td>,
-                            <td key={`${r.name}-${sp.id}-tph`} className="text-center">
-                              {renderThroughputCell(
-                                r[`${sp.id}_completed`],
-                                r[`${sp.id}_hours`],
-                              )}
-                            </td>,
                             <td key={`${r.name}-${sp.id}-ot`} className="text-center">
                               {renderOnTimeCell(r[`${sp.id}_onTime`])}
+                            </td>,
+                            <td key={`${r.name}-${sp.id}-part`} className="text-center">
+                              {renderParticipationCell(r[`${sp.id}_participation`])}
                             </td>,
                             <td key={`${r.name}-${sp.id}-w`}>
                               {renderWorkloadCell(r[`${sp.id}_workload`])}
@@ -713,13 +655,10 @@ function SprintMetricsTable({
                                 {renderHours(r[`${sp.id}_hours`])}
                               </td>
                               <td className="text-center">
-                                {renderThroughputCell(
-                                  r[`${sp.id}_completed`],
-                                  r[`${sp.id}_hours`],
-                                )}
+                                {renderOnTimeCell(r[`${sp.id}_onTime`])}
                               </td>
                               <td className="text-center">
-                                {renderOnTimeCell(r[`${sp.id}_onTime`])}
+                                {renderParticipationCell(r[`${sp.id}_participation`])}
                               </td>
                               <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
                             </>
@@ -735,6 +674,7 @@ function SprintMetricsTable({
                       const bc = si > 0 ? ' td-sprint-compare-first' : '';
                       const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
+                      const partAvg = participationAvgForSprint(sp.id);
                       return [
                         <td key={`avg-${sp.id}-a`} className={`summary-cell text-center${bc}`}>
                           {avgForKey(`${sp.id}_assigned`)}
@@ -745,15 +685,16 @@ function SprintMetricsTable({
                         <td key={`avg-${sp.id}-h`} className="summary-cell text-center">
                           {hoursAvgForSprint(sp.id)}
                         </td>,
-                        <td key={`avg-${sp.id}-tph`} className="summary-cell text-center">
-                          {(() => {
-                            const team = teamThroughputForSprint(sp.id);
-                            return renderThroughputCell(team.completed, team.hours);
-                          })()}
-                        </td>,
                         <td key={`avg-${sp.id}-ot`} className="summary-cell text-center">
                           {otAvg != null ? (
                             <span className="summary-cell">{otAvg}%</span>
+                          ) : (
+                            <span className="cell-muted">—</span>
+                          )}
+                        </td>,
+                        <td key={`avg-${sp.id}-part`} className="summary-cell text-center">
+                          {partAvg != null ? (
+                            <span className="summary-cell">{partAvg}%</span>
                           ) : (
                             <span className="cell-muted">—</span>
                           )}
@@ -771,6 +712,7 @@ function SprintMetricsTable({
                       const sp = selectedSprints[0];
                       const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
+                      const partAvg = participationAvgForSprint(sp.id);
                       return (
                         <>
                           <td className="summary-cell text-center">
@@ -781,14 +723,15 @@ function SprintMetricsTable({
                           </td>
                           <td className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>
                           <td className="summary-cell text-center">
-                            {(() => {
-                              const team = teamThroughputForSprint(sp.id);
-                              return renderThroughputCell(team.completed, team.hours);
-                            })()}
-                          </td>
-                          <td className="summary-cell text-center">
                             {otAvg != null ? (
                               <span className="summary-cell">{otAvg}%</span>
+                            ) : (
+                              <span className="cell-muted">—</span>
+                            )}
+                          </td>
+                          <td className="summary-cell text-center">
+                            {partAvg != null ? (
+                              <span className="summary-cell">{partAvg}%</span>
                             ) : (
                               <span className="cell-muted">—</span>
                             )}

@@ -171,6 +171,209 @@ public class EmailService {
         }
     }
 
+    /**
+     * Reminds a developer that an assigned task is due soon or overdue.
+     * Failures are logged only (does not throw).
+     */
+    public void sendTaskDueReminderEmail(
+            String toEmail,
+            String assigneeName,
+            String taskTitle,
+            String dueLabel,
+            String priority,
+            String sprintLabel,
+            String managerContact) {
+        if (fromEmail == null || fromEmail.isEmpty()) {
+            logger.warn("Task due reminder email skipped: spring.mail.username is not configured");
+            return;
+        }
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            String safeName = assigneeName != null && !assigneeName.isBlank() ? assigneeName.trim() : "there";
+            String safeTitle = taskTitle != null ? taskTitle.trim() : "Untitled task";
+            String safeDue = dueLabel != null && !dueLabel.isBlank() ? dueLabel.trim() : "Due soon";
+            String safeManager =
+                    managerContact != null && !managerContact.isBlank()
+                            ? managerContact.trim()
+                            : "your manager";
+            String portalUrl = frontendUrl != null ? frontendUrl.trim() : "";
+            String botHandle = telegramBotUsername != null ? telegramBotUsername.trim().replace("@", "") : "";
+            String telegramLine = buildTelegramInstructionPlain(botHandle);
+            String telegramBlockersLine = buildTelegramBlockerInstructionPlain(botHandle);
+            String telegramLineHtml = buildTelegramInstructionHtml(botHandle);
+            String telegramBlockersLineHtml = buildTelegramBlockerInstructionHtml(botHandle);
+
+            String plainText = buildTaskDueReminderPlainText(
+                    safeName,
+                    safeTitle,
+                    safeDue,
+                    priority,
+                    sprintLabel,
+                    safeManager,
+                    portalUrl,
+                    telegramLine,
+                    telegramBlockersLine);
+            String html = buildTaskDueReminderHtml(
+                    safeName,
+                    safeTitle,
+                    safeDue,
+                    priority,
+                    sprintLabel,
+                    safeManager,
+                    portalUrl,
+                    telegramLineHtml,
+                    telegramBlockersLineHtml);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(toEmail.trim());
+            helper.setSubject("Task due soon — Oracle Task Manager");
+            helper.setFrom(fromEmail);
+            helper.setText(plainText, html);
+
+            mailSender.send(message);
+            logger.info("Task due reminder email sent to {}", toEmail);
+        } catch (Exception e) {
+            logger.error("Failed to send task due reminder email to {}: {}", toEmail, e.getMessage(), e);
+        }
+    }
+
+    private static String buildTelegramBlockerInstructionPlain(String botHandle) {
+        if (botHandle != null && !botHandle.isBlank()) {
+            return "Report blockers in Telegram: open https://t.me/"
+                    + botHandle
+                    + " , sign in, and use My Blockers or tell your manager in the bot.";
+        }
+        return "Report blockers in Telegram: open your team's Task Manager bot, sign in, and use My Blockers.";
+    }
+
+    private static String buildTelegramBlockerInstructionHtml(String botHandle) {
+        if (botHandle != null && !botHandle.isBlank()) {
+            return "Report blockers in Telegram: open <a href=\"https://t.me/"
+                    + escapeHtml(botHandle)
+                    + "\" style=\"color:#0070f3\">@"
+                    + escapeHtml(botHandle)
+                    + "</a>, sign in, and use <strong>My Blockers</strong> or contact your manager in the bot.";
+        }
+        return "Report blockers in Telegram: open your team&rsquo;s Task Manager bot, sign in, and use "
+                + "<strong>My Blockers</strong>.";
+    }
+
+    private static String buildTaskDueReminderPlainText(
+            String assigneeName,
+            String taskTitle,
+            String dueLabel,
+            String priority,
+            String sprintLabel,
+            String managerContact,
+            String portalUrl,
+            String telegramSignInLine,
+            String telegramBlockersLine) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Task due soon\n\n");
+        sb.append("Hi ").append(assigneeName).append(",\n\n");
+        sb.append("Your assignment is approaching its due date:\n");
+        sb.append(taskTitle).append("\n\n");
+        sb.append("Due: ").append(dueLabel).append("\n");
+        if (priority != null && !priority.isBlank()) {
+            sb.append("Priority: ").append(priority.trim()).append("\n");
+        }
+        if (sprintLabel != null && !sprintLabel.isBlank()) {
+            sb.append("Sprint: ").append(sprintLabel.trim()).append("\n");
+        }
+        sb.append("\n");
+        sb.append("WHAT TO DO\n");
+        sb.append("=========\n");
+        sb.append("• If you are blocked or need help: ").append(telegramBlockersLine);
+        sb.append("\n   Or contact your manager: ").append(managerContact).append("\n");
+        sb.append("• If work is in progress: update your task status in the web portal (My Tasks) or Telegram.\n");
+        sb.append("• If you finished the work: mark your assignment complete and log your worked hours if you have not yet.\n\n");
+        sb.append("Web portal: sign in and open My Tasks");
+        if (portalUrl != null && !portalUrl.isBlank()) {
+            sb.append("\n").append(portalUrl);
+        }
+        sb.append("\nTelegram: ").append(telegramSignInLine).append("\n");
+        return sb.toString();
+    }
+
+    private String buildTaskDueReminderHtml(
+            String safeName,
+            String safeTitle,
+            String safeDue,
+            String priority,
+            String sprintLabel,
+            String safeManager,
+            String portalUrl,
+            String telegramSignInHtml,
+            String telegramBlockersHtml) {
+        StringBuilder details = new StringBuilder();
+        details.append("<p style='color:#444;margin:8px 0'><strong>Due:</strong> ")
+                .append(escapeHtml(safeDue))
+                .append("</p>");
+        if (priority != null && !priority.isBlank()) {
+            details.append("<p style='color:#444;margin:8px 0'><strong>Priority:</strong> ")
+                    .append(escapeHtml(priority))
+                    .append("</p>");
+        }
+        if (sprintLabel != null && !sprintLabel.isBlank()) {
+            details.append("<p style='color:#444;margin:8px 0'><strong>Sprint:</strong> ")
+                    .append(escapeHtml(sprintLabel))
+                    .append("</p>");
+        }
+
+        String portalBlock =
+                "<p style='color:#1a1a1a;margin:12px 0 8px 0'><strong>Web portal</strong></p>"
+                        + "<p style='color:#444;margin:0 0 12px 0'>Sign in and open <strong>My Tasks</strong> to update status and hours"
+                        + (portalUrl.isEmpty()
+                                ? ".</p>"
+                                : ": <a href=\""
+                                        + escapeHtml(portalUrl)
+                                        + "\" style=\"color:#0070f3\">"
+                                        + escapeHtml(portalUrl)
+                                        + "</a></p>");
+
+        return "<div style='font-family:sans-serif;max-width:520px;margin:auto;padding:24px'>"
+                + "<h2 style='color:#1a1a1a'>Task due soon</h2>"
+                + "<p style='color:#444'>Hi "
+                + escapeHtml(safeName)
+                + ",</p>"
+                + "<p style='color:#444'>Your assignment is approaching its due date:</p>"
+                + "<p style='color:#1a1a1a;font-size:18px;font-weight:600;margin:16px 0'>"
+                + escapeHtml(safeTitle)
+                + "</p>"
+                + details
+                + "<div style='border:2px solid #E53935;border-radius:8px;padding:16px;margin:20px 0;background:#fff5f5'>"
+                + "<p style='color:#1a1a1a;font-size:16px;font-weight:700;margin:0 0 12px 0'>What to do</p>"
+                + "<ul style='color:#444;margin:0;padding-left:20px;line-height:1.6'>"
+                + "<li><strong>Blocked or need help?</strong> "
+                + telegramBlockersHtml
+                + " Or contact your manager: <strong>"
+                + escapeHtml(safeManager)
+                + "</strong>.</li>"
+                + "<li><strong>Work in progress?</strong> Update your task status in the portal or Telegram.</li>"
+                + "<li><strong>Already done?</strong> Mark your assignment complete and log worked hours if you forgot.</li>"
+                + "</ul>"
+                + portalBlock
+                + "<p style='color:#1a1a1a;margin:12px 0 8px 0'><strong>Telegram</strong></p>"
+                + "<p style='color:#444;margin:0'>"
+                + telegramSignInHtml
+                + "</p>"
+                + "</div>"
+                + (portalUrl.isEmpty()
+                        ? ""
+                        : "<p style='margin:16px 0'><a href=\""
+                                + escapeHtml(portalUrl)
+                                + "\" style='display:inline-block;background:#E53935;color:#fff;"
+                                + "padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold'>"
+                                + "Open My Tasks</a></p>")
+                + "<p style='color:#888;font-size:12px;margin-top:24px'>"
+                + "You receive this reminder once per open assignment when the due date is near.</p>"
+                + "</div>";
+    }
+
     private static String buildTelegramInstructionPlain(String botHandle) {
         if (botHandle != null && !botHandle.isBlank()) {
             return "Telegram: open https://t.me/" + botHandle + " , send /start, and sign in.";
