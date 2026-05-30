@@ -36,7 +36,7 @@ import {
   buildSprintNumberMap,
   formatSprintLabel,
   resolveActiveProjectIdNum,
-  sortSprintsForDisplay,
+  sortSprintsForSelect,
 } from '../sprints/utils/sprintUtils';
 import { fetchSprintsProjectDevelopers } from '../sprints/sprintsPageApi';
 
@@ -105,7 +105,7 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     };
   }, [effectiveProjectIdNum]);
 
-  const sortedSprints = useMemo(() => sortSprintsForDisplay(sprints), [sprints]);
+  const sortedSprints = useMemo(() => sortSprintsForSelect(sprints), [sprints]);
   const sprintNumberMap = useMemo(() => buildSprintNumberMap(sortedSprints), [sortedSprints]);
 
   useEffect(() => {

@@ -23,7 +23,6 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
-import DashboardBlockedTasksPanel from './DashboardBlockedTasksPanel';
 import DeveloperTable from '../kpis/DeveloperTable';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import {
@@ -36,8 +35,8 @@ import {
 } from './dashboardSprintData';
 import {
   DASHBOARD_CONTENT_MAX_WIDTH,
-  DASHBOARD_PRIMARY_ACCENT,
   DASHBOARD_BLOCK_GAP,
+  completionRateProgressColor,
   SECTION_BRAND_DARK,
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
@@ -53,7 +52,8 @@ import { resolveLoadErrorMessage } from '../../utils/auth';
 /** Select value: compare all sprints side by side. */
 const ALL_SPRINTS_FILTER = 'all';
 
-// ── Avatar palette for blocked notification items ────────────────────────────
+/** Oracle red used for block-notification emphasis on the dashboard bell. */
+const BLOCK_NOTIF_RED = '#C74126';
 const AVATAR_PALETTE_LIGHT = [
   { bg: '#EEEDFE', color: '#3C3489' },
   { bg: '#E6F1FB', color: '#0C447C' },
@@ -246,6 +246,11 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     const done = taskStatusDistribution.find((r) => r.key === 'DONE')?.count ?? 0;
     return Math.round((100 * done) / taskStatusTotal);
   }, [taskStatusDistribution, taskStatusTotal]);
+
+  const completionRateColor = useMemo(
+    () => completionRateProgressColor(heroProgress),
+    [heroProgress],
+  );
 
   const projectName =
     currentProject?.name ||
@@ -467,16 +472,24 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                 aria-expanded={blockedNotifOpen}
                 sx={{
                   borderRadius: '10px',
-                  ...(showBlockedNotifPulse
+                  ...(blockedNotifOpen
                     ? {
-                        bgcolor: alpha('#C74126', isDark ? 0.2 : 0.1),
-                        color: '#C74126',
+                        bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
+                        color: BLOCK_NOTIF_RED,
+                        border: `1px solid ${isDark ? '#3A3C42' : '#E0E0E0'}`,
+                        boxShadow: 'none',
+                        '&:hover': { bgcolor: isDark ? '#3A3C42' : '#EEEEEE' },
+                      }
+                    : showBlockedNotifPulse
+                    ? {
+                        bgcolor: alpha(BLOCK_NOTIF_RED, isDark ? 0.2 : 0.1),
+                        color: BLOCK_NOTIF_RED,
                         '@keyframes notifPulse': {
                           '0%, 100%': { boxShadow: '0 0 0 2px rgba(199,65,38,0.3)' },
                           '50%': { boxShadow: '0 0 0 7px rgba(199,65,38,0.08)' },
                         },
                         animation: 'notifPulse 2.4s ease-in-out infinite',
-                        '&:hover': { bgcolor: alpha('#C74126', isDark ? 0.28 : 0.16) },
+                        '&:hover': { bgcolor: alpha(BLOCK_NOTIF_RED, isDark ? 0.28 : 0.16) },
                       }
                     : {
                         bgcolor: isDark ? '#2A2C32' : '#F5F5F5',
@@ -484,7 +497,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                       }),
                 }}
               >
-                <NotificationsIcon sx={{ color: hasBlockedNotifications ? '#C74126' : (isDark ? '#9A9A9A' : '#616161') }} />
+                <NotificationsIcon sx={{ color: hasBlockedNotifications || blockedNotifOpen ? BLOCK_NOTIF_RED : (isDark ? '#9A9A9A' : '#616161') }} />
               </IconButton>
               {/* Unread badge */}
               {unreadCount > 0 && !blockedNotifOpen && (
@@ -508,16 +521,19 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
               PaperProps={{
-                elevation: 0,
+                elevation: 8,
                 sx: {
                   mt: 1,
                   width: 340,
                   maxWidth: 'calc(100vw - 24px)',
                   borderRadius: '16px',
-                  border: `0.5px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+                  border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
                   overflow: 'hidden',
-                  boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.3)' : '0 8px 32px rgba(0,0,0,0.10)',
-                  bgcolor: 'background.paper',
+                  boxShadow: isDark
+                    ? '0 8px 32px rgba(0,0,0,0.45)'
+                    : '0 8px 32px rgba(0,0,0,0.12)',
+                  bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+                  backgroundImage: 'none',
                 },
               }}
             >
@@ -525,11 +541,11 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
               <Box sx={{
                 px: 2, py: 1.5,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                borderBottom: `0.5px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+                borderBottom: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
                 bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <LockOutlinedIcon sx={{ fontSize: 16, color: '#C74126' }} />
+                  <LockOutlinedIcon sx={{ fontSize: 16, color: BLOCK_NOTIF_RED }} />
                   <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
                     Task block reports
                   </Typography>
@@ -553,7 +569,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
               </Box>
 
               {/* Body */}
-              <Box sx={{ maxHeight: 400, overflowY: 'auto', bgcolor: isDark ? '#16181C' : '#FAFAFA' }}>
+              <Box sx={{ maxHeight: 400, overflowY: 'auto', bgcolor: isDark ? '#1C1E22' : '#FFFFFF' }}>
                 {!hasBlockedNotifications ? (
                   <Box sx={{ px: 2.5, py: 3, textAlign: 'center' }}>
                     <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: isDark ? '#2A2C32' : '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.25 }}>
@@ -577,20 +593,29 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                       .toUpperCase();
                     const avatarStyle = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
 
+                    const blockCardSx = {
+                      borderRadius: '10px',
+                      border: `1px solid ${isDark ? '#8B3A2E' : '#F09595'}`,
+                      bgcolor: isDark ? '#2D1C1A' : '#FCEBEB',
+                      px: 1.25,
+                      py: 1.25,
+                      ...(isUnread
+                        ? { borderColor: BLOCK_NOTIF_RED, borderWidth: '1.5px' }
+                        : {}),
+                    };
+
                     return (
                       <Box
                         key={n.key}
                         sx={{
-                          px: 2, py: 1.5,
-                          bgcolor: isUnread ? (isDark ? '#1C1E22' : '#FFFFFF') : 'transparent',
-                          borderBottom: `0.5px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
-                          borderLeft: isUnread ? '3px solid #C74126' : '3px solid transparent',
-                          transition: 'background 0.15s',
-                          '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
+                          px: 2,
+                          py: 1.5,
+                          borderBottom: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
                           '&:last-child': { borderBottom: 'none' },
                           cursor: 'default',
                         }}
                       >
+                        <Box sx={blockCardSx}>
                         {/* Top row: avatar + name + time */}
                         <Box
                           sx={{
@@ -633,7 +658,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                             sx={{
                               fontSize: 11,
                               fontWeight: 600,
-                              color: '#C74126',
+                              color: isDark ? '#9A9A9A' : '#757575',
                               mb: '2px',
                               letterSpacing: '0.02em',
                             }}
@@ -643,53 +668,40 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                         )}
 
                         {/* Task title */}
-                        <Typography sx={{ fontSize: 13, color: 'text.primary', mb: 0.875, lineHeight: 1.4 }}>
+                        <Typography sx={{ fontSize: 13, color: 'text.primary', mb: 0.5, lineHeight: 1.4 }}>
                           {n.taskTitle}
                         </Typography>
 
-                        {/* Block status line */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-                          <LockOutlinedIcon
-                            sx={{ fontSize: 13, color: '#C74126' }}
-                          />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', mb: 0.5 }}>
+                          <LockOutlinedIcon sx={{ fontSize: 14, color: BLOCK_NOTIF_RED }} />
                           <Typography
                             sx={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: '#C74126',
-                              letterSpacing: '0.03em',
-                              textTransform: 'uppercase',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: BLOCK_NOTIF_RED,
+                              letterSpacing: '0.02em',
                             }}
                           >
-                            Reason
+                            Blocked
                           </Typography>
-                          {compareMode && n.sprintLabel && (
-                            <Box
-                              sx={{
-                                fontSize: 11,
-                                fontWeight: 500,
-                                color: isDark ? '#9A9A9A' : '#757575',
-                                px: 0.75,
-                                py: '1px',
-                                borderRadius: '4px',
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              {n.sprintLabel}
-                            </Box>
-                          )}
+                          {compareMode && n.sprintLabel ? (
+                            <Typography sx={{ fontSize: 11, color: isDark ? '#9A9A9A' : '#757575' }}>
+                              · {n.sprintLabel}
+                            </Typography>
+                          ) : null}
                         </Box>
 
-                        {/* Blocked reason */}
-                        {n.blockedReason ? (
-                          <Typography sx={{ fontSize: 12, color: isDark ? '#E0E0E0' : '#424242', fontStyle: 'italic', lineHeight: 1.45, pl: 2.25 }}>
-                            "{n.blockedReason}"
-                          </Typography>
-                        ) : (
-                          <Typography sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#999999', lineHeight: 1.45, pl: 2.25 }}>
-                            No reason provided.
-                          </Typography>
-                        )}
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            color: isDark ? '#D4A5A0' : '#5C2E2E',
+                            fontStyle: n.blockedReason ? 'italic' : 'normal',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {n.blockedReason ? `"${n.blockedReason}"` : 'No reason provided.'}
+                        </Typography>
+                        </Box>
                       </Box>
                     );
                   })
@@ -698,7 +710,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
 
               {/* Footer */}
               {hasBlockedNotifications && (
-                <Box sx={{ px: 2, py: 1.25, borderTop: `0.5px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`, bgcolor: isDark ? '#1C1E22' : '#FFFFFF', display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ px: 2, py: 1.25, borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`, bgcolor: isDark ? '#1C1E22' : '#FFFFFF', display: 'flex', justifyContent: 'center' }}>
                   <Typography sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#9E9E9E' }}>
                     {blockedNotificationItems.length} blocked {blockedNotificationItems.length === 1 ? 'task' : 'tasks'} in current selection
                   </Typography>
@@ -726,12 +738,24 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
           <CardContent sx={{ py: 1.25, px: 1.75, '&:last-child': { pb: 1.25 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#333' }}>Completion rate</Typography>
-              <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: DASHBOARD_PRIMARY_ACCENT, lineHeight: 1 }}>
+              <Typography variant="h6" component="span" sx={{ fontWeight: 800, color: completionRateColor, lineHeight: 1 }}>
                 {heroProgress}%
               </Typography>
             </Box>
-            <LinearProgress variant="determinate" value={heroProgress}
-              sx={{ height: 8, borderRadius: 4, bgcolor: isDark ? '#2A2C32' : '#F0F0F0', '& .MuiLinearProgress-bar': { bgcolor: DASHBOARD_PRIMARY_ACCENT } }} />
+            <LinearProgress
+              variant="determinate"
+              value={heroProgress}
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: completionRateColor,
+                  borderRadius: 4,
+                  transition: 'background-color 0.35s ease',
+                },
+              }}
+            />
           </CardContent>
         </Card>
       </ScrollReveal>
@@ -846,10 +870,6 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
               </Box>
             ) : null}
           </Box>
-        </ScrollReveal>
-
-        <ScrollReveal delay={0.06}>
-          <DashboardBlockedTasksPanel selectedSprints={selectedSprints} />
         </ScrollReveal>
 
         <ScrollReveal delay={0.06}>

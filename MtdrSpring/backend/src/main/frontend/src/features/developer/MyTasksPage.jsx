@@ -33,7 +33,7 @@ import { ORACLE_RED, pageEase } from '../tasks/constants/taskConstants';
 import {
   pickDefaultSelectedSprint,
   resolveActiveProjectIdNum,
-  sortSprintsForDisplay,
+  sortSprintsForSelect,
   sortTasksForSprintTable,
   sprintProjectIdFromJson,
 } from '../sprints/utils/sprintUtils';
@@ -88,10 +88,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
         visibleUserTasks,
         projectDevelopersRef.current,
       );
-      const sorted = sortSprintsForDisplay(
-        Array.isArray(sprintsList) ? sprintsList : [],
-        synced.tasks,
-      );
+      const sorted = sortSprintsForSelect(Array.isArray(sprintsList) ? sprintsList : []);
       setSprints(sorted);
       setTasks(synced.tasks);
       setUserTasks(synced.userTasks);

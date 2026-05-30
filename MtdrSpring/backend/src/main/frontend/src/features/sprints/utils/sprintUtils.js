@@ -211,6 +211,12 @@ export function sortSprintsForDisplay(list, allTasks) {
   });
 }
 
+/** Ascending sprint id for dropdowns (Dashboard, Tasks, KPI, My Performance, My Tasks). */
+export function sortSprintsForSelect(list) {
+  if (!Array.isArray(list) || list.length <= 1) return list || [];
+  return [...list].sort((a, b) => Number(a.id) - Number(b.id));
+}
+
 export function taskDisplayName(task) {
   const t = typeof task.title === 'string' ? task.title.trim() : '';
   if (t) return t;
