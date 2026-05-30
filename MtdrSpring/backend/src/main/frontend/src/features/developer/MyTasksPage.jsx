@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -35,8 +35,20 @@ import {
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
   sortTasksForSprintTable,
+  sprintProjectIdFromJson,
 } from '../sprints/utils/sprintUtils';
 import { fetchSprintsProjectDevelopers, fetchSprintsTasksAndAssignments } from '../sprints/sprintsPageApi';
+import { getCachedBundleSnapshot } from '../dashboard/dashboardSprintData';
+import { resolveLoadErrorMessage } from '../../utils/auth';
+import {
+  applyRecentUpdatesToTaskLists,
+  getRecentlyCreatedTasks,
+  getRecentlyCreatedUserTasks,
+  getRecentlyDeletedTaskIdSet,
+  mergeUserTaskLists,
+  notifyTasksMutated,
+  TASKS_MUTATED_EVENT,
+} from '../../utils/taskSyncEvents';
 
 export default function MyTasksPage({ projectId, currentUser }) {
   const theme = useTheme();
@@ -54,39 +66,105 @@ export default function MyTasksPage({ projectId, currentUser }) {
   const [taskForDetail, setTaskForDetail] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { invalidateAndRefresh } = useProjectData();
+  const projectDevelopersRef = useRef(projectDevelopers);
+  projectDevelopersRef.current = projectDevelopers;
+
+  const applyBundleToState = useCallback(
+    (sprintsList, tasksList, userTasksList) => {
+      const deleted = new Set(getRecentlyDeletedTaskIdSet());
+      const createdTasks = getRecentlyCreatedTasks();
+      const baseTasks = Array.isArray(tasksList) ? tasksList : [];
+      const mergedTasks = [...createdTasks, ...baseTasks].filter(
+        (task, index, arr) =>
+          arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+      );
+      const visibleTasks = mergedTasks.filter((t) => !deleted.has(String(t?.id)));
+      const visibleUserTasks = mergeUserTaskLists(
+        getRecentlyCreatedUserTasks(),
+        Array.isArray(userTasksList) ? userTasksList : [],
+      ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
+      const synced = applyRecentUpdatesToTaskLists(
+        visibleTasks,
+        visibleUserTasks,
+        projectDevelopersRef.current,
+      );
+      const sorted = sortSprintsForDisplay(
+        Array.isArray(sprintsList) ? sprintsList : [],
+        synced.tasks,
+      );
+      setSprints(sorted);
+      setTasks(synced.tasks);
+      setUserTasks(synced.userTasks);
+    },
+    [],
+  );
 
   const loadData = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
     const forceFresh = opts.forceFresh === true;
+    const projectKey =
+      effectiveProjectIdNum != null ? String(effectiveProjectIdNum) : null;
+
     if (!silent) {
-      setLoading(true);
       setLoadError('');
     }
+
+    if (!silent && !forceFresh && projectKey) {
+      const snap = getCachedBundleSnapshot(projectKey);
+      if (snap) {
+        let sprintsData = snap.sprints;
+        if (effectiveProjectIdNum != null && Array.isArray(sprintsData)) {
+          sprintsData = sprintsData.filter(
+            (s) => sprintProjectIdFromJson(s) === effectiveProjectIdNum,
+          );
+        }
+        applyBundleToState(
+          Array.isArray(sprintsData) ? sprintsData : [],
+          snap.tasks,
+          snap.userTasks,
+        );
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+    } else if (!silent) {
+      setLoading(true);
+    }
+
     try {
       if (forceFresh) {
         await invalidateAndRefresh();
       }
       const { sprintsList, tasksList, userTasksList } =
         await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
-      const sorted = sortSprintsForDisplay(
-        Array.isArray(sprintsList) ? sprintsList : [],
-        Array.isArray(tasksList) ? tasksList : [],
-      );
-      setSprints(sorted);
-      setTasks(Array.isArray(tasksList) ? tasksList : []);
-      setUserTasks(Array.isArray(userTasksList) ? userTasksList : []);
-    } catch {
-      setSprints([]);
-      setTasks([]);
-      setUserTasks([]);
-      setLoadError('Could not load your tasks.');
+      applyBundleToState(sprintsList, tasksList, userTasksList);
+    } catch (e) {
+      if (!silent) {
+        setSprints([]);
+        setTasks([]);
+        setUserTasks([]);
+        setLoadError(
+          resolveLoadErrorMessage(e, 'Could not load your tasks. Try signing in again.'),
+        );
+      }
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [projectId, invalidateAndRefresh]);
+  }, [projectId, effectiveProjectIdNum, invalidateAndRefresh, applyBundleToState]);
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onTasksMutated = (event) => {
+      if (event?.detail?.source === 'my-tasks-page') return;
+      loadData({ silent: true }).catch((err) => {
+        console.error('MyTasksPage sync refresh failed:', err);
+      });
+    };
+    window.addEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
+    return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
   }, [loadData]);
 
   useEffect(() => {
@@ -212,7 +290,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
   const borderColor = isDark ? '#2A2C32' : '#ECECEC';
   const cardBg = theme.palette.background.paper;
 
-  if (loading) {
+  if (loading && sprints.length === 0 && tasks.length === 0) {
     return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
@@ -367,7 +445,13 @@ export default function MyTasksPage({ projectId, currentUser }) {
           setDetailOpen(false);
           setTaskForDetail(null);
           try {
-            await loadData({ silent: true, forceFresh: true });
+            notifyTasksMutated({
+              type: 'task-updated',
+              task: updated,
+              meta,
+              source: 'my-tasks-page',
+            });
+            await loadData({ silent: true });
           } catch (e) {
             console.error('Failed to refresh my tasks after save:', e);
           }

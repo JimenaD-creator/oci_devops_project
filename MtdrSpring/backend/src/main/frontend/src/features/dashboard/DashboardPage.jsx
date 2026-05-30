@@ -48,6 +48,7 @@ import { fetchProjectById, fetchProjectDevelopers } from './projectApi';
 import { countTeamDevelopers } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
+import { resolveLoadErrorMessage } from '../../utils/auth';
 
 /** Select value: compare all sprints side by side. */
 const ALL_SPRINTS_FILTER = 'all';
@@ -79,12 +80,10 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     sprints: sharedSprints,
     loading: sharedLoading,
     error: dataError,
-    getRawBundle,
+    taskCount: sharedTaskCount,
   } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
-  const [projectTaskCount, setProjectTaskCount] = useState(0);
-  const [sprintsLoading, setSprintsLoading] = useState(true);
   const [sprintFilter, setSprintFilter] = useState(null);
   const [currentProject, setCurrentProject] = useState(null);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
@@ -96,11 +95,9 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
 
   useEffect(() => {
     if (!projectId) {
-      setSprintsLoading(false);
       return;
     }
     let cancelled = false;
-    setSprintsLoading(true);
 
     Promise.all([
       fetchProjectById(projectId).catch(() => null),
@@ -110,26 +107,21 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
         if (cancelled) return;
         if (project) setCurrentProject(project);
         setProjectDevelopers(Array.isArray(developers) ? developers : []);
-      })
-      .finally(() => {
-        if (!cancelled && !sharedLoading) setSprintsLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [projectId, sharedLoading]);
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) {
       setAllSprints([]);
-      setSprintsLoading(false);
       return;
     }
     const projectChanged = prevProjectIdRef.current !== projectId;
     prevProjectIdRef.current = projectId;
 
-    setSprintsLoading(sharedLoading);
     const sprints = Array.isArray(sharedSprints) ? sharedSprints : [];
     setAllSprints(sprints);
 
@@ -143,46 +135,13 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
         const picked = pickDefaultSelectedSprint(sprints);
         return picked?.id != null ? String(picked.id) : ALL_SPRINTS_FILTER;
       });
-    } else if (sprints.length === 0) {
+    } else if (sprints.length === 0 && !sharedLoading) {
       setSprintFilter(null);
     }
-
-    if (!sharedLoading) setSprintsLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
 
   useEffect(() => {
-    if (!projectId) {
-      setProjectTaskCount(0);
-      return;
-    }
-    if (sharedLoading) return undefined;
-
-    let cancelled = false;
-    getRawBundle()
-      .then(({ tasks }) => {
-        if (!cancelled) {
-          setProjectTaskCount(Array.isArray(tasks) ? tasks.length : 0);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setProjectTaskCount(0);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, sharedLoading, getRawBundle, allSprints.length]);
-
-  useEffect(() => {
-    setProjectDevelopers([]);
-  }, [projectId]);
-
-  useEffect(() => {
     setSeenBlockedKeysCsv('');
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) setSprintsLoading(false);
   }, [projectId]);
 
   const sortedSprintsForFilter = useMemo(
@@ -344,20 +303,19 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     );
   }
 
-  if (sprintsLoading) {
+  if (sharedLoading && allSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 
-  const loadErrorMessage =
-    dataError?.userMessage ||
-    (dataError?.code === 'UNAUTHORIZED'
-      ? 'Sesión inválida o expirada. Cierra sesión, recarga la página e inicia sesión de nuevo.'
-      : dataError?.message
-        ? `Error al cargar datos: ${dataError.message}`
-        : null);
+  const loadErrorMessage = dataError
+    ? resolveLoadErrorMessage(
+        dataError,
+        dataError?.message ? `Error al cargar datos: ${dataError.message}` : 'No se pudieron cargar los datos.',
+      )
+    : null;
 
   const shouldShowEmptyDashboardView =
-    !loadErrorMessage && (allSprints.length === 0 || projectTaskCount === 0);
+    !loadErrorMessage && (allSprints.length === 0 || sharedTaskCount === 0);
 
   if (loadErrorMessage) {
     return (
@@ -689,80 +647,49 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
                           {n.taskTitle}
                         </Typography>
 
-                        {/* Block card */}
-                        <Box sx={{ borderRadius: '10px', overflow: 'hidden', border: `0.5px solid ${isDark ? '#7F3030' : '#F09595'}` }}>
-                          {/* Card header — solid red */}
-                          <Box
+                        {/* Block status line */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                          <LockOutlinedIcon
+                            sx={{ fontSize: 13, color: '#C74126' }}
+                          />
+                          <Typography
                             sx={{
-                              bgcolor: '#C74126',
-                              px: 1.25,
-                              py: 0.75,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 1,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#C74126',
+                              letterSpacing: '0.03em',
+                              textTransform: 'uppercase',
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <LockOutlinedIcon
-                                sx={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}
-                              />
-                              <Typography
-                                sx={{
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: 'rgba(255,255,255,0.95)',
-                                  letterSpacing: '0.03em',
-                                  textTransform: 'uppercase',
-                                }}
-                              >
-                                Blocked
-                              </Typography>
+                            Reason
+                          </Typography>
+                          {compareMode && n.sprintLabel && (
+                            <Box
+                              sx={{
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: isDark ? '#9A9A9A' : '#757575',
+                                px: 0.75,
+                                py: '1px',
+                                borderRadius: '4px',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {n.sprintLabel}
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              {compareMode && n.sprintLabel && (
-                                <Box
-                                  sx={{
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    color: 'rgba(255,255,255,0.8)',
-                                    bgcolor: 'rgba(0,0,0,0.18)',
-                                    px: 0.875,
-                                    py: '1px',
-                                    borderRadius: '20px',
-                                    lineHeight: 1.5,
-                                  }}
-                                >
-                                  {n.sprintLabel}
-                                </Box>
-                              )}
-                              <Typography
-                                sx={{
-                                  fontSize: 11,
-                                  color: 'rgba(255,255,255,0.75)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 0.4,
-                                }}
-                              >
-                                <LockOutlinedIcon sx={{ fontSize: 11 }} />
-                                {formatBlockedSinceAge(n.blockedSince)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          {/* Card body — light red */}
-                          <Box sx={{ bgcolor: isDark ? '#4A1A1A' : '#FCEBEB', px: 1.25, py: 1 }}>
-                            {n.blockedReason ? (
-                              <Typography sx={{ fontSize: 12, color: isDark ? '#EF9A9A' : '#501313', fontStyle: 'italic', lineHeight: 1.45 }}>
-                                "{n.blockedReason}"
-                              </Typography>
-                            ) : (
-                              <Typography sx={{ fontSize: 12, color: isDark ? '#EF9A9A' : '#791F1F', lineHeight: 1.45 }}>
-                                No reason provided.
-                              </Typography>
-                            )}
-                          </Box>
+                          )}
                         </Box>
+
+                        {/* Blocked reason */}
+                        {n.blockedReason ? (
+                          <Typography sx={{ fontSize: 12, color: isDark ? '#E0E0E0' : '#424242', fontStyle: 'italic', lineHeight: 1.45, pl: 2.25 }}>
+                            "{n.blockedReason}"
+                          </Typography>
+                        ) : (
+                          <Typography sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#999999', lineHeight: 1.45, pl: 2.25 }}>
+                            No reason provided.
+                          </Typography>
+                        )}
                       </Box>
                     );
                   })

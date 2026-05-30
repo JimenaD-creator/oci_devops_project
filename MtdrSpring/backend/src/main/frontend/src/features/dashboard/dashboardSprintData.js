@@ -7,7 +7,7 @@ import {
   mergeRosterWithSprintDevelopers,
 } from '../../utils/teamRosterUtils';
 import { getApiBase } from '../../utils/apiBase';
-import { apiFetch } from '../../utils/auth';
+import { apiFetch, getSessionExpiredMessage, isUnauthorizedHttpStatus } from '../../utils/auth';
 
 /** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
@@ -25,11 +25,12 @@ export const SPRINT_CHART_COLORS = [
   '#43A047',
 ];
 
-// Cache variables
+// Cache variables (raw API arrays + pre-enriched sprints for fast page loads)
 let cachedData = {
   sprints: null,
   tasks: null,
   userTasks: null,
+  enrichedSprints: null,
   timestamp: 0,
   projectId: null,
 };
@@ -572,6 +573,22 @@ function isCacheValidForProject(pid, now, forceFresh) {
   );
 }
 
+/** Synchronous snapshot for stale-while-revalidate UI (no network). */
+export function getCachedBundleSnapshot(projectId) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  if (!pid || !isCacheValidForProject(pid, Date.now(), false)) {
+    return null;
+  }
+  return {
+    sprints: cachedData.sprints,
+    tasks: cachedData.tasks,
+    userTasks: cachedData.userTasks,
+    enrichedSprints: cachedData.enrichedSprints,
+    taskCount: Array.isArray(cachedData.tasks) ? cachedData.tasks.length : 0,
+  };
+}
+
 /**
  * Returns raw API arrays (sprints, tasks, userTasks) using the same cache as fetchDashboardSprints.
  */
@@ -617,11 +634,14 @@ export async function fetchDashboardSprints(projectId, options = {}) {
   const now = Date.now();
 
   if (isCacheValidForProject(pid, now, forceFresh)) {
-    console.log('Using cached dashboard data');
+    if (Array.isArray(cachedData.enrichedSprints)) {
+      return cachedData.enrichedSprints;
+    }
     const sortedCached = [...cachedData.sprints].sort((a, b) => Number(a.id) - Number(b.id));
     const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
     const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
     assignSprintAccentColors(enriched);
+    cachedData.enrichedSprints = enriched;
     return enriched;
   }
 
@@ -642,10 +662,9 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
       const err = new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
       err.httpStatus = status;
-      if (status === 401 || status === 403) {
+      if (isUnauthorizedHttpStatus(status)) {
         err.code = 'UNAUTHORIZED';
-        err.userMessage =
-          'No se pudieron cargar los datos. Cierra sesión, recarga la página e inicia sesión de nuevo.';
+        err.userMessage = getSessionExpiredMessage();
       }
       throw err;
     }
@@ -654,11 +673,11 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     const apiTasks = await tasksRes.json();
     const apiUserTasks = await userTasksRes.json();
 
-    // Update cache
     cachedData = {
       sprints: apiSprints,
       tasks: apiTasks,
       userTasks: apiUserTasks,
+      enrichedSprints: null,
       timestamp: now,
       projectId: pid,
     };
@@ -675,10 +694,11 @@ export async function fetchDashboardSprints(projectId, options = {}) {
       enriched = mapped;
     }
     assignSprintAccentColors(enriched);
+    cachedData.enrichedSprints = enriched;
     return enriched;
   } catch (error) {
     console.error('Dashboard data load failed:', error);
-    if (error?.code === 'UNAUTHORIZED' || error?.httpStatus === 401 || error?.httpStatus === 403) {
+    if (error?.code === 'UNAUTHORIZED' || isUnauthorizedHttpStatus(error?.httpStatus)) {
       throw error;
     }
     return [];
@@ -691,6 +711,7 @@ export function invalidateDashboardCache() {
     sprints: null,
     tasks: null,
     userTasks: null,
+    enrichedSprints: null,
     timestamp: 0,
     projectId: null,
   };

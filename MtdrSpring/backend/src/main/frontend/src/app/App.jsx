@@ -7,6 +7,7 @@ import {
   logout,
   persistCurrentUser,
   resolveProfilePicture,
+  SESSION_EXPIRED_EVENT,
 } from '../utils/auth';
 import {
   buildUserSessionFromAuth,
@@ -125,6 +126,8 @@ function App() {
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   /** null = loading; array = projects for this manager's team */
   const [managerProjects, setManagerProjects] = useState(null);
+  /** null = loading; array = projects for teams this developer belongs to */
+  const [developerProjects, setDeveloperProjects] = useState(null);
   /** loading | ready | missing — avoids infinite spinner when prod DB has no team/project for user */
   const [devProjectStatus, setDevProjectStatus] = useState(() =>
     localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
@@ -220,36 +223,47 @@ function App() {
   }, [user?.id, user?.role, selectedProjectId, showProjectPicker]);
 
   useEffect(() => {
-    if (!isDeveloperRole(user?.role)) {
+    if (!isDeveloperRole(user?.role) || !user?.id) {
+      setDeveloperProjects(null);
       return;
     }
-    if (selectedProjectId) {
-      setDevProjectStatus('ready');
-      return;
-    }
-    setDevProjectStatus('loading');
     let cancelled = false;
-    apiFetch(`${getApiBase()}/api/projects/developer/${user.id}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((project) => {
+    apiFetch(`${getApiBase()}/api/projects/developer/${user.id}/list`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((projects) => {
         if (cancelled) return;
-        if (project?.id) {
-          localStorage.setItem('currentProjectId', String(project.id));
-          localStorage.setItem('currentProjectName', project.name || '');
-          setSelectedProjectId(String(project.id));
-          setSelectedProjectName(project.name || '');
-          setDevProjectStatus('ready');
-        } else {
+        const list = Array.isArray(projects) ? projects : [];
+        setDeveloperProjects(list);
+        if (selectedProjectId || showProjectPicker) {
+          setDevProjectStatus(list.length > 0 ? 'ready' : 'missing');
+          return;
+        }
+        if (list.length === 0) {
           setDevProjectStatus('missing');
+          return;
+        }
+        if (list.length === 1 && list[0]?.id != null) {
+          const only = list[0];
+          localStorage.setItem('currentProjectId', String(only.id));
+          localStorage.setItem('currentProjectName', only.name || '');
+          setSelectedProjectId(String(only.id));
+          setSelectedProjectName(only.name || '');
+          setDevProjectStatus('ready');
+        } else if (list.length > 1) {
+          setDevProjectStatus('ready');
+          setShowProjectPicker(true);
         }
       })
       .catch(() => {
-        if (!cancelled) setDevProjectStatus('missing');
+        if (!cancelled) {
+          setDeveloperProjects([]);
+          setDevProjectStatus('missing');
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [user, selectedProjectId]);
+  }, [user?.id, user?.role, selectedProjectId, showProjectPicker]);
 
   useEffect(() => {
     if (activePage === 'tasks' || activePage === 'sprints') setSprintsNavOpen(true);
@@ -331,12 +345,22 @@ function App() {
     setSelectedProjectId(String(project.id));
     setSelectedProjectName(project.name || '');
     setShowProjectPicker(false);
-    setActivePage('dashboard');
+    setDevProjectStatus('ready');
+    setActivePage(isDeveloperRole(user?.role) ? 'my-tasks' : 'dashboard');
   };
 
   const handleChangeProject = () => {
     if (isManagerRole(user?.role) && managerProjects && managerProjects.length <= 1) {
       const name = managerProjects[0]?.name || selectedProjectName || 'your project';
+      setSnack({
+        open: true,
+        msg: `You only have one assigned project (${name}).`,
+        severity: 'info',
+      });
+      return;
+    }
+    if (isDeveloperRole(user?.role) && developerProjects && developerProjects.length <= 1) {
+      const name = developerProjects[0]?.name || selectedProjectName || 'your project';
       setSnack({
         open: true,
         msg: `You only have one assigned project (${name}).`,
@@ -350,6 +374,16 @@ function App() {
     setSelectedProjectName(null);
     setShowProjectPicker(true);
   };
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setUser(null);
+      setProfilePicture(null);
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, [navigate]);
 
   useEffect(() => {
     if (user) return;
@@ -391,6 +425,11 @@ function App() {
     { text: 'My Performance', id: 'my-performance', icon: <AnalyticsIcon /> },
   ];
 
+  const developerSecondaryNavItems =
+    developerProjects != null && developerProjects.length > 1
+      ? [{ text: 'Change project', id: 'selector', icon: <SwapHorizIcon /> }]
+      : [];
+
   const NAV_ITEMS = [
     { text: 'Dashboard',      icon: <DashboardIcon />,   id: 'dashboard',   roles: ['ADMIN', 'MANAGER'] },
     { text: 'AI Insights',    icon: <AutoAwesomeIcon />, id: 'ai-insights', roles: ['ADMIN', 'MANAGER'] },
@@ -413,7 +452,7 @@ function App() {
     ? DEVELOPER_NAV_ITEMS
     : NAV_ITEMS.filter((item) => ['dashboard', 'ai-insights', 'analytics'].includes(item.id));
   const secondaryNavItems = isDeveloper
-    ? []
+    ? developerSecondaryNavItems
     : NAV_ITEMS.filter((item) => !['dashboard', 'ai-insights', 'analytics'].includes(item.id));
 
   const SPRINTS_SUBITEMS = [
@@ -446,11 +485,23 @@ function App() {
     );
   }
 
-  if (isDeveloper && !selectedProjectId) {
-    if (devProjectStatus === 'loading') {
+  if (isDeveloper && (!selectedProjectId || showProjectPicker)) {
+    if (developerProjects == null && !showProjectPicker) {
       return <PageLoader />;
     }
-    return (
+    if (showProjectPicker || (developerProjects && developerProjects.length > 1)) {
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <ProjectSelector
+            onSelect={handleSelectProject}
+            mode="developer"
+            skipAutoSelect={showProjectPicker}
+          />
+        </Suspense>
+      );
+    }
+    if (devProjectStatus === 'missing' || (developerProjects && developerProjects.length === 0)) {
+      return (
       <Box
         sx={{
           minHeight: '100vh',
@@ -478,7 +529,9 @@ function App() {
           </Button>
         </Box>
       </Box>
-    );
+      );
+    }
+    return <PageLoader />;
   }
 
   const drawerBg     = '#1A1A1A';

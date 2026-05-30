@@ -33,6 +33,17 @@ public class BotHelper {
 		}
 	}
 
+	/** Plain text; does not remove or replace the current reply keyboard. */
+	public static void sendMessageKeepReplyKeyboard(Long chatId, String text, TelegramClient bot) {
+		try {
+			SendMessage messageToTelegram =
+					SendMessage.builder().chatId(chatId).text(text).build();
+			bot.execute(messageToTelegram);
+		} catch (Exception e) {
+			logger.error(e.getLocalizedMessage(), e);
+		}
+	}
+
 	public static void sendMessageToTelegram(Long chatId, String text,TelegramClient bot, ReplyKeyboardMarkup rk ) {
 
 		try {

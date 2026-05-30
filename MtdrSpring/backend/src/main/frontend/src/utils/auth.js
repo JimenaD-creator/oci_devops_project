@@ -4,6 +4,12 @@ import { buildUserSessionFromAuth } from './userRoleUtils';
 const LEGACY_AUTH_KEY = 'mtdr_authenticated';
 const TOKEN_KEY = 'mtdr_auth_token';
 const USER_KEY = 'currentUser';
+export const SESSION_EXPIRED_EVENT = 'mtdr-session-expired';
+
+const SESSION_EXPIRED_MESSAGE_ES =
+  'Sesión inválida o expirada. Cierra sesión, recarga la página e inicia sesión de nuevo.';
+const SESSION_EXPIRED_MESSAGE_EN =
+  'Your session is invalid or expired. Sign out, reload the page, and sign in again.';
 /** Inline in currentUser JSON; larger images use mtdr_profile_picture_{userId}. */
 const MAX_INLINE_PROFILE_PICTURE_LENGTH = 120_000;
 
@@ -92,9 +98,79 @@ export function loadStoredUser() {
   }
 }
 
+function parseJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const padded = part.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/** True when JWT exp claim is in the past (30s skew). Missing exp → not treated as expired. */
+export function isTokenExpired(token = getAuthToken()) {
+  if (!token) return true;
+  const payload = parseJwtPayload(token);
+  if (!payload?.exp) return false;
+  return Date.now() >= Number(payload.exp) * 1000 - 30_000;
+}
+
+export function isUnauthorizedHttpStatus(status) {
+  return status === 401 || status === 403;
+}
+
+export function isUnauthorizedError(error) {
+  if (!error) return false;
+  if (error.code === 'UNAUTHORIZED') return true;
+  return isUnauthorizedHttpStatus(error.httpStatus);
+}
+
+export function getSessionExpiredMessage() {
+  try {
+    const lang = typeof navigator !== 'undefined' ? navigator.language : '';
+    return lang && lang.toLowerCase().startsWith('es')
+      ? SESSION_EXPIRED_MESSAGE_ES
+      : SESSION_EXPIRED_MESSAGE_EN;
+  } catch {
+    return SESSION_EXPIRED_MESSAGE_ES;
+  }
+}
+
+export function resolveLoadErrorMessage(error, fallback = 'Could not load data.') {
+  if (isUnauthorizedError(error)) {
+    return getSessionExpiredMessage();
+  }
+  if (error?.userMessage && String(error.userMessage).trim()) {
+    return String(error.userMessage).trim();
+  }
+  return fallback;
+}
+
+export function notifySessionExpired() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+let sessionExpiryHandled = false;
+
+export function handleSessionExpiredOnce() {
+  if (sessionExpiryHandled) return;
+  sessionExpiryHandled = true;
+  logout();
+  notifySessionExpired();
+}
+
+export function resetSessionExpiryGuard() {
+  sessionExpiryHandled = false;
+}
+
 export function isAuthenticated() {
   const token = getAuthToken();
-  if (!token) return false;
+  if (!token || isTokenExpired(token)) return false;
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return false;
@@ -157,6 +233,7 @@ export function login(authData, remember = false) {
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(LEGACY_AUTH_KEY);
+  resetSessionExpiryGuard();
 
   const token = authData?.token;
   const userForStorage = buildUserForStorage(authData?.user);
@@ -222,8 +299,21 @@ export function apiFetch(input, init = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
   const nextInit = { cache: 'no-store', ...init, headers };
-  if (input instanceof Request) {
-    return fetch(new Request(input, nextInit));
+  const run = input instanceof Request ? fetch(new Request(input, nextInit)) : fetch(input, nextInit);
+  return run.then((response) => {
+    if (token && isUnauthorizedHttpStatus(response.status) && !isAuthLoginRequest(input, init)) {
+      handleSessionExpiredOnce();
+    }
+    return response;
+  });
+}
+
+function isAuthLoginRequest(input, init) {
+  try {
+    const rawUrl = input instanceof Request ? input.url : String(input);
+    const path = new URL(rawUrl, window.location.origin).pathname.replace(/\/+$/, '');
+    return path.endsWith('/api/auth/login');
+  } catch {
+    return false;
   }
-  return fetch(input, nextInit);
 }

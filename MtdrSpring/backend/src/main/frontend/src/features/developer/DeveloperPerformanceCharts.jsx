@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   BarChart,
   Bar,
@@ -139,26 +139,194 @@ function ProductivityScoreTooltip({ active, payload }) {
       </Typography>
       <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mt: 0.5, lineHeight: 1.45 }}>
         Completion {row.completionRate}%
-        {typeof row.onTime === 'number' ? ` · On-time ${row.onTime}%` : ''} · Workload {row.workload}%
+        {typeof row.onTime === 'number' ? ` · On-time ${row.onTime}%` : ''}
+        {typeof row.participation === 'number' ? ` · Participation ${row.participation}%` : ''}
+        {typeof row.workload === 'number' ? ` · Workload ${row.workload}%` : ''}
       </Typography>
       <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mt: 0.25 }}>
         {row.completed} of {row.assigned} tasks · {Number(row.hours || 0).toFixed(1)} h logged
+        {Number(row.estimated) > 0 ? ` · ${Number(row.estimated).toFixed(1)} h estimated` : ''}
       </Typography>
     </Box>
   );
 }
 
-export function ProductivityScoreTrendChart({ data = [] }) {
+function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  const entries = (series || [])
+    .map((s) => {
+      const score = row[s.dataKey];
+      if (score == null || !Number.isFinite(Number(score))) return null;
+      const meta = row._meta?.[s.dataKey];
+      return { ...s, score: Number(score), meta };
+    })
+    .filter(Boolean)
+    .sort(
+      (a, b) =>
+        (a.isCurrentUser ? -1 : 0) - (b.isCurrentUser ? -1 : 0) || b.score - a.score,
+    );
+
+  if (!entries.length) return null;
+
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+        bgcolor: isDark ? '#1C1E22' : '#fff',
+        p: 1.25,
+        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.08)',
+        minWidth: 220,
+        maxWidth: 320,
+      }}
+    >
+      <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: row.color || SCORE_LINE, mb: 1 }}>
+        {label}
+      </Typography>
+      {entries.map((e) => (
+        <Box key={e.dataKey} sx={{ mb: entries.length > 1 ? 0.75 : 0 }}>
+          <Typography sx={{ fontWeight: e.isCurrentUser ? 800 : 600, fontSize: '0.85rem', color: e.color }}>
+            {e.name}
+            {e.isCurrentUser ? ' (you)' : ''}: {formatProductivityScoreDisplay(e.score)}
+          </Typography>
+          {e.meta ? (
+            <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', lineHeight: 1.4 }}>
+              Completion {e.meta.completionRate}%
+              {typeof e.meta.onTime === 'number' ? ` · On-time ${e.meta.onTime}%` : ''}
+              {typeof e.meta.participation === 'number'
+                ? ` · Participation ${e.meta.participation}%`
+                : ''}
+              {typeof e.meta.workload === 'number' ? ` · Workload ${e.meta.workload}%` : ''}
+            </Typography>
+          ) : null}
+          {e.meta ? (
+            <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', mt: 0.25 }}>
+              {e.meta.completed} of {e.meta.assigned} tasks · {Number(e.meta.hours || 0).toFixed(1)} h
+              {Number(e.meta.estimated) > 0
+                ? ` / ${Number(e.meta.estimated).toFixed(1)} h est.`
+                : ''}
+            </Typography>
+          ) : null}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function compareLineStroke(s, isDark) {
+  if (s.isCurrentUser) {
+    return { color: s.color, opacity: 1, width: 4 };
+  }
+  return {
+    color: alpha(s.color, isDark ? 0.58 : 0.55),
+    opacity: isDark ? 0.78 : 0.72,
+    width: 2,
+  };
+}
+
+/** Teammate lines first; signed-in developer last so their line draws on top. */
+function compareSeriesRenderOrder(series) {
+  return [...series].sort((a, b) => {
+    if (a.isCurrentUser === b.isCurrentUser) return 0;
+    return a.isCurrentUser ? 1 : -1;
+  });
+}
+
+function CompareLineDot({ cx, cy, payload, seriesItem, isDark }) {
+  if (cx == null || cy == null || payload == null || !Number.isFinite(payload)) return null;
+  const { color, opacity, width } = compareLineStroke(seriesItem, isDark);
+  if (seriesItem.isCurrentUser) {
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={6}
+        fill={color}
+        stroke={isDark ? '#1C1E22' : '#FFFFFF'}
+        strokeWidth={2}
+        style={{ opacity }}
+      />
+    );
+  }
+  return (
+    <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" style={{ opacity }} />
+  );
+}
+
+/** Developer line legend — rendered below the chart so it does not overlap the Sprint axis label. */
+function ProductivityCompareLegend({ series = [], isDark = false }) {
+  if (!series.length) return null;
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: { xs: 1.25, sm: 2 },
+        pt: 1.5,
+        pb: 0.5,
+        px: 0.5,
+        borderTop: (theme) => `1px solid ${theme.palette.mode === 'dark' ? '#2A2C32' : '#ECECEC'}`,
+      }}
+    >
+      {series.map((s) => {
+        const stroke = compareLineStroke(s, isDark);
+        return (
+          <Box
+            key={s.dataKey}
+            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, maxWidth: '100%' }}
+          >
+            <Box
+              sx={{
+                width: s.isCurrentUser ? 26 : 20,
+                height: s.isCurrentUser ? 4 : 3,
+                borderRadius: 1,
+                bgcolor: stroke.color,
+                opacity: stroke.opacity,
+                flexShrink: 0,
+              }}
+            />
+            <Typography
+              sx={{
+                fontSize: '0.75rem',
+                fontWeight: s.isCurrentUser ? 800 : 500,
+                color: s.isCurrentUser ? 'text.primary' : 'text.secondary',
+                opacity: s.isCurrentUser ? 1 : 0.88,
+                lineHeight: 1.2,
+              }}
+            >
+              {s.name}
+              {s.isCurrentUser ? ' (you)' : ''}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+export function ProductivityScoreTrendChart({ data = [], series = null, compareMode = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const gridStroke = isDark ? '#2A2C32' : '#E8E8E8';
   const tickFill = theme.palette.text.primary;
 
+  const isCompare = compareMode && Array.isArray(series) && series.length > 0;
+
   if (!data.length) {
     return (
       <ChartShell
-        title="Your productivity score trend"
-        description="Weighted KPI per sprint (completion, on-time, participation, workload)."
+        title={isCompare ? 'Productivity score comparison' : 'Your productivity score trend'}
+        description={
+          isCompare
+            ? 'Your score vs teammates across sprints (same formula as KPI Analytics).'
+            : 'Weighted KPI per sprint (completion, on-time, participation, workload).'
+        }
       >
         <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
           No sprint activity yet. Complete tasks in a sprint to see your score trend.
@@ -169,12 +337,20 @@ export function ProductivityScoreTrendChart({ data = [] }) {
 
   return (
     <ChartShell
-      title="Your productivity score trend"
-      description="Weighted KPI per sprint (completion, on-time, participation, workload)."
+      title={isCompare ? 'Productivity score comparison' : 'Your productivity score trend'}
+      description={
+        isCompare
+          ? 'Your line in Oracle red (bold); teammates in lighter colors. Hover a sprint to compare scores.'
+          : 'Weighted KPI per sprint (completion, on-time, participation, workload).'
+      }
     >
-      <Box sx={{ width: '100%', height: CHART_H }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 28, right: 16, left: 72, bottom: 52 }}>
+      <Box sx={{ width: '100%' }}>
+        <Box sx={{ width: '100%', height: CHART_H }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={data}
+              margin={{ top: 28, right: 16, left: 72, bottom: isCompare ? 58 : 52 }}
+            >
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="name"
@@ -186,7 +362,7 @@ export function ProductivityScoreTrendChart({ data = [] }) {
               label={{
                 value: 'Sprint',
                 position: 'bottom',
-                offset: 12,
+                offset: isCompare ? 4 : 12,
                 fill: tickFill,
                 fontSize: 12,
                 fontWeight: 700,
@@ -210,26 +386,69 @@ export function ProductivityScoreTrendChart({ data = [] }) {
                 style: { textAnchor: 'middle' },
               }}
             />
-            <Tooltip content={<ProductivityScoreTooltip />} />
-            <Line
-              type="monotone"
-              dataKey="productivityScore"
-              stroke={SCORE_LINE}
-              strokeWidth={3}
-              dot={<ColoredDot />}
-              activeDot={{ r: 7, fill: SCORE_LINE, stroke: SCORE_LINE }}
-            >
-              <LabelList
-                dataKey="productivityScore"
-                position="top"
-                fill={SCORE_LINE}
-                fontSize={11}
-                fontWeight={800}
-                formatter={(v) => formatProductivityScoreDisplay(v)}
-              />
-            </Line>
-          </LineChart>
-        </ResponsiveContainer>
+            {isCompare ? (
+              <>
+                <Tooltip content={<ProductivityCompareTooltip series={series} />} />
+                {compareSeriesRenderOrder(series).map((s) => {
+                  const stroke = compareLineStroke(s, isDark);
+                  return (
+                    <Line
+                      key={s.dataKey}
+                      type="monotone"
+                      dataKey={s.dataKey}
+                      name={s.name}
+                      stroke={stroke.color}
+                      strokeWidth={stroke.width}
+                      strokeOpacity={stroke.opacity}
+                      connectNulls={false}
+                      dot={(dotProps) => {
+                        const val = dotProps.payload?.[s.dataKey];
+                        if (!Number.isFinite(Number(val))) return null;
+                        return (
+                          <CompareLineDot
+                            cx={dotProps.cx}
+                            cy={dotProps.cy}
+                            payload={val}
+                            seriesItem={s}
+                            isDark={isDark}
+                          />
+                        );
+                      }}
+                      activeDot={
+                        s.isCurrentUser
+                          ? { r: 8, stroke: stroke.color, fill: stroke.color, strokeWidth: 2 }
+                          : { r: 4, stroke: stroke.color, fill: stroke.color, strokeOpacity: 0.6 }
+                      }
+                    />
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                <Tooltip content={<ProductivityScoreTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="productivityScore"
+                  stroke={SCORE_LINE}
+                  strokeWidth={3}
+                  dot={<ColoredDot />}
+                  activeDot={{ r: 7, fill: SCORE_LINE, stroke: SCORE_LINE }}
+                >
+                  <LabelList
+                    dataKey="productivityScore"
+                    position="top"
+                    fill={SCORE_LINE}
+                    fontSize={11}
+                    fontWeight={800}
+                    formatter={(v) => formatProductivityScoreDisplay(v)}
+                  />
+                </Line>
+              </>
+            )}
+            </LineChart>
+          </ResponsiveContainer>
+        </Box>
+        {isCompare ? <ProductivityCompareLegend series={series} isDark={isDark} /> : null}
       </Box>
     </ChartShell>
   );

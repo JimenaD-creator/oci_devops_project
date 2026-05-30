@@ -55,4 +55,16 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
                     + "AND t.assignedSprint.assignedProject.id = :projectId")
     List<UserTask> findBlockerReportsByUserIdAndProjectId(
             @Param("userId") Long userId, @Param("projectId") Long projectId);
+
+    /** Open assignments on tasks whose due date is on or before {@code windowEnd} (e.g. now + 72h). */
+    @Query(
+            "SELECT ut FROM UserTask ut "
+                    + "JOIN FETCH ut.user "
+                    + "JOIN FETCH ut.task t "
+                    + "LEFT JOIN FETCH t.assignedSprint s "
+                    + "LEFT JOIN FETCH s.assignedProject p "
+                    + "LEFT JOIN FETCH p.assignedTeam team "
+                    + "LEFT JOIN FETCH team.manager "
+                    + "WHERE t.dueDate IS NOT NULL AND t.dueDate <= :windowEnd")
+    List<UserTask> findAssignmentsDueBefore(@Param("windowEnd") java.time.LocalDateTime windowEnd);
 }

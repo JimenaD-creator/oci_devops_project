@@ -72,6 +72,17 @@ export function productivityScoreFromSprintKpis(kpis) {
  * Participation = worked hours vs estimated hours on assigned tasks.
  * Workload balance uses relative hours share within the sprint (dashboard dev.workload).
  */
+/**
+ * Hours logged vs estimated hours on assigned tasks (20% of individual productivity score).
+ * @returns {number|null} 0–100, or null when there is no estimate to compare against.
+ */
+export function participationRateFromDeveloperHours(hours = 0, assignedHoursEstimate = 0) {
+  const h = Math.max(0, Number(hours) || 0);
+  const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
+  if (estimate <= 0) return h > 0 ? 0 : null;
+  return Math.min(100, Math.round((100 * h) / estimate));
+}
+
 export function productivityScoreFromDeveloperMetrics({
   assigned = 0,
   completed = 0,
@@ -86,8 +97,7 @@ export function productivityScoreFromDeveloperMetrics({
   const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
   const completionRate = a > 0 ? Math.round((100 * c) / a) : 0;
   const onTimeDelivery = typeof onTime === 'number' ? onTime : 0;
-  const teamParticipation =
-    estimate > 0 ? Math.min(100, Math.round((100 * h) / estimate)) : 0;
+  const teamParticipation = participationRateFromDeveloperHours(h, estimate) ?? 0;
   const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(workload) || 0)));
 
   return computeProductivityScore({
