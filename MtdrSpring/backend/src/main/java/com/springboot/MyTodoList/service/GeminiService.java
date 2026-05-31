@@ -14,6 +14,8 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserSprint;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
+import com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil;
+import com.springboot.MyTodoList.util.SprintLiveKpiUtil;
 import com.springboot.MyTodoList.util.UserRoleUtil;
 import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
@@ -200,8 +202,8 @@ public class GeminiService {
                     new IllegalStateException("Sprint has no project assigned"));
             }
 
-            // Refresh KPIs from current tasks so in-progress sprints get a live snapshot (not stale zeros).
-            kpiService.calculateAndSaveKpisForSprint(sprintId);
+            // Same live KPI formula as dashboard / KPI Analytics (not SQL snapshot that can diverge).
+            syncLiveKpisToSprintEntity(sprintId);
             sprint = sprintRepository.findById(sprintId).orElse(sprint);
 
             List<Sprint> historicalSprints = sprintRepository
@@ -953,11 +955,12 @@ public class GeminiService {
     }
 
     private String buildPrompt(Sprint currentSprint, List<Sprint> allSprints, Long sprintId) {
-        double cr  = toPercent(currentSprint.getCompletionRate());
-        double otd = toPercent(currentSprint.getOnTimeDelivery());
-        double tp  = toPercent(currentSprint.getTeamParticipation());
-        double wb  = toPercent(currentSprint.getWorkloadBalance());
-        double ps  = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
+        Map<String, Object> currentLive = resolveLiveKpisForSprint(currentSprint);
+        double cr  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "completionRate");
+        double otd = GeminiInsightKpiAlignUtil.intMetric(currentLive, "onTimeDelivery");
+        double tp  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "teamParticipation");
+        double wb  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "workloadBalance");
+        double ps  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "productivityScore");
 
         String teamWorkloadJson = buildTeamWorkloadJson(sprintId);
         String blockedUserTaskReportsJson = buildBlockedUserTaskReportsJson(sprintId);
@@ -974,21 +977,24 @@ public class GeminiService {
         StringBuilder historyJson = new StringBuilder("[");
         for (int i = 0; i < previousSprints.size(); i++) {
             Sprint s = previousSprints.get(i);
+            Map<String, Object> histLive = resolveLiveKpisForSprint(s);
             if (i > 0) historyJson.append(",");
             historyJson.append(String.format(
                 "{\"sprintId\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f," +
                 "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f}",
                 s.getId(),
-                toPercent(s.getCompletionRate()),
-                toPercent(s.getOnTimeDelivery()),
-                toPercent(s.getTeamParticipation()),
-                toPercent(s.getWorkloadBalance()),
-                computeProductivityScore(s)
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "completionRate"),
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "onTimeDelivery"),
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "teamParticipation"),
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "workloadBalance"),
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "productivityScore")
             ));
         }
         historyJson.append("]");
 
-        String trendHint = detectTrendHint(previousSprints, currentSprint);
+        Long projectId = currentSprint.getAssignedProject() != null
+            ? currentSprint.getAssignedProject().getId() : null;
+        String trendHint = detectTrendHint(previousSprints, currentSprint, projectId);
         String timelineJson = buildSprintTimelineJson(currentSprint);
         String taskStatusJson = buildTaskStatusCountsJson(sprintId);
         Map<String, Long> canonicalTaskCounts = getCanonicalTaskStatusCounts(sprintId);
@@ -1104,27 +1110,35 @@ public class GeminiService {
             "- Do not include any text outside the JSON object";
     }
 
-    private String detectTrendHint(List<Sprint> previous, Sprint current) {
-        if (previous.isEmpty()) return "This is the first sprint — no historical trend available.";
+    private String detectTrendHint(List<Sprint> previous, Sprint current, Long projectId) {
+        if (previous.isEmpty()) {
+            return "This is the first sprint — no historical trend available.";
+        }
 
-        Sprint last = previous.get(0);
-        double currentOtd  = toPercent(current.getOnTimeDelivery());
-        double previousOtd = toPercent(last.getOnTimeDelivery());
-        double drop = previousOtd - currentOtd;
+        Map<String, Object> currentLive = resolveLiveKpisForSprint(current);
+        int currentOtd = GeminiInsightKpiAlignUtil.intMetric(currentLive, "onTimeDelivery");
+        Map<String, Object> lastLive = resolveLiveKpisForSprint(previous.get(0));
+        int previousOtd = GeminiInsightKpiAlignUtil.intMetric(lastLive, "onTimeDelivery");
+        int drop = previousOtd - currentOtd;
 
         List<String> hints = new ArrayList<>();
-        if (drop >= 20) hints.add("On-time delivery dropped " + (int)drop + " points since last sprint.");
-        if (toPercent(current.getWorkloadBalance()) < 70)
+        if (drop >= 20) {
+            hints.add("On-time delivery dropped " + drop + " points since last sprint.");
+        }
+        if (GeminiInsightKpiAlignUtil.intMetric(currentLive, "workloadBalance") < 70) {
             hints.add("Workload balance is below 70%% — tasks may be unevenly distributed.");
-        if (toPercent(current.getCompletionRate()) < 50)
+        }
+        if (GeminiInsightKpiAlignUtil.intMetric(currentLive, "completionRate") < 50) {
             hints.add("Completion rate is below 50%% — team may be overloaded or blocked.");
+        }
 
-        if (previous.size() >= 2) {
-            Sprint secondLast = previous.get(1);
-            double otd2 = toPercent(secondLast.getOnTimeDelivery());
-            if (previousOtd < otd2 && currentOtd < previousOtd) {
+        if (projectId != null) {
+            List<Integer> chronoOtd = getLiveOnTimeSeriesChronological(projectId, current.getId());
+            if (GeminiInsightKpiAlignUtil.onTimeDeclinedThreeConsecutiveSprints(chronoOtd)
+                && chronoOtd.size() >= 3) {
+                int n = chronoOtd.size();
                 hints.add("On-time delivery has declined for 3 consecutive sprints: "
-                    + (int)otd2 + " → " + (int)previousOtd + " → " + (int)currentOtd + "%%.");
+                    + chronoOtd.get(n - 3) + " → " + chronoOtd.get(n - 2) + " → " + chronoOtd.get(n - 1) + "%.");
             }
         }
 
@@ -1243,6 +1257,7 @@ public class GeminiService {
         }
         ObjectNode copy = ((ObjectNode) enriched).deepCopy();
         syncDeveloperInsightNarrativesFromLiveWorkload(copy, sprintId);
+        alignPersistedInsightsWithLiveKpis(copy, sprintId);
         Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
         ensureWorkloadGuidanceFromAssignments(copy, sprintId, sprint);
         return copy;
@@ -1281,6 +1296,7 @@ public class GeminiService {
             normalizeKpiManagerGuideProductivityScore(root, sprintId);
             pruneInvalidWorkloadRecommendations(root, sprintId);
             prettifyHumanProseInInsights(root);
+            alignPersistedInsightsWithLiveKpis(root, sprintId);
             return root;
         } catch (Exception e) {
             System.err.println("[GeminiService] enrichInsightsForResponseUncached: " + e.getMessage());
@@ -1553,11 +1569,12 @@ public class GeminiService {
         if (sprint == null) {
             return;
         }
-        int cr = (int) Math.round(toPercent(sprint.getCompletionRate()));
-        int otd = (int) Math.round(toPercent(sprint.getOnTimeDelivery()));
-        int tp = (int) Math.round(toPercent(sprint.getTeamParticipation()));
-        int wb = (int) Math.round(toPercent(sprint.getWorkloadBalance()));
-        int ps = (int) Math.round(computeProductivityScore(sprint));
+        Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+        int cr = GeminiInsightKpiAlignUtil.intMetric(live, "completionRate");
+        int otd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
+        int tp = GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation");
+        int wb = GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance");
+        int ps = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
 
         ObjectNode guide = mapper.createObjectNode();
         guide.put("intro", "Summary from current sprint KPI scores for this sprint.");
@@ -3156,8 +3173,8 @@ public class GeminiService {
         }
         double sprintWb = -1.0;
         Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
-        if (sprint != null && sprint.getWorkloadBalance() != null) {
-            sprintWb = toPercent(sprint.getWorkloadBalance());
+        if (sprint != null) {
+            sprintWb = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "workloadBalance");
         }
         ArrayNode in = (ArrayNode) alertsNode;
         ArrayNode out = mapper.createArrayNode();
@@ -3199,10 +3216,10 @@ public class GeminiService {
      */
     private void normalizeKpiManagerGuideWorkloadBalance(ObjectNode root, Long sprintId) {
         Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
-        if (sprint == null || sprint.getWorkloadBalance() == null) {
+        if (sprint == null) {
             return;
         }
-        double wb = toPercent(sprint.getWorkloadBalance());
+        double wb = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "workloadBalance");
         if (wb < 70.0) {
             return;
         }
@@ -3247,7 +3264,7 @@ public class GeminiService {
         if (sprint == null) {
             return;
         }
-        int ps = (int) Math.round(computeProductivityScore(sprint));
+        int ps = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "productivityScore");
         JsonNode guideNode = root.get("kpiManagerGuide");
         if (guideNode == null || !guideNode.isObject()) {
             return;
@@ -3373,6 +3390,187 @@ public class GeminiService {
             for (JsonNode el : node) {
                 prettifyHumanProseInInsights(el);
             }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LIVE KPIs (dashboard / KPI Analytics parity)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private Map<String, Object> resolveLiveKpisForSprint(Sprint sprint) {
+        if (sprint == null || sprint.getId() == null) {
+            return Map.of();
+        }
+        List<Task> tasks = taskRepository.findByAssignedSprintId(sprint.getId());
+        List<UserTask> assignments = userTaskRepository.findBySprintIdWithUserAndTask(sprint.getId());
+        return SprintLiveKpiUtil.computeLiveKpis(sprint, tasks, assignments);
+    }
+
+    private void syncLiveKpisToSprintEntity(Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+        sprint.setCompletionRate(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "completionRate")));
+        sprint.setOnTimeDelivery(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery")));
+        sprint.setTeamParticipation(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation")));
+        sprintRepository.save(sprint);
+    }
+
+    private List<Integer> getLiveOnTimeSeriesChronological(Long projectId, Long currentSprintId) {
+        List<Integer> out = new ArrayList<>();
+        if (projectId == null || currentSprintId == null) {
+            return out;
+        }
+        List<Sprint> ordered = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+        for (Sprint s : ordered) {
+            out.add(GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(s), "onTimeDelivery"));
+            if (currentSprintId.equals(s.getId())) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
+     * On every GET/generate enrich: alert values, manager guide, and executive summary match live KPI cards.
+     */
+    private void alignPersistedInsightsWithLiveKpis(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+        Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
+        List<Integer> chronoOtd = getLiveOnTimeSeriesChronological(projectId, sprintId);
+
+        alignAlertsWithLiveKpis(root, live, chronoOtd);
+        alignExecutiveSummaryWithLiveKpis(root, live, chronoOtd);
+        alignKpiManagerGuideWithLiveKpis(root, live);
+        alignProductivityPredictionWithLiveKpis(root, live);
+
+        if (root.path("summary").isTextual()) {
+            String summary = root.get("summary").asText("");
+            summary = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(summary, live);
+            summary = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(summary, chronoOtd);
+            root.put("summary", summary);
+        }
+    }
+
+    private void alignAlertsWithLiveKpis(ObjectNode root, Map<String, Object> live, List<Integer> chronoOtd) {
+        JsonNode alertsNode = root.get("alerts");
+        if (alertsNode == null || !alertsNode.isArray()) {
+            return;
+        }
+        ArrayNode in = (ArrayNode) alertsNode;
+        ArrayNode out = mapper.createArrayNode();
+        for (int i = 0; i < in.size(); i++) {
+            JsonNode item = in.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpiRaw = o.path("kpi").asText("").trim();
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            String message = o.path("message").asText("");
+            if (GeminiInsightKpiAlignUtil.alertContradictsLiveOnTimeTrend(message, chronoOtd)) {
+                continue;
+            }
+            int liveVal = liveValueForAlertKpi(kpi, live);
+            if (liveVal >= 0) {
+                o.put("value", liveVal);
+            }
+            if (!message.isBlank()) {
+                String aligned = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(message, live);
+                aligned = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(aligned, chronoOtd);
+                o.put("message", aligned);
+            }
+            out.add(o);
+        }
+        root.set("alerts", out);
+    }
+
+    private static int liveValueForAlertKpi(String kpi, Map<String, Object> live) {
+        if ("completionrate".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "completionRate");
+        }
+        if ("ontimedelivery".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
+        }
+        if ("teamparticipation".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation");
+        }
+        if ("workloadbalance".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance");
+        }
+        if ("productivityscore".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
+        }
+        return -1;
+    }
+
+    private void alignExecutiveSummaryWithLiveKpis(
+            ObjectNode root, Map<String, Object> live, List<Integer> chronoOtd) {
+        JsonNode esNode = root.get("executiveSummary");
+        if (esNode == null || !esNode.isObject()) {
+            return;
+        }
+        ObjectNode es = (ObjectNode) esNode;
+        for (String field : List.of("overview", "trends", "improvementAreas", "nextSteps")) {
+            if (!es.path(field).isTextual()) {
+                continue;
+            }
+            String text = es.get(field).asText("");
+            text = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(text, live);
+            text = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(text, chronoOtd);
+            es.put(field, text);
+        }
+    }
+
+    private void alignKpiManagerGuideWithLiveKpis(ObjectNode root, Map<String, Object> live) {
+        JsonNode guideNode = root.get("kpiManagerGuide");
+        if (guideNode == null || !guideNode.isObject()) {
+            return;
+        }
+        ObjectNode guide = (ObjectNode) guideNode;
+        if (guide.path("intro").isTextual()) {
+            guide.put("intro", GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(guide.get("intro").asText(), live));
+        }
+        JsonNode byMetricNode = guide.get("byMetric");
+        if (byMetricNode == null || !byMetricNode.isObject()) {
+            return;
+        }
+        ObjectNode byMetric = (ObjectNode) byMetricNode;
+        for (String key : List.of(
+            "completionRate", "onTimeDelivery", "teamParticipation", "workloadBalance", "productivityScore")) {
+            if (!byMetric.path(key).isTextual()) {
+                continue;
+            }
+            String text = byMetric.get(key).asText("");
+            text = GeminiInsightKpiAlignUtil.alignMetricPercentInProse(
+                text, key, GeminiInsightKpiAlignUtil.intMetric(live, key));
+            byMetric.put(key, GeminiInsightKpiAlignUtil.fixGluedPercentSpacing(text));
+        }
+    }
+
+    private void alignProductivityPredictionWithLiveKpis(ObjectNode root, Map<String, Object> live) {
+        JsonNode predNode = root.get("productivityPrediction");
+        if (predNode == null || !predNode.isObject()) {
+            return;
+        }
+        ObjectNode pred = (ObjectNode) predNode;
+        int livePs = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
+        if (pred.has("predictedScore") && pred.get("predictedScore").isNumber()) {
+            int stored = pred.get("predictedScore").asInt();
+            if (Math.abs(stored - livePs) > 15) {
+                pred.put("predictedScore", livePs);
+            }
+        }
+        if (pred.path("reasoning").isTextual()) {
+            pred.put(
+                "reasoning",
+                GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(pred.get("reasoning").asText(), live));
         }
     }
 

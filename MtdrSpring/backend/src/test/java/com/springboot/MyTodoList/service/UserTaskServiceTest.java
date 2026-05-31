@@ -222,6 +222,7 @@ class UserTaskServiceTest {
     void reopenMyAssignment_resetsStatusAndClearsBlock() {
         UserTask mine = assignment(user(4L, "Dev"), 30L);
         mine.setStatus("DONE");
+        mine.setWorkedHours(6.0);
         mine.setIsBlocked(true);
         mine.setBlockedReason("waiting");
         when(userTaskRepository.findByTask_Id(30L)).thenReturn(List.of(mine));
@@ -230,6 +231,7 @@ class UserTaskServiceTest {
         assertTrue(userTaskService.reopenMyAssignment(4L, 30L));
 
         assertEquals("TODO", mine.getStatus());
+        assertEquals(0.0, mine.getWorkedHours(), 0.001);
         assertEquals(false, mine.getIsBlocked());
         assertEquals(null, mine.getBlockedReason());
         verify(taskAssignmentSyncService).syncTaskStatusFromAssignments(30L);

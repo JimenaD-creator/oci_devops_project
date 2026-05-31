@@ -32,6 +32,8 @@ import {
   clampTrendsPercentLikeValues,
   alignKpiMetricsInText,
   alignKpiProseForMetric,
+  stripContradictoryOnTimeDecline,
+  reconcileOnTimeDeliveryConcernProse,
   alignProductivityScoreProse,
 } from './aiInsightsConstants';
 
@@ -81,6 +83,16 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
     }
   }
   messageText = alignAlertMessagePercent(messageText, effectiveAlertValue);
+  if (currentSprintMetrics?.onTimeDelivery != null) {
+    messageText = stripContradictoryOnTimeDecline(
+      messageText,
+      currentSprintMetrics.onTimeDelivery,
+    );
+    messageText = reconcileOnTimeDeliveryConcernProse(
+      messageText,
+      currentSprintMetrics.onTimeDelivery,
+    );
+  }
   const valueIsPercentKpi = KPI_ALERT_PERCENT_KEYS.has(kpiKey);
   return (
     <Box
@@ -389,9 +401,15 @@ export function ExecutiveSummaryBlock({
     if (!raw) return null;
     const clamped = clampTrendsPercentLikeValues(raw);
     const withKpis = alignKpiMetricsInText(clamped, alignedMetrics);
-    return currentSprintActualScore != null
-      ? alignProductivityScoreProse(withKpis, currentSprintActualScore)
-      : withKpis;
+    let out =
+      currentSprintActualScore != null
+        ? alignProductivityScoreProse(withKpis, currentSprintActualScore)
+        : withKpis;
+    if (alignedMetrics?.onTimeDelivery != null) {
+      out = stripContradictoryOnTimeDecline(out, alignedMetrics.onTimeDelivery);
+      out = reconcileOnTimeDeliveryConcernProse(out, alignedMetrics.onTimeDelivery);
+    }
+    return out;
   };
   const trendsText = alignEsBlock(es?.trends);
   const overviewText = alignEsBlock(es?.overview);

@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -119,6 +121,32 @@ class UserTaskControllerTest {
         when(userTaskRepository.findByProjectIdWithUserAndTask(5L)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/user-tasks").param("projectId", "5")).andExpect(status().isOk());
+    }
+
+    @Test
+    void createUserTask_reopenFromCompleted_clearsWorkedHours() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        Task task = new Task();
+        task.setId(2L);
+        UserTask existing = new UserTask(user, task);
+        existing.setStatus("COMPLETED");
+        existing.setWorkedHours(5.0);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(taskRepository.findById(2L)).thenReturn(Optional.of(task));
+        when(userTaskRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/user-tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":1,\"taskId\":2,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UserTask> captor = ArgumentCaptor.forClass(UserTask.class);
+        verify(userTaskRepository).save(captor.capture());
+        assertEquals(0.0, captor.getValue().getWorkedHours(), 0.001);
+        assertEquals("IN_PROGRESS", captor.getValue().getStatus());
     }
 
     @Test

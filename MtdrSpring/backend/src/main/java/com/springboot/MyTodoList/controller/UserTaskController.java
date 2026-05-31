@@ -143,20 +143,26 @@ public class UserTaskController {
         UserTask userTask = userTaskRepository.findById(id)
                 .orElseGet(() -> new UserTask(user, task));
 
+        String newStatus = status != null ? status.toUpperCase() : "TODO";
+        boolean wasDone = userTask.isCompletedAssignment();
+        userTask.setStatus(newStatus);
+        boolean nowDone = userTask.isCompletedAssignment();
+
         /*
-         * UI often sends only { userId, taskId, status } when marking an assignee complete.
-         * Do not default workedHours to 0 — that wiped WORKED_HOURS. Only overwrite when the client sends the field.
+         * Reopening (COMPLETED → other): clear hours so the next completion logs a fresh total.
+         * Completing without workedHours in payload: keep existing total (setStatus does not clear).
          */
         double hoursToSave;
-        if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
-            hoursToSave = ((Number) payload.get("workedHours")).doubleValue();
+        if (!nowDone && wasDone) {
+            hoursToSave = 0.0;
+        } else if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
+            hoursToSave = Math.max(0.0, ((Number) payload.get("workedHours")).doubleValue());
         } else if (userTask.getWorkedHours() != null) {
             hoursToSave = userTask.getWorkedHours();
         } else {
             hoursToSave = 0.0;
         }
 
-        userTask.setStatus(status != null ? status.toUpperCase() : "TODO");
         userTask.setWorkedHours(hoursToSave);
 
         UserTask saved = userTaskRepository.save(userTask);

@@ -199,7 +199,17 @@ export function patchUserTasksAfterTaskSave(prevUserTasks, updated, meta, projec
 
   if (meta.syncAssignmentStatuses && meta.assignmentStatus != null) {
     const st = meta.assignmentStatus;
-    return prevUserTasks.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut));
+    const nowComplete = isUserTaskAssigneeComplete({ status: st });
+    return prevUserTasks.map((ut) => {
+      if (userTaskRowTaskId(ut) !== tid) return ut;
+      const next = { ...ut, status: st };
+      if (!nowComplete && isUserTaskAssigneeComplete(ut)) {
+        next.workedHours = 0;
+        next.worked_hours = 0;
+        next.hours = 0;
+      }
+      return next;
+    });
   }
 
   return prevUserTasks;

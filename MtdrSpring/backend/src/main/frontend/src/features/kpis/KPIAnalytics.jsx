@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -25,6 +25,11 @@ import {
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  filterTasksForKpiSprints,
+  pickProjectSprintsForKpi,
+  resolveKpiProjectId,
+} from './kpiAnalyticsProjectData';
 import { fetchSprintInsights } from '../ai/insightsApi';
 import {
   SECTION_BRAND_DARK,
@@ -241,7 +246,12 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
-  const { sprints: sharedSprints, loading: sharedLoading, getRawBundle } = useProjectData();
+  const {
+    sprints: sharedSprints,
+    ensureLoaded,
+    getRawBundle,
+    getCachedSnapshot,
+  } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -250,6 +260,8 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
   const [managerGuideLoading, setManagerGuideLoading] = useState(false);
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
   const [kpiDataReady, setKpiDataReady] = useState(false);
+  const sharedSprintsRef = useRef(sharedSprints);
+  sharedSprintsRef.current = sharedSprints;
 
   /** Sprint 0, 1, 2… (same labels as dashboard). */
   const getSprintLabel = useCallback((sprintId) => {
@@ -298,60 +310,79 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     };
   }, [selectedSprintId, loading, kpiDataReady]);
 
-  const syncKpiFromShared = useCallback(async () => {
-    const pid =
-      projectId != null && String(projectId).trim() !== ''
-        ? String(projectId).trim()
-        : typeof localStorage !== 'undefined'
-          ? String(localStorage.getItem('currentProjectId') || '').trim()
-          : '';
+  const applyKpiBundle = useCallback((snap, pid, contextSprints = []) => {
+    const sprintsData = pickProjectSprintsForKpi(snap?.enrichedSprints, contextSprints, pid);
+    const tasksData = filterTasksForKpiSprints(
+      Array.isArray(snap?.tasks) ? snap.tasks : [],
+      sprintsData,
+    );
+    setSprints(sprintsData);
+    setTasks(tasksData);
+    setSelectedSprintId((prev) => {
+      if (sprintsData.length === 0) return null;
+      if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
+      const defaultSprint = pickDefaultSelectedSprint(sprintsData);
+      return defaultSprint?.id ?? sprintsData[0]?.id ?? null;
+    });
+    return sprintsData.length > 0;
+  }, []);
+
+  const loadKpiData = useCallback(async () => {
+    const pid = resolveKpiProjectId(projectId);
     if (!pid) {
       setSprints([]);
       setTasks([]);
+      setSelectedSprintId(null);
       setLoading(false);
       setKpiDataReady(true);
       return;
     }
-    setLoading(sharedLoading);
+
+    setLoading(true);
     setKpiDataReady(false);
     try {
-      const { tasks: tasksDataRaw } = await getRawBundle();
-      let sprintsData = Array.isArray(sharedSprints) ? sharedSprints : [];
-      let tasksData = Array.isArray(tasksDataRaw) ? tasksDataRaw : [];
+      await ensureLoaded({ silent: false });
+      await getRawBundle();
+      let snap = getCachedSnapshot();
+      let hasSprints = applyKpiBundle(snap, pid, sharedSprintsRef.current);
 
-      sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
-      const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
-      tasksData = tasksData.filter((t) => {
-        const sid = taskSprintId(t);
-        return sid != null && sprintIds.has(sid);
-      });
-
-      setSprints(sprintsData);
-      setTasks(tasksData);
-      setSelectedSprintId((prev) => {
-        if (sprintsData.length === 0) return null;
-        if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
-        const defaultSprint = pickDefaultSelectedSprint(sprintsData);
-        return defaultSprint?.id ?? sprintsData[0]?.id ?? null;
-      });
+      if (!hasSprints) {
+        await getRawBundle({ forceFresh: true });
+        snap = getCachedSnapshot();
+        applyKpiBundle(snap, pid, sharedSprintsRef.current);
+      }
     } catch (error) {
       console.error('Error loading KPI data:', error);
       setSprints([]);
       setTasks([]);
+      setSelectedSprintId(null);
     } finally {
       setLoading(false);
       setKpiDataReady(true);
     }
-  }, [projectId, sharedSprints, sharedLoading, getRawBundle]);
+  }, [projectId, ensureLoaded, getRawBundle, getCachedSnapshot, applyKpiBundle]);
 
   useEffect(() => {
-    if (sharedLoading && sharedSprints.length === 0) {
-      setLoading(true);
-      setKpiDataReady(false);
-      return;
-    }
-    syncKpiFromShared();
-  }, [syncKpiFromShared, sharedLoading, projectId, sharedSprints]);
+    loadKpiData();
+  }, [loadKpiData]);
+
+  /** Context filled after first paint: refill once without forcing another full-page load cycle. */
+  useEffect(() => {
+    if (!kpiDataReady || loading || sprints.length > 0) return;
+    if (!Array.isArray(sharedSprints) || sharedSprints.length === 0) return;
+    const pid = resolveKpiProjectId(projectId);
+    if (!pid) return;
+    const snap = getCachedSnapshot();
+    applyKpiBundle(snap, pid, sharedSprints);
+  }, [
+    kpiDataReady,
+    loading,
+    sprints.length,
+    sharedSprints,
+    projectId,
+    getCachedSnapshot,
+    applyKpiBundle,
+  ]);
 
   const getSelectedSprint = () => sprints.find((s) => s.id === selectedSprintId);
 
@@ -400,8 +431,9 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
 
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
-  /** KPI cards need at least one sprint and one task; otherwise show full-page empty state. */
-  const shouldShowEmptyKpiView = sprints.length === 0 || tasks.length === 0;
+  /** After a finished load: need at least one sprint and one task in that project. */
+  const shouldShowEmptyKpiView =
+    kpiDataReady && !loading && (sprints.length === 0 || tasks.length === 0);
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
   const assignedTotalInSprint = kpis.totalTasks;
   const completedTotalInSprint = kpis.completedTasks;
@@ -484,7 +516,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     };
   }, [currentSprint, sprints, kpis.productivityScore, getSprintLabel]);
 
-  if (loading) return <PageLoadingSpinner />;
+  if (loading || !kpiDataReady) return <PageLoadingSpinner />;
 
   if (shouldShowEmptyKpiView) {
     return (

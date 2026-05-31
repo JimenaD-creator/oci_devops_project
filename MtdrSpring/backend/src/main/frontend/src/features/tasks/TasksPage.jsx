@@ -346,8 +346,18 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       );
       if (assignees.length > 0) {
         const utStatus = userTaskStatusFor(status);
+        const leavingDone = canonical !== 'DONE';
         setUserTasks((prev) =>
-          prev.map((row) => (userTaskRowTaskId(row) === tid ? { ...row, status: utStatus } : row)),
+          prev.map((row) => {
+            if (userTaskRowTaskId(row) !== tid) return row;
+            const next = { ...row, status: utStatus };
+            if (leavingDone && isUserTaskAssigneeComplete(row)) {
+              next.workedHours = 0;
+              next.worked_hours = 0;
+              next.hours = 0;
+            }
+            return next;
+          }),
         );
       }
     };

@@ -259,7 +259,11 @@ export function alignAlertLoosePercents(text, actualPercent) {
   out = out.replace(/\bcurrently\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `currently at ${display}`);
   out = out.replace(/\bnow\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `now at ${display}`);
   out = out.replace(/\bstands\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `stands at ${display}`);
-  return out;
+  out = out.replace(/\bhaving\s+dropped\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `which is at ${display}`);
+  out = out.replace(/\bhaving\s+fallen\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `which is at ${display}`);
+  out = out.replace(/\bdropped\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `is at ${display}`);
+  out = out.replace(/\bfell\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `is at ${display}`);
+  return fixHavingIsAtGrammar(out);
 }
 
 /** Fixes "0%as" → "0% as" after KPI % alignment (regex consumed optional %). */
@@ -328,7 +332,60 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   if (metricKey === 'productivityScore') {
     out = alignProductivityScoreProse(out, actual);
   }
+  if (metricKey === 'onTimeDelivery' && metrics.onTimeDelivery != null) {
+    out = reconcileOnTimeDeliveryConcernProse(out, metrics.onTimeDelivery);
+  }
   return out;
+}
+
+const ON_TIME_DECLINE_CLAIM_RE =
+  /declined|declining|dropped|fell|decreased|reduced|worsened|declined\s+for\s+\d+\s+consecutive/i;
+
+/**
+ * Drops on-time "decline" sentences when the live KPI card shows strong delivery (e.g. 100%).
+ */
+/** Fixes "having is at" after aligning "dropped to" inside "having dropped to". */
+export function fixHavingIsAtGrammar(text) {
+  if (text == null) return text;
+  return String(text).replace(/\bhaving\s+is\s+at\b/gi, 'which is at');
+}
+
+/**
+ * On-time ≥ 70% should not be called the "primary concern".
+ */
+export function reconcileOnTimeDeliveryConcernProse(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return fixHavingIsAtGrammar(text);
+  const otd = Number(onTimePercent);
+  let out = fixHavingIsAtGrammar(text);
+  if (otd < 70 || !/on[- ]?time/i.test(out)) return out;
+  const primaryClause =
+    /on[- ]?time\s+delivery\s+is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at|currently\s+at|now\s+at|stands\s+at)?\s*\d+(?:\.\d+)?\s*%\.?\s*/i;
+  if (primaryClause.test(out)) {
+    out = out.replace(
+      primaryClause,
+      `On-Time Delivery is at ${Math.round(otd)}% on completed work. `,
+    );
+  } else if (/primary\s+concern/i.test(out)) {
+    out = out.replace(
+      /is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at)?\s*\d+(?:\.\d+)?\s*%/gi,
+      `is at ${Math.round(otd)}% on completed work`,
+    );
+  }
+  return out.trim();
+}
+
+export function stripContradictoryOnTimeDecline(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return text;
+  const otd = Number(onTimePercent);
+  if (!ON_TIME_DECLINE_CLAIM_RE.test(text)) return text;
+  if (otd < 70) return text;
+  const sentences = String(text).split(/(?<=[.!?])\s+/);
+  const kept = sentences.filter((s) => {
+    if (!ON_TIME_DECLINE_CLAIM_RE.test(s)) return true;
+    return !/on[- ]?time|delivery|consecutive/i.test(s);
+  });
+  const joined = kept.join(' ').trim();
+  return joined || text;
 }
 
 /** Placeholder / invalid assignee names — not valid redistribution targets. */

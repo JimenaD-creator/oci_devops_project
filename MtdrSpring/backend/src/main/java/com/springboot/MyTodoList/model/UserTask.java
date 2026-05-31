@@ -92,6 +92,7 @@ public class UserTask {
             this.blockedReason = null;
         } else if (!nowDone && wasDone) {
             this.completedAt = null;
+            this.workedHours = 0.0;
         } else if (nowDone) {
             this.isBlocked = false;
             this.blockedReason = null;

@@ -4,6 +4,8 @@ import {
   alignKpiMetricsInText,
   alignKpiProseForMetric,
   alignSingleMetricBlock,
+  stripContradictoryOnTimeDecline,
+  reconcileOnTimeDeliveryConcernProse,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -55,5 +57,23 @@ describe('aiInsightsConstants KPI alignment', () => {
     const out = alignSingleMetricBlock(text, 'workloadBalance', 97);
     expect(out).toContain('workload balance score of 97%');
     expect(out).not.toContain('96%');
+  });
+
+  it('reconcileOnTimeDeliveryConcernProse removes primary concern at 100%', () => {
+    const text =
+      'On-Time Delivery is the primary concern, having is at 100%. Prioritizing blocked tasks is essential.';
+    const out = reconcileOnTimeDeliveryConcernProse(text, 100);
+    expect(out.toLowerCase()).not.toContain('primary concern');
+    expect(out).not.toContain('having is at');
+    expect(out).toContain('100%');
+    expect(out).toContain('blocked tasks');
+  });
+
+  it('stripContradictoryOnTimeDecline removes false decline at 100%', () => {
+    const text =
+      'On-Time Delivery has declined for three consecutive sprints, currently at 100%. Focus on tasks.';
+    const out = stripContradictoryOnTimeDecline(text, 100);
+    expect(out.toLowerCase()).not.toContain('declined');
+    expect(out).toContain('Focus on tasks');
   });
 });
