@@ -75,8 +75,9 @@ export default function DeveloperMetricCards({ metrics = [] }) {
         const topBorderColor = accent.main;
         const iconBg = isDark ? alpha(accent.main, 0.18) : accent.light;
         const iconColor = isDark ? accent.light : accent.label;
-        const labelColor = isDark ? accent.light : accent.label;
-        const trackBg = isDark ? 'rgba(255,255,255,0.10)' : alpha(accent.main, 0.15);
+const labelColor = isDark ? alpha(accent.light, 0.95) : accent.label;
+        const trackBg = isDark ? 'rgba(255,255,255,0.14)' : alpha(accent.main, 0.15);
+
 
         return (
           <Grid item xs={12} sm={6} md={3} key={m.label}>
@@ -86,9 +87,9 @@ export default function DeveloperMetricCards({ metrics = [] }) {
                 p: 2,
                 height: '100%',
                 borderRadius: 3,
-                border: `0.5px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+                border: `0.5px solid ${isDark ? '#3A3C42' : '#ECECEC'}`,
                 borderTop: `3px solid ${topBorderColor}`,
-                bgcolor: 'background.paper',
+                bgcolor: isDark ? '#1E2025' : 'background.paper',
               }}
             >
               {/* Icon chip */}
