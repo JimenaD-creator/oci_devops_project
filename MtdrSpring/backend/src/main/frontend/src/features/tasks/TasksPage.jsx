@@ -25,7 +25,7 @@ import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
-import { developerNumericId, finiteUserIds } from '../../utils/userIds';
+import { developerNumericId } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -42,19 +42,9 @@ import {
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { useProjectData } from '../../contexts/ProjectDataContext';
-import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
-import {
-  applyRecentUpdatesToTaskLists,
-  getRecentlyCreatedTasks,
-  getRecentlyCreatedUserTasks,
-  mergeUserTaskLists,
-  TASKS_MUTATED_EVENT,
-  getRecentlyDeletedTaskIdSet,
-  notifyTasksMutated,
-} from '../../utils/taskSyncEvents';
 
 export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
@@ -79,24 +69,27 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [taskForDetailDialog, setTaskForDetailDialog] = useState(null);
   const recentlyDeletedTaskIdsRef = useRef(new Set());
-  const projectDevelopersRef = useRef(projectDevelopers);
-  projectDevelopersRef.current = projectDevelopers;
-  const { invalidateAndRefresh } = useProjectData();
 
+  // Función para obtener el número secuencial de un sprint
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
-    const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
-    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
-    return index >= 0 ? index : sprintId;
+    const sortedSprints = [...sprintsList].sort((a, b) => a.id - b.id);
+    const index = sortedSprints.findIndex(s => s.id === sprintId);
+    return index >= 0 ? index + 1 : sprintId;
   }, []);
 
-  const getSprintLabel = useCallback(
-    (sprintId, sprintsList) => {
-      if (sprintId == null) return '';
-      const sprintNum = getSprintNumber(sprintId, sprintsList);
-      return `Sprint ${sprintNum}`;
-    },
-    [getSprintNumber],
-  );
+  // Función para obtener la etiqueta formateada del sprint
+  const getSprintLabel = useCallback((sprintId, sprintsList) => {
+    if (sprintId == null) return '';
+    const sprintNum = getSprintNumber(sprintId, sprintsList);
+    return `Sprint ${sprintNum}`;
+  }, [getSprintNumber]);
+
+  // Placeholder function for invalidateAndRefresh - needs to be defined or imported
+  const invalidateAndRefresh = useCallback(async () => {
+    // This function should be implemented based on your cache invalidation strategy
+    // For now, it's a placeholder that resolves immediately
+    return Promise.resolve();
+  }, []);
 
   const loadData = useCallback(
     async (opts = {}) => {
@@ -116,44 +109,23 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             forceFresh: forceRefresh,
           },
         );
-        const deleted = new Set([
-          ...recentlyDeletedTaskIdsRef.current,
-          ...getRecentlyDeletedTaskIdSet(),
-        ]);
-        const createdTasks = getRecentlyCreatedTasks();
-        const baseTasks = Array.isArray(tasksData) ? tasksData : [];
-        const mergedTasks = [...createdTasks, ...baseTasks].filter(
-          (task, index, arr) =>
-            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
-        );
-        const visibleTasks = mergedTasks.filter(
+        const deleted = recentlyDeletedTaskIdsRef.current;
+        const visibleTasks = (Array.isArray(tasksData) ? tasksData : []).filter(
           (t) => !deleted.has(taskEntityId(t)),
         );
-        const visibleUserTasks = mergeUserTaskLists(
-          getRecentlyCreatedUserTasks(),
-          Array.isArray(userTasksData) ? userTasksData : [],
-        ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
-        const synced = applyRecentUpdatesToTaskLists(
-          visibleTasks,
-          visibleUserTasks,
-          projectDevelopersRef.current,
+        const visibleUserTasks = (Array.isArray(userTasksData) ? userTasksData : []).filter(
+          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
         );
-        setRawTasks(synced.tasks);
+        setRawTasks(visibleTasks);
         setSprints(Array.isArray(sprintsData) ? sprintsData : []);
-        setUserTasks(synced.userTasks);
+        setUserTasks(visibleUserTasks);
       } catch (error) {
         console.error('Error loading tasks data:', error);
         setRawTasks([]);
         setSprints([]);
         setUserTasks([]);
-        if (!silent) {
-          setLoadError(
-            resolveLoadErrorMessage(
-              error,
-              'Could not load tasks. Check that the server is running and try again.',
-            ),
-          );
-        }
+        if (!silent)
+          setLoadError('Could not load tasks. Check that the server is running and try again.');
       } finally {
         if (!silent) setIsLoading(false);
       }
@@ -163,56 +135,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
-
-  useEffect(() => {
-    if (!taskDetailOpen || !taskForDetailDialog?.id) return;
-    const fresh = rawTasks.find((t) => Number(t.id) === Number(taskForDetailDialog.id));
-    if (fresh) setTaskForDetailDialog(fresh);
-  }, [rawTasks, taskForDetailDialog?.id, taskDetailOpen]);
-
-  useEffect(() => {
-    const onTasksMutated = (event) => {
-      if (event?.detail?.source === 'tasks-page') return;
-      if (event?.detail?.type === 'task-created' && event?.detail?.task) {
-        const created = event.detail.task;
-        setRawTasks((prev) => {
-          const exists = prev.some((t) => Number(t.id) === Number(created?.id));
-          return exists ? prev : [created, ...prev];
-        });
-        const rows = Array.isArray(event.detail.userTasks) ? event.detail.userTasks : [];
-        if (rows.length > 0) {
-          setUserTasks((prev) => mergeUserTaskLists(rows, prev));
-        }
-      }
-      if (event?.detail?.type === 'task-updated' && event?.detail?.task) {
-        const updated = event.detail.task;
-        const meta = event.detail.meta;
-        setRawTasks((prev) => mergeUpdatedTask(prev, updated));
-        setUserTasks((prev) =>
-          patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
-        );
-        setTaskForDetailDialog((prev) =>
-          prev && Number(prev.id) === Number(updated.id) ? { ...prev, ...updated } : prev,
-        );
-      }
-      if (event?.detail?.type === 'task-deleted' && event?.detail?.taskId != null) {
-        const tid = String(event.detail.taskId);
-        recentlyDeletedTaskIdsRef.current.add(tid);
-        setRawTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
-        setUserTasks((prev) =>
-          prev.filter((ut) => {
-            const utTid = userTaskRowTaskId(ut);
-            return !Number.isFinite(utTid) || String(utTid) !== tid;
-          }),
-        );
-      }
-      loadData({ silent: true }).catch((e) => {
-        console.error('TasksPage sync refresh failed:', e);
-      });
-    };
-    window.addEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
-    return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
   }, [loadData]);
 
   useEffect(() => {
@@ -315,128 +237,75 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   }, [developerFilter, developerFilterOptions]);
 
   const handleStatusChange = async (taskId, newStatus) => {
-    const tid = Number(taskId);
-    const task = rawTasks.find((t) => Number(t.id) === tid);
+    const task = rawTasks.find((t) => t.id === taskId);
     if (!task) return;
-
-    const assignees = userTasks.filter((ut) => userTaskRowTaskId(ut) === tid);
-    const ns = normalizeTaskStatus(newStatus);
-    const previousTaskStatus = task.status;
-    const assigneeSnapshot = assignees.map((ut) => ({ ...ut }));
-
-    const userTaskStatusFor = (status) => {
-      const canonical = normalizeTaskStatus(status);
-      return canonical === 'DONE' ? 'COMPLETED' : canonical;
-    };
-
-    const applyOptimistic = (status) => {
-      const canonical = normalizeTaskStatus(status);
-      setRawTasks((prev) =>
-        prev.map((t) => (Number(t.id) === tid ? { ...t, status: canonical } : t)),
-      );
-      if (assignees.length > 0) {
-        const utStatus = userTaskStatusFor(status);
-        setUserTasks((prev) =>
-          prev.map((row) => (userTaskRowTaskId(row) === tid ? { ...row, status: utStatus } : row)),
-        );
-      }
-    };
-
-    const rollbackOptimistic = () => {
-      setRawTasks((prev) =>
-        prev.map((t) => (Number(t.id) === tid ? { ...t, status: previousTaskStatus } : t)),
-      );
-      if (assigneeSnapshot.length > 0) {
-        setUserTasks((prev) => {
-          const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
-          return [...rest, ...assigneeSnapshot];
-        });
-      }
-    };
-
-    const commitServerUpdate = (updated, meta) => {
-      if (updated?.id != null) {
-        setRawTasks((prev) => mergeUpdatedTask(prev, updated));
-        if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
-          setUserTasks((prev) =>
-            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
-          );
-        }
-      }
-      if (!updated?.id) return;
-      notifyTasksMutated({
-        source: 'tasks-page',
-        type: 'task-updated',
-        taskId: updated.id,
-        task: updated,
-        meta,
-      });
-    };
-
+    const assignees = userTasks.filter(
+      (ut) => Number(ut?.task?.id ?? ut?.id?.taskId) === Number(taskId),
+    );
+    const ns = String(newStatus || '').toUpperCase();
     const putTask = async () => {
-      const res = await apiFetch(`${API_BASE}/api/tasks/${tid}`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...task, status: newStatus }),
       });
-      if (!res.ok) return null;
-      return res.json();
+      if (res.ok) {
+        const updated = await res.json();
+        setRawTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+        if (assignees.length > 1 && ns !== 'DONE') {
+          const canonicalUt = normalizeTaskStatus(newStatus);
+          setUserTasks((prev) =>
+            prev.map((row) => {
+              const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+              if (rowTaskId !== Number(taskId)) return row;
+              return { ...row, status: canonicalUt };
+            }),
+          );
+        }
+      }
     };
-
     try {
-      if (assignees.length > 1 && ns === 'DONE' && !assignees.every((ut) => isUserTaskAssigneeComplete(ut))) {
-        setMultiDoneTaskId(tid);
-        return;
-      }
-
-      applyOptimistic(newStatus);
-
       if (assignees.length === 0) {
-        const updated = await putTask();
-        if (!updated) {
-          rollbackOptimistic();
-          return;
-        }
-        commitServerUpdate(updated, undefined);
+        await putTask();
         return;
       }
-
-      if (assignees.length === 1 && ns === 'DONE') {
-        const ut = assignees[0];
-        const uid = Number(ut.user?.id ?? ut.user?.ID);
-        const markDoneRes = await apiFetch(`${API_BASE}/api/user-tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: uid, taskId: tid, status: 'COMPLETED' }),
-        });
-        if (!markDoneRes.ok) {
-          rollbackOptimistic();
-          return;
+      if (assignees.length === 1) {
+        if (ns === 'DONE') {
+          const ut = assignees[0];
+          const uid = Number(ut.user?.id ?? ut.user?.ID);
+          const markDoneRes = await fetch(`${API_BASE}/api/user-tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
+          });
+          if (markDoneRes.ok) {
+            setUserTasks((prev) =>
+              prev.map((row) => {
+                const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+                const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
+                if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
+                return { ...row, status: 'COMPLETED' };
+              }),
+            );
+            await putTask();
+          }
+        } else {
+          await putTask();
         }
-        const updated = await putTask();
-        if (!updated) {
-          rollbackOptimistic();
-          return;
-        }
-        commitServerUpdate(updated, {
-          syncAssignmentStatuses: true,
-          assignmentStatus: 'COMPLETED',
-        });
         return;
       }
-
-      const updated = await putTask();
-      if (!updated) {
-        rollbackOptimistic();
+      if (ns === 'DONE') {
+        const allDone = assignees.every((ut) => isUserTaskAssigneeComplete(ut));
+        if (allDone) {
+          await putTask();
+        } else {
+          setMultiDoneTaskId(taskId);
+        }
         return;
       }
-      commitServerUpdate(updated, {
-        syncAssignmentStatuses: true,
-        assignmentStatus: ns,
-      });
+      await putTask();
     } catch (e) {
       console.error('Error updating task status:', e);
-      rollbackOptimistic();
     }
   };
 
@@ -483,43 +352,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     }
   }, [invalidateAndRefresh, loadData]);
 
-  const handleTaskCreated = useCallback(
-    async (createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
-      setRawTasks((prev) => {
-        const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
-        return exists ? prev : [createdTask, ...prev];
-      });
-      let optimisticRows = [];
-      if (createdTask?.id) {
-        const byId = new Map(
-          (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
-        );
-        optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
-          const matched = byId.get(Number(uid));
-          return {
-            task: { id: Number(createdTask.id) },
-            user: {
-              id: Number(uid),
-              name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
-            },
-            status: assignmentStatus,
-          };
-        });
-        if (optimisticRows.length > 0) {
-          setUserTasks((prev) => mergeUserTaskLists(optimisticRows, prev));
-        }
-      }
-      notifyTasksMutated({
-        source: 'tasks-page',
-        type: 'task-created',
-        taskId: createdTask?.id,
-        task: createdTask,
-        userTasks: optimisticRows,
-      });
-      await refreshSharedAfterTaskMutation();
-    },
-    [projectDevelopers, refreshSharedAfterTaskMutation],
-  );
+  const handleTaskCreated = useCallback(async () => {
+    await refreshSharedAfterTaskMutation();
+  }, [refreshSharedAfterTaskMutation]);
 
   useEffect(() => {
     if (multiDoneTaskId == null) return;
@@ -533,30 +368,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const markAssigneeDone = async (taskId, ut) => {
     const uid = Number(ut.user?.id ?? ut.user?.ID);
     try {
-      const res = await apiFetch(`${API_BASE}/api/user-tasks`, {
+      const res = await fetch(`${API_BASE}/api/user-tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
       });
-      if (res.ok) {
-        setUserTasks((prev) =>
-          prev.map((row) => {
-            const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
-            const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
-            if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
-            return { ...row, status: 'COMPLETED' };
-          }),
-        );
-        const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
-        notifyTasksMutated({
-          source: 'tasks-page',
-          type: 'task-updated',
-          taskId,
-          task: taskRow ?? { id: taskId },
-          meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
-        });
-        await loadData({ silent: true });
-      }
+      if (res.ok) await loadData({ forceRefresh: true });
     } catch (e) {
       console.error('Error marking assignee done:', e);
     }
@@ -709,7 +526,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         elevation={0}
         sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'flex-start' }, gap: 1.5 }}>
           <Box>
             <Typography
               variant="h4"
@@ -723,11 +540,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               sx={{ mt: 1, bgcolor: pendingChipBg, color: '#E65100', fontWeight: 700 }}
             />
           </Box>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
+          <Stack
+            direction="row"
+            spacing={1.25}
+            alignItems="center"
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          >
             <FormControl
               size="small"
               sx={{
-                minWidth: { xs: '100%', sm: 180 },
+                flex: 1,
+                minWidth: { xs: 0, sm: 180 },
                 ...pageFormFieldOutline(),
                 '& .MuiOutlinedInput-root': {
                   bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
@@ -735,15 +558,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   '& fieldset': { borderColor: isDark ? '#2A2C32' : '#CCCCCC' },
                   '&:hover fieldset': { borderColor: isDark ? '#3A3C42' : '#AAAAAA' },
                 },
-                '& .MuiSelect-select': {
-                  color: isDark ? '#F0F0F0' : '#1A1A1A',
-                },
-                '& .MuiInputLabel-root': {
-                  color: isDark ? '#9A9A9A' : '#666666',
-                },
-                '& .MuiSvgIcon-root': {
-                  color: isDark ? '#9A9A9A' : '#666666',
-                },
+                '& .MuiSelect-select': { color: isDark ? '#F0F0F0' : '#1A1A1A' },
+                '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : '#666666' },
+                '& .MuiSvgIcon-root': { color: isDark ? '#9A9A9A' : '#666666' },
               }}
             >
               <InputLabel id="tasks-header-sprint-select-label">Sprint</InputLabel>
@@ -778,7 +595,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               >
                 {sortedSprintsForSelect.map((s, index) => (
                   <MenuItem key={s.id} value={String(s.id)}>
-                    Sprint {index}
+                    Sprint {index + 1}
                   </MenuItem>
                 ))}
               </Select>
@@ -794,6 +611,8 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   textTransform: 'none',
                   fontWeight: 700,
                   minHeight: 40,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   '&:hover': { bgcolor: '#A83B2D' },
                 }}
               >
@@ -1075,7 +894,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         sprints={sprintsForActiveProject}
         projectDevelopers={projectDevelopers}
         activeProjectId={selectedProjectId}
-        readOnly={developerMode}
         onClose={closeTaskDetailDialog}
         onSaved={async (updated, meta) => {
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));
@@ -1083,13 +901,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
           );
           closeTaskDetailDialog();
-          notifyTasksMutated({
-            source: 'tasks-page',
-            type: 'task-updated',
-            taskId: updated?.id,
-            task: updated,
-            meta,
-          });
           try {
             await refreshSharedAfterTaskMutation();
           } catch (e) {
@@ -1099,7 +910,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         onDeleted={async (taskId) => {
           removeTaskFromState(taskId);
           closeTaskDetailDialog();
-          notifyTasksMutated({ source: 'tasks-page', type: 'task-deleted', taskId });
           await refreshSharedAfterTaskMutation();
         }}
       />

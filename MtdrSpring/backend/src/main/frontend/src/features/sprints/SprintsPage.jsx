@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
   TextField,
+  Chip,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
@@ -22,9 +23,7 @@ import TaskTable from '../tasks/TaskTable';
 import {
   deriveTaskStatusFromAssignments,
   isUserTaskAssigneeComplete,
-  mergeUpdatedTask,
   normalizeTaskStatus,
-  patchUserTasksAfterTaskSave,
   taskEntityId,
   userTaskRowStatus,
   userTaskRowTaskId,
@@ -41,8 +40,6 @@ import {
   ORACLE_RED,
   ORACLE_RED_ACTION,
   pickDefaultSelectedSprint,
-  buildSprintNumberMap,
-  formatSprintLabel,
   resolveActiveProjectIdNum,
   sortSprintsForDisplay,
   sortTasksForSprintTable,
@@ -54,16 +51,6 @@ import {
   fetchSprintsProjectSummary,
   fetchSprintsTasksAndAssignments,
 } from './sprintsPageApi';
-import { useProjectData } from '../../contexts/ProjectDataContext';
-import {
-  applyRecentUpdatesToTaskLists,
-  getRecentlyCreatedTasks,
-  getRecentlyCreatedUserTasks,
-  mergeUserTaskLists,
-  TASKS_MUTATED_EVENT,
-  getRecentlyDeletedTaskIdSet,
-  notifyTasksMutated,
-} from '../../utils/taskSyncEvents';
 
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
@@ -87,12 +74,13 @@ export default function SprintsPage({ projectId }) {
   );
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const effectiveProjectIdNum = resolveActiveProjectIdNum(projectId);
-  const { invalidateAndRefresh } = useProjectData();
-  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+  const sprintNumberMap = useMemo(() => {
+  const map = new Map();
+  [...sprints].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i));
+  return map;
+}, [sprints]);
   /** Prevents a background reload (e.g. after confirm dialog focus) from re-adding a deleted task. */
   const recentlyDeletedTaskIdsRef = useRef(new Set());
-  const projectDevelopersRef = useRef(projectDevelopers);
-  projectDevelopersRef.current = projectDevelopers;
 
   useEffect(() => {
     if (effectiveProjectIdNum != null) {
@@ -153,37 +141,21 @@ export default function SprintsPage({ projectId }) {
   const loadData = useCallback(
     async (opts = {}) => {
       const silent = opts.silent === true;
-      const forceFresh = opts.forceFresh === true;
       if (!silent) setLoading(true);
       try {
         const { sprintsList, tasksList, userTasksList } =
-          await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
-        const deleted = new Set([
-          ...recentlyDeletedTaskIdsRef.current,
-          ...getRecentlyDeletedTaskIdSet(),
-        ]);
-        const createdTasks = getRecentlyCreatedTasks();
-        const baseTasks = Array.isArray(tasksList) ? tasksList : [];
-        const mergedTasks = [...createdTasks, ...baseTasks].filter(
-          (task, index, arr) =>
-            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
-        );
-        const visibleTasks = mergedTasks.filter(
+          await fetchSprintsTasksAndAssignments(projectId);
+        const deleted = recentlyDeletedTaskIdsRef.current;
+        const visibleTasks = (Array.isArray(tasksList) ? tasksList : []).filter(
           (t) => !deleted.has(taskEntityId(t)),
         );
-        const visibleUserTasks = mergeUserTaskLists(
-          getRecentlyCreatedUserTasks(),
-          Array.isArray(userTasksList) ? userTasksList : [],
-        ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
-        const synced = applyRecentUpdatesToTaskLists(
-          visibleTasks,
-          visibleUserTasks,
-          projectDevelopersRef.current,
+        const visibleUserTasks = (Array.isArray(userTasksList) ? userTasksList : []).filter(
+          (ut) => !deleted.has(String(userTaskRowTaskId(ut))),
         );
-        const sorted = sortSprintsForDisplay(sprintsList, synced.tasks);
+        const sorted = sortSprintsForDisplay(sprintsList, visibleTasks);
         setSprints(sorted);
-        setTasks(synced.tasks);
-        setUserTasks(synced.userTasks);
+        setTasks(visibleTasks);
+        setUserTasks(visibleUserTasks);
         setSelectedSprint((prev) => {
           if (prev) {
             const stillThere = sorted.find((s) => s.id === prev.id);
@@ -202,137 +174,24 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
-  useEffect(() => {
-    if (!selectedTaskForDialog?.id) return;
-    const fresh = tasks.find((t) => Number(t.id) === Number(selectedTaskForDialog.id));
-    if (fresh) setSelectedTaskForDialog(fresh);
-  }, [tasks, selectedTaskForDialog?.id]);
+  const handleTaskDeleted = useCallback((taskId) => {
+    const tid = String(taskId);
+    recentlyDeletedTaskIdsRef.current.add(tid);
+    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
 
-  useEffect(() => {
-    const onTasksMutated = (event) => {
-      if (event?.detail?.source === 'sprints-page') return;
-      if (event?.detail?.type === 'task-created' && event?.detail?.task) {
-        const created = event.detail.task;
-        setTasks((prev) => {
-          const exists = prev.some((t) => Number(t.id) === Number(created?.id));
-          if (exists) return prev;
-          const next = [created, ...prev];
-          setSprints((sp) => sortSprintsForDisplay(sp, next));
-          return next;
-        });
-        const rows = Array.isArray(event.detail.userTasks) ? event.detail.userTasks : [];
-        if (rows.length > 0) {
-          setUserTasks((prev) => mergeUserTaskLists(rows, prev));
-        }
-      }
-      if (event?.detail?.type === 'task-updated' && event?.detail?.task) {
-        const updated = event.detail.task;
-        const meta = event.detail.meta;
-        setTasks((prev) => {
-          const next = mergeUpdatedTask(prev, updated);
-          setSprints((sp) => sortSprintsForDisplay(sp, next));
-          return next;
-        });
-        setUserTasks((prev) =>
-          patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopersRef.current),
-        );
-        setSelectedTaskForDialog((prev) =>
-          prev && Number(prev.id) === Number(updated.id) ? { ...prev, ...updated } : prev,
-        );
-      }
-      if (event?.detail?.type === 'task-deleted' && event?.detail?.taskId != null) {
-        const tid = String(event.detail.taskId);
-        recentlyDeletedTaskIdsRef.current.add(tid);
-        setTasks((prev) => prev.filter((t) => taskEntityId(t) !== tid));
-        setUserTasks((prev) =>
-          prev.filter((ut) => {
-            const utTid = userTaskRowTaskId(ut);
-            return !Number.isFinite(utTid) || String(utTid) !== tid;
-          }),
-        );
-      }
-      loadData({ silent: true }).catch((e) => {
-        console.error('SprintsPage sync refresh failed:', e);
-      });
-    };
-    window.addEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
-    return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
-  }, [loadData]);
-
-  const handleTaskDeleted = useCallback(
-    async (taskId) => {
-      const tid = String(taskId);
-      recentlyDeletedTaskIdsRef.current.add(tid);
-      setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
-
-      setTasks((prev) => {
-        const next = prev.filter((t) => taskEntityId(t) !== tid);
-        setSprints((sp) => sortSprintsForDisplay(sp, next));
-        return next;
-      });
-      setUserTasks((prev) =>
-        prev.filter((ut) => {
-          const utTid = userTaskRowTaskId(ut);
-          return !Number.isFinite(utTid) || String(utTid) !== tid;
-        }),
-      );
-      setSelectedTaskForDialog(null);
-      notifyTasksMutated({ source: 'sprints-page', type: 'task-deleted', taskId });
-      try {
-        await invalidateAndRefresh();
-        await loadData({ silent: true, forceFresh: true });
-      } catch (e) {
-        console.error('Failed to refresh project data after task delete:', e);
-      }
-    },
-    [invalidateAndRefresh, loadData],
-  );
-
-  const handleTaskCreated = useCallback(
-    async (createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
-      setTasks((prev) => {
-        const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
-        const next = exists ? prev : [createdTask, ...prev];
-        setSprints((sp) => sortSprintsForDisplay(sp, next));
-        return next;
-      });
-      let optimisticRows = [];
-      if (createdTask?.id) {
-        const byId = new Map(
-          (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
-        );
-        optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
-          const matched = byId.get(Number(uid));
-          return {
-            task: { id: Number(createdTask.id) },
-            user: {
-              id: Number(uid),
-              name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
-            },
-            status: assignmentStatus,
-          };
-        });
-        if (optimisticRows.length > 0) {
-          setUserTasks((prev) => mergeUserTaskLists(optimisticRows, prev));
-        }
-      }
-      setNewTaskDialogOpen(false);
-      notifyTasksMutated({
-        source: 'sprints-page',
-        type: 'task-created',
-        taskId: createdTask?.id,
-        task: createdTask,
-        userTasks: optimisticRows,
-      });
-      try {
-        await invalidateAndRefresh();
-        await loadData({ silent: true, forceFresh: true });
-      } catch (e) {
-        console.error('Failed to refresh project data after task create:', e);
-      }
-    },
-    [invalidateAndRefresh, loadData, projectDevelopers],
-  );
+    setTasks((prev) => {
+      const next = prev.filter((t) => taskEntityId(t) !== tid);
+      setSprints((sp) => sortSprintsForDisplay(sp, next));
+      return next;
+    });
+    setUserTasks((prev) =>
+      prev.filter((ut) => {
+        const utTid = userTaskRowTaskId(ut);
+        return !Number.isFinite(utTid) || String(utTid) !== tid;
+      }),
+    );
+    setSelectedTaskForDialog(null);
+  }, []);
 
   const handleSprintCreated = (newSprint) => {
     setSprints((prev) => sortSprintsForDisplay([newSprint, ...prev], tasks));
@@ -403,7 +262,6 @@ export default function SprintsPage({ projectId }) {
                     name,
                     status: normalizeTaskStatus(userTaskRowStatus(ut)),
                     completed: isUserTaskAssigneeComplete(ut),
-                    completedAt: ut?.completedAt ?? ut?.completed_at ?? null,
                   };
                 })
                 .sort((a, b) =>
@@ -517,7 +375,7 @@ export default function SprintsPage({ projectId }) {
       <Box
         component={motion.div}
         variants={sprintsOverviewVariants.block}
-        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}
+        sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 4 }}
       >
         <Box>
           <Typography
@@ -537,7 +395,7 @@ export default function SprintsPage({ projectId }) {
             sprints
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, mt: { xs: 1, sm: 0 } }}>
           <Button
             variant="outlined"
             startIcon={<EditIcon />}
@@ -549,7 +407,6 @@ export default function SprintsPage({ projectId }) {
               borderColor: isDark ? '#2A2C32' : '#DDD',
               color: isDark ? '#9A9A9A' : '#555',
               borderRadius: 2,
-              mr: 1,
             }}
           >
             Edit sprint
@@ -565,7 +422,6 @@ export default function SprintsPage({ projectId }) {
               borderColor: isDark ? '#7F3030' : '#E0B4AF',
               color: '#B64536',
               borderRadius: 2,
-              mr: 1,
             }}
           >
             Delete sprint
@@ -625,13 +481,13 @@ export default function SprintsPage({ projectId }) {
                   }}
                   sx={{ flex: '0 0 320px', minWidth: 280, maxWidth: 360, scrollSnapAlign: 'start' }}
                 >
-<SprintCard
-  sprint={sprint}
-  tasks={tasks}
-  isSelected={selectedSprint?.id === sprint.id}
-  onClick={() => setSelectedSprint(sprint)}
-  sprintNumber={sprintNumberMap.get(sprint.id)}
-/>
+                  <SprintCard
+                    sprint={sprint}
+                    tasks={tasks}
+                    isSelected={selectedSprint?.id === sprint.id}
+                    onClick={() => setSelectedSprint(sprint)}
+                    sprintNumber={sprintNumberMap.get(sprint.id)}
+                  />
                 </Box>
               ))}
             </Box>
@@ -646,9 +502,7 @@ export default function SprintsPage({ projectId }) {
                 display: 'block',
               }}
             >
-{selectedSprint
-                ? `Tasks · ${formatSprintLabel(sprintNumberMap, selectedSprint.id) || `Sprint ${selectedSprint.id}`}`
-                : 'Tasks'}
+              {selectedSprint ? `Tasks · Sprint ${sprintNumberMap.get(selectedSprint.id) ?? selectedSprint.id}` : 'Tasks'}
             </Typography>
             <Box
               sx={{
@@ -818,9 +672,7 @@ export default function SprintsPage({ projectId }) {
             hasTaskTableFilters ? (
               <Box
                 sx={{
-                  py: 3.5,
-                  px: 2,
-                  textAlign: 'center',
+                  py: 3.5, px: 2, textAlign: 'center',
                   border: `1px dashed ${isDark ? '#2A2C32' : '#E0E0E0'}`,
                   borderRadius: 2,
                   bgcolor: isDark ? '#16181C' : '#FAFAFA',
@@ -828,29 +680,127 @@ export default function SprintsPage({ projectId }) {
                 }}
               >
                 <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.95rem' }}>
-                  {statusFilter !== 'all' &&
-                  developerFilter === 'all' &&
-                  priorityFilter === 'all' &&
-                  !dueDateFilter
+                  {statusFilter !== 'all' && developerFilter === 'all' && priorityFilter === 'all' && !dueDateFilter
                     ? 'No tasks with this status.'
                     : 'No tasks match the selected filters.'}
                 </Typography>
               </Box>
             ) : (
-              <TaskTable
-                items={filteredSprintRows}
-                variant="manager"
-                onRowClick={(row) => {
-                  const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
-                  if (task) setSelectedTaskForDialog(task);
-                }}
-                scrollMaxHeight={420}
-              />
+              <>
+                {/* Desktop: tabla normal */}
+                <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                  <TaskTable
+                    items={filteredSprintRows}
+                    variant="manager"
+                    onRowClick={(row) => {
+                      const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
+                      if (task) setSelectedTaskForDialog(task);
+                    }}
+                    scrollMaxHeight={420}
+                  />
+                </Box>
+
+                {/* Móvil: lista de cards */}
+                <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', gap: 1 }}>
+                  {filteredSprintRows.length === 0 && (
+                    <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
+                      No tasks in this sprint.
+                    </Typography>
+                  )}
+                  {filteredSprintRows.map((row) => {
+                    const statusChip = (() => {
+                      const st = String(row.status || '').toUpperCase().replace(/[\s-]+/g, '_');
+                      if (st === 'DONE' || st === 'COMPLETED') return { label: 'Done', bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', color: '#1B5E20' };
+                      if (st === 'IN_PROGRESS') return { label: 'In Progress', bgcolor: isDark ? '#1A3A5C' : '#E3F2FD', color: '#1565C0' };
+                      if (st === 'IN_REVIEW') return { label: 'In Review', bgcolor: isDark ? '#2A1A3D' : '#F3E5F5', color: '#7B1FA2' };
+                      return { label: 'To Do', bgcolor: isDark ? '#2A2C32' : '#ECEFF1', color: isDark ? '#9A9A9A' : '#455A64' };
+                    })();
+                    const priorityColor = (() => {
+                      const p = String(row.priority || '').toUpperCase();
+                      if (p === 'CRITICAL') return '#C62828';
+                      if (p === 'HIGH') return '#E65100';
+                      if (p === 'MEDIUM') return '#F57F17';
+                      return isDark ? '#9A9A9A' : '#455A64';
+                    })();
+                    const names = Array.isArray(row.developers) && row.developers.length > 0
+                      ? row.developers
+                      : row.developer ? [row.developer] : [];
+                    return (
+                      <Box
+                        key={row.id}
+                        onClick={() => {
+                          const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
+                          if (task) setSelectedTaskForDialog(task);
+                        }}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
+                          bgcolor: 'background.paper',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: '#C74634', bgcolor: isDark ? 'rgba(199,70,52,0.06)' : 'rgba(199,70,52,0.03)' },
+                        }}
+                      >
+                        {/* Título */}
+                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 600, color: 'text.primary', mb: 1, lineHeight: 1.35 }}>
+                          {row.description}
+                        </Typography>
+
+                        {/* Chips de status y prioridad */}
+                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
+                          <Chip
+                            label={statusChip.label}
+                            size="small"
+                            sx={{ bgcolor: statusChip.bgcolor, color: statusChip.color, fontWeight: 700, fontSize: '0.68rem', height: 20 }}
+                          />
+                          {row.priority && (
+                            <Chip
+                              label={String(row.priority).replace(/_/g, ' ')}
+                              size="small"
+                              sx={{ bgcolor: 'transparent', color: priorityColor, fontWeight: 700, fontSize: '0.68rem', height: 20, border: `1px solid ${priorityColor}44` }}
+                            />
+                          )}
+                        </Box>
+
+                        {/* Footer: devs + horas + fecha */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            {names.slice(0, 2).map((name, i) => (
+                              <Typography key={i} sx={{
+                                fontSize: '0.7rem', fontWeight: 700, px: 0.75, py: 0.2,
+                                borderRadius: '6px',
+                                bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+                                color: isDark ? '#9A9A9A' : '#555',
+                              }}>
+                                {String(name).split(' ')[0]}
+                              </Typography>
+                            ))}
+                            {names.length > 2 && (
+                              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>+{names.length - 2}</Typography>
+                            )}
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            {row.assignedHours != null && (
+                              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                {row.assignedHours}h
+                              </Typography>
+                            )}
+                            {row.dueDate && (
+                              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                {String(row.dueDate).slice(0, 10)}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </>
             )}
           </Grid>
         </Grid>
       </Box>
-
       <NewSprintDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -860,7 +810,34 @@ export default function SprintsPage({ projectId }) {
       <NewTaskDialog
         open={newTaskDialogOpen}
         onClose={() => setNewTaskDialogOpen(false)}
-        onCreated={handleTaskCreated}
+        onCreated={(createdTask, assignedUserIds = [], assignmentStatus = 'TODO') => {
+          setTasks((prev) => {
+            const exists = prev.some((t) => Number(t.id) === Number(createdTask?.id));
+            const next = exists ? prev : [createdTask, ...prev];
+            setSprints((sp) => sortSprintsForDisplay(sp, next));
+            return next;
+          });
+          if (createdTask?.id) {
+            const byId = new Map(
+              (projectDevelopers || []).map((u) => [Number(developerNumericId(u)), u]),
+            );
+            const optimisticRows = finiteUserIds(assignedUserIds).map((uid) => {
+              const matched = byId.get(Number(uid));
+              return {
+                task: { id: Number(createdTask.id) },
+                user: {
+                  id: Number(uid),
+                  name: matched?.name ?? matched?.NAME ?? `User ${uid}`,
+                },
+                status: assignmentStatus,
+              };
+            });
+            if (optimisticRows.length > 0) {
+              setUserTasks((prev) => [...optimisticRows, ...prev]);
+            }
+          }
+          setNewTaskDialogOpen(false);
+        }}
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         defaultSprintId={selectedSprint?.id}
@@ -884,34 +861,47 @@ export default function SprintsPage({ projectId }) {
       <TaskDetailDialog
         open={Boolean(selectedTaskForDialog)}
         initialTask={selectedTaskForDialog}
-        initialUserTasks={userTasks}
         sprints={sprints}
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={() => setSelectedTaskForDialog(null)}
-        onSaved={async (updated, meta) => {
+        onSaved={(updated, meta) => {
           setTasks((prev) => {
-            const next = mergeUpdatedTask(prev, updated);
+            const next = prev.map((x) =>
+              Number(x.id) === Number(updated.id) ? { ...x, ...updated } : x,
+            );
             setSprints((sp) => sortSprintsForDisplay(sp, next));
             return next;
           });
-          setUserTasks((prev) =>
-            patchUserTasksAfterTaskSave(prev, updated, meta, projectDevelopers),
-          );
-          setSelectedTaskForDialog(null);
-          notifyTasksMutated({
-            source: 'sprints-page',
-            type: 'task-updated',
-            taskId: updated?.id,
-            task: updated,
-            meta,
-          });
-          try {
-            await invalidateAndRefresh();
-            await loadData({ silent: true, forceFresh: true });
-          } catch (e) {
-            console.error('Failed to refresh sprints data after task save:', e);
+          if (meta?.assigneesChanged) {
+            const tid = Number(updated.id);
+            const ids = finiteUserIds(meta.assigneeUserIds);
+            setUserTasks((prev) => {
+              const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+              if (ids.length === 0) return rest;
+              const st = updated?.status ?? 'TODO';
+              const added = ids.map((userId) => {
+                const known = projectDevelopers.find((u) => developerNumericId(u) === userId);
+                const name = String(
+                  known?.name ?? known?.displayName ?? known?.email ?? `User ${userId}`,
+                ).trim();
+                return {
+                  user: { id: userId, name: name || `User ${userId}` },
+                  task: { id: tid },
+                  status: st,
+                };
+              });
+              return [...rest, ...added];
+            });
+          } else if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+            const tid = Number(updated.id);
+            const st = meta.assignmentStatus;
+            setUserTasks((prev) =>
+              prev.map((ut) => (userTaskRowTaskId(ut) === tid ? { ...ut, status: st } : ut)),
+            );
           }
+          setSelectedTaskForDialog(null);
+          void loadData({ silent: true });
         }}
         onDeleted={handleTaskDeleted}
       />
