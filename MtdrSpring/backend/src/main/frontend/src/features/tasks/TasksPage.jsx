@@ -45,6 +45,7 @@ import { useProjectData } from '../../contexts/ProjectDataContext';
 import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
 import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
+import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
 import {
   applyRecentUpdatesToTaskLists,
@@ -165,6 +166,14 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     loadData();
   }, [loadData]);
 
+  useProjectBundleSync(
+    useCallback(() => {
+      loadData({ silent: true, forceRefresh: false }).catch((e) => {
+        console.error('TasksPage bundle sync failed:', e);
+      });
+    }, [loadData]),
+  );
+
   useEffect(() => {
     if (!taskDetailOpen || !taskForDetailDialog?.id) return;
     const fresh = rawTasks.find((t) => Number(t.id) === Number(taskForDetailDialog.id));
@@ -174,6 +183,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'tasks-page') return;
+      if (event?.detail?.source === 'sse') return;
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setRawTasks((prev) => {
@@ -476,7 +486,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   const refreshSharedAfterTaskMutation = useCallback(async () => {
     try {
-      await invalidateAndRefresh();
+      await invalidateAndRefresh({ silent: true, confirmOnly: true });
       await loadData({ silent: true });
     } catch (e) {
       console.error('Failed to refresh shared project data after task change:', e);

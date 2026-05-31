@@ -247,7 +247,7 @@ public class ManagerChatService {
                     m.put("inProgress", 0);
                     m.put("toDo", 0);
                     m.put("inReview", 0);
-                    m.put("workedHours", 0L);
+                    m.put("workedHours", 0.0);
                     return m;
                 });
 
@@ -259,7 +259,9 @@ public class ManagerChatService {
                 else if ("In review".equals(norm)) dev.put("inReview", (int) dev.get("inReview") + 1);
 
                 if (ut.getWorkedHours() != null) {
-                    dev.put("workedHours", (long) dev.get("workedHours") + ut.getWorkedHours());
+                    dev.put(
+                            "workedHours",
+                            ((Number) dev.get("workedHours")).doubleValue() + ut.getWorkedHours());
                 }
             }
 
@@ -276,7 +278,7 @@ public class ManagerChatService {
                     m.put("inProgress", 0);
                     m.put("toDo", 0);
                     m.put("inReview", 0);
-                    m.put("workedHours", 0L);
+                    m.put("workedHours", 0.0);
                     m.put("rosterOnly", true);
                     byUser.put(uid, m);
                 }

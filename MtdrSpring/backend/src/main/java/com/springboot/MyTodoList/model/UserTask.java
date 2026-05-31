@@ -23,7 +23,7 @@ public class UserTask {
 
     @JsonAlias({ "hours", "worked_hours" })
     @Column(name = "WORKED_HOURS")
-    private Long workedHours;
+    private Double workedHours;
 
     @Column(name = "STATUS", length = 50)
     private String status;
@@ -70,11 +70,11 @@ public class UserTask {
         this.task = task;
     }
 
-    public Long getWorkedHours() {
+    public Double getWorkedHours() {
         return workedHours;
     }
 
-    public void setWorkedHours(Long workedHours) {
+    public void setWorkedHours(Double workedHours) {
         this.workedHours = workedHours;
     }
 

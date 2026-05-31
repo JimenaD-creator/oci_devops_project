@@ -32,7 +32,7 @@ public class DeveloperRadarController {
         int done;
         int onTime;
         int late;
-        long worked;
+        double worked;
         long assigned;
     }
 
@@ -117,7 +117,7 @@ public class DeveloperRadarController {
 
         int maxTotal     = byUser.values().stream().mapToInt(a -> a.total).max().orElse(1);
         int maxDone      = byUser.values().stream().mapToInt(a -> a.done).max().orElse(1);
-        long maxWorked   = byUser.values().stream().mapToLong(a -> a.worked).max().orElse(1);
+        double maxWorked = byUser.values().stream().mapToDouble(a -> a.worked).max().orElse(1.0);
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (DeveloperAgg a : byUser.values()) {

@@ -586,6 +586,7 @@ export function getCachedBundleSnapshot(projectId) {
     userTasks: cachedData.userTasks,
     enrichedSprints: cachedData.enrichedSprints,
     taskCount: Array.isArray(cachedData.tasks) ? cachedData.tasks.length : 0,
+    timestamp: cachedData.timestamp,
   };
 }
 
@@ -703,6 +704,82 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     }
     return [];
   }
+}
+
+function rebuildEnrichedSprintsFromCache() {
+  if (!Array.isArray(cachedData.sprints)) {
+    cachedData.enrichedSprints = [];
+    return;
+  }
+  const sortedSprints = [...cachedData.sprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
+  try {
+    cachedData.enrichedSprints = enrichSprintsWithUserTasks(
+      mapped,
+      cachedData.tasks || [],
+      cachedData.userTasks || [],
+    );
+  } catch (e) {
+    console.error('rebuildEnrichedSprintsFromCache failed:', e);
+    cachedData.enrichedSprints = mapped;
+  }
+  assignSprintAccentColors(cachedData.enrichedSprints);
+}
+
+function userTaskRowKey(ut) {
+  const tid = resolveUserTaskTaskId(ut);
+  const uid = resolveUserTaskUserId(ut);
+  if (tid == null || uid == null) return null;
+  return `${Number(tid)}:${Number(uid)}`;
+}
+
+/** Instant dashboard/KPI update after a local delete (before network refresh). */
+export function applyOptimisticTaskDeleted(projectId, taskId) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  const tid = Number(taskId);
+  if (!pid || !Number.isFinite(tid)) return null;
+  if (!isCacheValidForProject(pid, Date.now(), false)) return null;
+
+  cachedData.tasks = (cachedData.tasks || []).filter((t) => Number(t?.id) !== tid);
+  cachedData.userTasks = (cachedData.userTasks || []).filter((ut) => {
+    const utTid = resolveUserTaskTaskId(ut);
+    return utTid == null || Number(utTid) !== tid;
+  });
+  cachedData.timestamp = Date.now();
+  rebuildEnrichedSprintsFromCache();
+  return getCachedBundleSnapshot(pid);
+}
+
+/** Instant dashboard/KPI update after a local create (before network refresh). */
+export function applyOptimisticTaskCreated(projectId, task, userTasks = []) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  const tid = Number(task?.id);
+  if (!pid || !Number.isFinite(tid)) return null;
+  if (!isCacheValidForProject(pid, Date.now(), false)) return null;
+
+  const tasks = Array.isArray(cachedData.tasks) ? [...cachedData.tasks] : [];
+  if (!tasks.some((t) => Number(t?.id) === tid)) {
+    tasks.unshift(task);
+  }
+  cachedData.tasks = tasks;
+
+  const existingKeys = new Set(
+    (cachedData.userTasks || []).map(userTaskRowKey).filter(Boolean),
+  );
+  const extraRows = Array.isArray(userTasks) ? userTasks : [];
+  const mergedUserTasks = [...(cachedData.userTasks || [])];
+  for (const ut of extraRows) {
+    const key = userTaskRowKey(ut);
+    if (!key || existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    mergedUserTasks.push(ut);
+  }
+  cachedData.userTasks = mergedUserTasks;
+  cachedData.timestamp = Date.now();
+  rebuildEnrichedSprintsFromCache();
+  return getCachedBundleSnapshot(pid);
 }
 
 // Export function to manually invalidate cache when data changes

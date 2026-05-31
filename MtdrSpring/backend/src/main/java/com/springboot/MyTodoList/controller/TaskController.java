@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,9 @@ public class TaskController {
 
     @Autowired
     private TaskAssignmentNotificationService taskAssignmentNotificationService;
+
+    @Autowired
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     private static String canonicalTaskStatus(String raw) {
         String n = Optional.ofNullable(raw).orElse("").trim().toUpperCase().replaceAll("[\\s-]+", "_");
@@ -142,6 +146,7 @@ public class TaskController {
                 existingTask.setFinishDate(taskDetails.getDueDate());
             }
             Task updatedTask = taskRepository.save(existingTask);
+            projectTaskEventPublisher.taskUpdated(id, null, "rest");
             return ResponseEntity.ok(updatedTask);
         }
 
@@ -166,6 +171,7 @@ public class TaskController {
 
         taskRepository.save(existingTask);
         Task synced = taskAssignmentSyncService.syncTaskStatusFromAssignments(id);
+        projectTaskEventPublisher.taskUpdated(id, null, "rest");
         return ResponseEntity.ok(synced != null ? synced : taskRepository.findById(id).orElse(existingTask));
     }
     

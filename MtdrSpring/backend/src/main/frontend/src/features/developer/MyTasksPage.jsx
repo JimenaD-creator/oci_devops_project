@@ -29,6 +29,7 @@ import {
   userTaskRowTaskId,
 } from '../tasks/utils/taskUtils';
 import { useProjectData } from '../../contexts/ProjectDataContext';
+import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import { ORACLE_RED, pageEase } from '../tasks/constants/taskConstants';
 import {
   pickDefaultSelectedSprint,
@@ -153,9 +154,18 @@ export default function MyTasksPage({ projectId, currentUser }) {
     loadData();
   }, [loadData]);
 
+  useProjectBundleSync(
+    useCallback(() => {
+      loadData({ silent: true, forceFresh: false }).catch((err) => {
+        console.error('MyTasksPage bundle sync failed:', err);
+      });
+    }, [loadData]),
+  );
+
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'my-tasks-page') return;
+      if (event?.detail?.source === 'sse') return;
       loadData({ silent: true }).catch((err) => {
         console.error('MyTasksPage sync refresh failed:', err);
       });

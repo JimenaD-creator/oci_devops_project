@@ -331,7 +331,7 @@ public class GeminiService {
         int onTime;
         int late;
         int blocked;
-        long hours;
+        double hours;
         double completionRate;
         double onTimeRate;
         List<Map<String, Object>> taskDetails;
@@ -627,7 +627,7 @@ public class GeminiService {
                 int lateCompletedTasks;
                 int unknownCompletionTiming;
                 int completedWithZeroHours;
-                long workedHours;
+                double workedHours;
                 long assignedHours;
                 boolean fromSprintRosterOnly;
                 boolean fromProjectTeamOnly;
@@ -1425,11 +1425,11 @@ public class GeminiService {
                 final String nameLower;
                 final int assigned;
                 final int completed;
-                final long workedHours;
+                final double workedHours;
                 final long assignedHours;
                 final boolean rosterOnly;
 
-                Snap(String nameLower, int assigned, int completed, long workedHours, long assignedHours,
+                Snap(String nameLower, int assigned, int completed, double workedHours, long assignedHours,
                     boolean rosterOnly) {
                     this.nameLower = nameLower;
                     this.assigned = assigned;
@@ -1451,7 +1451,7 @@ public class GeminiService {
                 boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
                 int assigned = row.path("assignedTaskRows").asInt(0);
                 int completed = row.path("completedTasks").asInt(0);
-                long wh = row.path("workedHoursSum").asLong(0);
+                double wh = row.path("workedHoursSum").asDouble(0);
                 long ah = row.path("assignedHoursSum").asLong(0);
                 snaps.add(new Snap(dn, assigned, completed, wh, ah, rosterOnly));
             }
@@ -1482,7 +1482,7 @@ public class GeminiService {
                 if (pending < 1) {
                     continue;
                 }
-                long maxPeerWh = 0L;
+                double maxPeerWh = 0.0;
                 long maxPeerAh = 0L;
                 int peersWithSameAssigned = 0;
                 for (Snap p : snaps) {
@@ -1500,7 +1500,7 @@ public class GeminiService {
                     continue;
                 }
                 boolean moreLoggedHours =
-                    self.workedHours >= maxPeerWh + 8L || (maxPeerWh > 0 && self.workedHours >= (long) (maxPeerWh * 1.35));
+                    self.workedHours >= maxPeerWh + 8.0 || (maxPeerWh > 0 && self.workedHours >= maxPeerWh * 1.35);
                 boolean moreEstimatedHours =
                     self.assignedHours >= maxPeerAh + 16L
                         || (maxPeerAh > 0 && self.assignedHours >= (long) (maxPeerAh * 1.35));
@@ -1627,7 +1627,7 @@ public class GeminiService {
             if (wl == null || !wl.isArray()) {
                 return;
             }
-            long workedSum = 0;
+            double workedSum = 0;
             int workedDevCount = 0;
             for (JsonNode row : wl) {
                 if (row == null || !row.isObject()) {
@@ -1637,11 +1637,11 @@ public class GeminiService {
                     || row.path("fromProjectTeamOnly").asBoolean(false)) {
                     continue;
                 }
-                workedSum += row.path("workedHoursSum").asLong(0);
+                workedSum += row.path("workedHoursSum").asDouble(0);
                 workedDevCount++;
             }
-            long teamAvgWorked = workedDevCount > 0
-                ? Math.round((double) workedSum / workedDevCount) : 0L;
+            double teamAvgWorked = workedDevCount > 0
+                ? workedSum / workedDevCount : 0.0;
 
             ArrayNode dev = ensureArrayField(root, "developerInsights");
             Map<String, ObjectNode> byNameLower = new HashMap<>();
@@ -1679,14 +1679,14 @@ public class GeminiService {
         }
     }
 
-    private static String buildLiveDeveloperInsightNarrative(JsonNode row, long teamAvgWorkedHours) {
+    private static String buildLiveDeveloperInsightNarrative(JsonNode row, double teamAvgWorkedHours) {
         boolean rosterOnly = row.path("fromSprintRosterOnly").asBoolean(false);
         boolean projectTeamOnly = row.path("fromProjectTeamOnly").asBoolean(false);
         int completed = row.path("completedTasks").asInt(0);
         int onTime = row.path("onTimeCompletedTasks").asInt(0);
         int late = row.path("lateCompletedTasks").asInt(0);
         int unknown = row.path("unknownCompletionTiming").asInt(0);
-        long worked = row.path("workedHoursSum").asLong(0);
+        double worked = row.path("workedHoursSum").asDouble(0);
         int assignedRows = row.path("assignedTaskRows").asInt(0);
 
         StringBuilder sb = new StringBuilder();
@@ -1734,7 +1734,7 @@ public class GeminiService {
         return sb.toString().trim();
     }
 
-    private static String describeWorkedHoursVsTeam(long worked, long teamAvg) {
+    private static String describeWorkedHoursVsTeam(double worked, double teamAvg) {
         if (worked <= 0 && teamAvg <= 0) {
             return "";
         }
@@ -1848,7 +1848,7 @@ public class GeminiService {
         int completed;
         int open;
         int urgentPending;
-        long workedHours;
+        double workedHours;
         /** Open (not Done) tasks matching {@link #isHighPriorityTask(Task)}. */
         int highPriorityOpen;
         /** Open tasks with due date within ~72h or overdue per {@link #isDueSoon(Task, LocalDateTime)}. */
@@ -2240,23 +2240,23 @@ public class GeminiService {
             // Precision rule: only when it applies, suggest moving urgent work
             // from developers with zero completed tasks to developers with no open tasks.
             List<DeveloperUrgencyLoad> urg = new ArrayList<>(buildDeveloperUrgencyLoad(sprintId).values());
-            long maxWorkedAcrossTeam = urg.stream().mapToLong(d -> d.workedHours).max().orElse(0L);
+            double maxWorkedAcrossTeam = urg.stream().mapToDouble(d -> d.workedHours).max().orElse(0.0);
             DeveloperUrgencyLoad sender = urg.stream()
                 .filter(d -> d.completed == 0 && d.urgentPending > 0)
                 .max(Comparator.comparingInt((DeveloperUrgencyLoad d) -> d.urgentPending)
-                    .thenComparingLong(d -> d.workedHours))
+                    .thenComparingDouble(d -> d.workedHours))
                 .orElse(null);
             // Do not move work onto the teammate who already logged the most hours (e.g. finished all tasks
             // with heavy logging while others are idle for other reasons).
             DeveloperUrgencyLoad receiver = urg.stream()
                 .filter(d -> d.open == 0 && d.completed > 0)
-                .filter(d -> maxWorkedAcrossTeam == 0L || d.workedHours < maxWorkedAcrossTeam)
-                .min(Comparator.comparingLong((DeveloperUrgencyLoad d) -> d.workedHours)
+                .filter(d -> maxWorkedAcrossTeam <= 0.0 || d.workedHours < maxWorkedAcrossTeam)
+                .min(Comparator.comparingDouble((DeveloperUrgencyLoad d) -> d.workedHours)
                     .thenComparingInt(d -> -d.completed))
                 .orElse(null);
             if (sender != null && receiver != null && !Objects.equals(sender.name, receiver.name)) {
                 int moveUrgent = Math.max(1, Math.min(2, sender.urgentPending));
-                boolean hourGapMaterial = sender.workedHours >= receiver.workedHours + 4;
+                boolean hourGapMaterial = sender.workedHours >= receiver.workedHours + 4.0;
                 String priorityDueShort = formatUrgencyLoadPriorityDueShort(sender);
                 String priorityDueReason = formatUrgencyLoadPriorityAndDueSummary(sender);
                 boolean rewritten = false;
@@ -2626,10 +2626,10 @@ public class GeminiService {
         final int assignedRows;
         final int completed;
         final long assignedHours;
-        final long workedHours;
+        final double workedHours;
         final boolean rosterOnly;
 
-        AssignmentLoadSnap(String name, int assignedRows, int completed, long assignedHours, long workedHours,
+        AssignmentLoadSnap(String name, int assignedRows, int completed, long assignedHours, double workedHours,
             boolean rosterOnly) {
             this.name = name;
             this.nameLower = name.trim().toLowerCase(Locale.ROOT);
@@ -2671,7 +2671,7 @@ public class GeminiService {
                     row.path("assignedTaskRows").asInt(0),
                     row.path("completedTasks").asInt(0),
                     row.path("assignedHoursSum").asLong(0),
-                    row.path("workedHoursSum").asLong(0),
+                    row.path("workedHoursSum").asDouble(0),
                     rosterOnly));
             }
             List<AssignmentLoadSnap> active = snaps.stream()
@@ -2782,7 +2782,7 @@ public class GeminiService {
                 } else {
                     overloaded = (avgRows > 0.0 && s.assignedRows >= avgRows * 1.4)
                         || (avgHours > 0.0 && s.assignedHours >= avgHours * 1.35)
-                        || (avgHours > 0.0 && s.workedHours >= avgHours * 1.4 && s.workedHours >= 8L);
+                        || (avgHours > 0.0 && s.workedHours >= avgHours * 1.4 && s.workedHours >= 8.0);
                 }
                 if (!overloaded) {
                     continue;

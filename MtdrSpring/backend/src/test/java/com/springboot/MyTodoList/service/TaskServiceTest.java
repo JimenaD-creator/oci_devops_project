@@ -16,6 +16,7 @@ import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +46,9 @@ class TaskServiceTest {
     @Mock
     private TaskEmbeddingRepository taskEmbeddingRepository;
 
+    @Mock
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
+
     @InjectMocks
     private TaskService taskService;
 
@@ -57,6 +61,12 @@ class TaskServiceTest {
             t.setId(10L);
             return t;
         });
+        when(taskRepository.findById(10L)).thenAnswer(inv -> {
+            Task t = new Task();
+            t.setId(10L);
+            return Optional.of(t);
+        });
+        when(taskRepository.findProjectIdByTaskId(10L)).thenReturn(Optional.of(1L));
 
         Task result = taskService.createTask(task, null);
 
@@ -87,6 +97,7 @@ class TaskServiceTest {
             t.setStatus("IN PROGRESS");
             return Optional.of(t);
         });
+        when(taskRepository.findProjectIdByTaskId(20L)).thenReturn(Optional.of(2L));
 
         Task result = taskService.createTask(task, Arrays.asList(2L, 2L, null, 0L));
 
@@ -97,7 +108,7 @@ class TaskServiceTest {
         ArgumentCaptor<UserTask> captor = ArgumentCaptor.forClass(UserTask.class);
         verify(userTaskRepository).save(captor.capture());
         assertEquals("IN PROGRESS", captor.getValue().getStatus());
-        assertEquals(0L, captor.getValue().getWorkedHours());
+        assertEquals(0.0, captor.getValue().getWorkedHours(), 0.001);
     }
 
     @Test
@@ -126,6 +137,7 @@ class TaskServiceTest {
     void deleteTaskById_removesAssignmentsEmbeddingsAndTask() {
         UserTask assignment = new UserTask();
         when(userTaskRepository.findByTask_Id(40L)).thenReturn(List.of(assignment));
+        when(taskRepository.findProjectIdByTaskId(40L)).thenReturn(Optional.of(7L));
 
         taskService.deleteTaskById(40L);
 
@@ -137,6 +149,7 @@ class TaskServiceTest {
     @Test
     void deleteTaskById_noAssignments_stillDeletesTask() {
         when(userTaskRepository.findByTask_Id(41L)).thenReturn(Collections.emptyList());
+        when(taskRepository.findProjectIdByTaskId(41L)).thenReturn(Optional.empty());
 
         taskService.deleteTaskById(41L);
 

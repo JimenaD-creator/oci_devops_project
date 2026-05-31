@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.UserTaskService;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +48,9 @@ public class UserTaskController {
 
     @Autowired
     private UserTaskService userTaskService;
+
+    @Autowired
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     @GetMapping("/my-blockers")
     public ResponseEntity<List<Map<String, Object>>> getMyBlockers(
@@ -143,13 +147,13 @@ public class UserTaskController {
          * UI often sends only { userId, taskId, status } when marking an assignee complete.
          * Do not default workedHours to 0 — that wiped WORKED_HOURS. Only overwrite when the client sends the field.
          */
-        long hoursToSave;
+        double hoursToSave;
         if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
-            hoursToSave = ((Number) payload.get("workedHours")).longValue();
+            hoursToSave = ((Number) payload.get("workedHours")).doubleValue();
         } else if (userTask.getWorkedHours() != null) {
             hoursToSave = userTask.getWorkedHours();
         } else {
-            hoursToSave = 0L;
+            hoursToSave = 0.0;
         }
 
         userTask.setStatus(status != null ? status.toUpperCase() : "TODO");
@@ -157,6 +161,7 @@ public class UserTaskController {
 
         UserTask saved = userTaskRepository.save(userTask);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        projectTaskEventPublisher.taskUpdated(taskId, userId, "rest");
 
         return ResponseEntity.ok(saved);
 
@@ -179,7 +184,7 @@ public ResponseEntity<String> testInsert() {
 
         UserTask ut = new UserTask(user, task);
         ut.setStatus("TODO");
-        ut.setWorkedHours(0L);
+        ut.setWorkedHours(0.0);
 
         UserTask saved = userTaskRepository.save(ut);
         return ResponseEntity.ok("OK — saved with id: " + saved.getId());

@@ -141,6 +141,10 @@ export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) 
     : developerNames
       ? [developerNames]
       : [];
+  const workedHours = (assignmentRows || []).reduce((sum, ut) => {
+    const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
   return {
     id: task.id,
     description: task.title || `Task #${task.id}`,
@@ -151,7 +155,8 @@ export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) 
     status: statusMap[normalizedStatus] ?? 'todo',
     rawStatus: normalizedStatus,
     rawStatusOriginal: task.status,
-    actualHours: task.assignedHours ?? null,
+    assignedHours: task.assignedHours ?? null,
+    actualHours: workedHours > 0 ? workedHours : null,
     developers: list,
     developer: list[0] ?? null,
     dueDate: task.dueDate,

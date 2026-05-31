@@ -19,6 +19,7 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.ToDoItemRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,9 @@ public class UserTaskService {
 
     @Autowired
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Autowired
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     @Transactional(readOnly = true)
     public List<Long> findSprintIdsWithAssignmentsForUser(Long userId) {
@@ -189,6 +193,7 @@ public class UserTaskService {
             toDoItemRepository.updateStatusOnly(taskIdInt, synced.getStatus());
         }
         logger.info("USER_TASK status for userId {} taskId {} set to {} (task row synced)", userId, taskId, canonical);
+        projectTaskEventPublisher.taskUpdated(taskId, userId, "telegram");
         return true;
     }
 
@@ -261,10 +266,11 @@ public class UserTaskService {
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
         UserTask ut = new UserTask(user, task);
         ut.setStatus("TODO");
-        ut.setWorkedHours(0L);
+        ut.setWorkedHours(0.0);
         ut.setIsBlocked(false);
         userTaskRepository.save(ut);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        projectTaskEventPublisher.taskAssigned(taskId, userId, "telegram");
     }
 
     @Transactional
@@ -286,39 +292,39 @@ public class UserTaskService {
         ut.setBlockedReason(null);
         userTaskRepository.save(ut);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        projectTaskEventPublisher.taskUpdated(taskId, telegramUserId, "telegram");
         return true;
     }
 
     @Transactional
-    public UserTask saveWorkedHours(Long userId, Long taskId, Integer workedHours) {
+    public UserTask saveWorkedHours(Long userId, Long taskId, Double workedHours) {
         try {
             Long effectiveUserId = resolveAssigneeUserIdForWorkedHours(userId, taskId);
             UserTaskId id = new UserTaskId(effectiveUserId, taskId);
             Optional<UserTask> existingUserTask = userTaskRepository.findById(id);
-            int delta = workedHours == null ? 0 : workedHours;
-            if (delta < 0) delta = 0;
+            double hours = workedHours == null ? 0.0 : workedHours;
+            if (hours < 0) hours = 0.0;
             UserTask userTask;
-            long previous = 0L;
             if (existingUserTask.isPresent()) {
                 userTask = existingUserTask.get();
-                Long wh = userTask.getWorkedHours();
-                if (wh != null && wh > 0) previous = wh;
-                logger.info("Adding {}h for userId {} taskId {} (was {}h)", delta, effectiveUserId, taskId, previous);
+                Double wh = userTask.getWorkedHours();
+                logger.info("Setting {}h for userId {} taskId {} (was {}h)", hours, effectiveUserId, taskId, wh);
             } else {
                 User user = userRepository.findById(effectiveUserId)
                         .orElseThrow(() -> new IllegalArgumentException("User not found: " + effectiveUserId));
                 Task task = taskRepository.findById(taskId)
                         .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
                 userTask = new UserTask(user, task);
-                logger.info("Creating USER_TASK for userId {} taskId {} with {}h (first log)", effectiveUserId, taskId, delta);
+                logger.info("Creating USER_TASK for userId {} taskId {} with {}h (first log)", effectiveUserId, taskId, hours);
             }
-            userTask.setWorkedHours(previous + delta);
+            userTask.setWorkedHours(hours);
             userTask.setStatus("COMPLETED");
             userTask.setIsBlocked(false);
             userTask.setBlockedReason(null);
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
             logger.info("Worked hours total for userId {} taskId {} is now {}", effectiveUserId, taskId, userTask.getWorkedHours());
+            projectTaskEventPublisher.taskUpdated(taskId, effectiveUserId, "telegram");
             return saved;
         } catch (Exception e) {
             logger.error("Error saving worked hours for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
@@ -326,18 +332,18 @@ public class UserTaskService {
         }
     }
 
-    public Integer getWorkedHours(Long userId, Long taskId) {
+    public Double getWorkedHours(Long userId, Long taskId) {
         try {
             UserTaskId id = new UserTaskId(userId, taskId);
             Optional<UserTask> userTask = userTaskRepository.findById(id);
             if (userTask.isPresent()) {
-                Long hours = userTask.get().getWorkedHours();
-                return hours != null ? hours.intValue() : 0;
+                Double hours = userTask.get().getWorkedHours();
+                return hours != null ? hours : 0.0;
             }
-            return 0;
+            return 0.0;
         } catch (Exception e) {
             logger.error("Error retrieving worked hours for userId {} taskId {}", userId, taskId, e);
-            return 0;
+            return 0.0;
         }
     }
 
@@ -427,6 +433,7 @@ public class UserTaskService {
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
             logger.info("Blocked reason saved for userId {} taskId {}: {}", effectiveUserId, taskId, blockedReason);
+            projectTaskEventPublisher.blockerReported(taskId, effectiveUserId, "telegram");
             return saved;
         } catch (Exception e) {
             logger.error("Error saving blocked reason for userId {} taskId {}: {}", userId, taskId, e.getMessage(), e);
@@ -468,6 +475,7 @@ public class UserTaskService {
         UserTask saved = userTaskRepository.save(userTask);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
         logger.info("Blocker resolved for userId {} taskId {} (reason preserved)", userId, taskId);
+        projectTaskEventPublisher.blockerResolved(taskId, userId, "portal");
         return saved;
     }
 }
