@@ -54,7 +54,7 @@ function formatWorkedHoursForCard(hours) {
 export default function MyPerformancePage({ projectId, currentUser }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError, invalidateAndRefresh } =
+  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError, ensureLoaded } =
     useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +68,9 @@ export default function MyPerformancePage({ projectId, currentUser }) {
 
   useEffect(() => {
     if (effectiveProjectIdNum != null) {
-      invalidateAndRefresh();
+      ensureLoaded({ silent: true });
     }
-  }, [effectiveProjectIdNum, userId, invalidateAndRefresh]);
+  }, [effectiveProjectIdNum, userId, ensureLoaded]);
 
   useEffect(() => {
     setLoading(sharedLoading);

@@ -31,6 +31,8 @@ import {
   buildTeamProductivityTrendSeries,
   sprintDbIdSortKey,
 } from './dashboardSprintData';
+import { buildProductivityScoreComparisonTrend } from '../developer/developerPerformanceData';
+import { ProductivityScoreCompareChartEmbed } from '../developer/DeveloperPerformanceCharts';
 import { DASHBOARD_SCROLL_VIEWPORT } from './ScrollReveal';
 import {
   CHART_DESC,
@@ -867,6 +869,8 @@ function ChartShell({
   compact,
   belowDescription,
   headerAdornment,
+  /** When true, children render directly (chart + legend layouts); no ResponsiveContainer wrapper. */
+  bareContent = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -880,12 +884,15 @@ function ChartShell({
   const bg = tint ?? (isDark ? 'rgba(92, 107, 192, 0.1)' : 'rgba(92, 107, 192, 0.06)');
   const chartBoxSx =
     typeof height === 'object' && height !== null
-      ? { width: '100%', minWidth: 0, overflow: 'visible', height }
+      ? { width: '100%', minWidth: 0, overflow: bareContent ? 'visible' : 'visible', height }
       : {
           width: '100%',
           minWidth: 0,
           overflow: 'visible',
           height: typeof height === 'number' ? height : 400,
+          ...(bareContent
+            ? { display: 'flex', flexDirection: 'column', minHeight: 0 }
+            : {}),
         };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
@@ -972,11 +979,15 @@ function ChartShell({
 
       {/* Gráfica */}
       <Box ref={chartRef} sx={{ ...chartBoxSx, mt: chartMt }}>
-        {chartVisible ? (
-          <ResponsiveContainer width="100%" height="100%">
-            {children}
-          </ResponsiveContainer>
-        ) : null}
+        {chartVisible
+          ? bareContent
+            ? children
+            : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {children}
+                </ResponsiveContainer>
+              )
+          : null}
       </Box>
     </MotionPaper>
   );
@@ -1084,6 +1095,18 @@ export default function DashboardDeveloperCharts({
     if (!compareMode || orderedSelectedSprints.length < 2) return [];
     return buildTeamProductivityTrendSeries(orderedSelectedSprints);
   }, [compareMode, orderedSelectedSprints]);
+
+  const devProductivityComparison = useMemo(() => {
+    if (!compareMode || orderedSelectedSprints.length < 2) {
+      return { chartData: [], series: [] };
+    }
+    return buildProductivityScoreComparisonTrend(
+      orderedSelectedSprints,
+      projectDevelopers,
+      null,
+      null,
+    );
+  }, [compareMode, orderedSelectedSprints, projectDevelopers]);
 
   const teamTrendAxis = useMemo(() => buildProductivityScoreAxisDomainTicks(), []);
 
@@ -1646,90 +1669,119 @@ export default function DashboardDeveloperCharts({
           </BarChart>
         </ChartShell>
 
-        {/* ── Team productivity trend ── */}
-        <ChartShell
-          compact
-          title="Team productivity score trend"
-          description={CHART_DESC.compare.teamTrend}
-          height={hTeamTrend}
-          accent={teamTrendAccent}
-          tint={alpha(teamTrendAccent, isDark ? 0.12 : 0.08)}
+        {/* ── Productivity score trends: team vs by developer ── */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+            gap: 2,
+            width: '100%',
+            minWidth: 0,
+          }}
         >
-          <LineChart
-            data={teamProductivityTrend}
-            margin={{ top: 36, right: 20, left: 72, bottom: 52 }}
+          <ChartShell
+            compact
+            title="Team productivity score trend"
+            description={CHART_DESC.compare.teamTrend}
+            height={hTeamTrend}
+            accent={teamTrendAccent}
+            tint={alpha(teamTrendAccent, isDark ? 0.12 : 0.08)}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-            <XAxis
-              dataKey="sprintLabel"
-              tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
-              tickMargin={8}
-              height={40}
-              label={{
-                value: 'Sprint',
-                position: 'bottom',
-                offset: 16,
-                fill: isDark ? '#9A9A9A' : '#1A1A1A',
-                ...CHART_AXIS_LABEL,
-              }}
-            />
-            <YAxis
-              domain={teamTrendAxis.domain}
-              ticks={teamTrendAxis.ticks}
-              tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
-              width={44}
-              tickMargin={6}
-              tickFormatter={(v) => `${Math.round(Number(v) || 0)}%`}
-              label={{
-                value: 'Productivity score',
-                angle: -90,
-                position: 'left',
-                offset: 12,
-                fill: teamTrendAccent,
-                ...CHART_AXIS_LABEL,
-                style: { textAnchor: 'middle', fontSize: 13, fontWeight: 700 },
-              }}
-            />
-            <Tooltip
-              {...RECHARTS_BAR_TOOLTIP_PROPS}
-              content={(props) => <TeamProductivityTrendTooltip {...props} />}
-            />
-            <Line
-              type="monotone"
-              dataKey="productivityScore"
-              name="Productivity score"
-              stroke={teamTrendAccent}
-              strokeWidth={3}
-              connectNulls={false}
-              animationDuration={CHART_BAR_ANIM_MS}
-              animationEasing={CHART_BAR_EASING}
-              dot={(dotProps) => {
-                const { cx, cy, payload } = dotProps || {};
-                if (cx == null || cy == null || !Number.isFinite(payload?.productivityScore)) return null;
-                return (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={5}
-                    fill={payload.accentColor || teamTrendAccent}
-                    stroke={isDark ? '#1C1E22' : '#fff'}
-                    strokeWidth={2}
-                  />
-                );
-              }}
-              activeDot={{ r: 7, strokeWidth: 2 }}
+            <LineChart
+              data={teamProductivityTrend}
+              margin={{ top: 36, right: 20, left: 72, bottom: 52 }}
             >
-              <LabelList
-                dataKey="productivityScore"
-                position="top"
-                fill={teamTrendAccent}
-                fontSize={12}
-                fontWeight={800}
-                formatter={(v) => `${Math.round(Number(v) || 0)}%`}
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+              <XAxis
+                dataKey="sprintLabel"
+                tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+                tickMargin={8}
+                height={40}
+                label={{
+                  value: 'Sprint',
+                  position: 'bottom',
+                  offset: 16,
+                  fill: isDark ? '#9A9A9A' : '#1A1A1A',
+                  ...CHART_AXIS_LABEL,
+                }}
               />
-            </Line>
-          </LineChart>
-        </ChartShell>
+              <YAxis
+                domain={teamTrendAxis.domain}
+                ticks={teamTrendAxis.ticks}
+                tick={{ ...CHART_TICK(isDark), fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+                width={44}
+                tickMargin={6}
+                tickFormatter={(v) => `${Math.round(Number(v) || 0)}%`}
+                label={{
+                  value: 'Productivity score',
+                  angle: -90,
+                  position: 'left',
+                  offset: 12,
+                  fill: teamTrendAccent,
+                  ...CHART_AXIS_LABEL,
+                  style: { textAnchor: 'middle', fontSize: 13, fontWeight: 700 },
+                }}
+              />
+              <Tooltip
+                {...RECHARTS_BAR_TOOLTIP_PROPS}
+                content={(props) => <TeamProductivityTrendTooltip {...props} />}
+              />
+              <Line
+                type="monotone"
+                dataKey="productivityScore"
+                name="Productivity score"
+                stroke={teamTrendAccent}
+                strokeWidth={3}
+                connectNulls={false}
+                animationDuration={CHART_BAR_ANIM_MS}
+                animationEasing={CHART_BAR_EASING}
+                dot={(dotProps) => {
+                  const { cx, cy, payload } = dotProps || {};
+                  if (cx == null || cy == null || !Number.isFinite(payload?.productivityScore)) {
+                    return null;
+                  }
+                  return (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={5}
+                      fill={payload.accentColor || teamTrendAccent}
+                      stroke={isDark ? '#1C1E22' : '#fff'}
+                      strokeWidth={2}
+                    />
+                  );
+                }}
+                activeDot={{ r: 7, strokeWidth: 2 }}
+              >
+                <LabelList
+                  dataKey="productivityScore"
+                  position="top"
+                  fill={teamTrendAccent}
+                  fontSize={12}
+                  fontWeight={800}
+                  formatter={(v) => `${Math.round(Number(v) || 0)}%`}
+                />
+              </Line>
+            </LineChart>
+          </ChartShell>
+
+          <ChartShell
+            compact
+            bareContent
+            title="Productivity score by developer"
+            description={CHART_DESC.compare.devScoreByDeveloper}
+            height={hTeamTrend}
+            accent="#1565C0"
+            tint={isDark ? 'rgba(21, 101, 192, 0.12)' : 'rgba(21, 101, 192, 0.07)'}
+          >
+            <ProductivityScoreCompareChartEmbed
+              data={devProductivityComparison.chartData}
+              series={devProductivityComparison.series}
+              fillParent
+              legendCompact
+            />
+          </ChartShell>
+        </Box>
       </Box>
     );
   }

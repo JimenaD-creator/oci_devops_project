@@ -6,7 +6,9 @@ export const CHART_DESC = {
     hours:
       'Total hours worked and estimated hours per developer, summed across all selected sprints.',
     teamTrend:
-      'Sprint productivity score (0–100%) across selected sprints',
+      'Team productivity score (0–100%) across selected sprints',
+    devScoreByDeveloper:
+      'One line per developer with activity in the selected sprints.',
     combo: 'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',
   },
   single: {

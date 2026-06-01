@@ -55,6 +55,7 @@ import {
   fetchSprintsTasksAndAssignments,
 } from './sprintsPageApi';
 import { useProjectData } from '../../contexts/ProjectDataContext';
+import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import {
   applyRecentUpdatesToTaskLists,
   getRecentlyCreatedTasks,
@@ -202,6 +203,14 @@ export default function SprintsPage({ projectId }) {
     loadData();
   }, [loadData, effectiveProjectIdNum]);
 
+  useProjectBundleSync(
+    useCallback(() => {
+      loadData({ silent: true, forceFresh: false }).catch((e) => {
+        console.error('SprintsPage bundle sync failed:', e);
+      });
+    }, [loadData]),
+  );
+
   useEffect(() => {
     if (!selectedTaskForDialog?.id) return;
     const fresh = tasks.find((t) => Number(t.id) === Number(selectedTaskForDialog.id));
@@ -211,6 +220,7 @@ export default function SprintsPage({ projectId }) {
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'sprints-page') return;
+      if (event?.detail?.source === 'sse') return;
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setTasks((prev) => {
@@ -279,8 +289,8 @@ export default function SprintsPage({ projectId }) {
       setSelectedTaskForDialog(null);
       notifyTasksMutated({ source: 'sprints-page', type: 'task-deleted', taskId });
       try {
-        await invalidateAndRefresh();
-        await loadData({ silent: true, forceFresh: true });
+        await invalidateAndRefresh({ silent: true, confirmOnly: true });
+        await loadData({ silent: true, forceFresh: false });
       } catch (e) {
         console.error('Failed to refresh project data after task delete:', e);
       }
@@ -325,8 +335,8 @@ export default function SprintsPage({ projectId }) {
         userTasks: optimisticRows,
       });
       try {
-        await invalidateAndRefresh();
-        await loadData({ silent: true, forceFresh: true });
+        await invalidateAndRefresh({ silent: true, confirmOnly: true });
+        await loadData({ silent: true, forceFresh: false });
       } catch (e) {
         console.error('Failed to refresh project data after task create:', e);
       }

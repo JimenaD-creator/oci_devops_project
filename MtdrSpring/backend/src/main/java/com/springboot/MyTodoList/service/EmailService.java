@@ -243,23 +243,21 @@ public class EmailService {
 
     private static String buildTelegramBlockerInstructionPlain(String botHandle) {
         if (botHandle != null && !botHandle.isBlank()) {
-            return "Report blockers in Telegram: open https://t.me/"
-                    + botHandle
-                    + " , sign in, and use My Blockers or tell your manager in the bot.";
+            return "report your blocker through Telegram (https://t.me/" + botHandle + ").";
         }
-        return "Report blockers in Telegram: open your team's Task Manager bot, sign in, and use My Blockers.";
+        return "report your blocker through Telegram.";
     }
 
     private static String buildTelegramBlockerInstructionHtml(String botHandle) {
         if (botHandle != null && !botHandle.isBlank()) {
-            return "Report blockers in Telegram: open <a href=\"https://t.me/"
+            return "Report your blocker through "
+                    + "<a href=\"https://t.me/"
                     + escapeHtml(botHandle)
-                    + "\" style=\"color:#0070f3\">@"
+                    + "\" style=\"color:#0070f3\">Telegram (@"
                     + escapeHtml(botHandle)
-                    + "</a>, sign in, and use <strong>My Blockers</strong> or contact your manager in the bot.";
+                    + ")</a>.";
         }
-        return "Report blockers in Telegram: open your team&rsquo;s Task Manager bot, sign in, and use "
-                + "<strong>My Blockers</strong>.";
+        return "Report your blocker through Telegram.";
     }
 
     private static String buildTaskDueReminderPlainText(

@@ -32,6 +32,9 @@ import {
   clampTrendsPercentLikeValues,
   alignKpiMetricsInText,
   alignKpiProseForMetric,
+  alignCompletionRatePercentLabels,
+  stripContradictoryOnTimeDecline,
+  reconcileOnTimeDeliveryConcernProse,
   alignProductivityScoreProse,
 } from './aiInsightsConstants';
 
@@ -81,20 +84,30 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
     }
   }
   messageText = alignAlertMessagePercent(messageText, effectiveAlertValue);
+  if (currentSprintMetrics?.onTimeDelivery != null) {
+    messageText = stripContradictoryOnTimeDecline(
+      messageText,
+      currentSprintMetrics.onTimeDelivery,
+    );
+    messageText = reconcileOnTimeDeliveryConcernProse(
+      messageText,
+      currentSprintMetrics.onTimeDelivery,
+    );
+  }
   const valueIsPercentKpi = KPI_ALERT_PERCENT_KEYS.has(kpiKey);
   return (
     <Box
       sx={{
         display: 'flex',
-        gap: 2,
-        p: { xs: 2, md: 2.5 },
+        gap: 1.25,
+        p: { xs: 1.25, md: 1.5 },
         borderRadius: 2,
         bgcolor: cfg.bg,
         border: `1px solid ${cfg.border}`,
-        mb: 1.5,
+        mb: 1,
       }}
     >
-      <Icon size={24} color={cfg.color} style={{ marginTop: 4, flexShrink: 0 }} />
+      <Icon size={20} color={cfg.color} style={{ marginTop: 2, flexShrink: 0 }} />
       <Box sx={{ flex: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
           <Chip
@@ -161,15 +174,17 @@ export function WorkloadCard({ rec }) {
   );
 }
 
-export function SectionHeading({ icon: Icon, children }) {
+export function SectionHeading({ icon: Icon, children, dense = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-      {Icon && <Icon size={22} color={isDark ? '#9A9A9A' : '#607D8B'} aria-hidden />}
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: dense ? 0 : 2, flexWrap: 'wrap' }}>
+      {Icon && (
+        <Icon size={dense ? 18 : 22} color={isDark ? '#9A9A9A' : '#607D8B'} aria-hidden />
+      )}
       <Typography
         sx={{
-          fontSize: { xs: '1.1rem', md: '1.25rem' },
+          fontSize: dense ? { xs: '0.92rem', md: '0.98rem' } : { xs: '1.1rem', md: '1.25rem' },
           fontWeight: 800,
           color: 'text.primary',
           letterSpacing: '-0.02em',
@@ -192,7 +207,7 @@ export function BlockedAssignmentsSnapshot({ rows }) {
   return (
     <Box
       sx={{
-        mb: { xs: 2.5, md: 3.5 },
+        mb: 1.5,
         border: `1px solid ${isDark ? 'rgba(198, 40, 40, 0.5)' : 'rgba(198, 40, 40, 0.35)'}`,
         borderRadius: 2,
         overflow: 'hidden',
@@ -389,9 +404,15 @@ export function ExecutiveSummaryBlock({
     if (!raw) return null;
     const clamped = clampTrendsPercentLikeValues(raw);
     const withKpis = alignKpiMetricsInText(clamped, alignedMetrics);
-    return currentSprintActualScore != null
-      ? alignProductivityScoreProse(withKpis, currentSprintActualScore)
-      : withKpis;
+    let out =
+      currentSprintActualScore != null
+        ? alignProductivityScoreProse(withKpis, currentSprintActualScore)
+        : withKpis;
+    if (alignedMetrics?.onTimeDelivery != null) {
+      out = stripContradictoryOnTimeDecline(out, alignedMetrics.onTimeDelivery);
+      out = reconcileOnTimeDeliveryConcernProse(out, alignedMetrics.onTimeDelivery);
+    }
+    return out;
   };
   const trendsText = alignEsBlock(es?.trends);
   const overviewText = alignEsBlock(es?.overview);
@@ -403,8 +424,8 @@ export function ExecutiveSummaryBlock({
   const hasBreakdown = taskStatusBreakdown != null && taskStatusBreakdown.total != null;
 
   const statusChips = hasBreakdown ? (
-    <Box sx={{ mb: hasEsContent || fallbackSummary ? 2 : 0 }}>
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 1 }}>
+    <Box sx={{ mb: hasEsContent || fallbackSummary ? 1.25 : 0 }}>
+      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.75 }}>
         Task status
       </Typography>
       <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
@@ -448,7 +469,7 @@ export function ExecutiveSummaryBlock({
       >
         {statusChips}
         {overviewText && (
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 1.5 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Overview
             </Typography>
@@ -464,7 +485,7 @@ export function ExecutiveSummaryBlock({
           </Box>
         )}
         {trendsText && (
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 1.5 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Trends
             </Typography>
@@ -480,7 +501,7 @@ export function ExecutiveSummaryBlock({
           </Box>
         )}
         {improvementAreasText && (
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 1.5 }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
               Improvement areas
             </Typography>
@@ -607,6 +628,7 @@ export function PredictionsBlock({
   showNextSprintForecast = true,
   nextSprintLabel = null,
   nextSprintActualScore = null,
+  currentSprintMetrics = null,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -694,23 +716,47 @@ export function PredictionsBlock({
         </Box>
       )}
       {showScoreCard && (
-        <PredictionCard 
-          prediction={productivityPrediction} 
+        <PredictionCard
+          prediction={productivityPrediction}
           nextSprintLabel={nextSprintLabel}
           nextSprintActualScore={nextSprintActualScore}
+          currentSprintMetrics={currentSprintMetrics}
         />
       )}
     </Box>
   );
 }
 
-export function PredictionCard({ prediction, nextSprintLabel = null, nextSprintActualScore = null }) {
+export function PredictionCard({
+  prediction,
+  nextSprintLabel = null,
+  nextSprintActualScore = null,
+  currentSprintMetrics = null,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const rawScore = Number(prediction?.predictedScore);
-  const clampedScore = Number.isFinite(rawScore)
-    ? Math.max(0, Math.min(100, Math.round(rawScore)))
+  const livePs = Number(currentSprintMetrics?.productivityScore);
+  const resolvedScore =
+    Number.isFinite(livePs) &&
+    Number.isFinite(rawScore) &&
+    ((Math.abs(rawScore - Number(currentSprintMetrics?.onTimeDelivery)) <= 3 &&
+      Math.abs(rawScore - livePs) > 5) ||
+      (Math.abs(rawScore - Number(currentSprintMetrics?.completionRate)) <= 3 &&
+        Math.abs(rawScore - livePs) > 5))
+      ? livePs
+      : rawScore;
+  const clampedScore = Number.isFinite(resolvedScore)
+    ? Math.max(0, Math.min(100, Math.round(resolvedScore)))
     : 0;
+  const reasoningRaw = prediction?.reasoning ?? '';
+  const reasoningAligned =
+    currentSprintMetrics && reasoningRaw
+      ? alignCompletionRatePercentLabels(
+          alignKpiMetricsInText(reasoningRaw, currentSprintMetrics),
+          currentSprintMetrics,
+        )
+      : reasoningRaw;
   const TrendIcon =
     prediction.trend === 'up' ? TrendingUp : prediction.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
@@ -743,8 +789,11 @@ export function PredictionCard({ prediction, nextSprintLabel = null, nextSprintA
         >
           {clampedScore}
         </Typography>
-        <Typography sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
-          % predicted
+        <Typography sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, textAlign: 'center' }}>
+          % productivity
+          <Box component="span" sx={{ display: 'block', fontSize: '0.68rem', fontWeight: 500 }}>
+            predicted
+          </Box>
         </Typography>
         <TrendIcon size={24} color={trendColor} style={{ marginTop: 6 }} />
       </Box>
@@ -767,7 +816,7 @@ export function PredictionCard({ prediction, nextSprintLabel = null, nextSprintA
         <Typography
           sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: isDark ? '#E0E0E0' : '#37474F', lineHeight: 1.55 }}
         >
-          {prediction.reasoning}
+          {reasoningAligned}
         </Typography>
         {showComparison && (
           <Box sx={{ mt: 1.5, pt: 1, borderTop: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}` }}>

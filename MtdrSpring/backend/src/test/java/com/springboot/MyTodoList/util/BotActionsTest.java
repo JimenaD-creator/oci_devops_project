@@ -390,6 +390,45 @@ class BotActionsTest {
         assertEquals(developerId, stateManager.getViewingSelectedUserId(chatId));
     }
 
+    @Test
+    void decimalHoursSubmission_savesViaUserTaskService() throws Exception {
+        long chatId = 600L;
+        Long developerId = 15L;
+        Integer taskId = 42;
+
+        stateManager.setTelegramSignedInUser(chatId, developerId);
+        stateManager.setWaitingForHours(chatId, taskId, null, developerId);
+
+        BotActions submitHours = newBotActions();
+        submitHours.setChatId(chatId);
+        submitHours.setRequestText("1.5");
+        submitHours.fnElse();
+
+        verify(userTaskService).saveWorkedHours(eq(developerId), eq(42L), eq(1.5));
+        assertFalse(stateManager.hasPendingState(chatId));
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(telegramClient, atLeast(1)).execute(captor.capture());
+        assertTrue(captor.getValue().getText().contains("1.5 hours recorded"));
+    }
+
+    @Test
+    void decimalHoursSubmission_acceptsCommaSeparator() throws Exception {
+        long chatId = 601L;
+        Long developerId = 16L;
+        Integer taskId = 43;
+
+        stateManager.setTelegramSignedInUser(chatId, developerId);
+        stateManager.setWaitingForHours(chatId, taskId, null, developerId);
+
+        BotActions submitHours = newBotActions();
+        submitHours.setChatId(chatId);
+        submitHours.setRequestText("1,5");
+        submitHours.fnElse();
+
+        verify(userTaskService).saveWorkedHours(eq(developerId), eq(43L), eq(1.5));
+    }
+
     // All reply-keyboard button captions in one string (for assertions).
     private static String flattenKeyboard(SendMessage msg) {
         if (!(msg.getReplyMarkup() instanceof ReplyKeyboardMarkup)) {

@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.UserTaskService;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +48,9 @@ public class UserTaskController {
 
     @Autowired
     private UserTaskService userTaskService;
+
+    @Autowired
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     @GetMapping("/my-blockers")
     public ResponseEntity<List<Map<String, Object>>> getMyBlockers(
@@ -139,24 +143,31 @@ public class UserTaskController {
         UserTask userTask = userTaskRepository.findById(id)
                 .orElseGet(() -> new UserTask(user, task));
 
+        String newStatus = status != null ? status.toUpperCase() : "TODO";
+        boolean wasDone = userTask.isCompletedAssignment();
+        userTask.setStatus(newStatus);
+        boolean nowDone = userTask.isCompletedAssignment();
+
         /*
-         * UI often sends only { userId, taskId, status } when marking an assignee complete.
-         * Do not default workedHours to 0 — that wiped WORKED_HOURS. Only overwrite when the client sends the field.
+         * Reopening (COMPLETED → other): clear hours so the next completion logs a fresh total.
+         * Completing without workedHours in payload: keep existing total (setStatus does not clear).
          */
-        long hoursToSave;
-        if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
-            hoursToSave = ((Number) payload.get("workedHours")).longValue();
+        double hoursToSave;
+        if (!nowDone && wasDone) {
+            hoursToSave = 0.0;
+        } else if (payload.containsKey("workedHours") && payload.get("workedHours") != null) {
+            hoursToSave = Math.max(0.0, ((Number) payload.get("workedHours")).doubleValue());
         } else if (userTask.getWorkedHours() != null) {
             hoursToSave = userTask.getWorkedHours();
         } else {
-            hoursToSave = 0L;
+            hoursToSave = 0.0;
         }
 
-        userTask.setStatus(status != null ? status.toUpperCase() : "TODO");
         userTask.setWorkedHours(hoursToSave);
 
         UserTask saved = userTaskRepository.save(userTask);
         taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+        projectTaskEventPublisher.taskUpdated(taskId, userId, "rest");
 
         return ResponseEntity.ok(saved);
 
@@ -179,7 +190,7 @@ public ResponseEntity<String> testInsert() {
 
         UserTask ut = new UserTask(user, task);
         ut.setStatus("TODO");
-        ut.setWorkedHours(0L);
+        ut.setWorkedHours(0.0);
 
         UserTask saved = userTaskRepository.save(ut);
         return ResponseEntity.ok("OK — saved with id: " + saved.getId());

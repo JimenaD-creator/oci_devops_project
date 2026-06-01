@@ -43,6 +43,7 @@ import {
   PredictionsBlock,
   BlockedAssignmentsSnapshot,
 } from './InsightCardParts';
+import InsightsFreshnessBanner from './InsightsFreshnessBanner';
 
 function normalizeRecommendationKey(rec) {
   const cat = String(rec?.category ?? '')
@@ -124,6 +125,7 @@ export default function InsightCard({
   currentSprintActualScore = null,
   currentSprintMetrics = null,
   refreshToken = 0,
+  autoGenerateOnMissing = true,
   onOpenTeam = null,
 }) {
   const theme = useTheme();
@@ -139,6 +141,10 @@ export default function InsightCard({
   const [lastGeneratedAtMs, setLastGeneratedAtMs] = useState(null);
   const lastGeneratedAtMsRef = useRef(null);
   const cancelPollRef = useRef(false);
+  const autoGenInFlightRef = useRef(false);
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const lastSprintIdRef = useRef(null);
 
   const parseGeneratedAtMs = (value) => {
     const ms = new Date(value ?? '').getTime();
@@ -241,12 +247,15 @@ export default function InsightCard({
   }, [sprintId, pollForResults]);
 
   const loadExisting = useCallback(async () => {
-    if (!isValidSprintId(sprintId)) return;
+    if (!isValidSprintId(sprintId)) return { action: 'none' };
     try {
       const { notFound, data } = await fetchSprintInsights(sprintId);
       if (notFound || !data) {
+        setInsights(null);
+        setErrorCode(null);
+        setError(null);
         setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
-        return;
+        return { action: 'autoGenerate' };
       }
       const generatedMs = parseGeneratedAtMs(data.generatedAt);
       lastGeneratedAtMsRef.current = generatedMs;
@@ -260,7 +269,7 @@ export default function InsightCard({
               setErrorCode(null);
               setError(null);
               setStatus('idle');
-              return;
+              return { action: 'autoGenerate' };
             }
           } catch {
             /* show stored error below */
@@ -268,34 +277,102 @@ export default function InsightCard({
           setErrorCode(data.error);
           setError(getErrorMessage(data.error));
           setStatus('error');
-          return;
+          return { action: 'none' };
         }
         setInsights(null);
         setErrorCode(null);
         setError(null);
         setStatus('idle');
-        return;
+        return { action: 'autoGenerate' };
       }
       if (data.insights == null) {
         setInsights(null);
+        setErrorCode(null);
+        setError(null);
         setStatus('idle');
-        return;
+        return { action: 'autoGenerate' };
       }
       setInsights(data.insights);
       setAcknowledged(data.acknowledged ?? false);
       setErrorCode(null);
       setError(null);
       setStatus('loaded');
+      return { action: 'none' };
     } catch {
       setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
+      return { action: 'autoGenerate' };
     }
   }, [sprintId]);
 
+  const maybeAutoGenerateAfterLoad = useCallback(
+    async (loadAction) => {
+      if (!autoGenerateOnMissing || !isValidSprintId(sprintId)) return;
+      if (loadAction === 'none') return;
+      if (autoGenInFlightRef.current) return;
+
+      if (loadAction !== 'autoGenerate') return;
+
+      autoGenInFlightRef.current = true;
+      setStatus('generating');
+      setError(null);
+      setErrorCode(null);
+      try {
+        const aiStatus = await fetchAiStatus();
+        if (cancelPollRef.current) return;
+        if (!aiStatus.geminiConfigured) {
+          const code = aiStatus.errorCode ?? 'GEMINI_API_KEY_MISSING';
+          setErrorCode(code);
+          setError(getErrorMessage(code) || aiStatus.message || 'AI insights are not configured.');
+          setStatus('error');
+          return;
+        }
+        await startGeneration();
+      } catch (err) {
+        if (!cancelPollRef.current) {
+          setErrorCode(null);
+          setError(
+            err?.message
+              ? `Could not start AI insights automatically: ${err.message}`
+              : 'Could not start AI insights automatically. Check server connection and try Generate.',
+          );
+          setStatus('error');
+        }
+      } finally {
+        autoGenInFlightRef.current = false;
+      }
+    },
+    [autoGenerateOnMissing, sprintId, pollForResults, startGeneration],
+  );
+
   useEffect(() => {
     if (!isValidSprintId(sprintId)) return;
+
+    const sprintChanged = lastSprintIdRef.current !== sprintId;
+    lastSprintIdRef.current = sprintId;
+
+    if (!sprintChanged) {
+      if (
+        statusRef.current === 'generating' ||
+        statusRef.current === 'polling' ||
+        autoGenInFlightRef.current
+      ) {
+        return;
+      }
+      let cancelled = false;
+      (async () => {
+        const outcome = await loadExisting();
+        if (cancelled) return;
+        await maybeAutoGenerateAfterLoad(outcome?.action ?? 'none');
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     cancelPollRef.current = true;
+    autoGenInFlightRef.current = false;
     setInsights(null);
-    setStatus('idle');
+    setStatus('checking');
     setAcknowledged(false);
     setError(null);
     setErrorCode(null);
@@ -303,9 +380,18 @@ export default function InsightCard({
     setLastGeneratedAtMs(null);
     lastGeneratedAtMsRef.current = null;
     cancelPollRef.current = false;
-    loadExisting();
+
+    let cancelled = false;
+    (async () => {
+      const outcome = await loadExisting();
+      if (cancelled || cancelPollRef.current) return;
+      await maybeAutoGenerateAfterLoad(outcome?.action ?? 'none');
+    })();
+
     return () => {
+      cancelled = true;
       cancelPollRef.current = true;
+      autoGenInFlightRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when sprint or refreshToken changes
   }, [sprintId, refreshToken]);
@@ -348,7 +434,7 @@ export default function InsightCard({
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        p: { xs: 2.5, sm: 3.5, md: 4.5 },
+        p: { xs: 1.5, sm: 2, md: 2.25 },
         borderRadius: 2,
         border: `1px solid ${isDark ? 'rgba(103,58,183,0.3)' : 'rgba(103,58,183,0.18)'}`,
         borderLeft: '4px solid #673AB7',
@@ -366,9 +452,9 @@ export default function InsightCard({
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Sparkles size={22} color="#673AB7" />
+          <Sparkles size={20} color="#673AB7" />
           <Typography
-            sx={{ fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' }, color: 'text.primary' }}
+            sx={{ fontWeight: 700, fontSize: { xs: '0.98rem', md: '1.05rem' }, color: 'text.primary' }}
           >
             {sprintLabel}
           </Typography>
@@ -436,6 +522,29 @@ export default function InsightCard({
           )}
         </Box>
       </Box>
+
+      {(status === 'loaded' && insights) || status === 'generating' || status === 'polling' ? (
+        <Typography
+          sx={{
+            fontWeight: 800,
+            fontSize: { xs: '0.88rem', md: '0.95rem' },
+            color: '#673AB7',
+            mb: 1,
+            mt: 0.25,
+          }}
+        >
+          AI interpretation
+        </Typography>
+      ) : null}
+
+      {status === 'checking' && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.5 }}>
+          <CircularProgress size={24} sx={{ color: '#C74634' }} />
+          <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
+            Loading insights…
+          </Typography>
+        </Box>
+      )}
 
       {/* Idle / Error */}
       {(status === 'idle' || status === 'error') && (
@@ -510,13 +619,19 @@ export default function InsightCard({
       {/* Loaded */}
       {status === 'loaded' && insights && (
         <Collapse in={expanded}>
+          <InsightsFreshnessBanner
+            generatedAt={
+              lastGeneratedAtMs != null ? new Date(lastGeneratedAtMs).toISOString() : null
+            }
+            status={status}
+          />
           {/* Snapshot counters */}
           <Box
             sx={{
-              mb: { xs: 2.5, md: 3.5 },
+              mb: 1.5,
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
-              gap: 1.5,
+              gap: 1,
             }}
           >
             {[
@@ -545,16 +660,16 @@ export default function InsightCard({
               <Box
                 key={s.label}
                 sx={{
-                  px: 2,
-                  py: 1.5,
-                  borderRadius: 2,
+                  px: 1.25,
+                  py: 1,
+                  borderRadius: 1.5,
                   border: `1px solid ${s.border}`,
                   bgcolor: s.bg,
                   textAlign: 'center',
                 }}
               >
                 <Typography
-                  sx={{ fontSize: '1.7rem', lineHeight: 1.1, fontWeight: 800, color: s.color }}
+                  sx={{ fontSize: '1.35rem', lineHeight: 1.1, fontWeight: 800, color: s.color }}
                 >
                   {s.value}
                 </Typography>
@@ -574,12 +689,12 @@ export default function InsightCard({
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', lg: '1.05fr 0.95fr' },
-              gap: { xs: 2, md: 2.5 },
-              mb: { xs: 3, md: 4 },
+              gap: { xs: 1.25, md: 1.5 },
+              mb: { xs: 2, md: 2.5 },
             }}
           >
             {/* Left column: alerts + executive summary */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               <Box
                 sx={{
                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
@@ -590,15 +705,17 @@ export default function InsightCard({
               >
                 <Box
                   sx={{
-                    px: 2,
-                    py: 1.25,
+                    px: 1.5,
+                    py: 0.75,
                     bgcolor: isDark ? '#2A1A3D' : '#F3E5F5',
                     borderBottom: `1px solid ${isDark ? 'rgba(156,39,176,0.3)' : 'rgba(156,39,176,0.18)'}`,
                   }}
                 >
-                  <SectionHeading icon={BarChart2}>Automatic alerts</SectionHeading>
+                  <SectionHeading icon={BarChart2} dense>
+                    Automatic alerts
+                  </SectionHeading>
                 </Box>
-                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                <Box sx={{ p: { xs: 1.25, md: 1.5 } }}>
                   <AlertTypesLegend />
                   {insights.alerts?.length > 0 ? (
                     insights.alerts.map((a, i) => (
@@ -642,9 +759,11 @@ export default function InsightCard({
                 <Box
                   sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#1A3A5C' : '#E3F2FD', borderBottom: `1px solid ${isDark ? '#1A3A5C' : '#BBDEFB'}` }}
                 >
-                  <SectionHeading icon={FileText}>Sprint summary</SectionHeading>
+                  <SectionHeading icon={FileText}>
+                    Sprint summary
+                  </SectionHeading>
                 </Box>
-                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                   {(() => {
                     const es = insights.executiveSummary;
                     const hasExecFields =
@@ -681,7 +800,7 @@ export default function InsightCard({
             </Box>
 
             {/* Right column: recommendations + predictions */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               <Box
                 sx={{
                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
@@ -691,11 +810,13 @@ export default function InsightCard({
                 }}
               >
                 <Box
-                  sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', borderBottom: `1px solid ${isDark ? '#2E7D32' : '#C8E6C9'}` }}
+                  sx={{ px: 1.5, py: 0.75, bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', borderBottom: `1px solid ${isDark ? '#2E7D32' : '#C8E6C9'}` }}
                 >
-                  <SectionHeading icon={Lightbulb}>Actionable recommendations</SectionHeading>
+                  <SectionHeading icon={Lightbulb} dense>
+                    Actionable recommendations
+                  </SectionHeading>
                 </Box>
-                <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                <Box sx={{ p: { xs: 1.25, md: 1.5 } }}>
                   {recommendationList.length > 0 ? (
                     <ActionableRecommendationsList items={recommendationList} />
                   ) : (
@@ -722,11 +843,13 @@ export default function InsightCard({
                   }}
                 >
                   <Box
-                    sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#4A3A1A' : '#FFF8E1', borderBottom: `1px solid ${isDark ? '#7F6A1A' : '#FFECB3'}` }}
+                    sx={{ px: 1.5, py: 0.75, bgcolor: isDark ? '#4A3A1A' : '#FFF8E1', borderBottom: `1px solid ${isDark ? '#7F6A1A' : '#FFECB3'}` }}
                   >
-                    <SectionHeading icon={Sparkles}>Predictions</SectionHeading>
+                    <SectionHeading icon={Sparkles} dense>
+                      Predictions
+                    </SectionHeading>
                   </Box>
-                  <Box sx={{ p: { xs: 1.5, md: 2 } }}>
+                  <Box sx={{ p: { xs: 1.25, md: 1.5 } }}>
                     {hasPredictionsContent ? (
                       <PredictionsBlock
                         predictions={insights.predictions}
@@ -734,6 +857,7 @@ export default function InsightCard({
                         showNextSprintForecast={showNextSprintForecast}
                         nextSprintLabel={nextSprintLabel}
                         nextSprintActualScore={nextSprintActualScore}
+                        currentSprintMetrics={currentSprintMetrics}
                       />
                     ) : (
                       <Typography

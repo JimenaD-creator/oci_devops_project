@@ -107,13 +107,19 @@ export function alignAlertMessagePercent(prose, rawValue) {
   return String(prose).split(`${raw}%`).join(`${clamped}%`);
 }
 
+/** "21 percentage points" → "21%" (keeps Gemini sentence structure). */
+export function normalizePercentagePointsLabel(text) {
+  if (text == null) return text;
+  return String(text).replace(/\b(\d+(?:\.\d+)?)\s+percentage points?\b/gi, '$1%');
+}
+
 /**
  * Clamp percentage-like values in executive Trends prose to [0, 100].
  * Handles explicit percentages (e.g., "117%") and phrases like "score of 102.2".
  */
 export function clampTrendsPercentLikeValues(text) {
   if (text == null) return text;
-  let out = String(text);
+  let out = normalizePercentagePointsLabel(String(text));
   const clamp = (n) => Math.max(0, Math.min(100, n));
   const toDisplay = (n) => {
     const c = clamp(Number(n));
@@ -259,7 +265,11 @@ export function alignAlertLoosePercents(text, actualPercent) {
   out = out.replace(/\bcurrently\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `currently at ${display}`);
   out = out.replace(/\bnow\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `now at ${display}`);
   out = out.replace(/\bstands\s+at\s+-?\d+(?:\.\d+)?\s*%/gi, `stands at ${display}`);
-  return out;
+  out = out.replace(/\bhaving\s+dropped\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `which is at ${display}`);
+  out = out.replace(/\bhaving\s+fallen\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `which is at ${display}`);
+  out = out.replace(/\bdropped\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `is at ${display}`);
+  out = out.replace(/\bfell\s+to\s+-?\d+(?:\.\d+)?\s*%/gi, `is at ${display}`);
+  return fixHavingIsAtGrammar(out);
 }
 
 /** Fixes "0%as" → "0% as" after KPI % alignment (regex consumed optional %). */
@@ -277,6 +287,18 @@ function applyKpiMetricPatterns(text, key, actual) {
   tightList.forEach((pattern) => {
     result = result.replace(pattern, (_, prefix) => `${prefix}${display}`);
   });
+  if (key === 'onTimeDelivery') {
+    result = result.replace(
+      /improved on[- ]?time delivery by \d+(?:\.\d+)?\s*%/gi,
+      `on-time delivery at ${display}`,
+    );
+    result = result.replace(
+      /(-?\d+(?:\.\d+)?)\s*%\s*(?:improvement|increase|gain|decline|drop|reduction|decrease)\s+in\s+on[- ]?time[^.!?]*/gi,
+      `on-time delivery at ${display}`,
+    );
+    result = result.replace(/driven by a on[- ]?time delivery/gi, 'with on-time delivery');
+    result = result.replace(/driven by an on[- ]?time delivery/gi, 'with on-time delivery');
+  }
   const proximity = KPI_METRIC_PROXIMITY[key];
   if (proximity) {
     proximity.forEach((pattern) => {
@@ -284,6 +306,41 @@ function applyKpiMetricPatterns(text, key, actual) {
     });
   }
   return result;
+}
+
+/** Fixes "93% completion rate" when 93 is on-time delivery, not completion rate. */
+export function alignCompletionRatePercentLabels(text, metrics = {}) {
+  if (text == null || typeof text !== 'string') return text;
+  const cr = Number(metrics.completionRate);
+  const otd = Number(metrics.onTimeDelivery);
+  if (!Number.isFinite(cr) || !Number.isFinite(otd) || Math.abs(cr - otd) <= 3) return text;
+  let out = String(text).replace(/(\d+(?:\.\d+)?)\s*%\s*completion\s*rate/gi, (match, cited) => {
+    const n = Math.round(Number(cited));
+    if (Math.abs(n - otd) <= 2 && Math.abs(n - cr) > 5) {
+      return `${Math.round(otd)}% on-time delivery`;
+    }
+    return `${Math.round(cr)}% completion rate`;
+  });
+  out = out.replace(
+    /(on[- ]?time delivery at \d+)%\.?\s+and\s+a strong on[- ]?time delivery[^.!?]*/gi,
+    '$1%',
+  );
+  return out;
+}
+
+/** When trends cite productivity score as on-time improvement, rewrite to live on-time %. */
+export function fixProductivityPercentMisattributedToOnTime(text, metrics = {}) {
+  if (text == null || typeof text !== 'string') return text;
+  const ps = Number(metrics.productivityScore);
+  const otd = Number(metrics.onTimeDelivery);
+  if (!Number.isFinite(ps) || !Number.isFinite(otd) || Math.abs(ps - otd) <= 3) return text;
+  const match = text.match(
+    /(\d+(?:\.\d+)?)\s*%\s*(?:improvement|increase|gain|decline|drop|reduction|decrease)\s+in\s+on[- ]?time/i,
+  );
+  if (!match) return text;
+  const cited = Math.round(Number(match[1]));
+  if (Math.abs(cited - ps) > 2 || Math.abs(cited - otd) <= 5) return text;
+  return applyKpiMetricPatterns(text, 'onTimeDelivery', otd);
 }
 
 /**
@@ -313,6 +370,8 @@ export function alignKpiMetricsInText(text, metrics = {}) {
     if (actual == null || !Number.isFinite(Number(actual))) return;
     result = applyKpiMetricPatterns(result, key, actual);
   });
+  result = fixProductivityPercentMisattributedToOnTime(result, metrics);
+  result = alignCompletionRatePercentLabels(result, metrics);
   return fixGluedPercentProse(result);
 }
 
@@ -328,7 +387,60 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   if (metricKey === 'productivityScore') {
     out = alignProductivityScoreProse(out, actual);
   }
+  if (metricKey === 'onTimeDelivery' && metrics.onTimeDelivery != null) {
+    out = reconcileOnTimeDeliveryConcernProse(out, metrics.onTimeDelivery);
+  }
   return out;
+}
+
+const ON_TIME_DECLINE_CLAIM_RE =
+  /declined|declining|dropped|fell|decreased|reduced|worsened|declined\s+for\s+\d+\s+consecutive/i;
+
+/**
+ * Drops on-time "decline" sentences when the live KPI card shows strong delivery (e.g. 100%).
+ */
+/** Fixes "having is at" after aligning "dropped to" inside "having dropped to". */
+export function fixHavingIsAtGrammar(text) {
+  if (text == null) return text;
+  return String(text).replace(/\bhaving\s+is\s+at\b/gi, 'which is at');
+}
+
+/**
+ * On-time ≥ 70% should not be called the "primary concern".
+ */
+export function reconcileOnTimeDeliveryConcernProse(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return fixHavingIsAtGrammar(text);
+  const otd = Number(onTimePercent);
+  let out = fixHavingIsAtGrammar(text);
+  if (otd < 70 || !/on[- ]?time/i.test(out)) return out;
+  const primaryClause =
+    /on[- ]?time\s+delivery\s+is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at|currently\s+at|now\s+at|stands\s+at)?\s*\d+(?:\.\d+)?\s*%\.?\s*/i;
+  if (primaryClause.test(out)) {
+    out = out.replace(
+      primaryClause,
+      `On-Time Delivery is at ${Math.round(otd)}% on completed work. `,
+    );
+  } else if (/primary\s+concern/i.test(out)) {
+    out = out.replace(
+      /is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at)?\s*\d+(?:\.\d+)?\s*%/gi,
+      `is at ${Math.round(otd)}% on completed work`,
+    );
+  }
+  return out.trim();
+}
+
+export function stripContradictoryOnTimeDecline(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return text;
+  const otd = Number(onTimePercent);
+  if (!ON_TIME_DECLINE_CLAIM_RE.test(text)) return text;
+  if (otd < 70) return text;
+  const sentences = String(text).split(/(?<=[.!?])\s+/);
+  const kept = sentences.filter((s) => {
+    if (!ON_TIME_DECLINE_CLAIM_RE.test(s)) return true;
+    return !/on[- ]?time|delivery|consecutive/i.test(s);
+  });
+  const joined = kept.join(' ').trim();
+  return joined || text;
 }
 
 /** Placeholder / invalid assignee names — not valid redistribution targets. */

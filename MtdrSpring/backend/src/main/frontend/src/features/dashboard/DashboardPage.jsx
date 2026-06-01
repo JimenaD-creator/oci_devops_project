@@ -24,7 +24,9 @@ import DashboardTopMetrics from './DashboardTopMetrics';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DeveloperTable from '../kpis/DeveloperTable';
 import { useProjectData } from '../../contexts/ProjectDataContext';
+import { getLastTasksMutatedAt } from '../../utils/taskSyncEvents';
 import {
+  getCachedBundleSnapshot,
   mergeTaskStatusAcrossSprints,
   aggregateSelectionMetrics,
   sprintDbIdSortKey,
@@ -67,15 +69,19 @@ const AVATAR_PALETTE_DARK = [
   { bg: '#1A4A4A', color: '#80CBC4' },
 ];
 
-export default function DashboardPage({ projectId: propProjectId, onNavigateToTasks }) {
+export default function DashboardPage({ projectId: propProjectId, onNavigateToTasks, isPageActive = true }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const AVATAR_PALETTE = isDark ? AVATAR_PALETTE_DARK : AVATAR_PALETTE_LIGHT;
   const {
     sprints: sharedSprints,
     loading: sharedLoading,
+    refreshing: sharedRefreshing,
+    dataUpdatedAt,
     error: dataError,
     taskCount: sharedTaskCount,
+    ensureLoaded,
+    invalidateAndRefresh,
   } = useProjectData();
 
   const [allSprints, setAllSprints] = useState([]);
@@ -88,6 +94,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
 
   const projectId = propProjectId || localStorage.getItem('currentProjectId');
   const prevProjectIdRef = useRef(projectId);
+  const wasPageActiveRef = useRef(false);
 
   useEffect(() => {
     if (!projectId) {
@@ -140,6 +147,33 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
   useEffect(() => {
     setSeenBlockedKeysCsv('');
   }, [projectId]);
+
+  useEffect(() => {
+    if (!isPageActive || !projectId) return;
+
+    const becameActive = isPageActive && !wasPageActiveRef.current;
+    wasPageActiveRef.current = isPageActive;
+    if (!becameActive) return;
+
+    const lastMut = getLastTasksMutatedAt();
+    if (lastMut > dataUpdatedAt) {
+      invalidateAndRefresh({ silent: true }).catch(() => {});
+      return;
+    }
+
+    if (sharedSprints.length === 0 && !sharedLoading && !sharedRefreshing) {
+      const cached = getCachedBundleSnapshot(projectId);
+      ensureLoaded({ silent: Boolean(cached) }).catch(() => {});
+    }
+  }, [
+    isPageActive,
+    projectId,
+    dataUpdatedAt,
+    sharedSprints.length,
+    sharedLoading,
+    ensureLoaded,
+    invalidateAndRefresh,
+  ]);
 
   const sortedSprintsForFilter = useMemo(
     () => [...allSprints].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
@@ -336,7 +370,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     );
   }
 
-  if (sharedLoading && allSprints.length === 0) {
+  if ((sharedLoading || sharedRefreshing) && allSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 
@@ -446,6 +480,21 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
         position: 'relative',
       }}
     >
+      {sharedRefreshing ? (
+        <LinearProgress
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 2,
+            mb: 1,
+            borderRadius: 1,
+            bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
+            '& .MuiLinearProgress-bar': {
+              bgcolor: ORACLE_RED_ACTION,
+            },
+          }}
+        />
+      ) : null}
       <ScrollReveal>
         <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2 }, mb: 1.25, borderRadius: 3, border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`, bgcolor: 'background.paper' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 1 }}>

@@ -24,6 +24,7 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +58,9 @@ class TaskControllerTest {
 
     @MockBean
     private TaskAssignmentNotificationService taskAssignmentNotificationService;
+
+    @MockBean
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     @Test
     void getAllTasks_withoutProjectId_returnsAll() throws Exception {

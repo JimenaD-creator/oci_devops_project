@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.*;
 import com.springboot.MyTodoList.repository.*;
+import com.springboot.MyTodoList.util.ManagerChatReplyUtil;
+import com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil;
+import com.springboot.MyTodoList.util.SprintLiveKpiUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -36,12 +39,6 @@ public class ManagerChatService {
         .build();
     private static final int GEMINI_MAX_RETRIES = 3;
     private static final long GEMINI_RETRY_BASE_MS = 1000L;
-    private static final Pattern PERCENT_TOKEN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*%");
-    private static final Pattern PRODUCTIVITY_SCORE_TOKEN =
-        Pattern.compile(
-            "(productivity\\s+score(?:[^\\d%\\n]{0,60})?)(-?\\d+(?:\\.\\d+)?)(?:\\s*%)?",
-            Pattern.CASE_INSENSITIVE
-        );
     private static final Pattern SPRINT_ID_IN_TEXT =
         Pattern.compile("\\bsprint\\s*#?\\s*(\\d+)\\b", Pattern.CASE_INSENSITIVE);
 
@@ -76,8 +73,8 @@ public class ManagerChatService {
             String ragContext = buildRagContext(req.getMessage(), req.getSprintId());
             String systemPrompt = buildSystemPrompt(contextJson, ragContext, scope);
             String reply = callGemini(systemPrompt, req.getMessage(), req.getHistory());
-            reply = clampPercentagesToRange(reply);
-            reply = alignProductivityScoreMentions(reply, sprintProductivityScore);
+            reply = ManagerChatReplyUtil.clampPercentagesToRange(reply);
+            reply = ManagerChatReplyUtil.alignProductivityScoreMentions(reply, sprintProductivityScore);
             return ManagerChatResponse.of(reply, scope);
 
         } catch (Exception e) {
@@ -124,24 +121,34 @@ public class ManagerChatService {
         }
 
         List<Map<String, Object>> sprintData = new ArrayList<>();
+        List<Map<String, Object>> allDevRows = new ArrayList<>();
         for (Sprint s : sprints) {
             Map<String, Object> sd = new LinkedHashMap<>();
             sd.put("sprintId", s.getId());
             sd.put("startDate", s.getStartDate() != null ? s.getStartDate().toString() : null);
             sd.put("dueDate", s.getDueDate() != null ? s.getDueDate().toString() : null);
             sd.put("goal", s.getGoal());
-            sd.put("completionRate", toPercent(s.getCompletionRate()));
-            sd.put("onTimeDelivery", toPercent(s.getOnTimeDelivery()));
-            sd.put("teamParticipation", toPercent(s.getTeamParticipation()));
-            sd.put("workloadBalance", toPercent(s.getWorkloadBalance()));
 
-            List<Map<String, Object>> tasks = buildTasksForSprint(s.getId());
+            List<UserTask> sprintUserTasks = userTaskRepository.findBySprintIdWithUserAndTask(s.getId());
+            List<Task> sprintTasks = taskRepository.findByAssignedSprintId(s.getId());
+            Map<String, Object> liveKpis = SprintLiveKpiUtil.computeLiveKpis(s, sprintTasks, sprintUserTasks);
+            sd.put("kpis", liveKpis);
+            sd.put("completionRate", liveKpis.get("completionRate"));
+            sd.put("onTimeDelivery", liveKpis.get("onTimeDelivery"));
+            sd.put("teamParticipation", liveKpis.get("teamParticipation"));
+            sd.put("workloadBalance", liveKpis.get("workloadBalance"));
+            sd.put("productivityScore", liveKpis.get("productivityScore"));
+            sd.put("totalTasks", liveKpis.get("totalTasks"));
+            sd.put("totalCompleted", liveKpis.get("totalCompleted"));
+            sd.put("totalWorkedHours", liveKpis.get("totalWorkedHours"));
+
+            List<Map<String, Object>> tasks = buildTasksForSprint(sprintUserTasks, sprintTasks);
             sd.put("tasks", tasks);
-            sd.put("phase", resolvePhase(s, tasks));
-            sd.put("productivityScore", computeProductivityScoreFromTasks(tasks, s));
+            sd.put("phase", resolvePhase(s, tasks, liveKpis));
 
-            List<Map<String, Object>> devSummary = buildDevSummaryForSprint(s.getId());
+            List<Map<String, Object>> devSummary = buildDevSummaryForSprint(s.getId(), sprintUserTasks);
             sd.put("developers", devSummary);
+            allDevRows.addAll(devSummary);
 
             sd.put("blockedAssignments", buildBlockedAssignmentsForSprint(s.getId()));
 
@@ -153,6 +160,11 @@ public class ManagerChatService {
         context.put("asOf", LocalDateTime.now().toString());
         context.put("sprintCount", sprintData.size());
         context.put("sprints", sprintData);
+        if (sprintId == null && sprintData.size() > 1) {
+            context.put(
+                    "developersAggregatedAllSprints",
+                    SprintDeveloperMetricsUtil.mergeDeveloperRowsByUserId(allDevRows));
+        }
 
         return mapper.writeValueAsString(context);
     }
@@ -188,20 +200,29 @@ public class ManagerChatService {
         }
     }
 
-    private List<Map<String, Object>> buildTasksForSprint(Long sprintId) {
+    private List<Map<String, Object>> buildTasksForSprint(
+            List<UserTask> userTasks, List<Task> sprintTasks) {
         try {
-            List<UserTask> userTasks = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
-            if (userTasks == null) return List.of();
-
-            Map<Long, UserTask> deduped = new LinkedHashMap<>();
-            for (UserTask ut : userTasks) {
-                if (ut == null || ut.getTask() == null) continue;
-                deduped.putIfAbsent(ut.getTask().getId(), ut);
+            Map<Long, String> assigneeByTask = new LinkedHashMap<>();
+            if (userTasks != null) {
+                for (UserTask ut : userTasks) {
+                    if (ut == null || ut.getTask() == null || ut.getTask().getId() == null) {
+                        continue;
+                    }
+                    assigneeByTask.putIfAbsent(
+                            ut.getTask().getId(),
+                            ut.getUser() != null ? ut.getUser().getName() : "Unassigned");
+                }
             }
 
             List<Map<String, Object>> result = new ArrayList<>();
-            for (UserTask ut : deduped.values()) {
-                Task t = ut.getTask();
+            if (sprintTasks == null) {
+                return result;
+            }
+            for (Task t : sprintTasks) {
+                if (t == null) {
+                    continue;
+                }
                 Map<String, Object> tm = new LinkedHashMap<>();
                 tm.put("taskId", t.getId());
                 tm.put("title", t.getTitle());
@@ -209,10 +230,9 @@ public class ManagerChatService {
                 tm.put("priority", t.getPriority());
                 tm.put("classification", t.getClassification());
                 tm.put("assignedHours", t.getAssignedHours());
-                tm.put("workedHours", ut.getWorkedHours());
                 tm.put("dueDate", t.getDueDate() != null ? t.getDueDate().toString() : null);
                 tm.put("finishDate", t.getFinishDate() != null ? t.getFinishDate().toString() : null);
-                tm.put("assignee", ut.getUser() != null ? ut.getUser().getName() : "Unassigned");
+                tm.put("assignee", assigneeByTask.getOrDefault(t.getId(), "Unassigned"));
                 result.add(tm);
             }
             return result;
@@ -222,44 +242,21 @@ public class ManagerChatService {
         }
     }
 
-    private List<Map<String, Object>> buildDevSummaryForSprint(Long sprintId) {
+    private List<Map<String, Object>> buildDevSummaryForSprint(
+            Long sprintId, List<UserTask> userTasks) {
         try {
-            List<UserTask> userTasks = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
-            if (userTasks == null) return List.of();
+            if (userTasks == null) {
+                userTasks = List.of();
+            }
 
-            Map<Long, Map<String, Object>> byUser = new LinkedHashMap<>();
-            Set<String> seenKeys = new HashSet<>();
+            List<Map<String, Object>> out = new ArrayList<>(
+                    SprintDeveloperMetricsUtil.buildDeveloperSummaryRows(userTasks));
 
-            for (UserTask ut : userTasks) {
-                if (ut == null || ut.getId() == null || ut.getTask() == null) continue;
-                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
-                if (!seenKeys.add(key)) continue;
-
-                User u = ut.getUser();
-                Long uid = ut.getId().getUserId();
-                String name = (u != null && u.getName() != null) ? u.getName() : "User " + uid;
-
-                Map<String, Object> dev = byUser.computeIfAbsent(uid, id -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("name", name);
-                    m.put("assigned", 0);
-                    m.put("completed", 0);
-                    m.put("inProgress", 0);
-                    m.put("toDo", 0);
-                    m.put("inReview", 0);
-                    m.put("workedHours", 0L);
-                    return m;
-                });
-
-                dev.put("assigned", (int) dev.get("assigned") + 1);
-                String norm = normalizeStatus(ut.getTask().getStatus());
-                if ("Done".equals(norm)) dev.put("completed", (int) dev.get("completed") + 1);
-                else if ("In progress".equals(norm)) dev.put("inProgress", (int) dev.get("inProgress") + 1);
-                else if ("To do".equals(norm)) dev.put("toDo", (int) dev.get("toDo") + 1);
-                else if ("In review".equals(norm)) dev.put("inReview", (int) dev.get("inReview") + 1);
-
-                if (ut.getWorkedHours() != null) {
-                    dev.put("workedHours", (long) dev.get("workedHours") + ut.getWorkedHours());
+            Set<Long> present = new LinkedHashSet<>();
+            for (Map<String, Object> row : out) {
+                Object uid = row.get("userId");
+                if (uid instanceof Number) {
+                    present.add(((Number) uid).longValue());
                 }
             }
 
@@ -268,21 +265,11 @@ public class ManagerChatService {
                 for (UserSprint us : roster) {
                     if (us.getUser() == null) continue;
                     Long uid = us.getUser().getId();
-                    if (byUser.containsKey(uid)) continue;
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("name", us.getUser().getName());
-                    m.put("assigned", 0);
-                    m.put("completed", 0);
-                    m.put("inProgress", 0);
-                    m.put("toDo", 0);
-                    m.put("inReview", 0);
-                    m.put("workedHours", 0L);
-                    m.put("rosterOnly", true);
-                    byUser.put(uid, m);
+                    if (present.contains(uid)) continue;
+                    out.add(SprintDeveloperMetricsUtil.rosterOnlyRow(uid, us.getUser().getName()));
                 }
             }
-
-            return new ArrayList<>(byUser.values());
+            return out;
         } catch (Exception e) {
             System.err.println("[ManagerChatService] buildDevSummaryForSprint: " + e.getMessage());
             return List.of();
@@ -306,9 +293,20 @@ public class ManagerChatService {
             + "- If asked for productivity score, report the exact `productivityScore` value from sprint data (do not infer a different number).\n"
             + "- If a question cannot be answered from the data provided, say so clearly.\n"
             + "- For developer-specific questions, refer to them by name.\n"
+            + "- In each sprint's `developers` array, `completed` is the count of unique tasks where that developer's "
+            + "assignment is finished (same as the dashboard Completed Tasks chart). "
+            + "`pending` = assigned minus completed. Do not use TASK.status Done for per-developer completed counts "
+            + "on shared tasks.\n"
+            + "- For hours worked per developer, use `developers[].workedHours` only (sum of USER_TASK.WORKED_HOURS, "
+            + "same as the dashboard Hours Worked chart, one decimal). When scope is all sprints, use "
+            + "`developersAggregatedAllSprints` if present. Do not infer hours from `tasks` or TASK.assignedHours.\n"
+            + "- `assignedHoursEstimate` is planned task hours per developer (lighter bar on the hours chart).\n"
+            + "- For KPI questions (completion rate, on-time delivery, team participation, workload balance, "
+            + "productivity score), use each sprint's `kpis` object — these are live values matching KPI Analytics "
+            + "and the dashboard (not stale DB snapshots). Report integers as shown (0–100).\n"
+            + "- Productivity score formula: completion×0.4 + on-time×0.3 + participation×0.2 + workload×0.1.\n"
             + "- Use bullet points or short tables when listing multiple items.\n"
             + "- Never make up data. If a value is null or missing, say it's not recorded.\n"
-            + "- `productivityScore` is available in each sprint object (0-100), alongside completionRate/onTimeDelivery/teamParticipation/workloadBalance.\n"
             + "- Each sprint may include \"blockedAssignments\": who flagged an assignment as blocked, task id/title, and reason. "
             + "Use it when asked about blockers, who is stuck, or delivery risk. In your replies, never name database tables or columns.\n"
             + "- Keep responses under 300 words unless more detail is specifically requested.\n"
@@ -319,43 +317,6 @@ public class ManagerChatService {
             + ragContext + "\n\n"
             + "## Full project data (JSON)\n"
             + contextJson;
-    }
-
-    private String clampPercentagesToRange(String text) {
-        if (text == null || text.isBlank()) return text;
-        Matcher matcher = PERCENT_TOKEN.matcher(text);
-        StringBuffer out = new StringBuffer();
-        while (matcher.find()) {
-            String raw = matcher.group(1);
-            double n;
-            try {
-                n = Double.parseDouble(raw);
-            } catch (NumberFormatException ex) {
-                matcher.appendReplacement(out, Matcher.quoteReplacement(matcher.group(0)));
-                continue;
-            }
-            double clamped = Math.max(0d, Math.min(100d, n));
-            String replacement =
-                Math.abs(clamped - Math.rint(clamped)) < 1e-9
-                    ? String.format(Locale.ROOT, "%.0f%%", clamped)
-                    : String.format(Locale.ROOT, "%.1f%%", clamped);
-            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
-        }
-        matcher.appendTail(out);
-        return out.toString();
-    }
-
-    private String alignProductivityScoreMentions(String text, Integer expectedScore) {
-        if (text == null || text.isBlank() || expectedScore == null) return text;
-        Matcher matcher = PRODUCTIVITY_SCORE_TOKEN.matcher(text);
-        StringBuffer out = new StringBuffer();
-        while (matcher.find()) {
-            String prefix = matcher.group(1);
-            String replacement = prefix + expectedScore + "%";
-            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
-        }
-        matcher.appendTail(out);
-        return out.toString();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -471,7 +432,20 @@ public class ManagerChatService {
     // HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String resolvePhase(Sprint s, List<Map<String, Object>> tasks) {
+    private String resolvePhase(Sprint s, List<Map<String, Object>> tasks, Map<String, Object> liveKpis) {
+        if (liveKpis != null) {
+            Object cr = liveKpis.get("completionRate");
+            if (cr instanceof Number && ((Number) cr).intValue() >= 100) {
+                return "completed";
+            }
+            Object total = liveKpis.get("totalTasks");
+            Object done = liveKpis.get("totalCompleted");
+            if (total instanceof Number && done instanceof Number
+                    && ((Number) total).intValue() > 0
+                    && ((Number) done).intValue() >= ((Number) total).intValue()) {
+                return "completed";
+            }
+        }
         if (tasks != null && !tasks.isEmpty()) {
             boolean allDone = true;
             for (Map<String, Object> t : tasks) {
@@ -483,7 +457,6 @@ public class ManagerChatService {
             }
             if (allDone) return "completed";
         }
-        if (toPercent(s != null ? s.getCompletionRate() : null) >= 100.0) return "completed";
         LocalDateTime now = LocalDateTime.now();
         if (s.getStartDate() != null && now.isBefore(s.getStartDate())) return "not_started";
         if (s.getDueDate() != null && now.isAfter(s.getDueDate())) return "ended";
@@ -500,58 +473,20 @@ public class ManagerChatService {
         return raw;
     }
 
-    private double toPercent(java.math.BigDecimal value) {
-        if (value == null) return 0.0;
-        return value.multiply(java.math.BigDecimal.valueOf(100))
-            .setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
-    }
-
-    private int computeProductivityScoreFromTasks(List<Map<String, Object>> tasks, Sprint sprintFallback) {
-        double completionRate = 0.0;
-        double onTimeDelivery = 0.0;
-        if (tasks != null && !tasks.isEmpty()) {
-            int total = tasks.size();
-            int done = 0;
-            int doneOnTime = 0;
-            for (Map<String, Object> t : tasks) {
-                if (t == null) continue;
-                String st = String.valueOf(t.get("status"));
-                boolean isDone = "Done".equalsIgnoreCase(st);
-                if (!isDone) continue;
-                done++;
-                String finish = t.get("finishDate") != null ? String.valueOf(t.get("finishDate")) : null;
-                String due = t.get("dueDate") != null ? String.valueOf(t.get("dueDate")) : null;
-                if (finish != null && due != null) {
-                    try {
-                        LocalDateTime finishDt = LocalDateTime.parse(finish);
-                        LocalDateTime dueDt = LocalDateTime.parse(due);
-                        if (!finishDt.isAfter(dueDt)) doneOnTime++;
-                    } catch (Exception ignore) {}
-                }
-            }
-            completionRate = total > 0 ? (100.0 * done) / total : 0.0;
-            onTimeDelivery = done > 0 ? (100.0 * doneOnTime) / done : 0.0;
-        } else if (sprintFallback != null) {
-            completionRate = toPercent(sprintFallback.getCompletionRate());
-            onTimeDelivery = toPercent(sprintFallback.getOnTimeDelivery());
-        }
-
-        double teamParticipation = sprintFallback != null ? toPercent(sprintFallback.getTeamParticipation()) : 0.0;
-        double workloadBalance = sprintFallback != null ? toPercent(sprintFallback.getWorkloadBalance()) : 0.0;
-        teamParticipation = Math.max(0.0, Math.min(100.0, teamParticipation));
-        workloadBalance = Math.max(0.0, Math.min(100.0, workloadBalance));
-        completionRate = Math.max(0.0, Math.min(100.0, completionRate));
-        onTimeDelivery = Math.max(0.0, Math.min(100.0, onTimeDelivery));
-
-        double score = completionRate * 0.4 + onTimeDelivery * 0.3 + teamParticipation * 0.2 + workloadBalance * 0.1;
-        return (int) Math.round(Math.max(0.0, Math.min(100.0, score)));
-    }
-
     private Integer getRoundedProductivityScoreForSprint(Long sprintId) {
-        if (sprintId == null) return null;
-        List<Map<String, Object>> tasks = buildTasksForSprint(sprintId);
+        if (sprintId == null) {
+            return null;
+        }
         return sprintRepository.findById(sprintId)
-            .map(s -> computeProductivityScoreFromTasks(tasks, s))
+            .map(s -> {
+                List<Task> sprintTasks = taskRepository.findByAssignedSprintId(sprintId);
+                List<UserTask> sprintUserTasks =
+                        userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+                Map<String, Object> kpis =
+                        SprintLiveKpiUtil.computeLiveKpis(s, sprintTasks, sprintUserTasks);
+                Object score = kpis.get("productivityScore");
+                return score instanceof Number ? ((Number) score).intValue() : null;
+            })
             .orElse(null);
     }
 

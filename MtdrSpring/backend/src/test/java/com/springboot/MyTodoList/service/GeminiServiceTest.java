@@ -202,7 +202,7 @@ class GeminiServiceTest {
         UserTask ut = new UserTask(user, task);
         ut.setStatus("COMPLETED");
         ut.setCompletedAt(now.plusDays(2));
-        ut.setWorkedHours(6L);
+        ut.setWorkedHours(6.0);
         return ut;
     }
 

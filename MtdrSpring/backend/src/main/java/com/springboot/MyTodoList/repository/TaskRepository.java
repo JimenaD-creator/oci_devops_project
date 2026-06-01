@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.repository;
 
 import com.springboot.MyTodoList.model.Task;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +16,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t.status, COUNT(t) FROM Task t WHERE t.assignedSprint.id = :sid GROUP BY t.status")
     List<Object[]> countTasksByStatusForSprint(@Param("sid") Long sprintId);
 
+    @Query("SELECT t FROM Task t WHERE t.assignedSprint.id = :sprintId")
+    List<Task> findByAssignedSprintId(@Param("sprintId") Long sprintId);
+
     @Query("SELECT t FROM Task t WHERE t.assignedSprint.assignedProject.id = :projectId")
     List<Task> findByProjectId(@Param("projectId") Long projectId);
+
+    @Query("SELECT t.assignedSprint.assignedProject.id FROM Task t WHERE t.id = :taskId")
+    Optional<Long> findProjectIdByTaskId(@Param("taskId") Long taskId);
 }

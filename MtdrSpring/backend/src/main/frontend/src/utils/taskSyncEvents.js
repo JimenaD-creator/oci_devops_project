@@ -7,6 +7,7 @@ export const TASKS_MUTATED_EVENT = 'mtdr-tasks-mutated';
 const DELETED_TASK_TTL_MS = 20000;
 const CREATED_TASK_TTL_MS = 20000;
 const UPDATED_TASK_TTL_MS = 20000;
+let lastTasksMutatedAt = 0;
 const recentlyDeletedTaskIds = new Map();
 const recentlyCreatedTasks = new Map();
 const recentlyUpdatedTasks = new Map();
@@ -34,7 +35,17 @@ export function mergeUserTaskLists(...lists) {
   return out;
 }
 
+export function getLastTasksMutatedAt() {
+  return lastTasksMutatedAt;
+}
+
+/** After a shared bundle refresh, align mutation watermark so dashboard does not re-fetch in a loop. */
+export function markTasksSyncCaughtUp(at = Date.now()) {
+  lastTasksMutatedAt = at;
+}
+
 export function notifyTasksMutated(detail = {}) {
+  lastTasksMutatedAt = Date.now();
   if (detail?.type === 'task-deleted' && detail?.taskId != null) {
     const taskId = String(detail.taskId);
     recentlyDeletedTaskIds.set(taskId, Date.now() + DELETED_TASK_TTL_MS);

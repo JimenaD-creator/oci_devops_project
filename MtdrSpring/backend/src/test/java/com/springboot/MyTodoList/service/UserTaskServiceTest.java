@@ -17,6 +17,7 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.ToDoItemRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class UserTaskServiceTest {
 
     @Mock
     private TaskAssignmentSyncService taskAssignmentSyncService;
+
+    @Mock
+    private ProjectTaskEventPublisher projectTaskEventPublisher;
 
     @InjectMocks
     private UserTaskService userTaskService;
@@ -218,6 +222,7 @@ class UserTaskServiceTest {
     void reopenMyAssignment_resetsStatusAndClearsBlock() {
         UserTask mine = assignment(user(4L, "Dev"), 30L);
         mine.setStatus("DONE");
+        mine.setWorkedHours(6.0);
         mine.setIsBlocked(true);
         mine.setBlockedReason("waiting");
         when(userTaskRepository.findByTask_Id(30L)).thenReturn(List.of(mine));
@@ -226,6 +231,7 @@ class UserTaskServiceTest {
         assertTrue(userTaskService.reopenMyAssignment(4L, 30L));
 
         assertEquals("TODO", mine.getStatus());
+        assertEquals(0.0, mine.getWorkedHours(), 0.001);
         assertEquals(false, mine.getIsBlocked());
         assertEquals(null, mine.getBlockedReason());
         verify(taskAssignmentSyncService).syncTaskStatusFromAssignments(30L);
@@ -241,16 +247,16 @@ class UserTaskServiceTest {
     }
 
     @Test
-    void saveWorkedHours_addsToExistingTotal() {
+    void saveWorkedHours_replacesExistingTotal() {
         UserTask existing = assignment(user(2L, "Dev"), 50L);
-        existing.setWorkedHours(3L);
+        existing.setWorkedHours(3.0);
         when(userTaskRepository.findByTask_Id(50L)).thenReturn(List.of(existing));
         when(userTaskRepository.findById(new UserTaskId(2L, 50L))).thenReturn(Optional.of(existing));
         when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserTask saved = userTaskService.saveWorkedHours(2L, 50L, 2);
+        UserTask saved = userTaskService.saveWorkedHours(2L, 50L, 2.0);
 
-        assertEquals(5L, saved.getWorkedHours());
+        assertEquals(2.0, saved.getWorkedHours(), 0.001);
         assertEquals("COMPLETED", saved.getStatus());
         assertEquals(false, saved.getIsBlocked());
         verify(taskAssignmentSyncService).syncTaskStatusFromAssignments(50L);
@@ -266,9 +272,9 @@ class UserTaskServiceTest {
         when(taskRepository.findById(60L)).thenReturn(Optional.of(task));
         when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserTask saved = userTaskService.saveWorkedHours(3L, 60L, 4);
+        UserTask saved = userTaskService.saveWorkedHours(3L, 60L, 4.0);
 
-        assertEquals(4L, saved.getWorkedHours());
+        assertEquals(4.0, saved.getWorkedHours(), 0.001);
         verify(userRepository).findById(3L);
         verify(taskRepository).findById(60L);
     }
@@ -279,23 +285,49 @@ class UserTaskServiceTest {
         when(userTaskRepository.findById(new UserTaskId(99L, 61L))).thenReturn(Optional.empty());
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> userTaskService.saveWorkedHours(99L, 61L, 1));
+        assertThrows(RuntimeException.class, () -> userTaskService.saveWorkedHours(99L, 61L, 1.0));
+    }
+
+    @Test
+    void saveWorkedHours_acceptsDecimalValue() {
+        UserTask existing = assignment(user(2L, "Dev"), 55L);
+        existing.setWorkedHours(1.0);
+        when(userTaskRepository.findByTask_Id(55L)).thenReturn(List.of(existing));
+        when(userTaskRepository.findById(new UserTaskId(2L, 55L))).thenReturn(Optional.of(existing));
+        when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserTask saved = userTaskService.saveWorkedHours(2L, 55L, 1.5);
+
+        assertEquals(1.5, saved.getWorkedHours(), 0.001);
+    }
+
+    @Test
+    void saveWorkedHours_doesNotAddToExisting_whenSameDecimalEntered() {
+        UserTask existing = assignment(user(2L, "Dev"), 56L);
+        existing.setWorkedHours(0.5);
+        when(userTaskRepository.findByTask_Id(56L)).thenReturn(List.of(existing));
+        when(userTaskRepository.findById(new UserTaskId(2L, 56L))).thenReturn(Optional.of(existing));
+        when(userTaskRepository.save(any(UserTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserTask saved = userTaskService.saveWorkedHours(2L, 56L, 0.5);
+
+        assertEquals(0.5, saved.getWorkedHours(), 0.001);
     }
 
     @Test
     void getWorkedHours_whenPresent_returnsValue() {
         UserTask ut = assignment(user(1L, "Dev"), 70L);
-        ut.setWorkedHours(8L);
+        ut.setWorkedHours(8.0);
         when(userTaskRepository.findById(new UserTaskId(1L, 70L))).thenReturn(Optional.of(ut));
 
-        assertEquals(8, userTaskService.getWorkedHours(1L, 70L));
+        assertEquals(8.0, userTaskService.getWorkedHours(1L, 70L), 0.001);
     }
 
     @Test
     void getWorkedHours_whenMissing_returnsZero() {
         when(userTaskRepository.findById(new UserTaskId(1L, 71L))).thenReturn(Optional.empty());
 
-        assertEquals(0, userTaskService.getWorkedHours(1L, 71L));
+        assertEquals(0.0, userTaskService.getWorkedHours(1L, 71L), 0.001);
     }
 
     @Test

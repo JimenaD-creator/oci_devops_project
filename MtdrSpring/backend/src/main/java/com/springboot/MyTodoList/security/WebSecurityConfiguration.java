@@ -81,6 +81,10 @@ public class WebSecurityConfiguration {
             if (request == null || isLoginPath(request)) {
                 return null;
             }
+            String queryToken = request.getParameter("access_token");
+            if (queryToken != null && !queryToken.isBlank()) {
+                return queryToken.trim();
+            }
             return delegate.resolve(request);
         };
     }

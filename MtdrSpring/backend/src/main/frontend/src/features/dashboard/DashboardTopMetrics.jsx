@@ -28,10 +28,33 @@ function formatAverage(n, devCount) {
   return Number(n).toFixed(1);
 }
 
+const TREND_SUMMARY_TITLES = new Set(['Tasks Completed', 'Total hours worked']);
+const TREND_CHART_TITLES = new Set([
+  'Average tasks per developer',
+  'Average hours per developer',
+]);
+
+function isTrendSummaryCard(title, showTrendCharts) {
+  return showTrendCharts && TREND_SUMMARY_TITLES.has(title);
+}
+
+function isTrendChartCard(title, showTrendCharts) {
+  return showTrendCharts && TREND_CHART_TITLES.has(title);
+}
+
+/** Left stack + two trend columns on md+ (compare mode). */
+const COMPARE_TREND_GRID_PLACEMENT = {
+  'Tasks Completed': { gridColumn: { md: '1' }, gridRow: { md: '1' } },
+  'Total hours worked': { gridColumn: { md: '1' }, gridRow: { md: '2' } },
+  'Average tasks per developer': { gridColumn: { md: '2' }, gridRow: { md: '1 / span 2' } },
+  'Average hours per developer': { gridColumn: { md: '3' }, gridRow: { md: '1 / span 2' } },
+};
+
 /**
  * Scorecards: quick numeric KPIs for the selected sprint(s).
  * @param {{ showSectionHeader?: boolean, multiSprint?: boolean, scorecardsFourColumn?: boolean }} props
- * — When several sprints are selected, `scorecardsFourColumn` shows all four cards in one horizontal row (not 2×2).
+ * — When several sprints are selected, `scorecardsFourColumn` uses a 3-column layout on md+:
+ *   summary cards stacked on the left, trend charts full-height on the right.
  */
 export default function DashboardTopMetrics({
   totalTasks = 0,
@@ -119,6 +142,30 @@ export default function DashboardTopMetrics({
   ];
 
   const showTrendCharts = multiSprint && Array.isArray(avgTrendSeries) && avgTrendSeries.length > 1;
+  const compactCompareRow = scorecardsFourColumn && showTrendCharts;
+
+  const trendChartTooltipStyles = {
+    contentStyle: {
+      borderRadius: 6,
+      borderColor: isDark ? '#2A2C32' : '#E0E0E0',
+      backgroundColor: isDark ? '#1C1E22' : '#FFFFFF',
+      color: isDark ? '#F0F0F0' : '#1A1A1A',
+      fontSize: '0.68rem',
+      padding: '4px 7px',
+      lineHeight: 1.25,
+    },
+    labelStyle: {
+      fontSize: '0.65rem',
+      fontWeight: 600,
+      marginBottom: 2,
+      color: isDark ? '#B0B0B0' : '#555555',
+    },
+    itemStyle: {
+      fontSize: '0.65rem',
+      padding: 0,
+    },
+    wrapperStyle: { outline: 'none', zIndex: 1 },
+  };
 
   return (
     <Box sx={{ width: '100%', minWidth: 0, mb: showSectionHeader ? 2 : 0, alignSelf: 'stretch' }}>
@@ -138,8 +185,16 @@ export default function DashboardTopMetrics({
                 gridTemplateColumns: {
                   xs: '1fr',
                   sm: 'repeat(2, minmax(0, 1fr))',
-                  md: showTrendCharts ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+                  md: compactCompareRow
+                    ? 'minmax(0, 0.72fr) minmax(0, 1.14fr) minmax(0, 1.14fr)'
+                    : 'repeat(4, minmax(0, 1fr))',
                 },
+                ...(compactCompareRow
+                  ? {
+                      gridTemplateRows: { xs: 'auto', sm: 'auto', md: '1fr 1fr' },
+                      minHeight: { md: 248 },
+                    }
+                  : {}),
               }
             : {
                 gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
@@ -151,24 +206,45 @@ export default function DashboardTopMetrics({
           alignItems: 'stretch',
         }}
       >
-        {items.map((item, i) => (
-          <motion.div
+        {items.map((item, i) => {
+          const isTrendMetric = isTrendChartCard(item.title, showTrendCharts);
+          const isSummaryMetric = isTrendSummaryCard(item.title, showTrendCharts);
+          const comparePlacement = compactCompareRow
+            ? COMPARE_TREND_GRID_PLACEMENT[item.title]
+            : null;
+
+          return (
+          <Box
+            component={motion.div}
             key={item.title}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={DASHBOARD_SCROLL_VIEWPORT}
             transition={{ duration: 0.42, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
-            style={{ minWidth: 0 }}
+            sx={{
+              minWidth: 0,
+              ...(comparePlacement
+                ? {
+                    gridColumn: comparePlacement.gridColumn,
+                    gridRow: comparePlacement.gridRow,
+                    height: { md: '100%' },
+                    display: { md: 'flex' },
+                    flexDirection: { md: 'column' },
+                  }
+                : {}),
+            }}
           >
             <Paper
               elevation={0}
               sx={{
-                px: { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
+                px: {
+                  xs: scorecardsFourColumn ? (isSummaryMetric ? 0.85 : 1) : 1.5,
+                  sm: isSummaryMetric ? 1.1 : 1.5,
+                },
                 py: showTrendCharts
-                  ? item.title === 'Average tasks per developer' ||
-                    item.title === 'Average hours per developer'
-                    ? { xs: 1.35, sm: 1.5 }
-                    : { xs: 0.9, sm: 1 }
+                  ? isTrendMetric
+                    ? { xs: 1.2, sm: 1.35 }
+                    : { xs: 0.85, sm: 1 }
                   : { xs: scorecardsFourColumn ? 1.35 : 1.5, sm: 1.5 },
                 borderRadius: 3,
                 border: '1px solid',
@@ -176,11 +252,12 @@ export default function DashboardTopMetrics({
                 borderTop: `4px solid ${item.accent}`,
                 boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.06)',
                 minHeight: showTrendCharts
-                  ? item.title === 'Average tasks per developer' ||
-                    item.title === 'Average hours per developer'
-                    ? { xs: 210, sm: 228, md: 240 }
-                    : { xs: 118, sm: 128, md: 136 }
+                  ? isTrendMetric
+                    ? { xs: 210, sm: 228, md: compactCompareRow ? '100%' : 240 }
+                    : { xs: 118, sm: 128, md: compactCompareRow ? '100%' : 136 }
                   : { xs: scorecardsFourColumn ? 148 : 140, sm: scorecardsFourColumn ? 156 : 148 },
+                height: compactCompareRow ? { md: '100%' } : 'auto',
+                flex: compactCompareRow ? { md: 1 } : undefined,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -189,22 +266,22 @@ export default function DashboardTopMetrics({
                 background: isDark 
                   ? `linear-gradient(185deg, ${item.tint} 0%, #1C1E22 52%)`
                   : `linear-gradient(185deg, ${item.tint} 0%, #FFFFFF 52%)`,
-                justifyContent: 'flex-start',
+                justifyContent:
+                  compactCompareRow && isSummaryMetric ? { md: 'center' } : 'flex-start',
                 boxSizing: 'border-box',
               }}
             >
-              {(() => {
-                const isTrendMetric =
-                  showTrendCharts &&
-                  (item.title === 'Average tasks per developer' ||
-                    item.title === 'Average hours per developer');
-                const reserveTrendSpace = showTrendCharts && !isTrendMetric;
-                return (
-                  <>
+              <>
                     <Box
                       sx={{
-                        width: { xs: scorecardsFourColumn ? 40 : 48, sm: 48 },
-                        height: { xs: scorecardsFourColumn ? 40 : 48, sm: 48 },
+                        width: {
+                          xs: isSummaryMetric ? 32 : scorecardsFourColumn ? 40 : 48,
+                          sm: isSummaryMetric ? 34 : 48,
+                        },
+                        height: {
+                          xs: isSummaryMetric ? 32 : scorecardsFourColumn ? 40 : 48,
+                          sm: isSummaryMetric ? 34 : 48,
+                        },
                         borderRadius: 2,
                         bgcolor: item.iconBg,
                         display: 'flex',
@@ -212,17 +289,19 @@ export default function DashboardTopMetrics({
                         justifyContent: 'center',
                         flexShrink: 0,
                         mb: showTrendCharts
-                          ? item.title === 'Average tasks per developer' ||
-                            item.title === 'Average hours per developer'
-                            ? { xs: 1, sm: 1.25 }
-                            : { xs: 0.6, sm: 0.8 }
+                          ? isTrendMetric
+                            ? { xs: 0.75, sm: 1 }
+                            : { xs: 0.35, sm: 0.45 }
                           : { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
                         border: `1px solid ${item.accent}22`,
                       }}
                     >
                       <item.icon
                         sx={{
-                          fontSize: { xs: scorecardsFourColumn ? 22 : 26, sm: 26 },
+                          fontSize: {
+                            xs: isSummaryMetric ? 18 : scorecardsFourColumn ? 22 : 26,
+                            sm: isSummaryMetric ? 20 : 26,
+                          },
                           color: item.accent,
                         }}
                       />
@@ -232,22 +311,37 @@ export default function DashboardTopMetrics({
                         ...METRIC_LABEL_SX,
                         color: 'text.primary',
                         mb: {
-                          xs: isTrendMetric ? 0.6 : scorecardsFourColumn ? 0.75 : 1.25,
-                          sm: isTrendMetric ? 0.75 : 1.25,
+                          xs: isTrendMetric ? 0.5 : isSummaryMetric ? 0.35 : scorecardsFourColumn ? 0.75 : 1.25,
+                          sm: isTrendMetric ? 0.65 : isSummaryMetric ? 0.4 : 1.25,
                         },
                         px: { xs: scorecardsFourColumn ? 0.25 : 1, sm: 1 },
-                        ...(scorecardsFourColumn
-                          ? { fontSize: { xs: '0.65rem', sm: '0.75rem' }, lineHeight: 1.3 }
+                        ...(scorecardsFourColumn || isSummaryMetric
+                          ? {
+                              fontSize: {
+                                xs: isSummaryMetric ? '0.6rem' : '0.65rem',
+                                sm: isSummaryMetric ? '0.68rem' : '0.75rem',
+                              },
+                              lineHeight: 1.25,
+                            }
                           : {}),
                       }}
                     >
                       {item.title}
                     </Typography>
                     {isTrendMetric ? (
-                      <Box sx={{ width: '100%', mt: 'auto', pt: 0.15 }}>
-                        <Box sx={{ width: '100%', height: 140 }}>
+                      <Box sx={{ width: '100%', mt: 'auto', pt: 0.1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                        <Box
+                          sx={{
+                            width: '100%',
+                            flex: 1,
+                            minHeight: compactCompareRow ? { md: 130 } : 140,
+                          }}
+                        >
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={avgTrendSeries}>
+                            <LineChart
+                              data={avgTrendSeries}
+                              margin={{ top: 4, right: 6, left: 0, bottom: 2 }}
+                            >
                               <CartesianGrid
                                 strokeDasharray="3 3"
                                 stroke={isDark ? '#2A2C32' : '#CFD8DC'}
@@ -255,13 +349,21 @@ export default function DashboardTopMetrics({
                               />
                               <XAxis
                                 dataKey="sprintLabel"
-                                tick={{ fontSize: 10, fill: isDark ? '#9A9A9A' : '#000000' }}
+                                angle={-38}
+                                textAnchor="end"
+                                height={46}
+                                interval={0}
+                                tick={{
+                                  fontSize: 9,
+                                  fill: isDark ? '#9A9A9A' : '#424242',
+                                }}
                                 axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                                 tickLine={false}
+                                dy={6}
                               />
                               <YAxis
-                                width={28}
-                                tick={{ fontSize: 10, fill: isDark ? '#9A9A9A' : '#000000' }}
+                                width={24}
+                                tick={{ fontSize: 9, fill: isDark ? '#9A9A9A' : '#424242' }}
                                 axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                                 tickLine={false}
                                 domain={['dataMin - 0.5', 'dataMax + 0.5']}
@@ -272,12 +374,7 @@ export default function DashboardTopMetrics({
                                   item.title.includes('hours') ? 'Avg hours/dev' : 'Avg tasks/dev',
                                 ]}
                                 labelFormatter={(label) => `${label}`}
-                                contentStyle={{ 
-                                  borderRadius: 8, 
-                                  borderColor: isDark ? '#2A2C32' : '#E0E0E0',
-                                  backgroundColor: isDark ? '#1C1E22' : '#FFFFFF',
-                                  color: isDark ? '#F0F0F0' : '#1A1A1A',
-                                }}
+                                {...trendChartTooltipStyles}
                               />
                               <Line
                                 type="monotone"
@@ -286,8 +383,8 @@ export default function DashboardTopMetrics({
                                 }
                                 stroke={item.accent}
                                 strokeWidth={2.25}
-                                dot={{ r: 3, fill: item.accent }}
-                                activeDot={{ r: 4 }}
+                                dot={{ r: 2.75, fill: item.accent }}
+                                activeDot={{ r: 3.5 }}
                               />
                             </LineChart>
                           </ResponsiveContainer>
@@ -296,13 +393,13 @@ export default function DashboardTopMetrics({
                           sx={{
                             ...METRIC_HELPER_SX,
                             textAlign: 'center',
-                            pt: 0.35,
+                            pt: 0.25,
                             px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
                             fontSize: {
-                              xs: scorecardsFourColumn ? '0.68rem' : '0.8125rem',
-                              sm: '0.8125rem',
+                              xs: scorecardsFourColumn ? '0.62rem' : '0.8125rem',
+                              sm: '0.72rem',
                             },
-                            lineHeight: 1.35,
+                            lineHeight: 1.3,
                             color: 'text.secondary',
                             fontWeight: 700,
                           }}
@@ -316,7 +413,7 @@ export default function DashboardTopMetrics({
                           sx={{
                             ...METRIC_VALUE_SX,
                             color: 'text.primary',
-                            mb: item.subtitle ? 0.5 : 0,
+                            mb: item.subtitle ? (isSummaryMetric ? 0.25 : 0.5) : 0,
                             ...(item.valueCompact
                               ? {
                                   fontSize: {
@@ -326,27 +423,28 @@ export default function DashboardTopMetrics({
                                   lineHeight: 1.35,
                                   fontWeight: 700,
                                 }
-                              : scorecardsFourColumn
-                                ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
-                                : {}),
+                              : isSummaryMetric
+                                ? { fontSize: { xs: '1.15rem', sm: '1.35rem', md: '1.4rem' } }
+                                : scorecardsFourColumn
+                                  ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
+                                  : {}),
                           }}
                         >
                           {item.value}
                         </Typography>
-                        {reserveTrendSpace ? <Box sx={{ width: '100%', height: 12 }} /> : null}
                         {item.subtitle ? (
                           <Typography
                             sx={{
                               ...METRIC_HELPER_SX,
                               textAlign: 'center',
-                              mt: 'auto',
-                              pt: 0.5,
+                              mt: isSummaryMetric && compactCompareRow ? 0 : 0,
+                              pt: isSummaryMetric ? 0.35 : 0.5,
                               px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
                               fontSize: {
-                                xs: scorecardsFourColumn ? '0.68rem' : '0.8125rem',
-                                sm: '0.8125rem',
+                                xs: isSummaryMetric ? '0.62rem' : scorecardsFourColumn ? '0.68rem' : '0.8125rem',
+                                sm: isSummaryMetric ? '0.7rem' : '0.8125rem',
                               },
-                              lineHeight: 1.35,
+                              lineHeight: 1.3,
                               color: 'text.secondary',
                               fontWeight: 700,
                             }}
@@ -356,12 +454,11 @@ export default function DashboardTopMetrics({
                         ) : null}
                       </>
                     )}
-                  </>
-                );
-              })()}
+              </>
             </Paper>
-          </motion.div>
-        ))}
+          </Box>
+          );
+        })}
       </Box>
     </Box>
   );

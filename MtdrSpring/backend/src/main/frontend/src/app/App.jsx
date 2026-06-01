@@ -796,13 +796,17 @@ function App() {
           bgcolor: 'background.default',
         }}
       >
-        <ProjectDataProvider projectId={selectedProjectId}>
+        <ProjectDataProvider
+          projectId={selectedProjectId}
+          preload={isManagerRole(user?.role) || isAdminRole(user?.role)}
+        >
           <Suspense fallback={<PageLoader />}>
             {visitedPages.has('dashboard') && (
               <Box sx={pageVisibilitySx('dashboard')}>
                 <DashboardPage
                   onNavigateToTasks={handleNavigateToProjectTasks}
                   projectId={selectedProjectId}
+                  isPageActive={activePage === 'dashboard'}
                 />
               </Box>
             )}
