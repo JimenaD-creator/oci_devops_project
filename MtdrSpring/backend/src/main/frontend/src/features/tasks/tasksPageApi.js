@@ -1,6 +1,23 @@
 import { API_BASE } from './constants/taskConstants';
 import { fetchProjectBundleRaw } from '../dashboard/dashboardSprintData';
 import { sprintProjectIdFromJson } from './utils/taskUtils';
+import { apiFetch } from '../../utils/auth';
+
+/** Marks a USER_TASK complete and persists worked hours (total for this assignment). */
+export async function completeAssigneeWithHours(taskId, userId, workedHours) {
+  const res = await apiFetch(`${API_BASE}/api/user-tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId,
+      taskId: Number(taskId),
+      status: 'COMPLETED',
+      workedHours,
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to save worked hours');
+  return res.json();
+}
 
 export async function fetchProjectDevelopersList(projectId) {
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/developers`);

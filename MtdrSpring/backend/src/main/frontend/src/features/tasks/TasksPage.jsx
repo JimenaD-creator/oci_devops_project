@@ -23,6 +23,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import KanbanBoard from './KanbanBoard';
+import LogWorkedHoursDialog from './LogWorkedHoursDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
@@ -38,12 +39,18 @@ import {
   isUserTaskAssigneeComplete,
   normalizeTaskStatus,
   pageFormFieldOutline,
+  shouldPromptWorkedHoursForAssigneeDone,
+  shouldPromptWorkedHoursOnKanbanDone,
   taskEntityId,
   userTaskRowTaskId,
 } from './utils/taskUtils';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
-import { fetchProjectDevelopersList, fetchTasksPageBundle } from './tasksPageApi';
+import {
+  completeAssigneeWithHours,
+  fetchProjectDevelopersList,
+  fetchTasksPageBundle,
+} from './tasksPageApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
@@ -83,6 +90,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const projectDevelopersRef = useRef(projectDevelopers);
   projectDevelopersRef.current = projectDevelopers;
   const { invalidateAndRefresh } = useProjectData();
+  const [pendingDone, setPendingDone] = useState(null);
 
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
     const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
@@ -409,6 +417,31 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         return;
       }
 
+      if (
+        shouldPromptWorkedHoursOnKanbanDone({
+          developerMode,
+          currentUserId,
+          normalizedStatus: ns,
+          assignees,
+        })
+      ) {
+        const myAssignment = assignees.find(
+          (ut) => Number(ut.user?.id ?? ut.user?.ID) === currentUserId,
+        );
+        setPendingDone({
+          taskId: tid,
+          newStatus: ns,
+          userId: currentUserId,
+          mode: 'full',
+          initialHours:
+            myAssignment.workedHours ??
+            myAssignment.worked_hours ??
+            myAssignment.hours ??
+            '',
+        });
+        return;
+      }
+
       applyOptimistic(newStatus);
 
       if (assignees.length === 0) {
@@ -550,33 +583,169 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       setMultiDoneTaskId(null);
   }, [userTasks, multiDoneTaskId]);
 
-  const markAssigneeDone = async (taskId, ut) => {
-    const uid = Number(ut.user?.id ?? ut.user?.ID);
-    try {
-      const res = await apiFetch(`${API_BASE}/api/user-tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
+  const patchUserTaskAfterCompletion = useCallback((taskId, uid, workedHours) => {
+    const hours = workedHours == null ? undefined : Number(workedHours);
+    setUserTasks((prev) =>
+      prev.map((row) => {
+        const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
+        const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
+        if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
+        const next = { ...row, status: 'COMPLETED' };
+        if (hours != null && Number.isFinite(hours)) {
+          next.workedHours = hours;
+          next.worked_hours = hours;
+          next.hours = hours;
+        }
+        return next;
+      }),
+    );
+  }, []);
+
+  const finishAssigneeCompletion = useCallback(
+    async (taskId, uid, workedHours) => {
+      if (workedHours != null && Number.isFinite(Number(workedHours))) {
+        await completeAssigneeWithHours(taskId, uid, Number(workedHours));
+      } else {
+        const res = await apiFetch(`${API_BASE}/api/user-tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: uid, taskId: Number(taskId), status: 'COMPLETED' }),
+        });
+        if (!res.ok) throw new Error('Failed to mark assignment complete');
+      }
+      patchUserTaskAfterCompletion(taskId, uid, workedHours);
+      const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
+      notifyTasksMutated({
+        source: 'tasks-page',
+        type: 'task-updated',
+        taskId,
+        task: taskRow ?? { id: taskId },
+        meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
       });
-      if (res.ok) {
+      await loadData({ silent: true });
+    },
+    [rawTasks, loadData, patchUserTaskAfterCompletion],
+  );
+
+  const handleConfirmWorkedHours = useCallback(
+    async (workedHours) => {
+      const snapshot = pendingDone;
+      if (!snapshot) return;
+      const { taskId, userId, newStatus = 'DONE', mode } = snapshot;
+      const tid = Number(taskId);
+      const uid = Number(userId);
+      const task = rawTasks.find((t) => Number(t.id) === tid);
+      if (!task) return;
+
+      // Close dialog immediately so the Kanban update feels instant.
+      setPendingDone(null);
+      setLoadError('');
+
+      const previousTaskStatus = task.status;
+      const assignees = userTasks.filter((ut) => userTaskRowTaskId(ut) === tid);
+      const assigneeSnapshot = assignees.map((ut) => ({ ...ut }));
+
+      const rollbackTaskStatus = () => {
+        setRawTasks((prev) =>
+          prev.map((t) => (Number(t.id) === tid ? { ...t, status: previousTaskStatus } : t)),
+        );
+      };
+
+      const rollbackAssignees = () => {
+        if (assigneeSnapshot.length === 0) return;
+        setUserTasks((prev) => {
+          const rest = prev.filter((ut) => userTaskRowTaskId(ut) !== tid);
+          return [...rest, ...assigneeSnapshot];
+        });
+      };
+
+      if (mode === 'full') {
+        setRawTasks((prev) =>
+          prev.map((t) => (Number(t.id) === tid ? { ...t, status: 'DONE' } : t)),
+        );
         setUserTasks((prev) =>
           prev.map((row) => {
-            const rowTaskId = Number(row?.task?.id ?? row?.id?.taskId);
-            const rowUserId = Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId);
-            if (rowTaskId !== Number(taskId) || rowUserId !== uid) return row;
-            return { ...row, status: 'COMPLETED' };
+            if (userTaskRowTaskId(row) !== tid) return row;
+            if (Number(row?.user?.id ?? row?.user?.ID ?? row?.id?.userId) !== uid) return row;
+            return {
+              ...row,
+              status: 'COMPLETED',
+              workedHours,
+              worked_hours: workedHours,
+              hours: workedHours,
+            };
           }),
         );
-        const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
-        notifyTasksMutated({
-          source: 'tasks-page',
-          type: 'task-updated',
-          taskId,
-          task: taskRow ?? { id: taskId },
-          meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
-        });
-        await loadData({ silent: true });
       }
+
+      try {
+        await finishAssigneeCompletion(tid, uid, workedHours);
+
+        if (mode === 'assigneeOnly') {
+          return;
+        }
+
+        const res = await apiFetch(`${API_BASE}/api/tasks/${tid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...task, status: newStatus }),
+        });
+        if (!res.ok) {
+          rollbackTaskStatus();
+          rollbackAssignees();
+          setLoadError('Could not mark the task as Done. Your hours may have been saved — refresh and try again.');
+          return;
+        }
+        const updated = await res.json();
+        if (updated?.id != null) {
+          setRawTasks((prev) => mergeUpdatedTask(prev, updated));
+          setUserTasks((prev) =>
+            patchUserTasksAfterTaskSave(prev, updated, {
+              syncAssignmentStatuses: true,
+              assignmentStatus: 'COMPLETED',
+            }, projectDevelopersRef.current),
+          );
+          notifyTasksMutated({
+            source: 'tasks-page',
+            type: 'task-updated',
+            taskId: updated.id,
+            task: updated,
+            meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+          });
+        }
+      } catch (e) {
+        console.error('Error saving worked hours:', e);
+        if (mode === 'full') {
+          rollbackTaskStatus();
+          rollbackAssignees();
+        }
+        setLoadError('Could not save worked hours. Please try again.');
+      }
+    },
+    [pendingDone, rawTasks, userTasks, finishAssigneeCompletion],
+  );
+
+  const markAssigneeDone = async (taskId, ut) => {
+    const uid = Number(ut.user?.id ?? ut.user?.ID);
+    if (
+      shouldPromptWorkedHoursForAssigneeDone({
+        developerMode,
+        currentUserId,
+        assigneeUserId: uid,
+      })
+    ) {
+      const task = rawTasks.find((t) => Number(t.id) === Number(taskId));
+      setPendingDone({
+        taskId: Number(taskId),
+        userId: uid,
+        mode: 'assigneeOnly',
+        initialHours: ut.workedHours ?? ut.worked_hours ?? ut.hours ?? '',
+        taskTitle: task?.title ?? '',
+      });
+      return;
+    }
+    try {
+      await finishAssigneeCompletion(Number(taskId), uid, null);
     } catch (e) {
       console.error('Error marking assignee done:', e);
     }
@@ -998,6 +1167,19 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           </Paper>
         </Grid>
       </Grid>
+
+      <LogWorkedHoursDialog
+        open={pendingDone != null}
+        taskTitle={
+          pendingDone?.taskTitle ??
+          (pendingDone
+            ? rawTasks.find((t) => Number(t.id) === Number(pendingDone.taskId))?.title
+            : '')
+        }
+        initialHours={pendingDone?.initialHours ?? ''}
+        onCancel={() => setPendingDone(null)}
+        onConfirm={handleConfirmWorkedHours}
+      />
 
       {/* Multi-done dialog */}
       <Dialog

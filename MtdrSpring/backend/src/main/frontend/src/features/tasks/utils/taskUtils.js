@@ -15,6 +15,40 @@ export function isUserTaskAssigneeComplete(ut) {
   return u === 'COMPLETED' || u === 'DONE';
 }
 
+/** Numeric USER_ID for a user-task row. */
+export function userTaskRowUserId(ut) {
+  const raw = ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/**
+ * Developer Kanban: prompt for worked hours before moving to Done when they are the sole assignee.
+ */
+export function shouldPromptWorkedHoursOnKanbanDone({
+  developerMode,
+  currentUserId,
+  normalizedStatus,
+  assignees,
+}) {
+  if (!developerMode || !Number.isFinite(currentUserId)) return false;
+  if (normalizeTaskStatus(normalizedStatus) !== 'DONE') return false;
+  if (!Array.isArray(assignees) || assignees.length !== 1) return false;
+  const myAssignment = assignees.find((ut) => userTaskRowUserId(ut) === currentUserId);
+  return Boolean(myAssignment && !isUserTaskAssigneeComplete(myAssignment));
+}
+
+/** Developer multi-assignee dialog: prompt when marking their own row complete. */
+export function shouldPromptWorkedHoursForAssigneeDone({
+  developerMode,
+  currentUserId,
+  assigneeUserId,
+}) {
+  if (!developerMode || !Number.isFinite(currentUserId)) return false;
+  const uid = Number(assigneeUserId);
+  return Number.isFinite(uid) && uid === currentUserId;
+}
+
 /** Canonical string id for a TASK entity (API may use id or ID). */
 export function taskEntityId(task) {
   const raw = task?.id ?? task?.ID ?? task?.taskId;
