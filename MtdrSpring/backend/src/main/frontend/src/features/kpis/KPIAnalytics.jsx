@@ -366,6 +366,23 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     loadKpiData();
   }, [loadKpiData]);
 
+  /** Land on the sprint chosen from AI Insights comparison link. */
+  useEffect(() => {
+    if (sprints.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('kpiAnalyticsLandingSprintId');
+      if (raw == null || String(raw).trim() === '') return;
+      const id = Number(raw);
+      sessionStorage.removeItem('kpiAnalyticsLandingSprintId');
+      if (!Number.isFinite(id)) return;
+      if (sprints.some((s) => Number(s.id) === id)) {
+        setSelectedSprintId(id);
+      }
+    } catch {
+      sessionStorage.removeItem('kpiAnalyticsLandingSprintId');
+    }
+  }, [sprints]);
+
   /** Context filled after first paint: refill once without forcing another full-page load cycle. */
   useEffect(() => {
     if (!kpiDataReady || loading || sprints.length > 0) return;

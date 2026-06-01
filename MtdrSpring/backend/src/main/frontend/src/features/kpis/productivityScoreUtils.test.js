@@ -32,9 +32,17 @@ describe('productivityScoreUtils (KPI Analytics)', () => {
     expect(withNote).not.toMatch(/will update.*will update/i);
     const added = appendProductivityEvolutionNote('Score is 12%.', {
       phase: 'in_progress',
-      isEarly: true,
+      isEarly: false,
     });
-    expect(added).toMatch(/keep updating/i);
+    expect(added).toMatch(/marked Done/i);
+  });
+
+  it('appendProductivityEvolutionNote skips duplicate when Gemini already mentions active tasks', () => {
+    const gemini =
+      'The productivity score is 81%, which reflects the current balance of completed work and active tasks.';
+    const out = appendProductivityEvolutionNote(gemini, { phase: 'in_progress', isEarly: false });
+    expect(out).toBe(gemini);
+    expect(out).not.toMatch(/not a final grade.*not a final grade/i);
   });
 
   it('stripProductivityGuideInstructionEcho removes instruction-style suffix', () => {

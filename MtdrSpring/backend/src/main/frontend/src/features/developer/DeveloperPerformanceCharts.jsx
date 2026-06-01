@@ -173,16 +173,23 @@ function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
 
   if (!entries.length) return null;
 
+  const panelBg = isDark ? '#1C1E22' : '#FFFFFF';
+
   return (
     <Box
       sx={{
         borderRadius: 2,
-        border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
-        bgcolor: isDark ? '#1C1E22' : '#fff',
+        border: `1px solid ${isDark ? '#3A3C42' : '#D0D0D0'}`,
+        bgcolor: panelBg,
+        backgroundColor: panelBg,
+        opacity: 1,
         p: 1.25,
-        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.08)',
+        boxShadow: isDark
+          ? '0 4px 16px rgba(0,0,0,0.55)'
+          : '0 4px 16px rgba(0,0,0,0.14)',
         minWidth: 220,
         maxWidth: 320,
+        pointerEvents: 'none',
       }}
     >
       <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: row.color || SCORE_LINE, mb: 1 }}>
@@ -258,8 +265,22 @@ function CompareLineDot({ cx, cy, payload, seriesItem, isDark }) {
   );
 }
 
+/** Recharts wraps custom tooltip content in a semi-transparent box — strip that layer. */
+const PRODUCTIVITY_COMPARE_TOOLTIP_PROPS = {
+  wrapperStyle: { opacity: 1, zIndex: 20, outline: 'none' },
+  contentStyle: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    boxShadow: 'none',
+    padding: 0,
+    opacity: 1,
+  },
+  cursor: { stroke: 'rgba(0,0,0,0.12)', strokeWidth: 1 },
+  isAnimationActive: false,
+};
+
 /** Developer line legend — rendered below the chart so it does not overlap the Sprint axis label. */
-function ProductivityCompareLegend({ series = [], isDark = false }) {
+function ProductivityCompareLegend({ series = [], isDark = false, compact = false }) {
   if (!series.length) return null;
   return (
     <Box
@@ -267,10 +288,12 @@ function ProductivityCompareLegend({ series = [], isDark = false }) {
         display: 'flex',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        gap: { xs: 1.25, sm: 2 },
-        pt: 1.5,
-        pb: 0.5,
+        alignItems: 'center',
+        gap: compact ? { xs: 0.65, sm: 1 } : { xs: 1.25, sm: 2 },
+        pt: compact ? 0.75 : 1.5,
+        pb: compact ? 0.15 : 0.5,
         px: 0.5,
+        flexShrink: 0,
         borderTop: (theme) => `1px solid ${theme.palette.mode === 'dark' ? '#2A2C32' : '#ECECEC'}`,
       }}
     >
@@ -279,11 +302,17 @@ function ProductivityCompareLegend({ series = [], isDark = false }) {
         return (
           <Box
             key={s.dataKey}
-            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, maxWidth: '100%' }}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              maxWidth: compact ? 'calc(50% - 6px)' : '100%',
+              minWidth: 0,
+            }}
           >
             <Box
               sx={{
-                width: s.isCurrentUser ? 26 : 20,
+                width: s.isCurrentUser ? 22 : 18,
                 height: s.isCurrentUser ? 4 : 3,
                 borderRadius: 1,
                 bgcolor: stroke.color,
@@ -292,12 +321,22 @@ function ProductivityCompareLegend({ series = [], isDark = false }) {
               }}
             />
             <Typography
+              noWrap
               sx={{
-                fontSize: '0.75rem',
-                fontWeight: s.isCurrentUser ? 800 : 500,
-                color: s.isCurrentUser ? 'text.primary' : 'text.secondary',
-                opacity: s.isCurrentUser ? 1 : 0.88,
+                fontSize: compact ? '0.68rem' : '0.75rem',
+                fontWeight: s.isCurrentUser ? 800 : compact ? 600 : 500,
+                color: compact
+                  ? isDark
+                    ? '#F5F5F5'
+                    : '#1A1A1A'
+                  : s.isCurrentUser
+                    ? 'text.primary'
+                    : 'text.secondary',
+                opacity: 1,
                 lineHeight: 1.2,
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               {s.name}
@@ -306,6 +345,127 @@ function ProductivityCompareLegend({ series = [], isDark = false }) {
           </Box>
         );
       })}
+    </Box>
+  );
+}
+
+/** Multi-line productivity score chart body (no outer shell) for dashboard embed. */
+export function ProductivityScoreCompareChartEmbed({
+  data = [],
+  series = [],
+  chartHeight = 200,
+  /** Fill parent ChartShell height; legend stays inside the same box. */
+  fillParent = false,
+  legendCompact = false,
+  emptyMessage = 'No developer activity in the selected sprints.',
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const gridStroke = isDark ? '#2A2C32' : '#E8E8E8';
+  const tickFill = theme.palette.text.primary;
+
+  if (!data.length || !series.length) {
+    return (
+      <Typography sx={{ py: 3, textAlign: 'center', color: 'text.secondary', fontSize: '0.82rem' }}>
+        {emptyMessage}
+      </Typography>
+    );
+  }
+
+  const chartAreaSx = fillParent
+    ? { flex: '1 1 0', minHeight: 120, width: '100%', minWidth: 0 }
+    : { width: '100%', height: chartHeight, minHeight: chartHeight };
+
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        minWidth: 0,
+        height: fillParent ? '100%' : 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}
+    >
+      <Box sx={{ ...chartAreaSx, position: 'relative', zIndex: 1, overflow: 'visible' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 28, right: 12, left: 68, bottom: 48 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10, fill: tickFill }}
+              angle={-32}
+              textAnchor="end"
+              height={44}
+              tickMargin={6}
+              label={{
+                value: 'Sprint',
+                position: 'bottom',
+                offset: 4,
+                fill: tickFill,
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            />
+            <YAxis
+              domain={[0, 100]}
+              ticks={[0, 20, 40, 60, 80, 100]}
+              tick={{ fontSize: 10, fill: tickFill }}
+              width={40}
+              tickMargin={4}
+              tickFormatter={(v) => `${v}%`}
+              label={{
+                value: 'Score',
+                angle: -90,
+                position: 'left',
+                offset: 8,
+                fill: SCORE_LINE,
+                fontSize: 11,
+                fontWeight: 700,
+                style: { textAnchor: 'middle' },
+              }}
+            />
+            <Tooltip
+              {...PRODUCTIVITY_COMPARE_TOOLTIP_PROPS}
+              content={<ProductivityCompareTooltip series={series} />}
+            />
+            {compareSeriesRenderOrder(series).map((s) => {
+              const stroke = compareLineStroke(s, isDark);
+              return (
+                <Line
+                  key={s.dataKey}
+                  type="monotone"
+                  dataKey={s.dataKey}
+                  name={s.name}
+                  stroke={stroke.color}
+                  strokeWidth={stroke.width}
+                  strokeOpacity={stroke.opacity}
+                  connectNulls={false}
+                  dot={(dotProps) => {
+                    const val = dotProps.payload?.[s.dataKey];
+                    if (!Number.isFinite(Number(val))) return null;
+                    return (
+                      <CompareLineDot
+                        cx={dotProps.cx}
+                        cy={dotProps.cy}
+                        payload={val}
+                        seriesItem={s}
+                        isDark={isDark}
+                      />
+                    );
+                  }}
+                  activeDot={{ r: 5, stroke: stroke.color, fill: stroke.color, strokeWidth: 2 }}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </Box>
+      <ProductivityCompareLegend
+        series={series}
+        isDark={isDark}
+        compact={legendCompact}
+      />
     </Box>
   );
 }
@@ -388,7 +548,10 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
             />
             {isCompare ? (
               <>
-                <Tooltip content={<ProductivityCompareTooltip series={series} />} />
+                <Tooltip
+              {...PRODUCTIVITY_COMPARE_TOOLTIP_PROPS}
+              content={<ProductivityCompareTooltip series={series} />}
+            />
                 {compareSeriesRenderOrder(series).map((s) => {
                   const stroke = compareLineStroke(s, isDark);
                   return (

@@ -107,13 +107,19 @@ export function alignAlertMessagePercent(prose, rawValue) {
   return String(prose).split(`${raw}%`).join(`${clamped}%`);
 }
 
+/** "21 percentage points" → "21%" (keeps Gemini sentence structure). */
+export function normalizePercentagePointsLabel(text) {
+  if (text == null) return text;
+  return String(text).replace(/\b(\d+(?:\.\d+)?)\s+percentage points?\b/gi, '$1%');
+}
+
 /**
  * Clamp percentage-like values in executive Trends prose to [0, 100].
  * Handles explicit percentages (e.g., "117%") and phrases like "score of 102.2".
  */
 export function clampTrendsPercentLikeValues(text) {
   if (text == null) return text;
-  let out = String(text);
+  let out = normalizePercentagePointsLabel(String(text));
   const clamp = (n) => Math.max(0, Math.min(100, n));
   const toDisplay = (n) => {
     const c = clamp(Number(n));
@@ -281,6 +287,18 @@ function applyKpiMetricPatterns(text, key, actual) {
   tightList.forEach((pattern) => {
     result = result.replace(pattern, (_, prefix) => `${prefix}${display}`);
   });
+  if (key === 'onTimeDelivery') {
+    result = result.replace(
+      /improved on[- ]?time delivery by \d+(?:\.\d+)?\s*%/gi,
+      `on-time delivery at ${display}`,
+    );
+    result = result.replace(
+      /(-?\d+(?:\.\d+)?)\s*%\s*(?:improvement|increase|gain|decline|drop|reduction|decrease)\s+in\s+on[- ]?time[^.!?]*/gi,
+      `on-time delivery at ${display}`,
+    );
+    result = result.replace(/driven by a on[- ]?time delivery/gi, 'with on-time delivery');
+    result = result.replace(/driven by an on[- ]?time delivery/gi, 'with on-time delivery');
+  }
   const proximity = KPI_METRIC_PROXIMITY[key];
   if (proximity) {
     proximity.forEach((pattern) => {
@@ -288,6 +306,41 @@ function applyKpiMetricPatterns(text, key, actual) {
     });
   }
   return result;
+}
+
+/** Fixes "93% completion rate" when 93 is on-time delivery, not completion rate. */
+export function alignCompletionRatePercentLabels(text, metrics = {}) {
+  if (text == null || typeof text !== 'string') return text;
+  const cr = Number(metrics.completionRate);
+  const otd = Number(metrics.onTimeDelivery);
+  if (!Number.isFinite(cr) || !Number.isFinite(otd) || Math.abs(cr - otd) <= 3) return text;
+  let out = String(text).replace(/(\d+(?:\.\d+)?)\s*%\s*completion\s*rate/gi, (match, cited) => {
+    const n = Math.round(Number(cited));
+    if (Math.abs(n - otd) <= 2 && Math.abs(n - cr) > 5) {
+      return `${Math.round(otd)}% on-time delivery`;
+    }
+    return `${Math.round(cr)}% completion rate`;
+  });
+  out = out.replace(
+    /(on[- ]?time delivery at \d+)%\.?\s+and\s+a strong on[- ]?time delivery[^.!?]*/gi,
+    '$1%',
+  );
+  return out;
+}
+
+/** When trends cite productivity score as on-time improvement, rewrite to live on-time %. */
+export function fixProductivityPercentMisattributedToOnTime(text, metrics = {}) {
+  if (text == null || typeof text !== 'string') return text;
+  const ps = Number(metrics.productivityScore);
+  const otd = Number(metrics.onTimeDelivery);
+  if (!Number.isFinite(ps) || !Number.isFinite(otd) || Math.abs(ps - otd) <= 3) return text;
+  const match = text.match(
+    /(\d+(?:\.\d+)?)\s*%\s*(?:improvement|increase|gain|decline|drop|reduction|decrease)\s+in\s+on[- ]?time/i,
+  );
+  if (!match) return text;
+  const cited = Math.round(Number(match[1]));
+  if (Math.abs(cited - ps) > 2 || Math.abs(cited - otd) <= 5) return text;
+  return applyKpiMetricPatterns(text, 'onTimeDelivery', otd);
 }
 
 /**
@@ -317,6 +370,8 @@ export function alignKpiMetricsInText(text, metrics = {}) {
     if (actual == null || !Number.isFinite(Number(actual))) return;
     result = applyKpiMetricPatterns(result, key, actual);
   });
+  result = fixProductivityPercentMisattributedToOnTime(result, metrics);
+  result = alignCompletionRatePercentLabels(result, metrics);
   return fixGluedPercentProse(result);
 }
 

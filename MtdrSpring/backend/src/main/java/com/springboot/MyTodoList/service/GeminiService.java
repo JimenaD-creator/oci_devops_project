@@ -965,36 +965,43 @@ public class GeminiService {
         String teamWorkloadJson = buildTeamWorkloadJson(sprintId);
         String blockedUserTaskReportsJson = buildBlockedUserTaskReportsJson(sprintId);
 
-        List<Sprint> previousSprints = allSprints.stream()
-            .filter(s -> !s.getId().equals(currentSprint.getId()))
-            .sorted((a, b) -> {
-                if (a.getStartDate() == null || b.getStartDate() == null) return 0;
-                return b.getStartDate().compareTo(a.getStartDate());
-            })
-            .limit(5)
-            .collect(java.util.stream.Collectors.toList());
+        Long projectId = currentSprint.getAssignedProject() != null
+            ? currentSprint.getAssignedProject().getId() : null;
+        List<Sprint> allPriorChronological = findAllPreviousSprintsChronological(currentSprint, projectId);
 
         StringBuilder historyJson = new StringBuilder("[");
-        for (int i = 0; i < previousSprints.size(); i++) {
-            Sprint s = previousSprints.get(i);
+        for (int i = 0; i < allPriorChronological.size(); i++) {
+            Sprint s = allPriorChronological.get(i);
             Map<String, Object> histLive = resolveLiveKpisForSprint(s);
-            if (i > 0) historyJson.append(",");
+            if (i > 0) {
+                historyJson.append(",");
+            }
+            String goalField = "";
+            if (s.getGoal() != null && !s.getGoal().isBlank()) {
+                try {
+                    goalField = ",\"sprintGoal\":" + mapper.writeValueAsString(s.getGoal().trim());
+                } catch (Exception ignored) {
+                    goalField = "";
+                }
+            }
             historyJson.append(String.format(
-                "{\"sprintId\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f," +
-                "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f}",
+                Locale.ROOT,
+                "{\"sprintId\":%d,\"orderIndex\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f,"
+                    + "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f%s}",
                 s.getId(),
+                i + 1,
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "completionRate"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "onTimeDelivery"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "teamParticipation"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "workloadBalance"),
-                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "productivityScore")
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "productivityScore"),
+                goalField
             ));
         }
         historyJson.append("]");
 
-        Long projectId = currentSprint.getAssignedProject() != null
-            ? currentSprint.getAssignedProject().getId() : null;
-        String trendHint = detectTrendHint(previousSprints, currentSprint, projectId);
+        String vsAllPriorJson = buildCanonicalVsAllPriorSprintsJson(currentSprint, projectId);
+        String trendHint = detectTrendHint(allPriorChronological, currentSprint, projectId);
         String timelineJson = buildSprintTimelineJson(currentSprint);
         String taskStatusJson = buildTaskStatusCountsJson(sprintId);
         Map<String, Long> canonicalTaskCounts = getCanonicalTaskStatusCounts(sprintId);
@@ -1015,6 +1022,8 @@ public class GeminiService {
                 "{\"sprintId\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f," +
                 "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f}\n\n",
                 currentSprint.getId(), cr, otd, tp, wb, ps) +
+            "## Canonical comparison vs ALL prior sprints (authoritative; oldest-to-newest columns match UI table)\n" +
+            vsAllPriorJson + "\n\n" +
             "## Sprint timeline (live snapshot; phase is authoritative for whether the sprint has ended)\n" +
             timelineJson + "\n\n" +
             "## Task counts by status (this sprint only)\n" +
@@ -1024,7 +1033,7 @@ public class GeminiService {
                 "TODO=%d, IN_PROCESS=%d, IN_REVIEW=%d, DONE=%d, UNKNOWN=%d\n\n",
                 todoCount, inProcessCount, inReviewCount, doneCount, unknownCount
             ) +
-            "## Historical Data (previous sprints, most recent first)\n" +
+            "## Historical Data (ALL prior sprints for this project, chronological oldest-first)\n" +
             historyJson + "\n\n" +
             "## Team workload (per developer: assignments, hours, sample tasks with optional startDate/dueDate; compare task startDate to Sprint timeline.asOf before judging delay; fromSprintRosterOnly=true means on sprint roster but no assignment rows yet — still include them in developerInsights)\n" +
             teamWorkloadJson + "\n\n" +
@@ -1057,6 +1066,7 @@ public class GeminiService {
             "\"reason\":\"Low workload balance; redistribution is recommended.\"}]," +
             "\"productivityPrediction\":{\"predictedScore\":72,\"trend\":\"down\"," +
             "\"confidence\":\"medium\",\"reasoning\":\"Consistent decline in on-time delivery.\"}," +
+            "\"sprintChangeSummary\":\"\"," +
             "\"kpiManagerGuide\":{\"intro\":\"One-sentence headline for an engineering manager.\",\"byMetric\":{" +
             "\"completionRate\":\"1-2 sentences tied to the current %.\",\"onTimeDelivery\":\"...\"," +
             "\"teamParticipation\":\"...\",\"workloadBalance\":\"...\",\"productivityScore\":\"...\"}}," +
@@ -1078,6 +1088,8 @@ public class GeminiService {
             "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
             "  For workload_redistribution, also evaluate worked-hour imbalance: if someone with urgent/open tasks has clearly higher logged hours than peers, recommend moving 1-2 suitable tasks to a teammate with lower logged hours and little/no open work.\n" +
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
+            "- sprintChangeSummary: always use \"\" (empty string). Sprint-over-sprint facts belong in the UI comparison table; narrative belongs in executiveSummary and alerts.\n" +
+            "- When hasPriorSprints=true: executiveSummary.trends must be 1 short direct sentence (max 2 if essential), under ~28 words, comparing to the immediately previous sprint by label. No semicolon KPI lists. Write deltas with the % symbol (e.g. \"improved by 21% compared to the previous sprint\"), never the words \"percentage points\". When in_progress with open tasks, say the lower score is because work is not Done yet—not that the team underperformed vs a closed sprint.\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
             "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
@@ -1102,6 +1114,7 @@ public class GeminiService {
             "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
             "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, teamParticipation, and workloadBalance — "
             + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
+            + "When phase is in_progress, add one brief line only if needed: the score updates as work is marked Done and is not a final grade while the sprint is open. "
             + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
             + "(no baseline, expected, underperforming, sprint not started, early snapshot, little work completed yet, or similar excuses). "
             + "You MAY add one short sentence that the score will update as the sprint runs and tasks or hours change. "
@@ -1110,14 +1123,15 @@ public class GeminiService {
             "- Do not include any text outside the JSON object";
     }
 
-    private String detectTrendHint(List<Sprint> previous, Sprint current, Long projectId) {
-        if (previous.isEmpty()) {
+    private String detectTrendHint(List<Sprint> allPriorChronological, Sprint current, Long projectId) {
+        if (allPriorChronological.isEmpty()) {
             return "This is the first sprint — no historical trend available.";
         }
 
         Map<String, Object> currentLive = resolveLiveKpisForSprint(current);
         int currentOtd = GeminiInsightKpiAlignUtil.intMetric(currentLive, "onTimeDelivery");
-        Map<String, Object> lastLive = resolveLiveKpisForSprint(previous.get(0));
+        Sprint lastPrior = allPriorChronological.get(allPriorChronological.size() - 1);
+        Map<String, Object> lastLive = resolveLiveKpisForSprint(lastPrior);
         int previousOtd = GeminiInsightKpiAlignUtil.intMetric(lastLive, "onTimeDelivery");
         int drop = previousOtd - currentOtd;
 
@@ -2583,16 +2597,21 @@ public class GeminiService {
     }
 
     private static final Pattern PRODUCTIVITY_EVOLUTION_NOTE_ALREADY = Pattern.compile(
-        "\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
+        "(?i)\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
             + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|task\\s+(?:progress|updates?)|"
-            + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins)\\b",
-        Pattern.CASE_INSENSITIVE);
+            + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins|still\\s+open|"
+            + "sprint\\s+(?:is\\s+)?(?:still\\s+)?open|pending\\s+task|live\\s+snapshot|"
+            + "not\\s+yet\\s+done|not\\s+a\\s+final|active\\s+tasks?|marked\\s+done|"
+            + "updates?\\s+as\\s+more)\\b");
 
     private static String productivityEvolutionNote(Sprint sprint) {
         String phase = resolveSprintPhase(sprint);
         if ("not_started".equals(phase)) {
             return "It will update once the sprint begins and tasks move through statuses, "
                 + "assignments, and logged hours feed the four KPIs.";
+        }
+        if ("in_progress".equals(phase)) {
+            return "It updates as more work is marked Done—not a final grade while the sprint is open.";
         }
         if (isSprintEarlyForProductivityGuide(sprint)) {
             return "It will keep updating as tasks progress and completion, on-time delivery, "
@@ -2616,17 +2635,27 @@ public class GeminiService {
         return raw + " " + note;
     }
 
+    private static String polishProductivityGuideProse(String text) {
+        if (text == null || text.isBlank()) {
+            return text == null ? "" : text.trim();
+        }
+        String out = text.trim();
+        out = out.replaceAll("\\bso Pending tasks\\b", "so pending tasks");
+        out = out.replaceAll("\\s{2,}", " ");
+        return out.trim();
+    }
+
     /** Align %% with KPI card; keep Gemini prose like other metrics (strip prompt echoes only). */
     private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
         int clamped = Math.min(100, Math.max(0, scorePct));
         if (existing == null || existing.isBlank()) {
-            return appendProductivityEvolutionNote(
+            return polishProductivityGuideProse(appendProductivityEvolutionNote(
                 String.format(
                     Locale.ROOT,
                     "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
                         + "team participation, and workload balance into one indicator for overall sprint performance.",
                     clamped),
-                sprint);
+                sprint));
         }
         String out = stripProductivityGuideInstructionEcho(existing);
         out = stripProductivityLowScoreExcuses(out, sprint);
@@ -2634,7 +2663,7 @@ public class GeminiService {
             out = softenProductivityGuidePerformanceLabels(out);
         }
         out = replaceProductivityScoreMentionsInProse(out, clamped);
-        return appendProductivityEvolutionNote(out, sprint);
+        return polishProductivityGuideProse(appendProductivityEvolutionNote(out, sprint));
     }
 
     private static final class AssignmentLoadSnap {
@@ -3418,6 +3447,122 @@ public class GeminiService {
         sprintRepository.save(sprint);
     }
 
+    private List<Sprint> findAllPreviousSprintsChronological(Sprint current, Long projectId) {
+        List<Sprint> out = new ArrayList<>();
+        if (current == null || projectId == null) {
+            return out;
+        }
+        List<Sprint> ordered = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+        for (Sprint s : ordered) {
+            if (current.getId().equals(s.getId())) {
+                break;
+            }
+            out.add(s);
+        }
+        return out;
+    }
+
+    private Sprint findImmediatePreviousSprint(Sprint current, Long projectId) {
+        List<Sprint> all = findAllPreviousSprintsChronological(current, projectId);
+        return all.isEmpty() ? null : all.get(all.size() - 1);
+    }
+
+    /**
+     * Same labels as frontend {@code buildSprintNumberMap}: sprints sorted by DB id → Sprint 0, Sprint 1, …
+     */
+    private Map<Long, Integer> buildSprintDisplayIndexMap(Long projectId) {
+        Map<Long, Integer> map = new HashMap<>();
+        if (projectId == null) {
+            return map;
+        }
+        List<Sprint> sprints = sprintRepository.findByAssignedProjectId(projectId);
+        sprints.sort(Comparator.comparing(Sprint::getId));
+        for (int i = 0; i < sprints.size(); i++) {
+            map.put(sprints.get(i).getId(), i);
+        }
+        return map;
+    }
+
+    private String sprintDisplayLabel(Map<Long, Integer> displayMap, Long sprintId) {
+        if (sprintId == null) {
+            return "Sprint";
+        }
+        Integer idx = displayMap.get(sprintId);
+        return idx != null ? "Sprint " + idx : "Sprint " + sprintId;
+    }
+
+    private String buildCanonicalVsAllPriorSprintsJson(Sprint current, Long projectId) {
+        if (current == null || projectId == null) {
+            return "{\"hasPriorSprints\":false,\"hasPreviousSprint\":false}";
+        }
+        List<Sprint> allPrior = findAllPreviousSprintsChronological(current, projectId);
+        if (allPrior.isEmpty()) {
+            return "{\"hasPriorSprints\":false,\"hasPreviousSprint\":false}";
+        }
+        Map<String, Object> cur = resolveLiveKpisForSprint(current);
+        StringBuilder priorArr = new StringBuilder("[");
+        for (int i = 0; i < allPrior.size(); i++) {
+            Sprint s = allPrior.get(i);
+            Map<String, Object> m = resolveLiveKpisForSprint(s);
+            if (i > 0) {
+                priorArr.append(",");
+            }
+            priorArr.append(String.format(
+                Locale.ROOT,
+                "{\"sprintId\":%d,\"completionRate\":%d,\"onTimeDelivery\":%d,"
+                    + "\"teamParticipation\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}",
+                s.getId(),
+                GeminiInsightKpiAlignUtil.intMetric(m, "completionRate"),
+                GeminiInsightKpiAlignUtil.intMetric(m, "onTimeDelivery"),
+                GeminiInsightKpiAlignUtil.intMetric(m, "teamParticipation"),
+                GeminiInsightKpiAlignUtil.intMetric(m, "workloadBalance"),
+                GeminiInsightKpiAlignUtil.intMetric(m, "productivityScore")));
+        }
+        priorArr.append("]");
+        Sprint previous = allPrior.get(allPrior.size() - 1);
+        Map<String, Object> prev = resolveLiveKpisForSprint(previous);
+        int dCr = GeminiInsightKpiAlignUtil.intMetric(cur, "completionRate")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "completionRate");
+        int dOtd = GeminiInsightKpiAlignUtil.intMetric(cur, "onTimeDelivery")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "onTimeDelivery");
+        int dTp = GeminiInsightKpiAlignUtil.intMetric(cur, "teamParticipation")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "teamParticipation");
+        int dWb = GeminiInsightKpiAlignUtil.intMetric(cur, "workloadBalance")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "workloadBalance");
+        int dPs = GeminiInsightKpiAlignUtil.intMetric(cur, "productivityScore")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "productivityScore");
+        return String.format(
+            Locale.ROOT,
+            "{\"hasPriorSprints\":true,\"hasPreviousSprint\":true,\"priorSprintCount\":%d,"
+                + "\"priorSprintsChronological\":%s,"
+                + "\"immediatePreviousSprintId\":%d,\"currentSprintId\":%d,"
+                + "\"immediatePrevious\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"teamParticipation\":%d,"
+                + "\"workloadBalance\":%d,\"productivityScore\":%d},"
+                + "\"current\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"teamParticipation\":%d,"
+                + "\"workloadBalance\":%d,\"productivityScore\":%d},"
+                + "\"deltaVsImmediatePrevious\":{\"completionRate\":%d,\"onTimeDelivery\":%d,"
+                + "\"teamParticipation\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}}",
+            allPrior.size(),
+            priorArr,
+            previous.getId(),
+            current.getId(),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "completionRate"),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "onTimeDelivery"),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "teamParticipation"),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "workloadBalance"),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "productivityScore"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "completionRate"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "onTimeDelivery"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "teamParticipation"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "workloadBalance"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "productivityScore"),
+            dCr,
+            dOtd,
+            dTp,
+            dWb,
+            dPs);
+    }
+
     private List<Integer> getLiveOnTimeSeriesChronological(Long projectId, Long currentSprintId) {
         List<Integer> out = new ArrayList<>();
         if (projectId == null || currentSprintId == null) {
@@ -3446,7 +3591,8 @@ public class GeminiService {
         List<Integer> chronoOtd = getLiveOnTimeSeriesChronological(projectId, sprintId);
 
         alignAlertsWithLiveKpis(root, live, chronoOtd);
-        alignExecutiveSummaryWithLiveKpis(root, live, chronoOtd);
+        alignExecutiveSummaryWithLiveKpis(root, sprint, live, chronoOtd);
+        enrichSprintChangeSummary(root, sprint, live, chronoOtd);
         alignKpiManagerGuideWithLiveKpis(root, live);
         alignProductivityPredictionWithLiveKpis(root, live);
 
@@ -3510,19 +3656,66 @@ public class GeminiService {
         return -1;
     }
 
+    /** Clears legacy sprintChangeSummary; comparison table + executive summary replace it in the UI. */
+    private void enrichSprintChangeSummary(
+            ObjectNode root, Sprint sprint, Map<String, Object> live, List<Integer> chronoOtd) {
+        root.put("sprintChangeSummary", "");
+    }
+
     private void alignExecutiveSummaryWithLiveKpis(
-            ObjectNode root, Map<String, Object> live, List<Integer> chronoOtd) {
+            ObjectNode root, Sprint sprint, Map<String, Object> live, List<Integer> chronoOtd) {
         JsonNode esNode = root.get("executiveSummary");
         if (esNode == null || !esNode.isObject()) {
             return;
         }
         ObjectNode es = (ObjectNode) esNode;
+        Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
+        List<Sprint> allPrior = findAllPreviousSprintsChronological(sprint, projectId);
+        String previousLabel = null;
+        int dPs = 0;
+        int dCr = 0;
+        int dOtd = 0;
+        int dTp = 0;
+        int dWb = 0;
+        GeminiInsightKpiAlignUtil.SprintChangeContext changeCtx = null;
+        if (!allPrior.isEmpty()) {
+            Sprint previous = allPrior.get(allPrior.size() - 1);
+            Map<String, Object> prevLive = resolveLiveKpisForSprint(previous);
+            dPs = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "productivityScore");
+            dCr = GeminiInsightKpiAlignUtil.intMetric(live, "completionRate")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "completionRate");
+            dOtd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "onTimeDelivery");
+            dTp = GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "teamParticipation");
+            dWb = GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "workloadBalance");
+            Map<Long, Integer> sprintDisplayMap = buildSprintDisplayIndexMap(projectId);
+            previousLabel = sprintDisplayLabel(sprintDisplayMap, previous.getId());
+            changeCtx =
+                GeminiInsightKpiAlignUtil.SprintChangeContext.fromLiveMaps(
+                    resolveSprintPhase(sprint), live, prevLive);
+            if (es.path("trends").isTextual()) {
+                String trends = GeminiInsightKpiAlignUtil.refineExecutiveTrends(
+                    es.get("trends").asText(""),
+                    previousLabel,
+                    dPs,
+                    dCr,
+                    dOtd,
+                    dTp,
+                    dWb,
+                    changeCtx);
+                es.put("trends", trends);
+            }
+        }
         for (String field : List.of("overview", "trends", "improvementAreas", "nextSteps")) {
             if (!es.path(field).isTextual()) {
                 continue;
             }
-            String text = es.get(field).asText("");
+            String             text = GeminiInsightKpiAlignUtil.normalizePercentagePointsLabel(es.get(field).asText(""));
             text = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(text, live);
+            text = GeminiInsightKpiAlignUtil.fixProductivityPercentMisattributedToOnTime(text, live);
             text = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(text, chronoOtd);
             es.put(field, text);
         }
@@ -3561,9 +3754,14 @@ public class GeminiService {
         }
         ObjectNode pred = (ObjectNode) predNode;
         int livePs = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
+        int liveCr = GeminiInsightKpiAlignUtil.intMetric(live, "completionRate");
+        int liveOtd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
         if (pred.has("predictedScore") && pred.get("predictedScore").isNumber()) {
             int stored = pred.get("predictedScore").asInt();
-            if (Math.abs(stored - livePs) > 15) {
+            boolean looksLikeSingleKpiNotProductivity =
+                (Math.abs(stored - liveOtd) <= 3 && Math.abs(stored - livePs) > 5)
+                    || (Math.abs(stored - liveCr) <= 3 && Math.abs(stored - livePs) > 5);
+            if (looksLikeSingleKpiNotProductivity || Math.abs(stored - livePs) > 15) {
                 pred.put("predictedScore", livePs);
             }
         }

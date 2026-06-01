@@ -159,7 +159,7 @@ export default function AIInsightsPage({
         maxWidth: '100%',
         boxSizing: 'border-box',
         px: { xs: 1, sm: 2, md: 3 },
-        py: 1,
+        py: 0.5,
       }}
     >
       <Box
@@ -167,27 +167,30 @@ export default function AIInsightsPage({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: { xs: 'flex-start', sm: 'flex-end' },
-          mb: 2.5,
+          mb: 1.5,
           flexWrap: 'wrap',
-          gap: 2,
+          gap: 1.5,
         }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, minWidth: 0 }}>
-            <Sparkles size={28} color="#673AB7" />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25, minWidth: 0 }}>
+            <Sparkles size={24} color="#673AB7" />
             <Typography
               variant="h4"
               sx={{
                 fontWeight: 800,
                 color: 'text.primary',
                 letterSpacing: '-0.5px',
-                fontSize: { xs: '1.65rem', md: '2rem' },
+                fontSize: { xs: '1.45rem', md: '1.75rem' },
               }}
             >
               AI Insights
             </Typography>
           </Box>
-          <Typography variant="body1" sx={{ color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, maxWidth: '56rem' }}>
+          <Typography
+            variant="body2"
+            sx={{ color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, maxWidth: '56rem', fontSize: '0.875rem' }}
+          >
             Gemini-powered sprint analysis: alerts, recommendations, summary, and predictions.
           </Typography>
         </Box>
@@ -269,6 +272,7 @@ export default function AIInsightsPage({
           currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
           currentSprintMetrics={currentSprintKpiMetrics}
           refreshToken={insightsRefreshKey}
+          autoGenerateOnMissing
           onOpenTeam={onOpenTeam}
         />
       )}

@@ -3,6 +3,7 @@ import {
   alignAlertLoosePercents,
   alignKpiMetricsInText,
   alignKpiProseForMetric,
+  alignCompletionRatePercentLabels,
   alignSingleMetricBlock,
   stripContradictoryOnTimeDecline,
   reconcileOnTimeDeliveryConcernProse,
@@ -27,6 +28,24 @@ describe('aiInsightsConstants KPI alignment', () => {
   it('alignKpiMetricsInText updates tight on-time pattern', () => {
     const out = alignKpiMetricsInText('On-time delivery is at 63%.', { onTimeDelivery: 83 });
     expect(out).toBe('On-time delivery is at 83%.');
+  });
+
+  it('alignCompletionRatePercentLabels rewrites on-time % mislabeled as completion', () => {
+    const out = alignCompletionRatePercentLabels(
+      'The team achieved a 93% completion rate and a strong on-time delivery performance this sprint.',
+      { completionRate: 68, onTimeDelivery: 93 },
+    );
+    expect(out.toLowerCase()).toContain('93% on-time delivery');
+    expect(out.toLowerCase()).not.toContain('93% completion rate');
+  });
+
+  it('does not swap productivity score into on-time improvement clause', () => {
+    const out = alignKpiMetricsInText(
+      'Productivity increased by 6 points compared to the previous sprint, driven by a 97% improvement in on-time delivery.',
+      { productivityScore: 97, onTimeDelivery: 71 },
+    );
+    expect(out.toLowerCase()).toContain('with on-time delivery at 71%');
+    expect(out.toLowerCase()).not.toContain('97% improvement in on-time');
   });
 
   it('keeps a space after percent (avoids "0as" in manager guide)', () => {

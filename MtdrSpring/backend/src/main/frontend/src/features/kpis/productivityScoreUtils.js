@@ -190,9 +190,9 @@ export function stripProductivityLowScoreExcuses(text, timeline) {
 }
 
 const EVOLUTION_NOTE_ALREADY =
-  /\b(?:will\s+update|will\s+change|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins)\b/i;
+  /\b(?:will\s+update|will\s+change|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins|still\s+open|sprint\s+(?:is\s+)?(?:still\s+)?open|pending\s+task|live\s+snapshot|not\s+yet\s+done|not\s+a\s+final|active\s+tasks?|marked\s+done|updates?\s+as\s+more)\b/i;
 
-/** Short forward-looking note (not a excuse for a low %). */
+/** Short forward-looking note (not an excuse for a low %). */
 export function productivityEvolutionNote(timeline) {
   const phase = timeline?.phase;
   if (phase === 'not_started') {
@@ -200,6 +200,9 @@ export function productivityEvolutionNote(timeline) {
       'It will update once the sprint begins and tasks move through statuses, ' +
       'assignments, and logged hours feed the four KPIs.'
     );
+  }
+  if (phase === 'in_progress') {
+    return 'It updates as more work is marked Done—not a final grade while the sprint is open.';
   }
   if (timeline?.isEarly) {
     return (
@@ -214,14 +217,25 @@ export function productivityEvolutionNote(timeline) {
 export function appendProductivityEvolutionNote(text, timeline) {
   if (text == null) return text;
   const phase = timeline?.phase;
-  const isEarly = timeline?.isEarly === true || phase === 'not_started';
-  if (!isEarly) return text;
+  const needsNote =
+    phase === 'in_progress' || timeline?.isEarly === true || phase === 'not_started';
+  if (!needsNote) return text;
   const note = productivityEvolutionNote(timeline);
   if (!note) return text;
   const raw = String(text).trim();
   if (!raw) return note;
   if (EVOLUTION_NOTE_ALREADY.test(raw)) return raw;
   return `${raw} ${note}`;
+}
+
+/** Fixes awkward merges from Gemini + evolution note (e.g. "so Pending"). */
+export function polishProductivityGuideProse(text) {
+  if (text == null) return text;
+  let out = String(text).trim();
+  if (!out) return out;
+  out = out.replace(/\bso Pending tasks\b/g, 'so pending tasks');
+  out = out.replace(/\s{2,}/g, ' ');
+  return out.trim();
 }
 
 function productivityScoreLeadLine(score) {
@@ -260,10 +274,14 @@ export function finalizeProductivityManagerGuideText(text, score, sprint = null)
     out = out ? `${lead} ${out}` : lead;
   }
   const timeline = resolveSprintTimelineContext(sprint);
-  if (timeline.isEarly || timeline.phase === 'not_started') {
+  if (
+    timeline.isEarly ||
+    timeline.phase === 'not_started' ||
+    timeline.phase === 'in_progress'
+  ) {
     out = appendProductivityEvolutionNote(out, timeline);
   }
-  return out.trim();
+  return polishProductivityGuideProse(out.trim());
 }
 
 /** Strip judgmental performance labels when sprint has not started or is still early. */
