@@ -18,6 +18,7 @@ import DeveloperMetricCards from './DeveloperMetricCards';
 import DeveloperTable from '../kpis/DeveloperTable';
 import DeveloperRadarCards from '../ai/DeveloperRadarCards';
 import DeveloperPerformanceNarrative from './DeveloperPerformanceNarrative';
+import DeveloperEmptyState from './DeveloperEmptyState';
 import {
   aggregateDeveloperPerformance,
   buildCompletedTasksBySprintChart,
@@ -205,6 +206,24 @@ export default function MyPerformancePage({ projectId, currentUser }) {
     return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
+  const hasNoSprints = sortedSprints.length === 0;
+
+  if (hasNoSprints) {
+    return (
+      <Box sx={{ maxWidth: 1200, width: '100%' }}>
+        {error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
+        <DeveloperEmptyState
+          pageTitle="My Performance"
+          description="There are no sprints or performance data to show in this project yet. Metrics and charts will appear once your manager creates sprints and assigns you work."
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 1200, width: '100%' }}>
       <Paper
@@ -249,7 +268,6 @@ export default function MyPerformancePage({ projectId, currentUser }) {
                 const sp = sortedSprints.find((s) => Number(s.id) === id);
                 setSelectedSprint(sp || null);
               }}
-              disabled={!sortedSprints.length}
             >
               {sortedSprints.map((s) => (
                 <MenuItem key={s.id} value={String(s.id)}>

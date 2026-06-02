@@ -15,6 +15,7 @@ import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import TaskTable from '../tasks/TaskTable';
 import { TaskDetailDialog } from '../tasks/TaskDetailDialog';
 import DeveloperMetricCards from './DeveloperMetricCards';
+import DeveloperEmptyState from './DeveloperEmptyState';
 import { filterUserTasksForUser } from './developerTaskFilters';
 import { resolveUserTaskUserId, taskSprintId, userTaskWorkedHours } from '../dashboard/dashboardSprintData';
 import {
@@ -299,6 +300,24 @@ export default function MyTasksPage({ projectId, currentUser }) {
 
   if (loading && sprints.length === 0 && tasks.length === 0) {
     return <PageLoadingSpinner color={ORACLE_RED} />;
+  }
+
+  const hasNoSprints = !loading && sprints.length === 0;
+
+  if (hasNoSprints) {
+    return (
+      <Box sx={{ maxWidth: 1200, width: '100%' }}>
+        {loadError ? (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLoadError('')}>
+            {loadError}
+          </Alert>
+        ) : null}
+        <DeveloperEmptyState
+          pageTitle="My Tasks"
+          description="There are no sprints or tasks assigned to you in this project yet. When your manager creates sprints and assigns work, your tasks will appear here."
+        />
+      </Box>
+    );
   }
 
   return (

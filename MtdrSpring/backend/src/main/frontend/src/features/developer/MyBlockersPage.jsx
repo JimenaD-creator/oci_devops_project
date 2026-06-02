@@ -30,6 +30,7 @@ import {
   formatSprintLabel,
   resolveActiveProjectIdNum,
 } from '../sprints/utils/sprintUtils';
+import DeveloperEmptyState from './DeveloperEmptyState';
 
 function formatReportedDate(iso) {
   if (!iso) return '—';
@@ -259,6 +260,25 @@ export default function MyBlockersPage({ projectId, currentUser }) {
     return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
+  const hasNoSprints = projectSprints.length === 0;
+  const showProjectEmpty = hasNoSprints && rows.length === 0;
+
+  if (showProjectEmpty) {
+    return (
+      <Box sx={{ maxWidth: 1100, width: '100%' }}>
+        {error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
+        <DeveloperEmptyState
+          pageTitle="My Blockers"
+          description="There are no sprints or blocker reports in this project yet. Blockers you report via Telegram will appear here once sprints and assignments exist."
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 1100, width: '100%' }}>
       <Paper
@@ -305,7 +325,7 @@ export default function MyBlockersPage({ projectId, currentUser }) {
               No blocker reports yet
             </Typography>
             <Typography sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
-              When you flag an assignment as blocked (web or Telegram) with a reason, it will appear here.
+              When you flag an assignment as blocked (only via Telegram) with a reason, it will appear here.
               Resolved reports stay in your history.
             </Typography>
           </Box>

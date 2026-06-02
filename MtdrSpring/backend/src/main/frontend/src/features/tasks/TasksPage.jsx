@@ -54,6 +54,7 @@ import {
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
+import DeveloperEmptyState from '../developer/DeveloperEmptyState';
 import {
   applyRecentUpdatesToTaskLists,
   getRecentlyCreatedTasks,
@@ -882,6 +883,26 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     return <PageLoadingSpinner color={ORACLE_RED} />;
   }
 
+  if (!sprintsForActiveProject.length) {
+    return (
+      <Box sx={{ maxWidth: 1200, width: '100%' }}>
+        {loadError ? (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLoadError('')}>
+            {loadError}
+          </Alert>
+        ) : null}
+        <DeveloperEmptyState
+          pageTitle={developerMode ? 'Kanban Board' : 'Tasks'}
+          description={
+            developerMode
+              ? 'There are no sprints or tasks assigned to you in this project yet. When your manager creates sprints and assigns work, your Kanban board will appear here.'
+              : 'There are no sprints or tasks in this project yet. Create a sprint and add tasks to use the Kanban board.'
+          }
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 1200, width: '100%' }}>
       {loadError ? (
@@ -991,11 +1012,6 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             ) : null}
           </Stack>
         </Box>
-        {!sprints.length ? (
-          <Typography variant="body2" sx={{ mt: 1.25, color: 'text.secondary' }}>
-            No sprints available.
-          </Typography>
-        ) : null}
       </Paper>
 
       {/* Filter card */}
