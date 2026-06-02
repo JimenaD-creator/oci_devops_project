@@ -47,6 +47,10 @@ public class UserService {
                     "Role not allowed. Use MANAGER or a team role (e.g., front-end developer, DevOps engineer).");
         }
         user.setType(UserRoleUtil.normalizeDisplayType(user.getType()));
+        // Hash password al crear
+        if (user.getUserPassword() != null && !user.getUserPassword().isBlank()) {
+            user.setUserPassword(passwordEncoder.encode(user.getUserPassword()));
+        }
         return userRepository.save(user);
     }
 
@@ -65,7 +69,13 @@ public class UserService {
             user.setName(userDetails.getName());
             user.setEmail(userDetails.getEmail());
             user.setPhoneNumber(userDetails.getPhoneNumber());
-            user.setUserPassword(userDetails.getUserPassword());
+
+            // Solo hashear y actualizar si viene password nuevo no vacío
+            if (userDetails.getUserPassword() != null && !userDetails.getUserPassword().isBlank()) {
+                user.setUserPassword(passwordEncoder.encode(userDetails.getUserPassword()));
+            }
+            // Si viene null/vacío se mantiene el password actual sin tocar
+
             if (userDetails.getProfilePicture() != null) {
                 user.setProfilePicture(userDetails.getProfilePicture());
             }
