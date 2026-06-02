@@ -3,12 +3,11 @@ import {
   fetchProjectBundleRaw,
   getCachedBundleSnapshot,
 } from '../dashboard/dashboardSprintData';
+import { fetchProjectDevelopers } from '../dashboard/projectApi';
 import { resolveActiveProjectIdNum, sprintProjectIdFromJson } from './utils/sprintUtils';
 
-export async function fetchSprintsProjectDevelopers(projectIdNum) {
-  const res = await fetch(`${API_BASE}/api/projects/${projectIdNum}/developers`);
-  const data = res.ok ? await res.json() : [];
-  return Array.isArray(data) ? data : [];
+export async function fetchSprintsProjectDevelopers(projectIdNum, options = {}) {
+  return fetchProjectDevelopers(projectIdNum, options);
 }
 
 export async function fetchSprintsProjectSummary(projectIdNum) {

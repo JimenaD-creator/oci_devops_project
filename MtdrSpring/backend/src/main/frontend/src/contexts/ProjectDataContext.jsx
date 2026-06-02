@@ -15,6 +15,7 @@ import {
   applyOptimisticTaskDeleted,
   applyOptimisticTaskCreated,
 } from '../features/dashboard/dashboardSprintData';
+import { fetchProjectDevelopers } from '../features/dashboard/projectApi';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
 import {
   markTasksSyncCaughtUp,
@@ -81,7 +82,10 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       setError(null);
       let succeeded = false;
       try {
-        const data = await fetchDashboardSprints(pid, { forceFresh });
+        const [data] = await Promise.all([
+          fetchDashboardSprints(pid, { forceFresh }),
+          fetchProjectDevelopers(pid, { forceFresh }).catch(() => []),
+        ]);
         setSprints(Array.isArray(data) ? data : []);
         const freshSnap = getCachedBundleSnapshot(pid);
         const updatedAt = freshSnap?.timestamp ?? Date.now();

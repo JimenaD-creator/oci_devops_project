@@ -51,6 +51,7 @@ import {
   fetchProjectDevelopersList,
   fetchTasksPageBundle,
 } from './tasksPageApi';
+import { getCachedProjectDevelopersSnapshot } from '../dashboard/projectApi';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import { filterUserTasksForUser, taskIdsForUser } from '../developer/developerTaskFilters';
@@ -291,6 +292,10 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       return () => {
         cancelled = true;
       };
+    }
+    const devSnap = getCachedProjectDevelopersSnapshot(selectedProjectId);
+    if (devSnap) {
+      setProjectDevelopers(devSnap.developers);
     }
     (async () => {
       try {

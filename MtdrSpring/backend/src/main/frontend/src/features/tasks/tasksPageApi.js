@@ -1,5 +1,6 @@
 import { API_BASE } from './constants/taskConstants';
 import { fetchProjectBundleRaw } from '../dashboard/dashboardSprintData';
+import { fetchProjectDevelopers } from '../dashboard/projectApi';
 import { sprintProjectIdFromJson } from './utils/taskUtils';
 import { apiFetch } from '../../utils/auth';
 
@@ -19,10 +20,8 @@ export async function completeAssigneeWithHours(taskId, userId, workedHours) {
   return res.json();
 }
 
-export async function fetchProjectDevelopersList(projectId) {
-  const res = await fetch(`${API_BASE}/api/projects/${projectId}/developers`);
-  const data = res.ok ? await res.json() : [];
-  return Array.isArray(data) ? data : [];
+export async function fetchProjectDevelopersList(projectId, options = {}) {
+  return fetchProjectDevelopers(projectId, options);
 }
 
 /**

@@ -44,7 +44,7 @@ import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
-import { fetchProjectById, fetchProjectDevelopers } from './projectApi';
+import { fetchProjectById, fetchProjectDevelopers, getCachedProjectDevelopersSnapshot } from './projectApi';
 import { countTeamDevelopers } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { resolveLoadErrorMessage } from '../../utils/auth';
@@ -101,6 +101,11 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
       return;
     }
     let cancelled = false;
+
+    const devSnap = getCachedProjectDevelopersSnapshot(projectId);
+    if (devSnap) {
+      setProjectDevelopers(devSnap.developers);
+    }
 
     Promise.all([
       fetchProjectById(projectId).catch(() => null),

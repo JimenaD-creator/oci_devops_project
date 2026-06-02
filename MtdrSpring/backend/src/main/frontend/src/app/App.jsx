@@ -798,7 +798,7 @@ function App() {
       >
         <ProjectDataProvider
           projectId={selectedProjectId}
-          preload={isManagerRole(user?.role) || isAdminRole(user?.role)}
+          preload={Boolean(selectedProjectId)}
         >
           <Suspense fallback={<PageLoader />}>
             {visitedPages.has('dashboard') && (

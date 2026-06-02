@@ -54,6 +54,7 @@ import {
   fetchSprintsProjectSummary,
   fetchSprintsTasksAndAssignments,
 } from './sprintsPageApi';
+import { getCachedProjectDevelopersSnapshot } from '../dashboard/projectApi';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { useProjectBundleSync } from '../../hooks/useProjectBundleSync';
 import {
@@ -112,6 +113,10 @@ export default function SprintsPage({ projectId }) {
       return () => {
         cancelled = true;
       };
+    }
+    const devSnap = getCachedProjectDevelopersSnapshot(String(effectiveProjectIdNum));
+    if (devSnap) {
+      setProjectDevelopers(devSnap.developers);
     }
     (async () => {
       try {

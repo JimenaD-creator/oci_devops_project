@@ -40,6 +40,7 @@ import {
   sprintProjectIdFromJson,
 } from '../sprints/utils/sprintUtils';
 import { fetchSprintsProjectDevelopers, fetchSprintsTasksAndAssignments } from '../sprints/sprintsPageApi';
+import { getCachedProjectDevelopersSnapshot } from '../dashboard/projectApi';
 import { getCachedBundleSnapshot } from '../dashboard/dashboardSprintData';
 import { resolveLoadErrorMessage } from '../../utils/auth';
 import {
@@ -182,6 +183,10 @@ export default function MyTasksPage({ projectId, currentUser }) {
       return () => {
         cancelled = true;
       };
+    }
+    const devSnap = getCachedProjectDevelopersSnapshot(String(effectiveProjectIdNum));
+    if (devSnap) {
+      setProjectDevelopers(devSnap.developers);
     }
     (async () => {
       try {

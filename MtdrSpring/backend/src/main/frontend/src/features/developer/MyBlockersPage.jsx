@@ -524,7 +524,7 @@ export default function MyBlockersPage({ projectId, currentUser }) {
         projectDevelopers={projectDevelopers}
         activeProjectId={effectiveProjectIdNum}
         onClose={closeDetail}
-        readOnly={false}
+        readOnly
       />
     </Box>
   );
