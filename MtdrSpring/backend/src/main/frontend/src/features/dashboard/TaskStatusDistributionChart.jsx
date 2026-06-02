@@ -36,19 +36,34 @@ function StatusTooltip({ active, payload }) {
     <Box
       sx={{
         bgcolor: 'background.paper',
-        borderRadius: 1,
-        px: 1.5,
-        py: 1.25,
-        fontSize: 14,
-        boxShadow: isDark ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.12)',
-        border: '2px solid',
+        borderRadius: 0.75,
+        px: 0.875,
+        py: 0.5,
+        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid',
         borderColor: fill,
+        maxWidth: 168,
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary', lineHeight: 1.2 }}>
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: '0.75rem',
+          color: 'text.primary',
+          lineHeight: 1.25,
+        }}
+      >
         {row.name}
       </Typography>
-      <Typography sx={{ mt: 0.75, fontSize: '1.05rem', fontWeight: 800, color: 'text.primary' }}>
+      <Typography
+        sx={{
+          mt: 0.25,
+          fontSize: '0.7rem',
+          fontWeight: 600,
+          color: 'text.secondary',
+          lineHeight: 1.2,
+        }}
+      >
         {row.value} tasks{pct ? ` · ${pct}` : ''}
       </Typography>
     </Box>

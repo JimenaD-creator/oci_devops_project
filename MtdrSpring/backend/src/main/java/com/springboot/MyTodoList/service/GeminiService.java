@@ -91,6 +91,12 @@ public class GeminiService {
     private static final Set<String> PRETTIFY_SKIP_KEYS = Set.of(
         "category", "severity", "kpi", "trend", "confidence");
 
+    /** Persisted Gemini sprint-summary prose (Sprint summary UI); not overwritten on GET enrich. */
+    private static final String GEMINI_EXECUTIVE_SUMMARY_KEY = "geminiExecutiveSummary";
+
+    private static final List<String> EXECUTIVE_SUMMARY_TEXT_FIELDS =
+        List.of("overview", "trends", "improvementAreas", "nextSteps");
+
     @Autowired
     private SprintRepository sprintRepository;
 
@@ -1270,10 +1276,19 @@ public class GeminiService {
             return enriched;
         }
         ObjectNode copy = ((ObjectNode) enriched).deepCopy();
+        try {
+            if (!copy.has("blockedAssignments")) {
+                injectBlockedAssignmentsSnapshot(copy, sprintId);
+            }
+        } catch (Exception e) {
+            System.err.println("[GeminiService] applyLiveDeveloperNarratives blocked snapshot: " + e.getMessage());
+        }
         syncDeveloperInsightNarrativesFromLiveWorkload(copy, sprintId);
         alignPersistedInsightsWithLiveKpis(copy, sprintId);
+        finalizeExecutiveSummaryFromGemini(copy, sprintId);
         Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
         ensureWorkloadGuidanceFromAssignments(copy, sprintId, sprint);
+        finalizeDeveloperInsightNarratives(copy);
         return copy;
     }
 
@@ -1287,6 +1302,7 @@ public class GeminiService {
                 return insights;
             }
             ObjectNode root = (ObjectNode) normalized;
+            captureGeminiExecutiveSummaryIfNeeded(root);
             normalizeDeveloperInsightRows(root);
             normalizeActionableRecommendationRows(root);
             enrichDeveloperInsightsIfEmpty(root, sprintId);
@@ -1311,6 +1327,7 @@ public class GeminiService {
             pruneInvalidWorkloadRecommendations(root, sprintId);
             prettifyHumanProseInInsights(root);
             alignPersistedInsightsWithLiveKpis(root, sprintId);
+            finalizeExecutiveSummaryFromGemini(root, sprintId);
             return root;
         } catch (Exception e) {
             System.err.println("[GeminiService] enrichInsightsForResponseUncached: " + e.getMessage());
@@ -1391,6 +1408,31 @@ public class GeminiService {
         }
     }
 
+    /** Keep overload when logged hours are clearly above team average (even if assignments are Done). */
+    private static boolean teamAvgWorkedForOverloadGuardrail(JsonNode wl, double workedHours) {
+        if (wl == null || !wl.isArray() || workedHours <= 0) {
+            return false;
+        }
+        double sum = 0;
+        int count = 0;
+        for (JsonNode row : wl) {
+            if (row == null || !row.isObject()) {
+                continue;
+            }
+            if (row.path("fromSprintRosterOnly").asBoolean(false)
+                || row.path("fromProjectTeamOnly").asBoolean(false)) {
+                continue;
+            }
+            sum += row.path("workedHoursSum").asDouble(0);
+            count++;
+        }
+        if (count <= 0) {
+            return false;
+        }
+        double avg = sum / count;
+        return avg > 0 && workedHours > avg + Math.max(2, Math.round(avg * 0.15));
+    }
+
     /**
      * Deterministic guardrail: Gemini may still mark overloaded=true when assignedTaskRows equals completedTasks
      * (no incomplete assignments). Force overloaded=false from Team workload JSON so UI stays consistent without
@@ -1430,7 +1472,9 @@ public class GeminiService {
                 int assignedRows = row.path("assignedTaskRows").asInt(0);
                 int completedTasks = row.path("completedTasks").asInt(0);
                 int pendingIncompleteAssignments = assignedRows - completedTasks;
-                if (rosterOnly || pendingIncompleteAssignments <= 0) {
+                double workedHours = row.path("workedHoursSum").asDouble(0);
+                boolean highHoursVsTeam = teamAvgWorkedForOverloadGuardrail(wl, workedHours);
+                if (rosterOnly || (pendingIncompleteAssignments <= 0 && !highHoursVsTeam)) {
                     o.put("overloaded", false);
                     o.put("overloadGuardrailCorrected", true);
                 }
@@ -1649,8 +1693,8 @@ public class GeminiService {
     }
 
     /**
-     * Overwrites persisted Gemini prose with facts from the current USER_TASK / TASK snapshot on every GET.
-     * Narrative style is kept similar to AI Insights, but counts and on-time/late come from live DB rows.
+     * Refreshes factual completion / hours text from USER_TASK rows on every GET, while preserving
+     * supplemental Gemini narrative (overload, blockers, redistribution) in {@code aiNarrative}.
      */
     private void syncDeveloperInsightNarrativesFromLiveWorkload(ObjectNode root, Long sprintId) {
         try {
@@ -1702,12 +1746,190 @@ public class GeminiService {
                     dev.add(o);
                     byNameLower.put(key, o);
                 }
-                o.put("insight", buildLiveDeveloperInsightNarrative(row, teamAvgWorked));
+                String priorInsight = o.path("insight").asText("").trim();
+                String live = buildLiveDeveloperInsightNarrative(row, teamAvgWorked);
+                o.put("liveInsightSummary", live);
+                preserveAiNarrativeFromPriorInsight(o, priorInsight, live);
+                int assignedRows = row.path("assignedTaskRows").asInt(0);
+                int completed = row.path("completedTasks").asInt(0);
+                int pending = Math.max(0, assignedRows - completed);
+                o.put("pendingAssignments", pending);
                 o.put("liveDataSynced", true);
             }
         } catch (Exception e) {
             System.err.println("[GeminiService] syncDeveloperInsightNarrativesFromLiveWorkload: " + e.getMessage());
         }
+    }
+
+    /** Keeps the full Gemini developer insight from the last generation (before live overwrite). */
+    private static void preserveAiNarrativeFromPriorInsight(ObjectNode o, String priorInsight, String liveSummary) {
+        if (o == null || priorInsight == null || priorInsight.isBlank()) {
+            return;
+        }
+        if (!o.path("aiNarrative").asText("").trim().isEmpty()) {
+            return;
+        }
+        if (isEssentiallyLiveOnlyInsight(priorInsight, liveSummary)) {
+            return;
+        }
+        o.put("aiNarrative", priorInsight.trim());
+    }
+
+    private static boolean isEssentiallyLiveOnlyInsight(String prior, String live) {
+        if (prior == null || live == null) {
+            return true;
+        }
+        String p = prior.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        String l = live.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        if (p.equals(l)) {
+            return true;
+        }
+        return p.startsWith("completed ") && p.contains("assignment")
+            && (p.contains("hours logged") || p.contains("hour(s) logged"))
+            && l.startsWith("completed ") && l.contains("assignment");
+    }
+
+    private void finalizeDeveloperInsightNarratives(ObjectNode root) {
+        if (root == null) {
+            return;
+        }
+        JsonNode devNode = root.get("developerInsights");
+        if (devNode == null || !devNode.isArray()) {
+            return;
+        }
+        Map<String, List<String>> blockedByDev = blockedAssignmentNotesByDeveloper(root.get("blockedAssignments"));
+        ArrayNode dev = (ArrayNode) devNode;
+        for (JsonNode item : dev) {
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String live = o.path("liveInsightSummary").asText("").trim();
+            if (live.isEmpty()) {
+                live = o.path("insight").asText("").trim();
+            }
+            String ai = o.path("aiNarrative").asText("").trim();
+            String nameKey = o.path("developerName").asText("").trim().toLowerCase(Locale.ROOT);
+            List<String> blockedNotes = blockedByDev.get(nameKey);
+            String composed = composeDeveloperInsightDisplay(o, live, ai, blockedNotes);
+            o.put("insight", composed);
+        }
+    }
+
+    private Map<String, List<String>> blockedAssignmentNotesByDeveloper(JsonNode blockedArr) {
+        Map<String, List<String>> map = new HashMap<>();
+        if (blockedArr == null || !blockedArr.isArray()) {
+            return map;
+        }
+        for (JsonNode b : blockedArr) {
+            if (b == null || !b.isObject()) {
+                continue;
+            }
+            String dev = b.path("reportedByDeveloperName").asText("").trim();
+            if (dev.isEmpty()) {
+                dev = b.path("developerName").asText("").trim();
+            }
+            if (dev.isEmpty()) {
+                dev = b.path("assignee").asText("").trim();
+            }
+            if (dev.isEmpty()) {
+                continue;
+            }
+            String key = dev.toLowerCase(Locale.ROOT);
+            String title = b.path("taskTitle").asText("").trim();
+            if (title.isEmpty()) {
+                title = b.path("title").asText("").trim();
+            }
+            String reason = b.path("blockedReason").asText("").trim();
+            if (reason.isEmpty()) {
+                reason = b.path("reason").asText("").trim();
+            }
+            String note = title.isEmpty() ? "blocked task" : "\"" + title + "\" blocked";
+            if (!reason.isEmpty()) {
+                note = note + " (" + reason + ")";
+            }
+            map.computeIfAbsent(key, k -> new ArrayList<>()).add(note);
+        }
+        return map;
+    }
+
+    private static String composeDeveloperInsightDisplay(
+            ObjectNode o,
+            String liveSummary,
+            String aiNarrative,
+            List<String> blockedNotes) {
+        String live = liveSummary == null ? "" : liveSummary.trim();
+        String ai = aiNarrative == null ? "" : aiNarrative.trim();
+
+        if (!ai.isEmpty()) {
+            StringBuilder sb = new StringBuilder(ai);
+            String lower = sb.toString().toLowerCase(Locale.ROOT);
+            appendBlockedNotesIfMissing(sb, blockedNotes, lower);
+            lower = sb.toString().toLowerCase(Locale.ROOT);
+            if (!live.isEmpty()
+                && !isEssentiallyLiveOnlyInsight(live, ai)
+                && !liveSnapshotRedundantWithAi(live, sb.toString())) {
+                sb.append(" Current snapshot: ").append(live);
+                if (!live.endsWith(".") && !live.endsWith("!") && !live.endsWith("?")) {
+                    sb.append('.');
+                }
+            }
+            return sb.toString().trim();
+        }
+
+        StringBuilder sb = new StringBuilder(live);
+        if (sb.length() == 0) {
+            sb.append("No assignment rows in the workload snapshot for this sprint.");
+        }
+        String lower = sb.toString().toLowerCase(Locale.ROOT);
+
+        int pending = o.path("pendingAssignments").asInt(-1);
+        if (pending > 0 && !lower.contains("open assignment") && !lower.contains("still in progress")) {
+            sb.append(String.format(
+                " %d open assignment row%s remain in this sprint.",
+                pending,
+                pending == 1 ? "" : "s"));
+            lower = sb.toString().toLowerCase(Locale.ROOT);
+        }
+
+        if (o.path("overloaded").asBoolean(false) && !lower.contains("overload")) {
+            String moveTo = o.path("suggestedMoveTo").asText("").trim();
+            int moveN = o.path("suggestedTasksToMove").asInt(0);
+            if (!moveTo.isEmpty() && moveN > 0) {
+                sb.append(String.format(
+                    " Flagged as overloaded — consider moving ~%d task(s) to %s.",
+                    moveN,
+                    moveTo));
+            } else {
+                sb.append(" Flagged as overloaded relative to peers this sprint.");
+            }
+            lower = sb.toString().toLowerCase(Locale.ROOT);
+        }
+
+        appendBlockedNotesIfMissing(sb, blockedNotes, lower);
+        return sb.toString().trim();
+    }
+
+    private static void appendBlockedNotesIfMissing(
+            StringBuilder sb,
+            List<String> blockedNotes,
+            String lowerAlready) {
+        String lower = lowerAlready == null ? sb.toString().toLowerCase(Locale.ROOT) : lowerAlready;
+        if (blockedNotes != null && !blockedNotes.isEmpty() && !lower.contains("blocked")) {
+            sb.append(" Blocked: ").append(String.join("; ", blockedNotes)).append('.');
+        }
+    }
+
+    private static boolean liveSnapshotRedundantWithAi(String live, String aiText) {
+        if (live == null || live.isBlank() || aiText == null) {
+            return true;
+        }
+        String l = live.trim().toLowerCase(Locale.ROOT);
+        String a = aiText.toLowerCase(Locale.ROOT);
+        if (a.contains(l)) {
+            return true;
+        }
+        return l.startsWith("completed ") && l.contains("assignment") && a.contains("completed");
     }
 
     private static String buildLiveDeveloperInsightNarrative(JsonNode row, double teamAvgWorkedHours) {
@@ -2181,16 +2403,13 @@ public class GeminiService {
             }
 
             if (best.spread <= 1) {
-                // Balanced distribution by status: avoid misleading move recommendations.
-                for (JsonNode n : actionable) {
-                    if (!n.isObject()) continue;
-                    ObjectNode o = (ObjectNode) n;
-                    if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) continue;
-                    o.put("text",
-                        "Current task status distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.");
-                    o.put("guardrailCorrected", true);
-                }
-                workloadRecs.removeAll();
+                clearWorkloadRedistribution(root);
+                ArrayNode actionableBalanced = ensureArrayField(root, "actionableRecommendations");
+                addRecommendation(
+                    actionableBalanced,
+                    "workload_redistribution",
+                    "Current task status distribution is balanced across developers. "
+                        + "Keep assignments stable and focus on unblocking tasks in In progress/In review.");
                 return;
             }
 
@@ -2198,10 +2417,17 @@ public class GeminiService {
             int toCount = statusValue(best.to, best.statusKey);
             int tasksToMove = Math.max(1, best.spread / 2);
 
+            ArrayNode actionableRevised = mapper.createArrayNode();
             for (JsonNode n : actionable) {
-                if (!n.isObject()) continue;
+                if (!n.isObject()) {
+                    actionableRevised.add(n);
+                    continue;
+                }
                 ObjectNode o = (ObjectNode) n;
-                if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) continue;
+                if (!"workload_redistribution".equalsIgnoreCase(o.path("category").asText(""))) {
+                    actionableRevised.add(n);
+                    continue;
+                }
                 String recommendationText = o.path("text").asText("");
                 String mentionedStatus = statusKeyFromRecommendationText(recommendationText);
                 StatusSpread targetSpread = mentionedStatus != null
@@ -2211,12 +2437,6 @@ public class GeminiService {
                 int targetTo = statusValue(targetSpread.to, targetSpread.statusKey);
                 int targetMove = Math.max(1, targetSpread.spread / 2);
                 if (targetSpread.spread <= 1) {
-                    o.put(
-                        "text",
-                        String.format(
-                            "Current %s distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.",
-                            targetSpread.statusLabel));
-                    o.put("guardrailCorrected", true);
                     continue;
                 }
                 o.put(
@@ -2231,7 +2451,10 @@ public class GeminiService {
                         targetSpread.to.name,
                         targetTo));
                 o.put("guardrailCorrected", true);
+                actionableRevised.add(o);
             }
+            root.set("actionableRecommendations", actionableRevised);
+            actionable = actionableRevised;
 
             if (workloadRecs.size() == 0) {
                 ObjectNode o = mapper.createObjectNode();
@@ -2692,6 +2915,41 @@ public class GeminiService {
     }
 
     /**
+     * Prefer receivers who finished assigned work but logged fewer hours (capacity for more work).
+     */
+    private static AssignmentLoadSnap pickRedistributionReceiver(
+            List<AssignmentLoadSnap> withWork,
+            AssignmentLoadSnap from) {
+        if (withWork == null || from == null) {
+            return null;
+        }
+        List<AssignmentLoadSnap> others = withWork.stream()
+            .filter(p -> !p.nameLower.equals(from.nameLower))
+            .collect(Collectors.toList());
+        Comparator<AssignmentLoadSnap> byLightHours = Comparator
+            .comparingDouble((AssignmentLoadSnap p) -> p.workedHours)
+            .thenComparingLong(p -> p.assignedHours)
+            .thenComparingInt(p -> p.assignedRows);
+        Optional<AssignmentLoadSnap> finishedAssigned = others.stream()
+            .filter(p -> !p.rosterOnly && p.assignedRows > 0 && p.pending() < 1)
+            .min(byLightHours);
+        if (finishedAssigned.isPresent()) {
+            return finishedAssigned.get();
+        }
+        Optional<AssignmentLoadSnap> noPending = others.stream()
+            .filter(p -> p.pending() < 1)
+            .min(byLightHours);
+        if (noPending.isPresent()) {
+            return noPending.get();
+        }
+        return others.stream()
+            .min(Comparator.comparingInt((AssignmentLoadSnap p) -> p.pending())
+                .thenComparingDouble(p -> p.workedHours)
+                .thenComparingLong(p -> p.assignedHours))
+            .orElse(null);
+    }
+
+    /**
      * Ensures workload balance redistribution and overload flags exist from assignment data,
      * including before the sprint starts (planned load only).
      */
@@ -2833,11 +3091,10 @@ public class GeminiService {
                 if (!overloaded) {
                     continue;
                 }
-                AssignmentLoadSnap receiver = withWork.stream()
-                    .filter(p -> !p.nameLower.equals(s.nameLower))
-                    .min(Comparator.comparingLong((AssignmentLoadSnap p) -> p.assignedHours)
-                        .thenComparingInt(p -> p.assignedRows))
-                    .orElse(lightest);
+                AssignmentLoadSnap receiver = pickRedistributionReceiver(withWork, s);
+                if (receiver == null) {
+                    receiver = lightest;
+                }
                 int suggestMove = Math.max(
                     1,
                     Math.max(spreadRows, s.assignedRows - receiver.assignedRows) / 2);
@@ -2870,7 +3127,9 @@ public class GeminiService {
                         receiver.name,
                         receiver.assignedRows,
                         receiver.assignedHours);
-                insightRow.put("insight", note);
+                if (insightRow.path("aiNarrative").asText("").isBlank()) {
+                    insightRow.put("aiNarrative", note);
+                }
             }
 
             if (imbalancedByKpi) {
@@ -2947,6 +3206,9 @@ public class GeminiService {
     }
 
     private void enrichExecutiveSummaryIfSparse(ObjectNode root) {
+        if (geminiExecutiveSummaryHasContent(root.get(GEMINI_EXECUTIVE_SUMMARY_KEY))) {
+            return;
+        }
         String summary = root.path("summary").asText("").trim();
         JsonNode esNode = root.get("executiveSummary");
         ObjectNode es;
@@ -2978,6 +3240,127 @@ public class GeminiService {
             }
         } else if (overviewBlank && !summary.isEmpty()) {
             es.put("overview", summary);
+        }
+    }
+
+    /**
+     * On first enrich after generation (or legacy rows without {@link #GEMINI_EXECUTIVE_SUMMARY_KEY}),
+     * stores Gemini sprint-summary fields so GET enrich does not replace them with templates.
+     */
+    private void captureGeminiExecutiveSummaryIfNeeded(ObjectNode root) {
+        if (geminiExecutiveSummaryHasContent(root.get(GEMINI_EXECUTIVE_SUMMARY_KEY))) {
+            return;
+        }
+        JsonNode esNode = root.get("executiveSummary");
+        if (esNode == null || !esNode.isObject()) {
+            return;
+        }
+        ObjectNode gemini = mapper.createObjectNode();
+        for (String field : EXECUTIVE_SUMMARY_TEXT_FIELDS) {
+            String v = esNode.path(field).asText("").trim();
+            if (v.isEmpty() || isDeterministicExecutiveSummaryText(v)) {
+                continue;
+            }
+            if ("overview".equals(field)) {
+                String body = stripCanonicalTaskStatusLead(v);
+                if (!body.isEmpty()) {
+                    gemini.put("overviewBody", body);
+                }
+            }
+            gemini.put(field, v);
+        }
+        if (gemini.size() > 0) {
+            root.set(GEMINI_EXECUTIVE_SUMMARY_KEY, gemini);
+        }
+    }
+
+    private static boolean geminiExecutiveSummaryHasContent(JsonNode geminiNode) {
+        if (geminiNode == null || !geminiNode.isObject()) {
+            return false;
+        }
+        for (String field : EXECUTIVE_SUMMARY_TEXT_FIELDS) {
+            if (!geminiNode.path(field).asText("").trim().isEmpty()) {
+                return true;
+            }
+        }
+        return !geminiNode.path("overviewBody").asText("").trim().isEmpty();
+    }
+
+    /** True for {@link #enrichExecutiveSummaryIfSparse} filler text, not model output. */
+    private static boolean isDeterministicExecutiveSummaryText(String text) {
+        if (text == null || text.isBlank()) {
+            return true;
+        }
+        String lower = text.trim().toLowerCase(Locale.ROOT);
+        return lower.contains("kpi snapshot is available")
+            || lower.contains("compare this sprint with prior sprints in kpi analytics")
+            || lower.contains("use alerts and recommendations above for the highest-impact")
+            || lower.contains("review workload and near-due tasks with the team")
+            || lower.contains("open kpi analytics and the sprint task board")
+            || lower.contains("regenerate insights or update task data to refresh this section")
+            || lower.contains("align scope, assignments, and deadlines based on current metrics");
+    }
+
+    /**
+     * Restores Sprint summary ({@code executiveSummary}) from persisted Gemini prose after KPI alignment.
+     * Refreshes only the canonical task-status lead sentence with live DB counts.
+     */
+    private void finalizeExecutiveSummaryFromGemini(ObjectNode root, Long sprintId) {
+        if (sprintId == null) {
+            return;
+        }
+        JsonNode geminiNode = root.get(GEMINI_EXECUTIVE_SUMMARY_KEY);
+        if (!geminiExecutiveSummaryHasContent(geminiNode)) {
+            return;
+        }
+        ObjectNode gemini = (ObjectNode) geminiNode;
+        ObjectNode es;
+        JsonNode esNode = root.get("executiveSummary");
+        if (esNode != null && esNode.isObject()) {
+            es = (ObjectNode) esNode;
+        } else {
+            es = mapper.createObjectNode();
+            root.set("executiveSummary", es);
+        }
+        Map<String, Long> counts = getCanonicalTaskStatusCounts(sprintId);
+        String lead = buildCanonicalTaskStatusOverviewLead(counts);
+        for (String field : List.of("trends", "improvementAreas", "nextSteps")) {
+            String preserved = gemini.path(field).asText("").trim();
+            if (!preserved.isEmpty()) {
+                es.put(field, preserved);
+            }
+        }
+        String overviewFull = gemini.path("overview").asText("").trim();
+        String body = stripCanonicalTaskStatusLead(overviewFull);
+        if (body.isEmpty()) {
+            body = gemini.path("overviewBody").asText("").trim();
+        }
+        if (!overviewFull.isEmpty() || !body.isEmpty()) {
+            es.put("overview", body.isEmpty() ? lead : lead + " " + body);
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint != null) {
+            Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+            Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
+            List<Integer> chronoOtd = getLiveOnTimeSeriesChronological(projectId, sprintId);
+            alignExecutiveSummaryProseFields(es, live, chronoOtd);
+        }
+    }
+
+    private static void alignExecutiveSummaryProseFields(
+            ObjectNode es, Map<String, Object> live, List<Integer> chronoOtd) {
+        if (es == null || live == null || live.isEmpty()) {
+            return;
+        }
+        for (String field : EXECUTIVE_SUMMARY_TEXT_FIELDS) {
+            if (!es.path(field).isTextual()) {
+                continue;
+            }
+            String text = GeminiInsightKpiAlignUtil.normalizePercentagePointsLabel(es.get(field).asText(""));
+            text = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(text, live);
+            text = GeminiInsightKpiAlignUtil.fixProductivityPercentMisattributedToOnTime(text, live);
+            text = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(text, chronoOtd);
+            es.put(field, text);
         }
     }
 
@@ -3401,6 +3784,9 @@ public class GeminiService {
             List<String> keys = new ArrayList<>();
             o.fieldNames().forEachRemaining(keys::add);
             for (String k : keys) {
+                if (GEMINI_EXECUTIVE_SUMMARY_KEY.equals(k)) {
+                    continue;
+                }
                 JsonNode v = o.get(k);
                 if (v == null) {
                     continue;
@@ -3668,7 +4054,12 @@ public class GeminiService {
         if (esNode == null || !esNode.isObject()) {
             return;
         }
+        boolean geminiSummaryPreserved =
+            geminiExecutiveSummaryHasContent(root.get(GEMINI_EXECUTIVE_SUMMARY_KEY));
         ObjectNode es = (ObjectNode) esNode;
+        if (geminiSummaryPreserved) {
+            return;
+        }
         Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
         List<Sprint> allPrior = findAllPreviousSprintsChronological(sprint, projectId);
         String previousLabel = null;
@@ -3709,16 +4100,7 @@ public class GeminiService {
                 es.put("trends", trends);
             }
         }
-        for (String field : List.of("overview", "trends", "improvementAreas", "nextSteps")) {
-            if (!es.path(field).isTextual()) {
-                continue;
-            }
-            String             text = GeminiInsightKpiAlignUtil.normalizePercentagePointsLabel(es.get(field).asText(""));
-            text = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(text, live);
-            text = GeminiInsightKpiAlignUtil.fixProductivityPercentMisattributedToOnTime(text, live);
-            text = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(text, chronoOtd);
-            es.put(field, text);
-        }
+        alignExecutiveSummaryProseFields(es, live, chronoOtd);
     }
 
     private void alignKpiManagerGuideWithLiveKpis(ObjectNode root, Map<String, Object> live) {

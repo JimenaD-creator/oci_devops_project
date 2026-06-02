@@ -29,9 +29,9 @@ import {
   getErrorMessage,
   isApiKeyInsightError,
   isValidSprintId,
-  isValidWorkloadMoveRecommendation,
   AI_INSIGHTS_EMPTY,
 } from './aiInsightsConstants';
+import { computeRecommendationList } from './insightRecommendationsSync';
 import { fetchSprintInsights } from './insightsApi';
 import { fetchAiStatus } from './aiStatusApi';
 import {
@@ -45,76 +45,6 @@ import {
 } from './InsightCardParts';
 import InsightsFreshnessBanner from './InsightsFreshnessBanner';
 
-function normalizeRecommendationKey(rec) {
-  const cat = String(rec?.category ?? '')
-    .trim()
-    .toLowerCase();
-  const text = String(rec?.text ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-  return `${cat}::${text}`;
-}
-
-/**
- * Merges Gemini `actionableRecommendations` with structured `workloadRecommendations`.
- * Avoids duplicate "Workload redistribution": Gemini often already emits that category while
- * the API also returns workload rows — we prefer structured rows and drop matching AI lines.
- */
-function computeRecommendationList(ins) {
-  if (!ins) return [];
-  const actionables = [...(ins.actionableRecommendations ?? [])];
-  const workloadRows = [...(ins.workloadRecommendations ?? [])];
-  const structuredWorkload = workloadRows
-    .filter((r) =>
-      isValidWorkloadMoveRecommendation({
-        from: r?.from,
-        to: r?.to,
-        tasksToMove: r?.tasksToMove,
-      }),
-    )
-    .map((r) => {
-      const from = String(r.from).trim();
-      const to = String(r.to).trim();
-      const n = Number(r.tasksToMove);
-      const rs = typeof r.reason === 'string' ? r.reason.trim() : '';
-      const head = `Move ~${n} task(s) from ${from} to ${to}`;
-      const text = rs ? `${head}: ${rs}` : `${head}.`;
-      return {
-        category: 'workload_redistribution',
-        text,
-      };
-    });
-
-  const dropAiWorkloadDuplicates = structuredWorkload.length > 0;
-  const merged = [
-    ...(dropAiWorkloadDuplicates
-      ? actionables.filter(
-          (r) => String(r?.category ?? '').toLowerCase() !== 'workload_redistribution',
-        )
-      : actionables),
-    ...structuredWorkload,
-  ];
-
-  const seen = new Set();
-  const out = [];
-  for (const rec of merged) {
-    if (!rec || typeof rec.text !== 'string' || !rec.text.trim()) continue;
-    if (
-      String(rec?.category ?? '').toLowerCase() === 'workload_redistribution' &&
-      (/\bmove\s+~?\s*0\s+task/i.test(rec.text) ||
-        /(?:\bto\s+|\bfrom\s+)(n\/?a|unknown|unassigned)\b/i.test(rec.text))
-    ) {
-      continue;
-    }
-    const key = normalizeRecommendationKey(rec);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(rec);
-  }
-  return out;
-}
-
 export default function InsightCard({
   sprintId,
   sprintLabel,
@@ -127,6 +57,7 @@ export default function InsightCard({
   refreshToken = 0,
   autoGenerateOnMissing = true,
   onOpenTeam = null,
+  sprintDevelopers = [],
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -418,7 +349,10 @@ export default function InsightCard({
       }
     : null;
 
-  const recommendationList = useMemo(() => computeRecommendationList(insights), [insights]);
+  const recommendationList = useMemo(
+    () => computeRecommendationList(insights, { teamDevelopers: sprintDevelopers }),
+    [insights, sprintDevelopers],
+  );
 
   const hasExtendedPredictions =
     insights?.predictions &&

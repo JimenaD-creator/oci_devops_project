@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.User;
@@ -153,6 +154,46 @@ class GeminiServiceTest {
         assertEquals(1, enriched.get("taskStatusBreakdown").get("toDo").asInt());
 
         assertTrue(enriched.get("actionableRecommendations").size() > 0);
+    }
+
+    @Test
+    void enrichInsightsForResponse_preservesGeminiExecutiveSummaryOnReEnrich() throws Exception {
+        long sprintId = 7L;
+        when(userTaskRepository.findBySprintIdWithUserAndTask(sprintId)).thenReturn(Collections.emptyList());
+        when(userSprintRepository.findBySprintIdWithUser(sprintId)).thenReturn(Collections.emptyList());
+        when(sprintRepository.findById(sprintId)).thenReturn(Optional.empty());
+        when(taskRepository.countTasksByStatusForSprint(sprintId)).thenReturn(List.of(
+            new Object[] { "DONE", 2L },
+            new Object[] { "TODO", 1L }
+        ));
+
+        String geminiTrends =
+            "Productivity improved by 18% compared to Sprint 1 with stronger delivery focus.";
+        ObjectNode input = MAPPER.createObjectNode();
+        ObjectNode es = MAPPER.createObjectNode();
+        es.put(
+            "overview",
+            "Task status in this sprint: 1 To do, 0 In progress, 0 In review, 2 Done. "
+                + "Team closed critical items ahead of schedule.");
+        es.put("trends", geminiTrends);
+        es.put("improvementAreas", "Watch participation logging so hours match estimates.");
+        es.put("nextSteps", "Run a short retro after the sprint ends.");
+        input.set("executiveSummary", es);
+
+        JsonNode enriched = geminiService.enrichInsightsForResponse(input, sprintId);
+
+        assertTrue(enriched.has("geminiExecutiveSummary"));
+        assertEquals(geminiTrends, enriched.get("geminiExecutiveSummary").get("trends").asText());
+        assertEquals(geminiTrends, enriched.get("executiveSummary").get("trends").asText());
+        String overview = enriched.get("executiveSummary").get("overview").asText();
+        assertTrue(overview.startsWith("Task status in this sprint:"));
+        assertTrue(overview.contains("Team closed critical items"));
+
+        ObjectNode secondPass = (ObjectNode) enriched.deepCopy();
+        ObjectNode esMutated = (ObjectNode) secondPass.get("executiveSummary");
+        esMutated.put("trends", "Compared with Sprint 1, productivity and completion slipped.");
+        JsonNode reEnriched = geminiService.enrichInsightsForResponse(secondPass, sprintId);
+        assertEquals(geminiTrends, reEnriched.get("executiveSummary").get("trends").asText());
     }
 
     @Test

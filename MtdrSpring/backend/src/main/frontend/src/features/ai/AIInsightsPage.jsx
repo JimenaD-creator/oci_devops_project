@@ -274,6 +274,9 @@ export default function AIInsightsPage({
           refreshToken={insightsRefreshKey}
           autoGenerateOnMissing
           onOpenTeam={onOpenTeam}
+          sprintDevelopers={
+            Array.isArray(selectedSprint.developers) ? selectedSprint.developers : []
+          }
         />
       )}
     </Box>

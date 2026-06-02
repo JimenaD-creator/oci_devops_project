@@ -612,7 +612,25 @@ export function DeveloperInsightsTable({ rows }) {
         <TableBody>
           {rows.map((row, i) => (
             <TableRow key={i}>
-              <TableCell sx={{ fontWeight: 700, color: isDark ? '#90CAF9' : '#3949AB' }}>{row.developerName}</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: isDark ? '#90CAF9' : '#3949AB' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <span>{row.developerName}</span>
+                  {row.overloaded === true && (
+                    <Chip
+                      label="Overloaded"
+                      size="small"
+                      sx={{
+                        alignSelf: 'flex-start',
+                        height: 22,
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        bgcolor: isDark ? '#4A1A1A' : '#FFEBEE',
+                        color: '#C62828',
+                      }}
+                    />
+                  )}
+                </Box>
+              </TableCell>
               <TableCell sx={{ color: isDark ? '#E0E0E0' : '#455A64', lineHeight: 1.55 }}>{row.insight}</TableCell>
             </TableRow>
           ))}
