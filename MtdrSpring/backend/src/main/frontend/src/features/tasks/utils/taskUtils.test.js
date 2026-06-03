@@ -1,9 +1,31 @@
 import { expect, test } from 'vitest';
 import {
+  dateInputToEndOfLocalDayIso,
+  dateInputToStartOfLocalDayIso,
+  isoToDateInputValue,
+  isDateInputOnOrBefore,
   mapTaskToKanban,
   shouldPromptWorkedHoursForAssigneeDone,
   shouldPromptWorkedHoursOnKanbanDone,
 } from './taskUtils';
+
+test('dateInputToEndOfLocalDayIso uses 23:59:59.999 on selected day', () => {
+  expect(dateInputToEndOfLocalDayIso('2026-06-15')).toBe('2026-06-15T23:59:59.999');
+});
+
+test('dateInputToStartOfLocalDayIso uses midnight on selected day', () => {
+  expect(dateInputToStartOfLocalDayIso('2026-06-15')).toBe('2026-06-15T00:00:00.000');
+});
+
+test('isoToDateInputValue keeps calendar day from API datetime', () => {
+  expect(isoToDateInputValue('2026-06-15T23:59:59.999')).toBe('2026-06-15');
+  expect(isoToDateInputValue('2026-06-15T00:00:00.000Z')).toBe('2026-06-15');
+});
+
+test('isDateInputOnOrBefore compares YYYY-MM-DD strings', () => {
+  expect(isDateInputOnOrBefore('2026-06-01', '2026-06-15')).toBe(true);
+  expect(isDateInputOnOrBefore('2026-06-16', '2026-06-15')).toBe(false);
+});
 
 test('mapTaskToKanban uses logged worked hours, not assigned estimate', () => {
   const task = { id: 10, title: 'New task', assignedHours: 1, status: 'DONE' };

@@ -57,6 +57,10 @@ import {
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
 import {
+  dateInputToEndOfLocalDayIso,
+  dateInputToStartOfLocalDayIso,
+  isoToDateInputValue,
+  isDateInputOnOrBefore,
   normalizeTaskStatus,
   taskDetailSyncSignature,
   userTasksAssigneeSignature,
@@ -524,8 +528,8 @@ const sprintNumberMap = useMemo(() => {
     setStatus(t.status === 'PENDING' ? 'TODO' : t.status || 'TODO');
     setPriority(t.priority || 'MEDIUM');
     setAssignedHours(t.assignedHours != null ? String(t.assignedHours) : '');
-    setStartDate(t.startDate ? t.startDate.slice(0, 10) : '');
-    setDueDate(t.dueDate ? t.dueDate.slice(0, 10) : '');
+    setStartDate(isoToDateInputValue(t.startDate));
+    setDueDate(isoToDateInputValue(t.dueDate));
     setSprintId(t.assignedSprint?.id != null ? String(t.assignedSprint.id) : '');
     setAssignedUserIds(finiteUserIds(loadedAssigneeUserIds));
   };
@@ -561,7 +565,7 @@ const sprintNumberMap = useMemo(() => {
       setError('Sprint is required.');
       return;
     }
-    if (new Date(startDate) > new Date(dueDate)) {
+    if (!isDateInputOnOrBefore(startDate, dueDate)) {
       setError('Start date must be on or before due date.');
       return;
     }
@@ -628,8 +632,8 @@ const sprintNumberMap = useMemo(() => {
         status,
         priority,
         assignedHours: assignedHours === '' ? null : Number(assignedHours),
-        startDate: new Date(startDate).toISOString(),
-        dueDate: new Date(dueDate).toISOString(),
+        startDate: dateInputToStartOfLocalDayIso(startDate),
+        dueDate: dateInputToEndOfLocalDayIso(dueDate),
         assignedSprint: { id: Number(sprintId) },
       };
       const res = await putTask(task.id, payload);

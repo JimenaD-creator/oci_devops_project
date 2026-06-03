@@ -32,6 +32,11 @@ import {
 import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
 import { richDescriptionPlainText, sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
 import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
+import {
+  dateInputToEndOfLocalDayIso,
+  dateInputToStartOfLocalDayIso,
+  isDateInputOnOrBefore,
+} from './utils/taskUtils';
 
 const TYPE_OPTIONS = [
   {
@@ -338,7 +343,7 @@ export function NewTaskDialog({
       setError('Please fill in all required fields (including at least one developer).');
       return;
     }
-    if (new Date(startDate) > new Date(dueDate)) {
+    if (!isDateInputOnOrBefore(startDate, dueDate)) {
       setError('Start date must be on or before due date.');
       return;
     }
@@ -346,6 +351,7 @@ export function NewTaskDialog({
     setError('');
     try {
       const userIds = finiteUserIds(assignedToIds);
+      const dueIso = dateInputToEndOfLocalDayIso(dueDate);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -356,9 +362,9 @@ export function NewTaskDialog({
           status,
           priority,
           assignedHours: assignedHours ? Number(assignedHours) : null,
-          startDate: new Date(startDate).toISOString(),
-          dueDate: new Date(dueDate).toISOString(),
-          finishDate: new Date(dueDate).toISOString(),
+          startDate: dateInputToStartOfLocalDayIso(startDate),
+          dueDate: dueIso,
+          finishDate: dueIso,
           assignedSprint: { id: Number(sprintId) },
           assigneeUserIds: userIds,
         }),

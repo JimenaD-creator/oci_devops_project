@@ -31,7 +31,13 @@ import {
   STATUS_CHIP_SX,
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
-import { createTaskSelectFillSx, pageFormFieldOutline } from './utils/taskUtils';
+import {
+  createTaskSelectFillSx,
+  dateInputToEndOfLocalDayIso,
+  dateInputToStartOfLocalDayIso,
+  isDateInputOnOrBefore,
+  pageFormFieldOutline,
+} from './utils/taskUtils';
 import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 
 export function TasksNewTaskDialog({
@@ -177,7 +183,7 @@ export function TasksNewTaskDialog({
       setError('Please fill in all required fields (including at least one developer).');
       return;
     }
-    if (new Date(startDate) > new Date(dueDate)) {
+    if (!isDateInputOnOrBefore(startDate, dueDate)) {
       setError('Start date must be on or before due date.');
       return;
     }
@@ -185,6 +191,7 @@ export function TasksNewTaskDialog({
     setError('');
     try {
       const assigneeUserIds = finiteUserIds(assignedToIds);
+      const dueIso = dateInputToEndOfLocalDayIso(dueDate);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -195,9 +202,9 @@ export function TasksNewTaskDialog({
           status,
           priority,
           assignedHours: assignedHours ? Number(assignedHours) : null,
-          startDate: new Date(startDate).toISOString(),
-          dueDate: new Date(dueDate).toISOString(),
-          finishDate: new Date(dueDate).toISOString(),
+          startDate: dateInputToStartOfLocalDayIso(startDate),
+          dueDate: dueIso,
+          finishDate: dueIso,
           assignedSprint: { id: Number(sprintId) },
           assigneeUserIds,
         }),

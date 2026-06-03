@@ -7,6 +7,52 @@ import {
 
 export { resolveActiveProjectIdNum as resolveActiveProjectId, sprintProjectIdFromJson };
 
+/** Parse `<input type="date">` value (YYYY-MM-DD) as local calendar date. */
+export function parseDateInputLocal(dateStr) {
+  if (dateStr == null || dateStr === '') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr).trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatLocalDateTimeIso(d, hours, minutes, seconds, ms) {
+  const pad = (n, width = 2) => String(n).padStart(width, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(ms, 3)}`;
+}
+
+/** Start of selected calendar day for task start dates (00:00:00.000, local). */
+export function dateInputToStartOfLocalDayIso(dateStr) {
+  const d = parseDateInputLocal(dateStr);
+  if (!d) return null;
+  return formatLocalDateTimeIso(d, 0, 0, 0, 0);
+}
+
+/** End of selected calendar day for task due dates (23:59:59.999, local). */
+export function dateInputToEndOfLocalDayIso(dateStr) {
+  const d = parseDateInputLocal(dateStr);
+  if (!d) return null;
+  return formatLocalDateTimeIso(d, 23, 59, 59, 999);
+}
+
+/** Map API datetime to `<input type="date">` value (calendar day, not UTC slice). */
+export function isoToDateInputValue(iso) {
+  if (iso == null || iso === '') return '';
+  const s = String(iso).trim();
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+  if (m) return m[1];
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return formatLocalDateTimeIso(d, 0, 0, 0, 0).slice(0, 10);
+}
+
+export function isDateInputOnOrBefore(startStr, endStr) {
+  const start = String(startStr ?? '').trim();
+  const end = String(endStr ?? '').trim();
+  if (!start || !end) return true;
+  return start <= end;
+}
+
 /** USER_TASK row finished: COMPLETED (canonical) or DONE (legacy rows). */
 export function isUserTaskAssigneeComplete(ut) {
   const u = String(ut?.status || '')

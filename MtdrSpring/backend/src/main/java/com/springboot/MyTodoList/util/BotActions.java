@@ -1,11 +1,9 @@
 package com.springboot.MyTodoList.util;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -725,13 +723,6 @@ public class BotActions {
         return t.length() > 12 ? t.substring(0, 11) + "…" : t;
     }
 
-    private static String formatDueDateForTelegram(OffsetDateTime dt) {
-        if (dt == null) return "Not set";
-        LocalTime wall = dt.toOffsetTime().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
-        if (LocalTime.MIDNIGHT.equals(wall)) return dt.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm xxx"));
-    }
-
     private static String formatShortDate(LocalDateTime date) {
         if (date == null) return "";
         return date.format(DateTimeFormatter.ofPattern("MMM d"));
@@ -1301,7 +1292,7 @@ public class BotActions {
         String hoursLabel = WorkedHoursUtil.formatForDisplay(hours != null ? hours : 0.0);
         String teamStatus = formatTaskStatusForDisplay(task.getStatus());
         String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
-        String dueDateLine = formatDueDateForTelegram(task.getDueDate());
+        String dueDateLine = TaskDueDateFormatUtil.formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
                 "✅ *Your part is complete*\n\n"
@@ -1345,7 +1336,7 @@ public class BotActions {
                 .orElse(formatTaskStatusForDisplay(task.getStatus()));
         String teamStatus = formatTaskStatusForDisplay(task.getStatus());
         String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
-        String dueDateLine = formatDueDateForTelegram(task.getDueDate());
+        String dueDateLine = TaskDueDateFormatUtil.formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
                 "📋 *Task Details*\n\n" +
@@ -1378,7 +1369,7 @@ public class BotActions {
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
                 escapeMarkdown(formatTaskStatusForDisplay(task.getStatus())),
-                escapeMarkdown(formatDueDateForTelegram(task.getDueDate()))
+                escapeMarkdown(TaskDueDateFormatUtil.formatDueDateForTelegram(task.getDueDate()))
         );
 
         stateManager.setSelectingTaskStatus(chatId, task.getID(), sprintId, assigneeUserId);
