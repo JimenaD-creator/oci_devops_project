@@ -216,9 +216,7 @@ export default function ManagerChatbot({ projectId }) {
       });
 
       const data = await res.json();
-      const reply = data.error
-        ? `⚠️ ${data.reply || getErrorMessage(data.errorCode)}`
-        : data.reply;
+      const reply = data.error ? `⚠️ ${data.reply || getErrorMessage(data.errorCode)}` : data.reply;
 
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
       if (!open) setHasUnread(true);
@@ -274,12 +272,16 @@ export default function ManagerChatbot({ projectId }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: isDark ? '0 4px 20px rgba(229,57,53,0.35)' : '0 4px 20px rgba(229,57,53,0.45)',
+                  boxShadow: isDark
+                    ? '0 4px 20px rgba(229,57,53,0.35)'
+                    : '0 4px 20px rgba(229,57,53,0.45)',
                   color: '#fff',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   '&:hover': {
                     transform: 'scale(1.08)',
-                    boxShadow: isDark ? '0 6px 28px rgba(229,57,53,0.45)' : '0 6px 28px rgba(229,57,53,0.55)',
+                    boxShadow: isDark
+                      ? '0 6px 28px rgba(229,57,53,0.45)'
+                      : '0 6px 28px rgba(229,57,53,0.55)',
                   },
                   position: 'relative',
                 }}
@@ -323,7 +325,7 @@ export default function ManagerChatbot({ projectId }) {
                   display: 'flex',
                   flexDirection: 'column',
                   bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
-                  boxShadow: isDark 
+                  boxShadow: isDark
                     ? '0 24px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15)'
                     : '0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
                   border: `1px solid ${isDark ? 'rgba(229,57,53,0.2)' : 'rgba(229,57,53,0.12)'}`,
@@ -332,7 +334,7 @@ export default function ManagerChatbot({ projectId }) {
                 {/* Header */}
                 <Box
                   sx={{
-                    background: isDark 
+                    background: isDark
                       ? 'linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 100%)'
                       : 'linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%)',
                     px: 2.5,
@@ -395,7 +397,9 @@ export default function ManagerChatbot({ projectId }) {
                         </Typography>
                       </Box>
                     </Box>
-                    <Typography sx={{ color: isDark ? '#9A9A9A' : '#888', fontSize: '0.7rem', mt: 0.1 }}>
+                    <Typography
+                      sx={{ color: isDark ? '#9A9A9A' : '#888', fontSize: '0.7rem', mt: 0.1 }}
+                    >
                       Ask anything about your project
                     </Typography>
                   </Box>
@@ -438,7 +442,12 @@ export default function ManagerChatbot({ projectId }) {
                   }}
                 >
                   <Typography
-                    sx={{ fontSize: '0.7rem', color: isDark ? '#9A9A9A' : '#999', fontWeight: 600, flexShrink: 0 }}
+                    sx={{
+                      fontSize: '0.7rem',
+                      color: isDark ? '#9A9A9A' : '#999',
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
                   >
                     CONTEXT
                   </Typography>
@@ -452,7 +461,9 @@ export default function ManagerChatbot({ projectId }) {
                         color: isDark ? '#F0F0F0' : '#1A1A1A',
                         bgcolor: isDark ? '#1C1E22' : '#fff',
                         borderRadius: '8px',
-                        '& .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#2A2C32' : '#E8E8E8' },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDark ? '#2A2C32' : '#E8E8E8',
+                        },
                         '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#E53935' },
                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#E53935',
@@ -461,13 +472,24 @@ export default function ManagerChatbot({ projectId }) {
                         '& .MuiSelect-select': { py: 0.75 },
                       }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+                      <MenuItem
+                        value="all"
+                        sx={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: isDark ? '#F0F0F0' : '#1A1A1A',
+                        }}
+                      >
                         All sprints
                       </MenuItem>
                       {sortedSprintsForSelect.map((s) => {
                         const sprintNumber = sprintNumberMap.get(s.id);
                         return (
-                          <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+                          <MenuItem
+                            key={s.id}
+                            value={s.id}
+                            sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+                          >
                             Sprint {sprintNumber}
                           </MenuItem>
                         );
@@ -488,7 +510,10 @@ export default function ManagerChatbot({ projectId }) {
                     gap: 1.5,
                     '&::-webkit-scrollbar': { width: 4 },
                     '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: isDark ? '#2A2C32' : '#E0E0E0', borderRadius: 2 },
+                    '&::-webkit-scrollbar-thumb': {
+                      bgcolor: isDark ? '#2A2C32' : '#E0E0E0',
+                      borderRadius: 2,
+                    },
                   }}
                 >
                   {/* Empty state with suggestions */}
@@ -520,12 +545,22 @@ export default function ManagerChatbot({ projectId }) {
                       </Box>
                       <Box sx={{ textAlign: 'center' }}>
                         <Typography
-                          sx={{ fontWeight: 700, fontSize: '0.875rem', color: 'text.primary', mb: 0.5 }}
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.875rem',
+                            color: 'text.primary',
+                            mb: 0.5,
+                          }}
                         >
                           {aiBlocked ? 'AI chat unavailable' : 'How can I help?'}
                         </Typography>
                         <Typography
-                          sx={{ fontSize: '0.75rem', color: isDark ? '#9A9A9A' : '#999', maxWidth: 260, mx: 'auto' }}
+                          sx={{
+                            fontSize: '0.75rem',
+                            color: isDark ? '#9A9A9A' : '#999',
+                            maxWidth: 260,
+                            mx: 'auto',
+                          }}
                         >
                           {aiBlocked
                             ? aiConfigMessage || getErrorMessage('API_KEY_MISSING')
@@ -711,9 +746,7 @@ export default function ManagerChatbot({ projectId }) {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={
-                      aiBlocked ? 'AI chat unavailable' : 'Ask about your project...'
-                    }
+                    placeholder={aiBlocked ? 'AI chat unavailable' : 'Ask about your project...'}
                     multiline
                     maxRows={3}
                     fullWidth
@@ -743,20 +776,31 @@ export default function ManagerChatbot({ projectId }) {
                       background:
                         input.trim() && !loading
                           ? 'linear-gradient(135deg, #E53935, #C62828)'
-                          : (isDark ? '#2A2C32' : '#EEEEEE'),
-                      color: input.trim() && !loading ? '#fff' : (isDark ? '#5A5A5A' : '#BDBDBD'),
+                          : isDark
+                            ? '#2A2C32'
+                            : '#EEEEEE',
+                      color: input.trim() && !loading ? '#fff' : isDark ? '#5A5A5A' : '#BDBDBD',
                       transition: 'all 0.2s',
                       '&:hover': {
                         background:
                           input.trim() && !loading
                             ? 'linear-gradient(135deg, #EF5350, #E53935)'
-                            : (isDark ? '#2A2C32' : '#EEEEEE'),
+                            : isDark
+                              ? '#2A2C32'
+                              : '#EEEEEE',
                         transform: input.trim() && !loading ? 'scale(1.05)' : 'none',
                       },
-                      '&.Mui-disabled': { background: isDark ? '#2A2C32' : '#EEEEEE', color: isDark ? '#5A5A5A' : '#BDBDBD' },
+                      '&.Mui-disabled': {
+                        background: isDark ? '#2A2C32' : '#EEEEEE',
+                        color: isDark ? '#5A5A5A' : '#BDBDBD',
+                      },
                     }}
                   >
-                    {loading ? <CircularProgress size={16} sx={{ color: isDark ? '#9A9A9A' : '#999' }} /> : <SendIcon />}
+                    {loading ? (
+                      <CircularProgress size={16} sx={{ color: isDark ? '#9A9A9A' : '#999' }} />
+                    ) : (
+                      <SendIcon />
+                    )}
                   </IconButton>
                 </Box>
               </Box>

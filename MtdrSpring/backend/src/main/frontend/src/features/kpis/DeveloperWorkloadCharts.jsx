@@ -72,7 +72,7 @@ function ChartPlot({ children, height = CHART_H }) {
 function ChartCard({ title, subtitle, iconElement, children }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   return (
     <Paper
       sx={{
@@ -200,7 +200,7 @@ function buildAssignedCompletedRows(selectedSprints, uniqueTeamTotalsBySprintId)
 function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   return (
     <Box sx={{ mb: 1, width: '100%' }}>
       <Typography
@@ -277,7 +277,7 @@ export default function DeveloperWorkloadCharts({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const { combinedAssignedCompletedRows, workedEstimatedRows, hasData } = useMemo(() => {
     if (!selectedSprints?.length) {
       return {
@@ -402,7 +402,12 @@ export default function DeveloperWorkloadCharts({
                           return [`${v} tasks`, isA ? 'Assigned' : 'Completed'];
                         }}
                       />
-                      <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, color: isDark ? '#F0F0F0' : '#1A1A1A' }} />
+                      <Legend
+                        wrapperStyle={{
+                          ...CHART_LEGEND_STYLE,
+                          color: isDark ? '#F0F0F0' : '#1A1A1A',
+                        }}
+                      />
                       {selectedSprints.map((sp) => {
                         const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
                         return (
@@ -463,14 +468,17 @@ export default function DeveloperWorkloadCharts({
                 <Tooltip
                   contentStyle={tooltipStyle}
                   formatter={(v, name) => {
-                    const isPlanned = String(name).includes('Planned') || String(name).includes('Estimated');
+                    const isPlanned =
+                      String(name).includes('Planned') || String(name).includes('Estimated');
                     return [
                       `${Number(v).toFixed(1)} h`,
                       isPlanned ? 'Estimated hours' : 'Hours worked',
                     ];
                   }}
                 />
-                <Legend wrapperStyle={{ ...CHART_LEGEND_STYLE, color: isDark ? '#F0F0F0' : '#1A1A1A' }} />
+                <Legend
+                  wrapperStyle={{ ...CHART_LEGEND_STYLE, color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+                />
                 {selectedSprints.map((sp) => {
                   const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
                   return (

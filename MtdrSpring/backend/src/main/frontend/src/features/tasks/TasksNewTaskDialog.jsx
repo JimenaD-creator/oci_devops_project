@@ -262,9 +262,7 @@ export function TasksNewTaskDialog({
           borderColor: isDark ? '#2A2C32' : '#ECECEC',
           borderLeft: `4px solid ${ORACLE_RED}`,
           bgcolor: 'background.paper',
-          boxShadow: isDark 
-            ? '0 16px 40px rgba(0,0,0,0.4)' 
-            : '0 16px 40px rgba(199, 70, 52, 0.12)',
+          boxShadow: isDark ? '0 16px 40px rgba(0,0,0,0.4)' : '0 16px 40px rgba(199, 70, 52, 0.12)',
           height: { xs: 'auto', sm: '88vh' },
           maxHeight: 'calc(100vh - 24px)',
           overflow: 'hidden',
@@ -423,9 +421,9 @@ export function TasksNewTaskDialog({
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
               <InputLabel>Sprint</InputLabel>
-              <Select 
-                value={sprintId} 
-                onChange={(e) => setSprintId(e.target.value)} 
+              <Select
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
                 label="Sprint"
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
@@ -587,12 +585,12 @@ export function TasksNewTaskDialog({
         </Stack>
       </DialogContent>
       <DialogActions
-        sx={{ 
-          px: 2.5, 
-          pb: 2.25, 
-          pt: 1.5, 
+        sx={{
+          px: 2.5,
+          pb: 2.25,
+          pt: 1.5,
           borderTop: '1px solid',
-          borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)'
+          borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)',
         }}
       >
         <Button

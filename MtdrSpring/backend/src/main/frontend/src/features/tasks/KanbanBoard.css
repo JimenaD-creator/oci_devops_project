@@ -13,30 +13,30 @@
   --kb-avatar-border: #fff;
   --kb-empty-hint: #bdbdbd;
 
-  --kb-col-todo-header-bg:    #f5f5f5;
-  --kb-col-todo-title:        #616161;
-  --kb-col-todo-count-bg:     #eeeeee;
-  --kb-col-todo-border:       #e0e0e0;
+  --kb-col-todo-header-bg: #f5f5f5;
+  --kb-col-todo-title: #616161;
+  --kb-col-todo-count-bg: #eeeeee;
+  --kb-col-todo-border: #e0e0e0;
 
-  --kb-col-progress-header-bg:#e3f2fd;
-  --kb-col-progress-title:    #1565c0;
+  --kb-col-progress-header-bg: #e3f2fd;
+  --kb-col-progress-title: #1565c0;
   --kb-col-progress-count-bg: #bbdefb;
-  --kb-col-progress-border:   #90caf9;
+  --kb-col-progress-border: #90caf9;
 
-  --kb-col-review-header-bg:  #f3e5f5;
-  --kb-col-review-title:      #7b1fa2;
-  --kb-col-review-count-bg:   #e1bee7;
-  --kb-col-review-border:     #ce93d8;
+  --kb-col-review-header-bg: #f3e5f5;
+  --kb-col-review-title: #7b1fa2;
+  --kb-col-review-count-bg: #e1bee7;
+  --kb-col-review-border: #ce93d8;
 
-  --kb-col-done-header-bg:    #e8f5e9;
-  --kb-col-done-title:        #2e7d32;
-  --kb-col-done-count-bg:     #c8e6c9;
-  --kb-col-done-border:       #a5d6a7;
+  --kb-col-done-header-bg: #e8f5e9;
+  --kb-col-done-title: #2e7d32;
+  --kb-col-done-count-bg: #c8e6c9;
+  --kb-col-done-border: #a5d6a7;
 
-  --kb-kind-feature-border:   #c8e6c9;
-  --kb-kind-bug-border:       #ffcdd2;
-  --kb-kind-task-border:      #bbdefb;
-  --kb-kind-story-border:     #e1bee7;
+  --kb-kind-feature-border: #c8e6c9;
+  --kb-kind-bug-border: #ffcdd2;
+  --kb-kind-task-border: #bbdefb;
+  --kb-kind-story-border: #e1bee7;
 }
 
 /* ── CSS variables: dark overrides ── */
@@ -54,30 +54,30 @@
   --kb-avatar-border: #22252b;
   --kb-empty-hint: #3a3a3a;
 
-  --kb-col-todo-header-bg:    #1a1c20;
-  --kb-col-todo-title:        #7a7a7a;
-  --kb-col-todo-count-bg:     #26282e;
-  --kb-col-todo-border:       #2e3138;
+  --kb-col-todo-header-bg: #1a1c20;
+  --kb-col-todo-title: #7a7a7a;
+  --kb-col-todo-count-bg: #26282e;
+  --kb-col-todo-border: #2e3138;
 
-  --kb-col-progress-header-bg:#0a1929;
-  --kb-col-progress-title:    #5c9fd4;
+  --kb-col-progress-header-bg: #0a1929;
+  --kb-col-progress-title: #5c9fd4;
   --kb-col-progress-count-bg: #0d2137;
-  --kb-col-progress-border:   #1a3a5c;
+  --kb-col-progress-border: #1a3a5c;
 
-  --kb-col-review-header-bg:  #1a0a29;
-  --kb-col-review-title:      #b07fd4;
-  --kb-col-review-count-bg:   #2a0f3d;
-  --kb-col-review-border:     #4a1a6e;
+  --kb-col-review-header-bg: #1a0a29;
+  --kb-col-review-title: #b07fd4;
+  --kb-col-review-count-bg: #2a0f3d;
+  --kb-col-review-border: #4a1a6e;
 
-  --kb-col-done-header-bg:    #0a1f0c;
-  --kb-col-done-title:        #5cb85c;
-  --kb-col-done-count-bg:     #0f2e12;
-  --kb-col-done-border:       #1a4d1e;
+  --kb-col-done-header-bg: #0a1f0c;
+  --kb-col-done-title: #5cb85c;
+  --kb-col-done-count-bg: #0f2e12;
+  --kb-col-done-border: #1a4d1e;
 
-  --kb-kind-feature-border:   #1a4d1e;
-  --kb-kind-bug-border:       #4d1a1a;
-  --kb-kind-task-border:      #1a3a5c;
-  --kb-kind-story-border:     #3d1a5c;
+  --kb-kind-feature-border: #1a4d1e;
+  --kb-kind-bug-border: #4d1a1a;
+  --kb-kind-task-border: #1a3a5c;
+  --kb-kind-story-border: #3d1a5c;
 }
 
 /* ── Layout ── */
@@ -122,29 +122,61 @@
 }
 
 /* ── Column themes (usando variables) ── */
-.kanban-col-todo .kanban-column-header     { background: var(--kb-col-todo-header-bg); }
+.kanban-col-todo .kanban-column-header {
+  background: var(--kb-col-todo-header-bg);
+}
 .kanban-col-todo .kanban-column-header-title,
-.kanban-col-todo .kanban-column-count      { color: var(--kb-col-todo-title); }
-.kanban-col-todo .kanban-column-count      { background: var(--kb-col-todo-count-bg); }
-.kanban-col-todo .kanban-column-body       { border-color: var(--kb-col-todo-border); }
+.kanban-col-todo .kanban-column-count {
+  color: var(--kb-col-todo-title);
+}
+.kanban-col-todo .kanban-column-count {
+  background: var(--kb-col-todo-count-bg);
+}
+.kanban-col-todo .kanban-column-body {
+  border-color: var(--kb-col-todo-border);
+}
 
-.kanban-col-progress .kanban-column-header { background: var(--kb-col-progress-header-bg); }
+.kanban-col-progress .kanban-column-header {
+  background: var(--kb-col-progress-header-bg);
+}
 .kanban-col-progress .kanban-column-header-title,
-.kanban-col-progress .kanban-column-count  { color: var(--kb-col-progress-title); }
-.kanban-col-progress .kanban-column-count  { background: var(--kb-col-progress-count-bg); }
-.kanban-col-progress .kanban-column-body   { border-color: var(--kb-col-progress-border); }
+.kanban-col-progress .kanban-column-count {
+  color: var(--kb-col-progress-title);
+}
+.kanban-col-progress .kanban-column-count {
+  background: var(--kb-col-progress-count-bg);
+}
+.kanban-col-progress .kanban-column-body {
+  border-color: var(--kb-col-progress-border);
+}
 
-.kanban-col-review .kanban-column-header   { background: var(--kb-col-review-header-bg); }
+.kanban-col-review .kanban-column-header {
+  background: var(--kb-col-review-header-bg);
+}
 .kanban-col-review .kanban-column-header-title,
-.kanban-col-review .kanban-column-count    { color: var(--kb-col-review-title); }
-.kanban-col-review .kanban-column-count    { background: var(--kb-col-review-count-bg); }
-.kanban-col-review .kanban-column-body     { border-color: var(--kb-col-review-border); }
+.kanban-col-review .kanban-column-count {
+  color: var(--kb-col-review-title);
+}
+.kanban-col-review .kanban-column-count {
+  background: var(--kb-col-review-count-bg);
+}
+.kanban-col-review .kanban-column-body {
+  border-color: var(--kb-col-review-border);
+}
 
-.kanban-col-done .kanban-column-header     { background: var(--kb-col-done-header-bg); }
+.kanban-col-done .kanban-column-header {
+  background: var(--kb-col-done-header-bg);
+}
 .kanban-col-done .kanban-column-header-title,
-.kanban-col-done .kanban-column-count      { color: var(--kb-col-done-title); }
-.kanban-col-done .kanban-column-count      { background: var(--kb-col-done-count-bg); }
-.kanban-col-done .kanban-column-body       { border-color: var(--kb-col-done-border); }
+.kanban-col-done .kanban-column-count {
+  color: var(--kb-col-done-title);
+}
+.kanban-col-done .kanban-column-count {
+  background: var(--kb-col-done-count-bg);
+}
+.kanban-col-done .kanban-column-body {
+  border-color: var(--kb-col-done-border);
+}
 
 /* ── Column body ── */
 .kanban-column-body {
@@ -215,7 +247,9 @@
   box-shadow: 0 8px 20px var(--kb-card-shadow);
 }
 
-.kanban-task-card--done { opacity: 0.65; }
+.kanban-task-card--done {
+  opacity: 0.65;
+}
 
 .kanban-task-drag-handle {
   display: inline-flex;

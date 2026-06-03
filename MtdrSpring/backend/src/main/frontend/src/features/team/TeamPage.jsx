@@ -321,7 +321,10 @@ export default function TeamPage({
             projectDevelopers={rosterForInsights}
           />
 
-          <DashboardBlockedTasksPanel selectedSprints={[selectedSprint]} sprintNumberMap={sprintNumberMap} />
+          <DashboardBlockedTasksPanel
+            selectedSprints={[selectedSprint]}
+            sprintNumberMap={sprintNumberMap}
+          />
 
           <Paper
             sx={{

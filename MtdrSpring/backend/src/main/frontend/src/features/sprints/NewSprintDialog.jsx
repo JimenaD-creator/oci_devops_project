@@ -20,7 +20,7 @@ import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/spr
 export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [goal, setGoal] = useState('');
@@ -168,7 +168,15 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
       </DialogTitle>
 
       {/* Body */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : 'transparent' }}>
+      <DialogContent
+        sx={{
+          pt: '32px !important',
+          px: 3,
+          pb: 2,
+          overflowY: 'auto',
+          bgcolor: isDark ? '#111214' : 'transparent',
+        }}
+      >
         <Typography sx={{ fontSize: 15, color: isDark ? '#9A9A9A' : '#424242', mb: 2.5 }}>
           Pick start and end dates, then add an optional sprint goal.
         </Typography>

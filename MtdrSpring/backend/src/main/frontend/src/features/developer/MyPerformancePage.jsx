@@ -55,8 +55,12 @@ function formatWorkedHoursForCard(hours) {
 export default function MyPerformancePage({ projectId, currentUser }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const { sprints: sharedSprints, loading: sharedLoading, error: sharedError, ensureLoaded } =
-    useProjectData();
+  const {
+    sprints: sharedSprints,
+    loading: sharedLoading,
+    error: sharedError,
+    ensureLoaded,
+  } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -356,7 +360,13 @@ export default function MyPerformancePage({ projectId, currentUser }) {
                   }}
                 >
                   <Typography
-                    sx={{ fontSize: '0.8rem', color: 'text.secondary', fontWeight: 600, mb: 1, width: '100%' }}
+                    sx={{
+                      fontSize: '0.8rem',
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      mb: 1,
+                      width: '100%',
+                    }}
                   >
                     Radar (vs team)
                   </Typography>

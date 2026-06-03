@@ -117,12 +117,12 @@ export function userTaskRowStatus(ut) {
 /** Create-task dialog fields: Oracle red focus + grays (aligned with Tasks page). */
 export function pageFormFieldOutline(isDark = false) {
   return {
-    '& .MuiOutlinedInput-root': { 
-      borderRadius: 2, 
-      bgcolor: isDark ? '#1C1E22' : '#FFFFFF' 
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 2,
+      bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
     },
-    '& .MuiOutlinedInput-input': { 
-      color: isDark ? '#F0F0F0' : '#1A1A1A' 
+    '& .MuiOutlinedInput-input': {
+      color: isDark ? '#F0F0F0' : '#1A1A1A',
     },
     '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
       borderColor: isDark ? '#3A3C42' : 'rgba(199, 70, 52, 0.35)',
@@ -134,17 +134,17 @@ export function pageFormFieldOutline(isDark = false) {
       borderWidth: 2,
       borderColor: isDark ? '#EF5350' : ORACLE_RED,
     },
-    '& .MuiInputLabel-root': { 
-      color: isDark ? '#9A9A9A' : '#616161' 
+    '& .MuiInputLabel-root': {
+      color: isDark ? '#9A9A9A' : '#616161',
     },
-    '& .MuiInputLabel-root.Mui-focused': { 
-      color: isDark ? '#EF5350' : ORACLE_RED 
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: isDark ? '#EF5350' : ORACLE_RED,
     },
-    '& .MuiSelect-select': { 
-      color: isDark ? '#F0F0F0' : '#1A1A1A' 
+    '& .MuiSelect-select': {
+      color: isDark ? '#F0F0F0' : '#1A1A1A',
     },
-    '& .MuiSelect-icon': { 
-      color: isDark ? '#9A9A9A' : '#616161' 
+    '& .MuiSelect-icon': {
+      color: isDark ? '#9A9A9A' : '#616161',
     },
   };
 }

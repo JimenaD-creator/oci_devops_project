@@ -23,7 +23,7 @@ export default function KpiDonutChart({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const p = Math.min(100, Math.max(0, Number(pct)));
   const data = [
     { name: 'score', value: p },
@@ -83,7 +83,10 @@ export default function KpiDonutChart({
           {displayValue}
         </Typography>
         {displaySuffix ? (
-          <Typography variant="caption" sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}
+          >
             {displaySuffix}
           </Typography>
         ) : null}

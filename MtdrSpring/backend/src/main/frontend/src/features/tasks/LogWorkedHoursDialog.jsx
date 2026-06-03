@@ -101,10 +101,7 @@ export default function LogWorkedHoursDialog({
           overflow: 'visible',
         }}
       >
-        <Typography
-          variant="body2"
-          sx={{ mb: 2.5, color: 'text.primary', lineHeight: 1.5 }}
-        >
+        <Typography variant="body2" sx={{ mb: 2.5, color: 'text.primary', lineHeight: 1.5 }}>
           {taskTitle ? (
             <>
               Task:{' '}

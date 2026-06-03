@@ -41,7 +41,7 @@ export const KPI_DEFS = [
 export default function KPICards({ compareMode, selectedSprints = [] }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const ordered = useMemo(
     () => [...selectedSprints].sort((a, b) => a.id - b.id),
     [selectedSprints],

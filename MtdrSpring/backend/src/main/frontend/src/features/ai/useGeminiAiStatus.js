@@ -19,9 +19,7 @@ export function useGeminiAiStatus({ enabled = true } = {}) {
     try {
       const status = await fetchAiStatus();
       setConfigured(status.geminiConfigured);
-      const msg =
-        status.message ??
-        (status.errorCode ? getErrorMessage(status.errorCode) : null);
+      const msg = status.message ?? (status.errorCode ? getErrorMessage(status.errorCode) : null);
       setMessage(msg);
       return { configured: status.geminiConfigured, message: msg };
     } catch {

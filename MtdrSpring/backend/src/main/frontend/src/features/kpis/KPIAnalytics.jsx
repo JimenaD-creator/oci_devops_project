@@ -265,15 +265,18 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
   sharedSprintsRef.current = sharedSprints;
 
   /** Sprint 0, 1, 2… (same labels as dashboard). */
-  const getSprintLabel = useCallback((sprintId) => {
-    if (sprintId == null) return '';
-    const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
-    if (sprint?.shortLabel) return sprint.shortLabel;
-    if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-    const sortedSprints = [...sprints].sort((a, b) => Number(a.id) - Number(b.id));
-    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
-    return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
-  }, [sprints]);
+  const getSprintLabel = useCallback(
+    (sprintId) => {
+      if (sprintId == null) return '';
+      const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
+      if (sprint?.shortLabel) return sprint.shortLabel;
+      if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
+      const sortedSprints = [...sprints].sort((a, b) => Number(a.id) - Number(b.id));
+      const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
+      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+    },
+    [sprints],
+  );
 
   useEffect(() => {
     if (!kpiDataReady || loading || selectedSprintId == null) return undefined;
@@ -301,8 +304,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
         });
         if (controller.signal.aborted) return;
 
-        const nextGuide =
-          notFound || !data ? null : data.insights?.kpiManagerGuide ?? null;
+        const nextGuide = notFound || !data ? null : (data.insights?.kpiManagerGuide ?? null);
         managerGuideBySprintRef.current.set(sprintKey, nextGuide);
         setManagerGuide(nextGuide);
       } catch (err) {
@@ -529,7 +531,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     const currentScore = kpis.productivityScore;
     const previousScore = productivityScoreFromSprintKpis(previous?.kpis);
     const delta = currentScore - previousScore;
-    
+
     const previousSprintLabel = getSprintLabel(previous.id);
 
     if (delta > 0) {

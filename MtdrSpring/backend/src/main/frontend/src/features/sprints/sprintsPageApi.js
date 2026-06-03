@@ -1,8 +1,5 @@
 import { API_BASE } from './constants/sprintConstants';
-import {
-  fetchProjectBundleRaw,
-  getCachedBundleSnapshot,
-} from '../dashboard/dashboardSprintData';
+import { fetchProjectBundleRaw, getCachedBundleSnapshot } from '../dashboard/dashboardSprintData';
 import { fetchProjectDevelopers } from '../dashboard/projectApi';
 import { resolveActiveProjectIdNum, sprintProjectIdFromJson } from './utils/sprintUtils';
 
@@ -36,8 +33,11 @@ export async function fetchSprintsTasksAndAssignments(projectIdProp, options = {
       return bundleFromSnapshot(snap, pid);
     }
   }
-  const { sprints: rawSprints, tasks: tasksData, userTasks: userTasksData } =
-    await fetchProjectBundleRaw(projectKey, options);
+  const {
+    sprints: rawSprints,
+    tasks: tasksData,
+    userTasks: userTasksData,
+  } = await fetchProjectBundleRaw(projectKey, options);
   let sprintsData = rawSprints;
   const tasksList = Array.isArray(tasksData) ? tasksData : [];
   const userTasksList = Array.isArray(userTasksData) ? userTasksData : [];

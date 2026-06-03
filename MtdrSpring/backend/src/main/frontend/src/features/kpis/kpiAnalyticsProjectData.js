@@ -39,9 +39,7 @@ export function pickProjectSprintsForKpi(enrichedFromSnapshot, sharedSprints, pr
 }
 
 export function filterTasksForKpiSprints(tasks, sprintRows) {
-  const sprintIds = new Set(
-    (sprintRows || []).map((s) => Number(s.id)).filter(Number.isFinite),
-  );
+  const sprintIds = new Set((sprintRows || []).map((s) => Number(s.id)).filter(Number.isFinite));
   return (Array.isArray(tasks) ? tasks : []).filter((t) => {
     const sid = taskSprintIdForKpi(t);
     return sid != null && sprintIds.has(sid);

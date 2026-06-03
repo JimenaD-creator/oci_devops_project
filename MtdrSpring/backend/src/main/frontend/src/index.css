@@ -493,7 +493,6 @@ body.login-route #root {
   font-size: 12px;
 }
 
-
 /* ══════════════════════════════════════════════
    DARK MODE — Login page
    Agregar al final de index.css
@@ -513,66 +512,66 @@ body.login-route #root {
 }
 
 [data-mui-color-scheme='dark'] .login-card {
-  background: #1C1E22;
+  background: #1c1e22;
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
 }
 
 [data-mui-color-scheme='dark'] .login-title {
-  color: #F0F0F0;
+  color: #f0f0f0;
 }
 
 [data-mui-color-scheme='dark'] .login-subtitle {
-  color: #6A6A6A;
+  color: #6a6a6a;
 }
 
 [data-mui-color-scheme='dark'] .login-label {
-  color: #9A9A9A;
+  color: #9a9a9a;
 }
 
 [data-mui-color-scheme='dark'] .login-input-wrapper {
-  background: #26282E;
-  border-color: #2E3138;
+  background: #26282e;
+  border-color: #2e3138;
 }
 
 [data-mui-color-scheme='dark'] .login-input-wrapper--focused {
   border-color: #c0392b;
   box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15);
-  background: #2E3038;
+  background: #2e3038;
 }
 
 [data-mui-color-scheme='dark'] .login-input-icon {
-  color: #5A5A5A;
+  color: #5a5a5a;
 }
 
 [data-mui-color-scheme='dark'] .login-input {
-  color: #F0F0F0;
+  color: #f0f0f0;
   background: transparent;
 }
 
 [data-mui-color-scheme='dark'] .login-input::placeholder {
-  color: #4A4A4A;
+  color: #4a4a4a;
 }
 
 [data-mui-color-scheme='dark'] .login-eye-btn {
-  color: #5A5A5A;
+  color: #5a5a5a;
 }
 
 [data-mui-color-scheme='dark'] .login-remember-text {
-  color: #7A7A7A;
+  color: #7a7a7a;
 }
 
 [data-mui-color-scheme='dark'] .login-footer {
-  border-top-color: #2A2A2A;
+  border-top-color: #2a2a2a;
 }
 
 [data-mui-color-scheme='dark'] .login-footer-text {
-  color: #4A4A4A;
+  color: #4a4a4a;
 }
 [data-mui-color-scheme='dark'] .login-input:-webkit-autofill,
 [data-mui-color-scheme='dark'] .login-input:-webkit-autofill:hover,
 [data-mui-color-scheme='dark'] .login-input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px #26282E inset !important;
-  -webkit-text-fill-color: #F0F0F0 !important;
-  caret-color: #F0F0F0;
+  -webkit-box-shadow: 0 0 0px 1000px #26282e inset !important;
+  -webkit-text-fill-color: #f0f0f0 !important;
+  caret-color: #f0f0f0;
   transition: background-color 5000s ease-in-out 0s;
 }

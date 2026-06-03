@@ -50,7 +50,11 @@ export function buildSprintTaskTableRows(tasks, userTasks, projectDevelopers = [
       taskAssignments = assignmentFilter(taskAssignments, task);
     }
 
-    const names = [...new Set(taskAssignments.map((ut) => resolveUtDeveloperName(ut, projectDevelopers)).filter(Boolean))];
+    const names = [
+      ...new Set(
+        taskAssignments.map((ut) => resolveUtDeveloperName(ut, projectDevelopers)).filter(Boolean),
+      ),
+    ];
     const workedHours = taskAssignments.reduce((sum, ut) => {
       const n = Number(ut?.workedHours ?? ut?.worked_hours ?? ut?.hours ?? 0);
       return sum + (Number.isFinite(n) ? n : 0);
@@ -71,7 +75,9 @@ export function buildSprintTaskTableRows(tasks, userTasks, projectDevelopers = [
                 completedAt: ut?.completedAt ?? ut?.completed_at ?? null,
               };
             })
-            .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }))
+            .sort((a, b) =>
+              String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }),
+            )
         : undefined;
     const derivedStatus = deriveTaskStatusFromAssignments(task.status, taskAssignments);
 

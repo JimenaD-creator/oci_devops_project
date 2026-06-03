@@ -134,12 +134,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         const createdTasks = getRecentlyCreatedTasks();
         const baseTasks = Array.isArray(tasksData) ? tasksData : [];
         const mergedTasks = [...createdTasks, ...baseTasks].filter(
-          (task, index, arr) =>
-            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+          (task, index, arr) => arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
         );
-        const visibleTasks = mergedTasks.filter(
-          (t) => !deleted.has(taskEntityId(t)),
-        );
+        const visibleTasks = mergedTasks.filter((t) => !deleted.has(taskEntityId(t)));
         const visibleUserTasks = mergeUserTaskLists(
           getRecentlyCreatedUserTasks(),
           Array.isArray(userTasksData) ? userTasksData : [],
@@ -418,7 +415,11 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     };
 
     try {
-      if (assignees.length > 1 && ns === 'DONE' && !assignees.every((ut) => isUserTaskAssigneeComplete(ut))) {
+      if (
+        assignees.length > 1 &&
+        ns === 'DONE' &&
+        !assignees.every((ut) => isUserTaskAssigneeComplete(ut))
+      ) {
         setMultiDoneTaskId(tid);
         return;
       }
@@ -440,10 +441,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           userId: currentUserId,
           mode: 'full',
           initialHours:
-            myAssignment.workedHours ??
-            myAssignment.worked_hours ??
-            myAssignment.hours ??
-            '',
+            myAssignment.workedHours ?? myAssignment.worked_hours ?? myAssignment.hours ?? '',
         });
         return;
       }
@@ -699,17 +697,24 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         if (!res.ok) {
           rollbackTaskStatus();
           rollbackAssignees();
-          setLoadError('Could not mark the task as Done. Your hours may have been saved — refresh and try again.');
+          setLoadError(
+            'Could not mark the task as Done. Your hours may have been saved — refresh and try again.',
+          );
           return;
         }
         const updated = await res.json();
         if (updated?.id != null) {
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));
           setUserTasks((prev) =>
-            patchUserTasksAfterTaskSave(prev, updated, {
-              syncAssignmentStatuses: true,
-              assignmentStatus: 'COMPLETED',
-            }, projectDevelopersRef.current),
+            patchUserTasksAfterTaskSave(
+              prev,
+              updated,
+              {
+                syncAssignmentStatuses: true,
+                assignmentStatus: 'COMPLETED',
+              },
+              projectDevelopersRef.current,
+            ),
           );
           notifyTasksMutated({
             source: 'tasks-page',
@@ -938,7 +943,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               sx={{ mt: 1, bgcolor: pendingChipBg, color: '#E65100', fontWeight: 700 }}
             />
           </Box>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.25}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+          >
             <FormControl
               size="small"
               sx={{
@@ -971,7 +981,10 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                 disabled={!sprints.length}
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
-                  const sprintNum = getSprintNumber(Number(value), sprintsForActiveProject.length ? sprintsForActiveProject : sprints);
+                  const sprintNum = getSprintNumber(
+                    Number(value),
+                    sprintsForActiveProject.length ? sprintsForActiveProject : sprints,
+                  );
                   return `Sprint ${sprintNum}`;
                 }}
                 MenuProps={{

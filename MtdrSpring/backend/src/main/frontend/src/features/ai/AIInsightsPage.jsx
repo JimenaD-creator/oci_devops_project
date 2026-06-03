@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Box,
-  Typography,
-  Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-} from '@mui/material';
+import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Sparkles } from 'lucide-react';
 import { useProjectData } from '../../contexts/ProjectDataContext';
@@ -26,11 +18,7 @@ import {
 import InsightCard from './InsightCard';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({
-  projectId,
-  onOpenTeam = null,
-  isPageActive = true,
-}) {
+export default function AIInsightsPage({ projectId, onOpenTeam = null, isPageActive = true }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -189,7 +177,12 @@ export default function AIInsightsPage({
           </Box>
           <Typography
             variant="body2"
-            sx={{ color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, maxWidth: '56rem', fontSize: '0.875rem' }}
+            sx={{
+              color: isDark ? '#9A9A9A' : '#607D8B',
+              fontWeight: 600,
+              maxWidth: '56rem',
+              fontSize: '0.875rem',
+            }}
           >
             Gemini-powered sprint analysis: alerts, recommendations, summary, and predictions.
           </Typography>
@@ -207,7 +200,10 @@ export default function AIInsightsPage({
               size="small"
               sx={{
                 minWidth: { xs: '100%', sm: 220 },
-                '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: isDark ? '#1C1E22' : '#FFFFFF' },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
+                },
                 '& .MuiSelect-select': {
                   color: 'text.primary',
                   fontWeight: 600,
@@ -256,7 +252,15 @@ export default function AIInsightsPage({
         )}
       </Box>
       {sprints.length === 0 && (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2, bgcolor: 'background.paper', border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}` }}>
+        <Paper
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
+          }}
+        >
           <Typography color="text.secondary">No sprints found for this project.</Typography>
         </Paper>
       )}

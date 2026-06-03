@@ -262,9 +262,9 @@ function SegmentedButtons({ options, value, onChange }) {
               py: 0.875,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
+              border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
+              color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
               fontSize: 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -273,7 +273,10 @@ function SegmentedButtons({ options, value, onChange }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 0.5,
-              '&:hover': { bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'), borderColor: opt.border },
+              '&:hover': {
+                bgcolor: active ? opt.bg : isDark ? '#2A2C32' : 'action.hover',
+                borderColor: opt.border,
+              },
             }}
           >
             {opt.dot && (
@@ -282,7 +285,7 @@ function SegmentedButtons({ options, value, onChange }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  bgcolor: active ? opt.dot : (isDark ? '#5A5A5A' : '#BDBDBD'),
+                  bgcolor: active ? opt.dot : isDark ? '#5A5A5A' : '#BDBDBD',
                   flexShrink: 0,
                 }}
               />
@@ -311,9 +314,9 @@ function TypeGrid({ value, onChange }) {
               py: 1,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
+              border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
+              color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
               fontSize: 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -322,7 +325,10 @@ function TypeGrid({ value, onChange }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 0.5,
-              '&:hover': { bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'), borderColor: opt.border },
+              '&:hover': {
+                bgcolor: active ? opt.bg : isDark ? '#2A2C32' : 'action.hover',
+                borderColor: opt.border,
+              },
             }}
           >
             <Box sx={{ fontSize: 16, lineHeight: 1 }}>{opt.icon}</Box>
@@ -398,12 +404,11 @@ export function TaskDetailDialog({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [taskUserTasks, setTaskUserTasks] = useState([]);
 
-
-const sprintNumberMap = useMemo(() => {
-  const map = new Map();
-  [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
-  return map;
-}, [sprints]);
+  const sprintNumberMap = useMemo(() => {
+    const map = new Map();
+    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
+    return map;
+  }, [sprints]);
   const resolvedDeveloperProjectId = useMemo(() => {
     const source =
       task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
@@ -841,7 +846,13 @@ const sprintNumberMap = useMemo(() => {
 
       {/* ── Body ── */}
       <DialogContent
-        sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : '#FAFAFA' }}
+        sx={{
+          pt: '32px !important',
+          px: 3,
+          pb: 2,
+          overflowY: 'auto',
+          bgcolor: isDark ? '#111214' : '#FAFAFA',
+        }}
       >
         {detailLoading && (
           <Box
@@ -960,10 +971,10 @@ const sprintNumberMap = useMemo(() => {
                 <Box>
                   <FieldLabel color="#5C6BC0">Sprint</FieldLabel>
                   <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
-{task.assignedSprint?.id != null
-  ? `Sprint ${sprintNumberMap.get(task.assignedSprint.id) ?? task.assignedSprint.id}`
-  : '—'}
-                    </Typography>
+                    {task.assignedSprint?.id != null
+                      ? `Sprint ${sprintNumberMap.get(task.assignedSprint.id) ?? task.assignedSprint.id}`
+                      : '—'}
+                  </Typography>
                 </Box>
                 <Box>
                   <FieldLabel color="#5C6BC0">Assigned to</FieldLabel>
@@ -1019,7 +1030,14 @@ const sprintNumberMap = useMemo(() => {
                   >
                     Start date
                   </Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: isDark ? '#FFE0B2' : '#412402', mt: 0.5 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: isDark ? '#FFE0B2' : '#412402',
+                      mt: 0.5,
+                    }}
+                  >
                     {formatDate(task.startDate)}
                   </Typography>
                 </Box>
@@ -1042,20 +1060,31 @@ const sprintNumberMap = useMemo(() => {
                   >
                     Due date
                   </Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: isDark ? '#BBDEFB' : '#042C53', mt: 0.5 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: isDark ? '#BBDEFB' : '#042C53',
+                      mt: 0.5,
+                    }}
+                  >
                     {formatDate(task.dueDate)}
                   </Typography>
                 </Box>
               </Box>
-
             </InfoCard>
 
             {/* On-time per developer only when several assignees share the task */}
             {showPerAssigneeDelivery && (
               <InfoCard accentColor="#5C6BC0">
                 <SectionLabel>Delivery by assignee</SectionLabel>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  Each row shows whether that developer finished their part on or before the due date.
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mb: 1 }}
+                >
+                  Each row shows whether that developer finished their part on or before the due
+                  date.
                 </Typography>
                 <Stack spacing={0.75}>
                   {[...taskUserTasks]
@@ -1120,102 +1149,107 @@ const sprintNumberMap = useMemo(() => {
                               gap: 1,
                             }}
                           >
-                          <Box
-                            sx={{
-                              flex: 1,
-                              minWidth: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              border: `0.5px solid ${isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)'}`,
-                            }}
-                          >
                             <Box
                               sx={{
                                 flex: 1,
                                 minWidth: 0,
-                                pl: 1,
-                                pr: 0.5,
-                                py: 0.6,
-                                bgcolor: pal.light,
-                                borderLeft: `3px solid ${pal.strip}`,
-                                color: pal.name,
-                                fontSize: 13,
-                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                borderRadius: '8px',
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
+                                border: `0.5px solid ${isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)'}`,
                               }}
                             >
-                              {name}
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  pl: 1,
+                                  pr: 0.5,
+                                  py: 0.6,
+                                  bgcolor: pal.light,
+                                  borderLeft: `3px solid ${pal.strip}`,
+                                  color: pal.name,
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {name}
+                              </Box>
+                              <Box
+                                sx={{
+                                  flexShrink: 0,
+                                  px: 1,
+                                  py: 0.6,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  letterSpacing: '0.04em',
+                                  color: statusChip.color,
+                                  bgcolor: statusChip.bg,
+                                  borderLeft: `3px solid ${statusChip.dot}`,
+                                }}
+                              >
+                                {statusChip.label}
+                              </Box>
+                              <Box
+                                sx={{
+                                  flexShrink: 0,
+                                  px: 1,
+                                  py: 0.6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: tone.color,
+                                  bgcolor: tone.bgcolor,
+                                  borderLeft: `3px solid ${tone.border}`,
+                                }}
+                              >
+                                {delivery.label}
+                              </Box>
                             </Box>
-                            <Box
-                              sx={{
-                                flexShrink: 0,
-                                px: 1,
-                                py: 0.6,
-                                fontSize: 11,
-                                fontWeight: 600,
-                                letterSpacing: '0.04em',
-                                color: statusChip.color,
-                                bgcolor: statusChip.bg,
-                                borderLeft: `3px solid ${statusChip.dot}`,
-                              }}
-                            >
-                              {statusChip.label}
-                            </Box>
-                            <Box
-                              sx={{
-                                flexShrink: 0,
-                                px: 1,
-                                py: 0.6,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: tone.color,
-                                bgcolor: tone.bgcolor,
-                                borderLeft: `3px solid ${tone.border}`,
-                              }}
-                            >
-                              {delivery.label}
-                            </Box>
-                          </Box>
-                          {delivery.complete && delivery.completedAt && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                flexShrink: 0,
-                                color: 'text.secondary',
-                                fontSize: 11,
-                                minWidth: 72,
-                                textAlign: 'right',
-                              }}
-                            >
-                              {formatDate(delivery.completedAt)}
-                            </Typography>
-                          )}
-                          {hrs > 0 && (
-                            <Box
-                              sx={{
-                                px: 1,
-                                py: 0.4,
-                                borderRadius: '20px',
-                                bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
-                                border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
-                                color: isDark ? '#90CAF9' : '#0C447C',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {hrs}h
-                            </Box>
-                          )}
+                            {delivery.complete && delivery.completedAt && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  flexShrink: 0,
+                                  color: 'text.secondary',
+                                  fontSize: 11,
+                                  minWidth: 72,
+                                  textAlign: 'right',
+                                }}
+                              >
+                                {formatDate(delivery.completedAt)}
+                              </Typography>
+                            )}
+                            {hrs > 0 && (
+                              <Box
+                                sx={{
+                                  px: 1,
+                                  py: 0.4,
+                                  borderRadius: '20px',
+                                  bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
+                                  border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
+                                  color: isDark ? '#90CAF9' : '#0C447C',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {hrs}h
+                              </Box>
+                            )}
                           </Box>
                           {delivery.hint && (
                             <Typography
                               variant="caption"
-                              sx={{ display: 'block', pl: 0.5, mt: 0.35, color: isDark ? '#FFB74D' : '#E65100' }}
+                              sx={{
+                                display: 'block',
+                                pl: 0.5,
+                                mt: 0.35,
+                                color: isDark ? '#FFB74D' : '#E65100',
+                              }}
                             >
                               {delivery.hint}
                             </Typography>
@@ -1257,10 +1291,6 @@ const sprintNumberMap = useMemo(() => {
                   <TypeGrid value={classification} onChange={setClassification} />
                 </Box>
                 <Box>
-                  <SectionLabel>Status</SectionLabel>
-                  <SegmentedButtons options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-                </Box>
-                <Box>
                   <SectionLabel>Priority</SectionLabel>
                   <SegmentedButtons
                     options={PRIORITY_OPTIONS}
@@ -1283,9 +1313,10 @@ const sprintNumberMap = useMemo(() => {
                       label="Sprint"
                     >
                       {sprints.map((s) => (
-<MenuItem key={s.id} value={String(s.id)}>
-    {`Sprint ${sprintNumberMap.get(s.id) ?? s.id}`}
-  </MenuItem>                      ))}
+                        <MenuItem key={s.id} value={String(s.id)}>
+                          {`Sprint ${sprintNumberMap.get(s.id) ?? s.id}`}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                   <TextField
@@ -1368,7 +1399,9 @@ const sprintNumberMap = useMemo(() => {
                           />
                           <ListItemText
                             primary={u.name}
-                            primaryTypographyProps={{ sx: { fontSize: 13, color: isDark ? '#F0F0F0' : '#1A1A1A' } }}
+                            primaryTypographyProps={{
+                              sx: { fontSize: 13, color: isDark ? '#F0F0F0' : '#1A1A1A' },
+                            }}
                           />
                         </MenuItem>
                       );

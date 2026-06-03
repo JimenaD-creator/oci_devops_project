@@ -61,17 +61,17 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 // Lazy load pages
-const SprintsPage     = lazy(() => import('../features/sprints/SprintsPage'));
-const TasksPage       = lazy(() => import('../features/tasks/TasksPage'));
-const DashboardPage   = lazy(() => import('../features/dashboard/DashboardPage'));
-const KPIAnalytics    = lazy(() => import('../features/kpis/KPIAnalytics'));
+const SprintsPage = lazy(() => import('../features/sprints/SprintsPage'));
+const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
+const KPIAnalytics = lazy(() => import('../features/kpis/KPIAnalytics'));
 const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
-const AIInsightsPage  = lazy(() => import('../features/ai/AIInsightsPage'));
-const TeamPage        = lazy(() => import('../features/team/TeamPage'));
-const ManagerChatbot  = lazy(() => import('../features/ai/ManagerChatbot'));
+const AIInsightsPage = lazy(() => import('../features/ai/AIInsightsPage'));
+const TeamPage = lazy(() => import('../features/team/TeamPage'));
+const ManagerChatbot = lazy(() => import('../features/ai/ManagerChatbot'));
 const MyPerformancePage = lazy(() => import('../features/developer/MyPerformancePage'));
-const MyTasksPage       = lazy(() => import('../features/developer/MyTasksPage'));
-const MyBlockersPage    = lazy(() => import('../features/developer/MyBlockersPage'));
+const MyTasksPage = lazy(() => import('../features/developer/MyTasksPage'));
+const MyBlockersPage = lazy(() => import('../features/developer/MyBlockersPage'));
 
 const DRAWER_WIDTH = 240;
 
@@ -79,7 +79,11 @@ const PageLoader = () => <PageLoadingSpinner color="#E53935" />;
 
 const getInitials = (name) => {
   if (!name) return '';
-  return name.split(' ').slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
 };
 
 // Comprime la imagen a base64 con canvas para no reventar el CLOB/localStorage
@@ -91,7 +95,7 @@ const compressImage = (file, maxWidth = 256, quality = 0.82) =>
       img.onload = () => {
         const scale = Math.min(1, maxWidth / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
-        canvas.width  = Math.round(img.width  * scale);
+        canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', quality));
@@ -107,8 +111,8 @@ function App() {
   const navigate = useNavigate();
   const { darkMode, toggleDark } = useThemeMode();
 
-  const [menuAnchor, setMenuAnchor]   = useState(null);
-  const [activePage, setActivePage]   = useState(() => {
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [activePage, setActivePage] = useState(() => {
     try {
       const stored = localStorage.getItem('currentUser');
       if (!stored) return 'dashboard';
@@ -120,8 +124,12 @@ function App() {
     }
   });
   const [sprintsNavOpen, setSprintsNavOpen] = useState(true);
-  const [selectedProjectId, setSelectedProjectId]     = useState(localStorage.getItem('currentProjectId'));
-  const [selectedProjectName, setSelectedProjectName] = useState(localStorage.getItem('currentProjectName'));
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    localStorage.getItem('currentProjectId'),
+  );
+  const [selectedProjectName, setSelectedProjectName] = useState(
+    localStorage.getItem('currentProjectName'),
+  );
   /** Manager opened "Change project" — do not auto-pick the first project again. */
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   /** null = loading; array = projects for this manager's team */
@@ -152,12 +160,16 @@ function App() {
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
   // ────────────────────────────────────────────────────────────────────────────
 
-  const handleTeamLandingConsumed = useCallback(() => { setTeamLandingSprintId(null); }, []);
+  const handleTeamLandingConsumed = useCallback(() => {
+    setTeamLandingSprintId(null);
+  }, []);
   const handleOpenTeamFromAi = useCallback((sprintId) => {
     setTeamLandingSprintId(sprintId != null ? Number(sprintId) : null);
     setActivePage('team');
   }, []);
-  const handleOpenAiInsightsFromTeam = useCallback(() => { setActivePage('ai-insights'); }, []);
+  const handleOpenAiInsightsFromTeam = useCallback(() => {
+    setActivePage('ai-insights');
+  }, []);
   const handleNavigateToProjectTasks = useCallback(() => {
     setSprintsNavOpen(true);
     setActivePage('sprints');
@@ -181,9 +193,7 @@ function App() {
         const updated = { ...user, profilePicture: dbUser.profilePicture };
         persistCurrentUser(updated);
         setUser(updated);
-        setProfilePicture(
-          resolveProfilePicture(updated.id, updated.profilePicture),
-        );
+        setProfilePicture(resolveProfilePicture(updated.id, updated.profilePicture));
       })
       .catch(() => {});
     return () => {
@@ -431,11 +441,26 @@ function App() {
       : [];
 
   const NAV_ITEMS = [
-    { text: 'Dashboard',      icon: <DashboardIcon />,   id: 'dashboard',   roles: ['ADMIN', 'MANAGER'] },
-    { text: 'AI Insights',    icon: <AutoAwesomeIcon />, id: 'ai-insights', roles: ['ADMIN', 'MANAGER'] },
-    { text: 'KPI Analytics',  icon: <AnalyticsIcon />,   id: 'analytics',   roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Team',           icon: <GroupIcon />,        id: 'team',        roles: ['ADMIN', 'MANAGER'] },
-    { text: 'Change project', icon: <SwapHorizIcon />,   id: 'selector',    roles: ['ADMIN', 'MANAGER'] },
+    { text: 'Dashboard', icon: <DashboardIcon />, id: 'dashboard', roles: ['ADMIN', 'MANAGER'] },
+    {
+      text: 'AI Insights',
+      icon: <AutoAwesomeIcon />,
+      id: 'ai-insights',
+      roles: ['ADMIN', 'MANAGER'],
+    },
+    {
+      text: 'KPI Analytics',
+      icon: <AnalyticsIcon />,
+      id: 'analytics',
+      roles: ['ADMIN', 'MANAGER'],
+    },
+    { text: 'Team', icon: <GroupIcon />, id: 'team', roles: ['ADMIN', 'MANAGER'] },
+    {
+      text: 'Change project',
+      icon: <SwapHorizIcon />,
+      id: 'selector',
+      roles: ['ADMIN', 'MANAGER'],
+    },
   ].filter((item) => {
     if (item.id === 'selector' && isManagerRole(user.role)) {
       if (managerProjects == null) return false;
@@ -456,8 +481,8 @@ function App() {
     : NAV_ITEMS.filter((item) => !['dashboard', 'ai-insights', 'analytics'].includes(item.id));
 
   const SPRINTS_SUBITEMS = [
-    { text: 'Tasks',        id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },
-    { text: 'Kanban board', id: 'tasks',   icon: <ViewKanbanIcon fontSize="small" /> },
+    { text: 'Tasks', id: 'sprints', icon: <ViewModuleIcon fontSize="small" /> },
+    { text: 'Kanban board', id: 'tasks', icon: <ViewKanbanIcon fontSize="small" /> },
   ];
 
   const sprintsSectionActive = activePage === 'tasks' || activePage === 'sprints';
@@ -471,8 +496,8 @@ function App() {
   };
 
   if (
-    (isAdminRole(user.role) || isManagerRole(user.role))
-    && (!selectedProjectId || showProjectPicker)
+    (isAdminRole(user.role) || isManagerRole(user.role)) &&
+    (!selectedProjectId || showProjectPicker)
   ) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -502,44 +527,43 @@ function App() {
     }
     if (devProjectStatus === 'missing' || (developerProjects && developerProjects.length === 0)) {
       return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'background.default',
-          p: 3,
-        }}
-      >
-        <Box sx={{ textAlign: 'center', maxWidth: 480 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Signed in — no project assigned
-          </Typography>
-          <Typography sx={{ color: 'text.secondary', mb: 2.5, fontSize: '0.9rem' }}>
-            Login worked, but user ID {user.id} is not linked to a project team (TEAM_MEMBER).
-            Ask your manager to add you to a project in the web app.
-          </Typography>
-          <Button
-            variant="contained"
-            sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}
-            onClick={handleLogout}
-          >
-            Sign out
-          </Button>
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'background.default',
+            p: 3,
+          }}
+        >
+          <Box sx={{ textAlign: 'center', maxWidth: 480 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+              Signed in — no project assigned
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', mb: 2.5, fontSize: '0.9rem' }}>
+              Login worked, but user ID {user.id} is not linked to a project team (TEAM_MEMBER). Ask
+              your manager to add you to a project in the web app.
+            </Typography>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#C62828' } }}
+              onClick={handleLogout}
+            >
+              Sign out
+            </Button>
+          </Box>
         </Box>
-      </Box>
       );
     }
     return <PageLoader />;
   }
 
-  const drawerBg     = '#1A1A1A';
+  const drawerBg = '#1A1A1A';
   const drawerBorder = '#2A2A2A';
 
   return (
     <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', bgcolor: 'background.default' }}>
-
       {/* Input file oculto */}
       <input
         ref={fileInputRef}
@@ -569,12 +593,22 @@ function App() {
         }}
       >
         {/* Header del drawer */}
-        <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${drawerBorder}` }}>
+        <Box
+          sx={{
+            p: 2.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            borderBottom: `1px solid ${drawerBorder}`,
+          }}
+        >
           <Box>
             <Typography sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
               {selectedProjectName || 'Software Manager Tool'}
             </Typography>
-            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>{getSidebarRoleLabel(user.role)}</Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#888' }}>
+              {getSidebarRoleLabel(user.role)}
+            </Typography>
           </Box>
         </Box>
 
@@ -583,9 +617,13 @@ function App() {
           {topNavItems.map((item) => (
             <ListItemButton
               key={item.id}
-              onClick={() => item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)}
+              onClick={() =>
+                item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)
+              }
               sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
+                borderRadius: '8px',
+                mb: 0.5,
+                py: 1.1,
                 backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
                 '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
                 transition: 'background-color 0.15s ease',
@@ -596,71 +634,92 @@ function App() {
               </ListItemIcon>
               <ListItemText
                 primary={item.text}
-                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: activePage === item.id ? 600 : 400,
+                }}
               />
             </ListItemButton>
           ))}
 
           {!isDeveloper ? (
-          <>
-          {/* Sprints colapsable */}
-          <ListItemButton
-            onClick={() => setSprintsNavOpen((o) => !o)}
-            sx={{
-              borderRadius: '8px', mb: 0.5, py: 1.1,
-              backgroundColor: sprintsSectionActive ? '#E53935' : 'transparent',
-              '&:hover': { backgroundColor: sprintsSectionActive ? '#C62828' : '#2A2A2A' },
-              transition: 'background-color 0.15s ease',
-            }}
-          >
-            <ListItemIcon sx={{ color: sprintsSectionActive ? 'white' : '#777', minWidth: 38 }}>
-              <AssignmentIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Sprints"
-              primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: sprintsSectionActive ? 600 : 400 }}
-            />
-            {sprintsNavOpen
-              ? <ExpandLess sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
-              : <ExpandMore sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
-            }
-          </ListItemButton>
+            <>
+              {/* Sprints colapsable */}
+              <ListItemButton
+                onClick={() => setSprintsNavOpen((o) => !o)}
+                sx={{
+                  borderRadius: '8px',
+                  mb: 0.5,
+                  py: 1.1,
+                  backgroundColor: sprintsSectionActive ? '#E53935' : 'transparent',
+                  '&:hover': { backgroundColor: sprintsSectionActive ? '#C62828' : '#2A2A2A' },
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                <ListItemIcon sx={{ color: sprintsSectionActive ? 'white' : '#777', minWidth: 38 }}>
+                  <AssignmentIcon />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Sprints"
+                  primaryTypographyProps={{
+                    fontSize: '0.875rem',
+                    fontWeight: sprintsSectionActive ? 600 : 400,
+                  }}
+                />
+                {sprintsNavOpen ? (
+                  <ExpandLess sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+                ) : (
+                  <ExpandMore sx={{ color: sprintsSectionActive ? '#fff' : '#777', ml: 0.5 }} />
+                )}
+              </ListItemButton>
 
-          <Collapse in={sprintsNavOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {SPRINTS_SUBITEMS.map((sub) => {
-                const subActive = activePage === sub.id;
-                return (
-                  <ListItemButton
-                    key={sub.id}
-                    onClick={() => setActivePage(sub.id)}
-                    sx={{
-                      pl: 3, py: 1, borderRadius: '8px', mb: 0.25,
-                      backgroundColor: subActive ? 'rgba(229,57,53,0.35)' : 'transparent',
-                      '&:hover': { backgroundColor: subActive ? 'rgba(229,57,53,0.45)' : '#2A2A2A' },
-                    }}
-                  >
-                    <ListItemIcon sx={{ color: subActive ? '#fff' : '#999', minWidth: 36 }}>
-                      {sub.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={sub.text}
-                      primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: subActive ? 600 : 400 }}
-                    />
-                  </ListItemButton>
-                );
-              })}
-            </List>
-          </Collapse>
-          </>
+              <Collapse in={sprintsNavOpen} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {SPRINTS_SUBITEMS.map((sub) => {
+                    const subActive = activePage === sub.id;
+                    return (
+                      <ListItemButton
+                        key={sub.id}
+                        onClick={() => setActivePage(sub.id)}
+                        sx={{
+                          pl: 3,
+                          py: 1,
+                          borderRadius: '8px',
+                          mb: 0.25,
+                          backgroundColor: subActive ? 'rgba(229,57,53,0.35)' : 'transparent',
+                          '&:hover': {
+                            backgroundColor: subActive ? 'rgba(229,57,53,0.45)' : '#2A2A2A',
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: subActive ? '#fff' : '#999', minWidth: 36 }}>
+                          {sub.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={sub.text}
+                          primaryTypographyProps={{
+                            fontSize: '0.8125rem',
+                            fontWeight: subActive ? 600 : 400,
+                          }}
+                        />
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              </Collapse>
+            </>
           ) : null}
 
           {secondaryNavItems.map((item) => (
             <ListItemButton
               key={item.id}
-              onClick={() => item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)}
+              onClick={() =>
+                item.id === 'selector' ? handleChangeProject() : setActivePage(item.id)
+              }
               sx={{
-                borderRadius: '8px', mb: 0.5, py: 1.1,
+                borderRadius: '8px',
+                mb: 0.5,
+                py: 1.1,
                 backgroundColor: activePage === item.id ? '#E53935' : 'transparent',
                 '&:hover': { backgroundColor: activePage === item.id ? '#C62828' : '#2A2A2A' },
                 transition: 'background-color 0.15s ease',
@@ -671,7 +730,10 @@ function App() {
               </ListItemIcon>
               <ListItemText
                 primary={item.text}
-                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: activePage === item.id ? 600 : 400 }}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: activePage === item.id ? 600 : 400,
+                }}
               />
             </ListItemButton>
           ))}
@@ -680,7 +742,16 @@ function App() {
         {/* ─── Footer del drawer ─── */}
         <Box sx={{ borderTop: `1px solid ${drawerBorder}` }}>
           {/* Botón dark mode */}
-          <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box
+            sx={{
+              px: 2,
+              pt: 1.5,
+              pb: 0.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
             <Typography sx={{ fontSize: '0.72rem', color: '#666' }}>
               {darkMode ? 'Dark mode' : 'Light mode'}
             </Typography>
@@ -697,7 +768,11 @@ function App() {
                   transition: 'all 0.2s ease',
                 }}
               >
-                {darkMode ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
+                {darkMode ? (
+                  <Brightness7Icon fontSize="small" />
+                ) : (
+                  <Brightness4Icon fontSize="small" />
+                )}
               </IconButton>
             </Tooltip>
           </Box>
@@ -718,14 +793,28 @@ function App() {
                 }}
               >
                 {uploadingPhoto ? (
-                  <Box sx={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <CircularProgress size={20} sx={{ color: '#E53935' }} />
                   </Box>
                 ) : (
                   <>
                     <Avatar
                       src={profilePicture || undefined}
-                      sx={{ bgcolor: '#E53935', width: 34, height: 34, fontSize: '0.75rem', fontWeight: 700 }}
+                      sx={{
+                        bgcolor: '#E53935',
+                        width: 34,
+                        height: 34,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}
                     >
                       {!profilePicture && getInitials(user.name)}
                     </Avatar>
@@ -753,10 +842,16 @@ function App() {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>{user.name}</Typography>
-              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>{getProfileRoleLabel(user.role, user.jobTitle)}</Typography>
+              <Typography sx={{ color: '#888', fontSize: '0.7rem' }}>
+                {getProfileRoleLabel(user.role, user.jobTitle)}
+              </Typography>
             </Box>
 
-            <IconButton size="small" sx={{ color: '#666' }} onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <IconButton
+              size="small"
+              sx={{ color: '#666' }}
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+            >
               <MoreVertIcon fontSize="small" />
             </IconButton>
 
@@ -788,18 +883,20 @@ function App() {
         component="main"
         sx={{
           position: 'fixed',
-          top: 0, right: 0, bottom: 0, left: `${DRAWER_WIDTH}px`,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: `${DRAWER_WIDTH}px`,
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          pt: 2, px: 4, pb: 4,
+          pt: 2,
+          px: 4,
+          pb: 4,
           boxSizing: 'border-box',
           bgcolor: 'background.default',
         }}
       >
-        <ProjectDataProvider
-          projectId={selectedProjectId}
-          preload={Boolean(selectedProjectId)}
-        >
+        <ProjectDataProvider projectId={selectedProjectId} preload={Boolean(selectedProjectId)}>
           <Suspense fallback={<PageLoader />}>
             {visitedPages.has('dashboard') && (
               <Box sx={pageVisibilitySx('dashboard')}>
@@ -858,11 +955,7 @@ function App() {
             )}
             {visitedPages.has('my-kanban') && (
               <Box sx={pageVisibilitySx('my-kanban')}>
-                <TasksPage
-                  projectId={selectedProjectId}
-                  developerMode
-                  currentUser={user}
-                />
+                <TasksPage projectId={selectedProjectId} developerMode currentUser={user} />
               </Box>
             )}
             {visitedPages.has('my-performance') && (
@@ -877,9 +970,24 @@ function App() {
             )}
           </Suspense>
         </ProjectDataProvider>
-        {!['dashboard', 'sprints', 'analytics', 'tasks', 'ai-insights', 'team', 'my-tasks', 'my-kanban', 'my-blockers', 'my-performance'].includes(activePage) && (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-            <Typography variant="h6" color="textSecondary">Section under development</Typography>
+        {![
+          'dashboard',
+          'sprints',
+          'analytics',
+          'tasks',
+          'ai-insights',
+          'team',
+          'my-tasks',
+          'my-kanban',
+          'my-blockers',
+          'my-performance',
+        ].includes(activePage) && (
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}
+          >
+            <Typography variant="h6" color="textSecondary">
+              Section under development
+            </Typography>
           </Box>
         )}
       </Box>

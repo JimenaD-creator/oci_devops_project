@@ -42,9 +42,7 @@ test('rejects negative hours without calling onConfirm', async () => {
   const user = userEvent.setup();
   const onConfirm = vi.fn();
 
-  renderWithTheme(
-    <LogWorkedHoursDialog open onConfirm={onConfirm} onCancel={vi.fn()} />,
-  );
+  renderWithTheme(<LogWorkedHoursDialog open onConfirm={onConfirm} onCancel={vi.fn()} />);
 
   await user.type(screen.getByLabelText('Hours worked'), '-1');
   await user.click(screen.getByRole('button', { name: 'Mark done' }));
@@ -57,9 +55,7 @@ test('cancel calls onCancel when not submitting', async () => {
   const user = userEvent.setup();
   const onCancel = vi.fn();
 
-  renderWithTheme(
-    <LogWorkedHoursDialog open onConfirm={vi.fn()} onCancel={onCancel} />,
-  );
+  renderWithTheme(<LogWorkedHoursDialog open onConfirm={vi.fn()} onCancel={onCancel} />);
 
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(onCancel).toHaveBeenCalledTimes(1);
@@ -69,9 +65,7 @@ test('allows zero hours', async () => {
   const user = userEvent.setup();
   const onConfirm = vi.fn().mockResolvedValue(undefined);
 
-  renderWithTheme(
-    <LogWorkedHoursDialog open onConfirm={onConfirm} onCancel={vi.fn()} />,
-  );
+  renderWithTheme(<LogWorkedHoursDialog open onConfirm={onConfirm} onCancel={vi.fn()} />);
 
   await user.type(screen.getByLabelText('Hours worked'), '0');
   await user.click(screen.getByRole('button', { name: 'Mark done' }));

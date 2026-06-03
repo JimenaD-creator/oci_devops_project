@@ -17,9 +17,7 @@ export function filterUserTasksForUser(userTasks, userId) {
 
 export function taskIdsForUser(userTasks, userId) {
   return new Set(
-    filterUserTasksForUser(userTasks, userId)
-      .map(userTaskRowTaskId)
-      .filter(Number.isFinite),
+    filterUserTasksForUser(userTasks, userId).map(userTaskRowTaskId).filter(Number.isFinite),
   );
 }
 

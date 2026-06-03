@@ -26,10 +26,7 @@ describe('sprintComparisonUtils', () => {
   });
 
   it('sortSprintsChronologically orders by due date', () => {
-    const sorted = sortSprintsChronologically([
-      sprint(2, '2026-06-01'),
-      sprint(1, '2026-05-01'),
-    ]);
+    const sorted = sortSprintsChronologically([sprint(2, '2026-06-01'), sprint(1, '2026-05-01')]);
     expect(sorted.map((s) => s.id)).toEqual([1, 2]);
   });
 

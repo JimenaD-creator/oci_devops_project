@@ -17,10 +17,7 @@ import {
 } from '../features/dashboard/dashboardSprintData';
 import { fetchProjectDevelopers } from '../features/dashboard/projectApi';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
-import {
-  markTasksSyncCaughtUp,
-  TASKS_MUTATED_EVENT,
-} from '../utils/taskSyncEvents';
+import { markTasksSyncCaughtUp, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
 
 const SSE_CONNECT_DELAY_MS = 2500;
 /** Minimum gap between SSE-driven force refreshes (avoids reload storms). */
@@ -41,7 +38,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     Array.isArray(initialSnap?.enrichedSprints) ? initialSnap.enrichedSprints : [],
   );
   const [taskCount, setTaskCount] = useState(() =>
-    Array.isArray(initialSnap?.tasks) ? initialSnap.tasks.length : initialSnap?.taskCount ?? 0,
+    Array.isArray(initialSnap?.tasks) ? initialSnap.tasks.length : (initialSnap?.taskCount ?? 0),
   );
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -202,10 +199,12 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
             appliedOptimistic = true;
           }
         }
-        invalidateAndRefreshRef.current?.({
-          silent: true,
-          confirmOnly: appliedOptimistic,
-        }).catch(() => {});
+        invalidateAndRefreshRef
+          .current?.({
+            silent: true,
+            confirmOnly: appliedOptimistic,
+          })
+          .catch(() => {});
       });
     }, SSE_CONNECT_DELAY_MS);
 
@@ -251,10 +250,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
   }, [invalidateAndRefresh, pid, applySnapshot]);
 
-  const getRawBundle = useCallback(
-    (options = {}) => fetchProjectBundleRaw(pid, options),
-    [pid],
-  );
+  const getRawBundle = useCallback((options = {}) => fetchProjectBundleRaw(pid, options), [pid]);
 
   const value = useMemo(
     () => ({
@@ -286,9 +282,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     ],
   );
 
-  return (
-    <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>
-  );
+  return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;
 }
 
 export function useProjectData() {

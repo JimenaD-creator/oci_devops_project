@@ -61,7 +61,7 @@ export default function TeamWorkloadBreakdown({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const aiOverloadMap = useMemo(
     () => buildAiOverloadMap(aiDeveloperInsights),
     [aiDeveloperInsights],

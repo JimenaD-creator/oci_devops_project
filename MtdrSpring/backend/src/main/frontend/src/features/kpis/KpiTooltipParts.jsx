@@ -8,10 +8,10 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 export const TOOLTIP_OUTLINE_RED = '#C74634';
 
 // Colores que ahora serán dinámicos según el tema
-const getTooltipTextColor = (isDark) => isDark ? '#F0F0F0' : '#424242';
-const getTooltipCalcColor = (isDark) => isDark ? '#90CAF9' : '#1565C0';
-const getTooltipBgColor = (isDark) => isDark ? '#1C1E22' : '#FFFFFF';
-const getTooltipArrowColor = (isDark) => isDark ? '#1C1E22' : '#FFFFFF';
+const getTooltipTextColor = (isDark) => (isDark ? '#F0F0F0' : '#424242');
+const getTooltipCalcColor = (isDark) => (isDark ? '#90CAF9' : '#1565C0');
+const getTooltipBgColor = (isDark) => (isDark ? '#1C1E22' : '#FFFFFF');
+const getTooltipArrowColor = (isDark) => (isDark ? '#1C1E22' : '#FFFFFF');
 
 /** MUI Tooltip `componentsProps.tooltip.sx` + rounded red border */
 export const getTooltipChromeSx = (isDark) => ({
@@ -37,7 +37,7 @@ function FormulaFraction({ label, numerator, denominator, suffix }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const calcColor = getTooltipCalcColor(isDark);
-  
+
   return (
     <Box sx={{ color: calcColor, textAlign: 'center' }}>
       {label ? (
@@ -86,7 +86,7 @@ function FormulaPlain({ text }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const calcColor = getTooltipCalcColor(isDark);
-  
+
   return (
     <Typography
       component="div"
@@ -149,7 +149,7 @@ export function KpiTooltipBody({ what, representation, formula }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const textColor = getTooltipTextColor(isDark);
-  
+
   return (
     <Box sx={{ maxWidth: 300 }}>
       <Typography
@@ -322,7 +322,9 @@ export function KpiInfoCornerButton({
           transition: 'transform 0.12s ease, background-color 0.15s ease, box-shadow 0.2s ease',
           '&:hover': {
             bgcolor: isDark ? 'rgba(199, 70, 52, 0.15)' : 'rgba(199, 70, 52, 0.08)',
-            boxShadow: isDark ? '0 2px 8px rgba(199, 70, 52, 0.3)' : '0 2px 8px rgba(199, 70, 52, 0.2)',
+            boxShadow: isDark
+              ? '0 2px 8px rgba(199, 70, 52, 0.3)'
+              : '0 2px 8px rgba(199, 70, 52, 0.2)',
             animation: 'none',
             transform: isInline ? 'none' : 'scale(1.05)',
           },

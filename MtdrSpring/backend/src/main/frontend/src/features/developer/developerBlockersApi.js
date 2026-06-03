@@ -1,41 +1,1 @@
-import { API_BASE } from '../sprints/constants/sprintConstants';
-
-/**
- * @returns {Promise<Array<{ taskId, taskTitle, sprintId, blockedReason, reportedAt, resolved?: boolean, status?: string }>>}
- */
-export async function fetchMyBlockers(userId, projectId) {
-  const uid = Number(userId);
-  const pid = Number(projectId);
-  if (!Number.isFinite(uid) || !Number.isFinite(pid)) {
-    return [];
-  }
-  const res = await fetch(
-    `${API_BASE}/api/user-tasks/my-blockers?userId=${uid}&projectId=${pid}`,
-    { cache: 'no-store', headers: { Accept: 'application/json' } },
-  );
-  if (!res.ok) {
-    throw new Error(`Could not load blocker reports (${res.status})`);
-  }
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-/**
- * Clears the active block for this assignee; keeps blockedReason in history.
- * @returns {Promise<object>}
- */
-export async function resolveMyBlocker(userId, taskId) {
-  const uid = Number(userId);
-  const tid = Number(taskId);
-  if (!Number.isFinite(uid) || !Number.isFinite(tid)) {
-    throw new Error('Invalid user or task.');
-  }
-  const res = await fetch(
-    `${API_BASE}/api/user-tasks/my-blockers/resolve?userId=${uid}&taskId=${tid}`,
-    { method: 'POST', headers: { Accept: 'application/json' } },
-  );
-  if (!res.ok) {
-    throw new Error(`Could not mark blocker as resolved (${res.status})`);
-  }
-  return res.json();
-}
+import { API_BASE } from '../sprints/constants/sprintConstants';/** * @returns {Promise<Array<{ taskId, taskTitle, sprintId, blockedReason, reportedAt, resolved?: boolean, status?: string }>>} */export async function fetchMyBlockers(userId, projectId) {  const uid = Number(userId);  const pid = Number(projectId);  if (!Number.isFinite(uid) || !Number.isFinite(pid)) {    return [];  }  const res = await fetch(    `${API_BASE}/api/user-tasks/my-blockers?userId=${uid}&projectId=${pid}`,    { cache: 'no-store', headers: { Accept: 'application/json' } },  );  if (!res.ok) {    throw new Error(`Could not load blocker reports (${res.status})`);  }  const data = await res.json();  return Array.isArray(data) ? data : [];}/** * Clears the active block for this assignee; keeps blockedReason in history. * @returns {Promise<object>} */export async function resolveMyBlocker(userId, taskId) {  const uid = Number(userId);  const tid = Number(taskId);  if (!Number.isFinite(uid) || !Number.isFinite(tid)) {    throw new Error('Invalid user or task.');  }  const res = await fetch(    `${API_BASE}/api/user-tasks/my-blockers/resolve?userId=${uid}&taskId=${tid}`,    { method: 'POST', headers: { Accept: 'application/json' } },  );  if (!res.ok) {    throw new Error(`Could not mark blocker as resolved (${res.status})`);  }  return res.json();}

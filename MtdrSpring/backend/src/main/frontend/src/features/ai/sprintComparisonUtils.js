@@ -123,8 +123,7 @@ function buildMultiPriorMetricRow(key, label, priorBundles, currentBundle) {
     previous: lastPrior,
     current,
     delta: deltaVsLastPrior,
-    deltaLabel:
-      deltaVsLastPrior == null ? '—' : formatPercentPointDelta(deltaVsLastPrior),
+    deltaLabel: deltaVsLastPrior == null ? '—' : formatPercentPointDelta(deltaVsLastPrior),
     tone: deltaVsLastPrior == null ? 'neutral' : deltaTone(deltaVsLastPrior),
     isPercent: true,
   };

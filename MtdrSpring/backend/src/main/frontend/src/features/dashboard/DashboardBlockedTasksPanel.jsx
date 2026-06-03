@@ -5,34 +5,34 @@ import { useTheme } from '@mui/material/styles';
 import { formatBlockedSinceAge, sortBlockedTasksNewestFirst } from './dashboardSprintData';
 
 function severityColors(count, isDark) {
-  if (count >= 4) { 
-    return { 
-      bg: isDark ? '#2D1A1A' : '#FFEBEE', 
-      border: isDark ? '#7F3030' : '#EF9A9A', 
-      fg: isDark ? '#EF9A9A' : '#B71C1C', 
-      chipBg: isDark ? '#C62828' : '#C62828' 
+  if (count >= 4) {
+    return {
+      bg: isDark ? '#2D1A1A' : '#FFEBEE',
+      border: isDark ? '#7F3030' : '#EF9A9A',
+      fg: isDark ? '#EF9A9A' : '#B71C1C',
+      chipBg: isDark ? '#C62828' : '#C62828',
     };
   }
-  if (count >= 2) { 
-    return { 
-      bg: isDark ? '#2D1F12' : '#FFF3E0', 
-      border: isDark ? '#7F4A1A' : '#FFCC80', 
-      fg: isDark ? '#FFB74D' : '#E65100', 
-      chipBg: isDark ? '#EF6C00' : '#EF6C00' 
+  if (count >= 2) {
+    return {
+      bg: isDark ? '#2D1F12' : '#FFF3E0',
+      border: isDark ? '#7F4A1A' : '#FFCC80',
+      fg: isDark ? '#FFB74D' : '#E65100',
+      chipBg: isDark ? '#EF6C00' : '#EF6C00',
     };
   }
-  return { 
-    bg: isDark ? '#2D2616' : '#FFF8E1', 
-    border: isDark ? '#7F6A1A' : '#FFE082', 
-    fg: isDark ? '#FFD54F' : '#F57F17', 
-    chipBg: isDark ? '#FB8C00' : '#FB8C00' 
+  return {
+    bg: isDark ? '#2D2616' : '#FFF8E1',
+    border: isDark ? '#7F6A1A' : '#FFE082',
+    fg: isDark ? '#FFD54F' : '#F57F17',
+    chipBg: isDark ? '#FB8C00' : '#FB8C00',
   };
 }
 
 export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const byDeveloper = new Map();
 
   (selectedSprints || []).forEach((sp) => {
@@ -96,14 +96,18 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                 <Box sx={{ minWidth: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <AlertTriangle size={16} color={palette.fg} />
-                    <Typography sx={{ fontWeight: 800, color: 'text.primary' }}>{dev.name}</Typography>
+                    <Typography sx={{ fontWeight: 800, color: 'text.primary' }}>
+                      {dev.name}
+                    </Typography>
                     <Chip
                       size="small"
                       label={`${dev.blockedCount} blocked`}
                       sx={{ bgcolor: palette.chipBg, color: '#fff', fontWeight: 700, height: 22 }}
                     />
                   </Box>
-                  <Typography sx={{ fontSize: '0.82rem', color: isDark ? '#9A9A9A' : '#546E7A', mb: 0.75 }}>
+                  <Typography
+                    sx={{ fontSize: '0.82rem', color: isDark ? '#9A9A9A' : '#546E7A', mb: 0.75 }}
+                  >
                     Oldest blocked: {formatBlockedSinceAge(oldest)}
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
@@ -111,11 +115,19 @@ export default function DashboardBlockedTasksPanel({ selectedSprints = [] }) {
                       const reason = String(t?.blockedReason || '').trim();
                       return (
                         <Box key={t.id}>
-                          <Typography sx={{ fontSize: '0.84rem', color: isDark ? '#E0E0E0' : '#37474F' }}>
+                          <Typography
+                            sx={{ fontSize: '0.84rem', color: isDark ? '#E0E0E0' : '#37474F' }}
+                          >
                             {t.title}
                           </Typography>
                           {reason ? (
-                            <Typography sx={{ fontSize: '0.78rem', color: isDark ? '#9A9A9A' : '#607D8B', pl: 0 }}>
+                            <Typography
+                              sx={{
+                                fontSize: '0.78rem',
+                                color: isDark ? '#9A9A9A' : '#607D8B',
+                                pl: 0,
+                              }}
+                            >
                               Reason: {reason}
                             </Typography>
                           ) : null}

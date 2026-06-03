@@ -61,7 +61,7 @@ function OnTimeChip({ item, isDark }) {
       label={ok ? 'Yes' : 'No'}
       size="small"
       sx={{
-        bgcolor: ok ? (isDark ? '#1A4A2A' : '#E8F5E9') : (isDark ? '#4A1A1A' : '#FFEBEE'),
+        bgcolor: ok ? (isDark ? '#1A4A2A' : '#E8F5E9') : isDark ? '#4A1A1A' : '#FFEBEE',
         color: ok ? '#2E7D32' : '#C62828',
         fontWeight: 700,
         fontSize: '0.7rem',
@@ -144,7 +144,6 @@ function DevChip({ developer, isDark }) {
 function DevelopersCell({ item, developers, developer, assigneeProgress, managerView, isDark }) {
   const theme = useTheme();
   const darkMode = theme.palette.mode === 'dark';
-  
   if (managerView && Array.isArray(assigneeProgress) && assigneeProgress.length > 1) {
     return (
       <Stack spacing={0.65} sx={{ py: 0.35 }}>
@@ -230,7 +229,13 @@ function DevelopersCell({ item, developers, developer, assigneeProgress, manager
                     lineHeight: 1.25,
                     whiteSpace: 'nowrap',
                     color: onTimeResult ? '#1B5E20' : '#B71C1C',
-                    bgcolor: onTimeResult ? (darkMode ? '#1A4A2A' : '#E8F5E9') : (darkMode ? '#4A1A1A' : '#FFEBEE'),
+                    bgcolor: onTimeResult
+                      ? darkMode
+                        ? '#1A4A2A'
+                        : '#E8F5E9'
+                      : darkMode
+                        ? '#4A1A1A'
+                        : '#FFEBEE',
                     borderLeft: `3px solid ${onTimeResult ? '#43A047' : '#E53935'}`,
                   }}
                 >
@@ -315,7 +320,11 @@ function taskStatusChipProps(item, isDark) {
   if (st === 'PENDING') {
     return { label: statusText(item), bgcolor: isDark ? '#4A2A1A' : '#FFF3E0', color: '#E65100' };
   }
-  return { label: statusText(item), bgcolor: isDark ? '#2A2C32' : '#ECEFF1', color: isDark ? '#9A9A9A' : '#455A64' };
+  return {
+    label: statusText(item),
+    bgcolor: isDark ? '#2A2C32' : '#ECEFF1',
+    color: isDark ? '#9A9A9A' : '#455A64',
+  };
 }
 
 function getPriorityChipProps(priority, isDark) {
@@ -384,11 +393,15 @@ export default function TaskTable({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const managerView = variant === 'manager';
   const developerView = variant === 'developer';
   const hasActions = Boolean(onComplete || onUndo || onDelete);
-  const baseLayout = developerView ? DEVELOPER_LAYOUT : managerView ? MANAGER_LAYOUT : DEFAULT_LAYOUT;
+  const baseLayout = developerView
+    ? DEVELOPER_LAYOUT
+    : managerView
+      ? MANAGER_LAYOUT
+      : DEFAULT_LAYOUT;
   const layout = hasActions
     ? baseLayout
     : {
@@ -448,7 +461,12 @@ export default function TaskTable({
             <TableRow>
               <TableCell
                 colSpan={colSpanEmpty}
-                sx={{ textAlign: 'center', py: 4, color: isDark ? '#5A5A5A' : '#CCC', fontSize: '0.85rem' }}
+                sx={{
+                  textAlign: 'center',
+                  py: 4,
+                  color: isDark ? '#5A5A5A' : '#CCC',
+                  fontSize: '0.85rem',
+                }}
               >
                 No tasks
               </TableCell>
@@ -467,8 +485,16 @@ export default function TaskTable({
                 onClick={clickable ? () => onRowClick(item) : undefined}
                 sx={{
                   '&:last-child td': { border: 0 },
-                  '&:nth-of-type(odd)': { bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(248, 251, 255, 0.6)' },
-                  '&:hover': { bgcolor: clickable ? (isDark ? 'rgba(199, 70, 52, 0.12)' : 'rgba(199, 70, 52, 0.06)') : undefined },
+                  '&:nth-of-type(odd)': {
+                    bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(248, 251, 255, 0.6)',
+                  },
+                  '&:hover': {
+                    bgcolor: clickable
+                      ? isDark
+                        ? 'rgba(199, 70, 52, 0.12)'
+                        : 'rgba(199, 70, 52, 0.06)'
+                      : undefined,
+                  },
                   ...(clickable ? { cursor: 'pointer' } : {}),
                 }}
               >
@@ -531,10 +557,24 @@ export default function TaskTable({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(4) }}>
+                <TableCell
+                  sx={{
+                    px: 1.5,
+                    fontSize: '0.85rem',
+                    color: isDark ? '#9A9A9A' : '#666',
+                    ...columnCellSx(4),
+                  }}
+                >
                   {item.assignedHours != null ? `${item.assignedHours}h` : '—'}
                 </TableCell>
-                <TableCell sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(5) }}>
+                <TableCell
+                  sx={{
+                    px: 1.5,
+                    fontSize: '0.85rem',
+                    color: isDark ? '#9A9A9A' : '#666',
+                    ...columnCellSx(5),
+                  }}
+                >
                   {item.actualHours != null && Number(item.actualHours) > 0
                     ? `${item.actualHours}h`
                     : '—'}
@@ -542,7 +582,12 @@ export default function TaskTable({
                 {managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(6) }}
+                      sx={{
+                        px: 1.5,
+                        fontSize: '0.85rem',
+                        color: isDark ? '#9A9A9A' : '#666',
+                        ...columnCellSx(6),
+                      }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
@@ -551,16 +596,26 @@ export default function TaskTable({
                         label={completionOnTimeDisplay(item)}
                         size="small"
                         sx={{
-                          bgcolor: completionOnTimeDisplay(item) === 'Yes'
-                            ? (isDark ? '#1A4A2A' : '#E8F5E9')
-                            : completionOnTimeDisplay(item) === 'No'
-                              ? (isDark ? '#4A1A1A' : '#FFEBEE')
-                              : (isDark ? '#2A2C32' : '#F5F5F5'),
-                          color: completionOnTimeDisplay(item) === 'Yes'
-                            ? '#2E7D32'
-                            : completionOnTimeDisplay(item) === 'No'
-                              ? '#C62828'
-                              : (isDark ? '#9A9A9A' : '#757575'),
+                          bgcolor:
+                            completionOnTimeDisplay(item) === 'Yes'
+                              ? isDark
+                                ? '#1A4A2A'
+                                : '#E8F5E9'
+                              : completionOnTimeDisplay(item) === 'No'
+                                ? isDark
+                                  ? '#4A1A1A'
+                                  : '#FFEBEE'
+                                : isDark
+                                  ? '#2A2C32'
+                                  : '#F5F5F5',
+                          color:
+                            completionOnTimeDisplay(item) === 'Yes'
+                              ? '#2E7D32'
+                              : completionOnTimeDisplay(item) === 'No'
+                                ? '#C62828'
+                                : isDark
+                                  ? '#9A9A9A'
+                                  : '#757575',
                           fontWeight: 700,
                           fontSize: '0.72rem',
                           height: 22,
@@ -572,7 +627,12 @@ export default function TaskTable({
                 {!managerView && (
                   <>
                     <TableCell
-                      sx={{ px: 1.5, fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#666', ...columnCellSx(6) }}
+                      sx={{
+                        px: 1.5,
+                        fontSize: '0.85rem',
+                        color: isDark ? '#9A9A9A' : '#666',
+                        ...columnCellSx(6),
+                      }}
                     >
                       {fmtDate(item.dueDate)}
                     </TableCell>
@@ -584,16 +644,26 @@ export default function TaskTable({
                         label={completionOnTimeDisplay(item)}
                         size="small"
                         sx={{
-                          bgcolor: completionOnTimeDisplay(item) === 'Yes'
-                            ? (isDark ? '#1A4A2A' : '#E8F5E9')
-                            : completionOnTimeDisplay(item) === 'No'
-                              ? (isDark ? '#4A1A1A' : '#FFEBEE')
-                              : (isDark ? '#2A2C32' : '#F5F5F5'),
-                          color: completionOnTimeDisplay(item) === 'Yes'
-                            ? '#2E7D32'
-                            : completionOnTimeDisplay(item) === 'No'
-                              ? '#C62828'
-                              : (isDark ? '#9A9A9A' : '#757575'),
+                          bgcolor:
+                            completionOnTimeDisplay(item) === 'Yes'
+                              ? isDark
+                                ? '#1A4A2A'
+                                : '#E8F5E9'
+                              : completionOnTimeDisplay(item) === 'No'
+                                ? isDark
+                                  ? '#4A1A1A'
+                                  : '#FFEBEE'
+                                : isDark
+                                  ? '#2A2C32'
+                                  : '#F5F5F5',
+                          color:
+                            completionOnTimeDisplay(item) === 'Yes'
+                              ? '#2E7D32'
+                              : completionOnTimeDisplay(item) === 'No'
+                                ? '#C62828'
+                                : isDark
+                                  ? '#9A9A9A'
+                                  : '#757575',
                           fontWeight: 700,
                           fontSize: '0.72rem',
                           height: 22,

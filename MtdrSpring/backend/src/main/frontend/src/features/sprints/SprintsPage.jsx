@@ -70,7 +70,7 @@ import {
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
@@ -162,8 +162,10 @@ export default function SprintsPage({ projectId }) {
       const forceFresh = opts.forceFresh === true;
       if (!silent) setLoading(true);
       try {
-        const { sprintsList, tasksList, userTasksList } =
-          await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
+        const { sprintsList, tasksList, userTasksList } = await fetchSprintsTasksAndAssignments(
+          projectId,
+          { forceFresh },
+        );
         const deleted = new Set([
           ...recentlyDeletedTaskIdsRef.current,
           ...getRecentlyDeletedTaskIdSet(),
@@ -171,12 +173,9 @@ export default function SprintsPage({ projectId }) {
         const createdTasks = getRecentlyCreatedTasks();
         const baseTasks = Array.isArray(tasksList) ? tasksList : [];
         const mergedTasks = [...createdTasks, ...baseTasks].filter(
-          (task, index, arr) =>
-            arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+          (task, index, arr) => arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
         );
-        const visibleTasks = mergedTasks.filter(
-          (t) => !deleted.has(taskEntityId(t)),
-        );
+        const visibleTasks = mergedTasks.filter((t) => !deleted.has(taskEntityId(t)));
         const visibleUserTasks = mergeUserTaskLists(
           getRecentlyCreatedUserTasks(),
           Array.isArray(userTasksList) ? userTasksList : [],
@@ -640,13 +639,13 @@ export default function SprintsPage({ projectId }) {
                   }}
                   sx={{ flex: '0 0 320px', minWidth: 280, maxWidth: 360, scrollSnapAlign: 'start' }}
                 >
-<SprintCard
-  sprint={sprint}
-  tasks={tasks}
-  isSelected={selectedSprint?.id === sprint.id}
-  onClick={() => setSelectedSprint(sprint)}
-  sprintNumber={sprintNumberMap.get(sprint.id)}
-/>
+                  <SprintCard
+                    sprint={sprint}
+                    tasks={tasks}
+                    isSelected={selectedSprint?.id === sprint.id}
+                    onClick={() => setSelectedSprint(sprint)}
+                    sprintNumber={sprintNumberMap.get(sprint.id)}
+                  />
                 </Box>
               ))}
             </Box>
@@ -661,7 +660,7 @@ export default function SprintsPage({ projectId }) {
                 display: 'block',
               }}
             >
-{selectedSprint
+              {selectedSprint
                 ? `Tasks · ${formatSprintLabel(sprintNumberMap, selectedSprint.id) || `Sprint ${selectedSprint.id}`}`
                 : 'Tasks'}
             </Typography>

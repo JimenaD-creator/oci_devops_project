@@ -249,7 +249,9 @@ const fullColumns = [
 ];
 
 function normalizeDeveloperName(name) {
-  return String(name ?? '').trim().toLowerCase();
+  return String(name ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function SprintMetricsTable({
@@ -262,7 +264,7 @@ function SprintMetricsTable({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
@@ -319,9 +321,7 @@ function SprintMetricsTable({
 
   const filtered = useMemo(
     () =>
-      hideSearch
-        ? rows
-        : rows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
+      hideSearch ? rows : rows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
     [rows, search, hideSearch],
   );
 
@@ -384,9 +384,7 @@ function SprintMetricsTable({
   };
 
   const participationAvgForSprint = (spId) => {
-    const nums = sorted
-      .map((r) => r[`${spId}_participation`])
-      .filter((v) => typeof v === 'number');
+    const nums = sorted.map((r) => r[`${spId}_participation`]).filter((v) => typeof v === 'number');
     if (!nums.length) return null;
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
@@ -758,7 +756,7 @@ function SprintMetricsTable({
 function FullAnalyticsTable() {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
 

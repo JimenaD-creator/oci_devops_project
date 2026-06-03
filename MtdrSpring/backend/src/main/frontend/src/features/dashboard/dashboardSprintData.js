@@ -660,7 +660,9 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     ]);
 
     if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) {
-      const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
+      const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find(
+        (s) => s >= 400,
+      );
       const err = new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
       err.httpStatus = status;
       if (isUnauthorizedHttpStatus(status)) {
@@ -765,9 +767,7 @@ export function applyOptimisticTaskCreated(projectId, task, userTasks = []) {
   }
   cachedData.tasks = tasks;
 
-  const existingKeys = new Set(
-    (cachedData.userTasks || []).map(userTaskRowKey).filter(Boolean),
-  );
+  const existingKeys = new Set((cachedData.userTasks || []).map(userTaskRowKey).filter(Boolean));
   const extraRows = Array.isArray(userTasks) ? userTasks : [];
   const mergedUserTasks = [...(cachedData.userTasks || [])];
   for (const ut of extraRows) {
@@ -1036,14 +1036,12 @@ export function sprintDbIdSortKey(sp) {
  * @param {object[]} selectedSprints
  */
 export function buildTeamProductivityTrendSeries(selectedSprints) {
-  const sprints = [...(selectedSprints || [])]
-    .filter(Boolean)
-    .sort((a, b) => {
-      const ta = new Date(a?.startDate ?? 0).getTime();
-      const tb = new Date(b?.startDate ?? 0).getTime();
-      if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
-      return sprintDbIdSortKey(a) - sprintDbIdSortKey(b);
-    });
+  const sprints = [...(selectedSprints || [])].filter(Boolean).sort((a, b) => {
+    const ta = new Date(a?.startDate ?? 0).getTime();
+    const tb = new Date(b?.startDate ?? 0).getTime();
+    if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
+    return sprintDbIdSortKey(a) - sprintDbIdSortKey(b);
+  });
 
   return sprints.map((sp, idx) => {
     const kpis = sp.kpis ?? {};
@@ -1072,7 +1070,7 @@ export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelop
 
   const sprintDefs = sprints.map((sp, idx) => ({
     id: Number(sp.id),
-shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
+    shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 

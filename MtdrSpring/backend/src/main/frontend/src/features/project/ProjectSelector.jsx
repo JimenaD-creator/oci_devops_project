@@ -35,7 +35,8 @@ import { TEAM_MEMBER_TYPE_SUGGESTIONS } from '../../utils/userRoleUtils';
 import { getApiBase } from '../../utils/apiBase';
 import { apiFetch } from '../../utils/auth';
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : getApiBase() || '';
+const API_BASE =
+  process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : getApiBase() || '';
 
 // Colapsa el array de userDetails (que tiene una fila por user+proyecto)
 // en una sola fila por usuario, juntando los proyectos en un array
@@ -92,9 +93,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const [userSearch, setUserSearch] = useState('');
 
   // Modals: búsqueda inline para elegir equipos, usuarios y proyectos
-  const [teamSearch, setTeamSearch]       = useState('');   // modal New Project → filtrar equipos
-  const [managerSearch, setManagerSearch] = useState('');   // modal New Team    → filtrar managers
-  const [memberSearch, setMemberSearch]   = useState('');   // modal Assign      → filtrar usuarios
+  const [teamSearch, setTeamSearch] = useState(''); // modal New Project → filtrar equipos
+  const [managerSearch, setManagerSearch] = useState(''); // modal New Team    → filtrar managers
+  const [memberSearch, setMemberSearch] = useState(''); // modal Assign      → filtrar usuarios
   const [assignTeamSearch, setAssignTeamSearch] = useState(''); // modal Assign  → filtrar equipos
 
   const fetchData = async () => {
@@ -202,9 +203,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const handleAction = async () => {
     let endpoint = '';
     if (openModal === 'project') endpoint = '/api/admin/projects';
-    if (openModal === 'team')    endpoint = '/api/admin/teams';
-    if (openModal === 'member')  endpoint = '/api/admin/teams/members';
-    if (openModal === 'user')    endpoint = '/users/create';
+    if (openModal === 'team') endpoint = '/api/admin/teams';
+    if (openModal === 'member') endpoint = '/api/admin/teams/members';
+    if (openModal === 'user') endpoint = '/users/create';
 
     try {
       // Sin hash aquí — el backend (UserService.saveUser) ya hashea con BCrypt
@@ -337,15 +338,17 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
       const role = (u.role || '').toUpperCase();
       return role === 'MANAGER' || role.includes('MANAGER');
     })
-    .filter((u) =>
-      (u.name || '').toLowerCase().includes(managerSearch.toLowerCase()) ||
-      String(u.id).includes(managerSearch),
+    .filter(
+      (u) =>
+        (u.name || '').toLowerCase().includes(managerSearch.toLowerCase()) ||
+        String(u.id).includes(managerSearch),
     );
 
   // Modal Assign Member → lista de usuarios
-  const usersForMember = userDetails.filter((u) =>
-    (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-    String(u.id).includes(memberSearch),
+  const usersForMember = userDetails.filter(
+    (u) =>
+      (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+      String(u.id).includes(memberSearch),
   );
 
   // Modal Assign Member → lista de equipos
@@ -396,7 +399,13 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   };
 
   // ── Subcomponente: lista seleccionable dentro de modals ──────────────────────
-  const SelectableList = ({ items, selectedId, onSelect: onSelectItem, labelKey = 'name', emptyText = 'No results' }) => (
+  const SelectableList = ({
+    items,
+    selectedId,
+    onSelect: onSelectItem,
+    labelKey = 'name',
+    emptyText = 'No results',
+  }) => (
     <Box
       sx={{
         maxHeight: 140,
@@ -408,7 +417,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
       }}
     >
       {items.length === 0 ? (
-        <Typography sx={{ p: 1.5, color: textSecondary, fontSize: '0.8rem' }}>{emptyText}</Typography>
+        <Typography sx={{ p: 1.5, color: textSecondary, fontSize: '0.8rem' }}>
+          {emptyText}
+        </Typography>
       ) : (
         items.map((item) => (
           <Box
@@ -426,10 +437,18 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               '&:hover': { bgcolor: isDark ? '#22242A' : '#FAFAFA' },
             }}
           >
-            <Typography sx={{ fontSize: '0.85rem', color: textColor, fontWeight: selectedId === item.id ? 700 : 400 }}>
+            <Typography
+              sx={{
+                fontSize: '0.85rem',
+                color: textColor,
+                fontWeight: selectedId === item.id ? 700 : 400,
+              }}
+            >
               {item[labelKey]}
             </Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: textSecondary }}>ID: {item.id}</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: textSecondary }}>
+              ID: {item.id}
+            </Typography>
           </Box>
         ))
       )}
@@ -440,7 +459,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     <Box sx={{ minHeight: '100vh', bgcolor: bgColor, py: 6 }}>
       <Container maxWidth="lg">
         <Box sx={{ mb: 6, textAlign: 'center' }}>
-          <Typography sx={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: 4, color: textColor }}>
+          <Typography
+            sx={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: 4, color: textColor }}
+          >
             ORACLE
           </Typography>
           <div
@@ -481,7 +502,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                 variant="outlined"
                 startIcon={<GroupAddIcon />}
                 onClick={() => openAndClear('team')}
-                sx={{ color: textColor, borderColor: borderColor, '&:hover': { borderColor: '#E53935', color: '#E53935' } }}
+                sx={{
+                  color: textColor,
+                  borderColor: borderColor,
+                  '&:hover': { borderColor: '#E53935', color: '#E53935' },
+                }}
               >
                 New Team
               </Button>
@@ -491,7 +516,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                 variant="outlined"
                 startIcon={<PersonAddIcon />}
                 onClick={() => openAndClear('member')}
-                sx={{ color: textColor, borderColor: borderColor, '&:hover': { borderColor: '#E53935', color: '#E53935' } }}
+                sx={{
+                  color: textColor,
+                  borderColor: borderColor,
+                  '&:hover': { borderColor: '#E53935', color: '#E53935' },
+                }}
               >
                 Assign Member
               </Button>
@@ -543,7 +572,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                     justifyContent: 'space-between',
                     '&:hover': {
                       borderColor: '#E53935',
-                      boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
+                      boxShadow: isDark
+                        ? '0 2px 8px rgba(0,0,0,0.3)'
+                        : '0 2px 8px rgba(0,0,0,0.08)',
                     },
                   }}
                 >
@@ -589,14 +620,20 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               />
               {userSearch && (
                 <Typography sx={{ mt: 0.5, fontSize: '0.75rem', color: textSecondary }}>
-                  {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''} of {userDetails.length}
+                  {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''} of{' '}
+                  {userDetails.length}
                 </Typography>
               )}
             </Box>
 
             <TableContainer
               component={Paper}
-              sx={{ border: `1px solid ${tableBorder}`, boxShadow: 'none', mb: 4, bgcolor: bgColor }}
+              sx={{
+                border: `1px solid ${tableBorder}`,
+                boxShadow: 'none',
+                mb: 4,
+                bgcolor: bgColor,
+              }}
             >
               <Table>
                 <TableHead sx={{ bgcolor: tableHeaderBg }}>
@@ -624,10 +661,16 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                     filteredUsers.map((user) => (
                       <TableRow key={user.id} sx={{ borderBottom: `1px solid ${tableBorder}` }}>
                         <TableCell sx={{ color: textSecondary }}>{user.id}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: textColor }}>{user.name?.toUpperCase()}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: textColor }}>
+                          {user.name?.toUpperCase()}
+                        </TableCell>
                         <TableCell sx={{ color: textSecondary }}>{user.email || '---'}</TableCell>
-                        <TableCell sx={{ color: textSecondary }}>{user.phoneNumber || '---'}</TableCell>
-                        <TableCell sx={{ color: textSecondary }}>{user.role || 'NO ROLE'}</TableCell>
+                        <TableCell sx={{ color: textSecondary }}>
+                          {user.phoneNumber || '---'}
+                        </TableCell>
+                        <TableCell sx={{ color: textSecondary }}>
+                          {user.role || 'NO ROLE'}
+                        </TableCell>
                         <TableCell sx={{ color: textSecondary }}>
                           {(user.teamName || user.managedTeamName || '---').toUpperCase()}
                         </TableCell>
@@ -666,13 +709,18 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         <Dialog
           open={openModal === 'project'}
           onClose={() => setOpenModal(null)}
-          maxWidth="sm" fullWidth
-          PaperProps={{ sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` } }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
         >
           <DialogTitle sx={{ color: textColor }}>NEW PROJECT</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="NAME" margin="dense"
+              fullWidth
+              label="NAME"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               sx={inputSx}
             />
@@ -682,7 +730,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               ASSIGN TEAM
             </Typography>
             <TextField
-              fullWidth size="small" margin="dense"
+              fullWidth
+              size="small"
+              margin="dense"
               placeholder="Search team by name…"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
@@ -702,7 +752,10 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               emptyText="No teams found — you can also type a Team ID below"
             />
             <TextField
-              fullWidth label="TEAM ID (manual)" type="number" margin="dense"
+              fullWidth
+              label="TEAM ID (manual)"
+              type="number"
+              margin="dense"
               value={formData.assignedTeam?.id || ''}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
@@ -712,8 +765,12 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>CREATE</Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+              CANCEL
+            </Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
+              CREATE
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -721,13 +778,18 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         <Dialog
           open={openModal === 'team'}
           onClose={() => setOpenModal(null)}
-          maxWidth="sm" fullWidth
-          PaperProps={{ sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` } }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
         >
           <DialogTitle sx={{ color: textColor }}>NEW TEAM</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth label="NAME" margin="dense"
+              fullWidth
+              label="NAME"
+              margin="dense"
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               sx={inputSx}
             />
@@ -737,7 +799,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               ASSIGN MANAGER
             </Typography>
             <TextField
-              fullWidth size="small" margin="dense"
+              fullWidth
+              size="small"
+              margin="dense"
               placeholder="Search manager by name or ID…"
               value={managerSearch}
               onChange={(e) => setManagerSearch(e.target.value)}
@@ -757,7 +821,10 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               emptyText="No managers found — you can also type a Manager ID below"
             />
             <TextField
-              fullWidth label="MANAGER ID (manual)" type="number" margin="dense"
+              fullWidth
+              label="MANAGER ID (manual)"
+              type="number"
+              margin="dense"
               value={formData.manager?.id || ''}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
@@ -767,8 +834,12 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>CREATE</Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+              CANCEL
+            </Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
+              CREATE
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -776,18 +847,22 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         <Dialog
           open={openModal === 'member'}
           onClose={() => setOpenModal(null)}
-          maxWidth="sm" fullWidth
-          PaperProps={{ sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` } }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
         >
           <DialogTitle sx={{ color: textColor }}>ASSIGN MEMBER</DialogTitle>
           <DialogContent>
-
             {/* ── Búsqueda de usuario ── */}
             <Typography variant="caption" sx={{ color: textSecondary, mt: 0.5, display: 'block' }}>
               SELECT USER
             </Typography>
             <TextField
-              fullWidth size="small" margin="dense"
+              fullWidth
+              size="small"
+              margin="dense"
               placeholder="Search user by name or ID…"
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
@@ -807,9 +882,14 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               emptyText="No users found"
             />
             <TextField
-              fullWidth label="USER ID (manual)" type="number" margin="dense"
+              fullWidth
+              label="USER ID (manual)"
+              type="number"
+              margin="dense"
               value={formData.user?.id || ''}
-              onChange={(e) => setFormData({ ...formData, user: { id: parseInt(e.target.value, 10) } })}
+              onChange={(e) =>
+                setFormData({ ...formData, user: { id: parseInt(e.target.value, 10) } })
+              }
               sx={inputSx}
             />
 
@@ -818,7 +898,9 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               SELECT TEAM
             </Typography>
             <TextField
-              fullWidth size="small" margin="dense"
+              fullWidth
+              size="small"
+              margin="dense"
               placeholder="Search team by name…"
               value={assignTeamSearch}
               onChange={(e) => setAssignTeamSearch(e.target.value)}
@@ -838,25 +920,41 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               emptyText="No teams found"
             />
             <TextField
-              fullWidth label="TEAM ID (manual)" type="number" margin="dense"
+              fullWidth
+              label="TEAM ID (manual)"
+              type="number"
+              margin="dense"
               value={formData.team?.id || ''}
-              onChange={(e) => setFormData({ ...formData, team: { id: parseInt(e.target.value, 10) } })}
+              onChange={(e) =>
+                setFormData({ ...formData, team: { id: parseInt(e.target.value, 10) } })
+              }
               sx={inputSx}
             />
 
             <TextField
-              fullWidth select label="ROLE" margin="dense"
+              fullWidth
+              select
+              label="ROLE"
+              margin="dense"
               value={formData.role || ''}
               onChange={(e) => setFormData({ ...formData, role: e.target.value.toUpperCase() })}
               sx={inputSx}
             >
-              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
-              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
+              <MenuItem value="MANAGER" sx={{ color: textColor }}>
+                MANAGER
+              </MenuItem>
+              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>
+                DEVELOPER
+              </MenuItem>
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>ASSIGN</Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+              CANCEL
+            </Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
+              ASSIGN
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -864,19 +962,43 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         <Dialog
           open={openModal === 'user'}
           onClose={() => setOpenModal(null)}
-          maxWidth="sm" fullWidth
-          PaperProps={{ sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` } }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
         >
           <DialogTitle sx={{ color: textColor }}>REGISTER USER</DialogTitle>
           <DialogContent>
-            <TextField fullWidth label="NAME" margin="dense"
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="EMAIL" margin="dense"
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="PHONE NUMBER" margin="dense"
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="PASSWORD" type="password" margin="dense"
-              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })} sx={inputSx} />
+            <TextField
+              fullWidth
+              label="NAME"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="EMAIL"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="PHONE NUMBER"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="PASSWORD"
+              type="password"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+              sx={inputSx}
+            />
             <Autocomplete
               freeSolo
               options={TEAM_MEMBER_TYPE_SUGGESTIONS}
@@ -884,29 +1006,51 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               renderInput={(params) => (
-                <TextField {...params} fullWidth label="TYPE / ROLE" margin="dense"
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="TYPE / ROLE"
+                  margin="dense"
                   placeholder="e.g. Frontend Developer"
                   helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
-                  sx={inputSx} />
+                  sx={inputSx}
+                />
               )}
             />
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
-              <input type="file" accept="image/*" onChange={handleImageUpload}
-                style={{ width: '100%', color: textColor }} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ width: '100%', color: textColor }}
+              />
               {formData.profilePicture && (
                 <Box sx={{ mt: 1, textAlign: 'center' }}>
-                  <img src={formData.profilePicture} alt="preview"
-                    style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E53935' }} />
+                  <img
+                    src={formData.profilePicture}
+                    alt="preview"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #E53935',
+                    }}
+                  />
                 </Box>
               )}
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.register}>REGISTER</Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+              CANCEL
+            </Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.register}>
+              REGISTER
+            </Button>
           </DialogActions>
         </Dialog>
 
@@ -914,22 +1058,48 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         <Dialog
           open={openModal === 'editUser'}
           onClose={() => setOpenModal(null)}
-          maxWidth="sm" fullWidth
-          PaperProps={{ sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` } }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
         >
-          <DialogTitle sx={{ color: textColor }}>EDIT USER — {selectedUser?.name?.toUpperCase()}</DialogTitle>
+          <DialogTitle sx={{ color: textColor }}>
+            EDIT USER — {selectedUser?.name?.toUpperCase()}
+          </DialogTitle>
           <DialogContent>
-            <TextField fullWidth label="NAME" margin="dense"
+            <TextField
+              fullWidth
+              label="NAME"
+              margin="dense"
               value={formData.name || ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="EMAIL" margin="dense"
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="EMAIL"
+              margin="dense"
               value={formData.email || ''}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="PHONE NUMBER" margin="dense"
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="PHONE NUMBER"
+              margin="dense"
               value={formData.phoneNumber || ''}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} sx={inputSx} />
-            <TextField fullWidth label="PASSWORD (leave blank to keep current)" type="password" margin="dense"
-              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })} sx={inputSx} />
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              sx={inputSx}
+            />
+            <TextField
+              fullWidth
+              label="PASSWORD (leave blank to keep current)"
+              type="password"
+              margin="dense"
+              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+              sx={inputSx}
+            />
             <Autocomplete
               freeSolo
               options={TEAM_MEMBER_TYPE_SUGGESTIONS}
@@ -937,29 +1107,51 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               renderInput={(params) => (
-                <TextField {...params} fullWidth label="TYPE / ROLE" margin="dense"
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="TYPE / ROLE"
+                  margin="dense"
                   placeholder="e.g. Backend Developer"
                   helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
-                  sx={inputSx} />
+                  sx={inputSx}
+                />
               )}
             />
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
-              <input type="file" accept="image/*" onChange={handleImageUpload}
-                style={{ width: '100%', color: textColor }} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ width: '100%', color: textColor }}
+              />
               {formData.profilePicture && (
                 <Box sx={{ mt: 1, textAlign: 'center' }}>
-                  <img src={formData.profilePicture} alt="preview"
-                    style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E53935' }} />
+                  <img
+                    src={formData.profilePicture}
+                    alt="preview"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #E53935',
+                    }}
+                  />
                 </Box>
               )}
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
-            <Button onClick={handleEditAction} variant="contained" sx={dialogButtonSx.save}>SAVE</Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+              CANCEL
+            </Button>
+            <Button onClick={handleEditAction} variant="contained" sx={dialogButtonSx.save}>
+              SAVE
+            </Button>
           </DialogActions>
         </Dialog>
       </Container>

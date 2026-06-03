@@ -5,8 +5,16 @@ import { loginWithCredentials, resolveProjectContextAfterLogin } from './loginAp
 import { buildUserSessionFromAuth } from '../../utils/userRoleUtils';
 
 const EyeIcon = ({ open }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     {open ? (
       <>
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -23,16 +31,32 @@ const EyeIcon = ({ open }) => (
 );
 
 const MailIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
     <polyline points="22,6 12,13 2,6" />
   </svg>
 );
 
 const LockIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
@@ -42,13 +66,13 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe]     = useState(false);
-  const [isLoading, setIsLoading]       = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
-  const [formError, setFormError]       = useState('');
+  const [formError, setFormError] = useState('');
 
-  const [showForgot, setShowForgot]     = useState(false);
-  const [forgotEmail, setForgotEmail]   = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStatus, setForgotStatus] = useState('idle');
 
   useEffect(() => {
@@ -107,8 +131,8 @@ export default function Login() {
       console.error('Login failed:', err);
       const serverMsg = err?.serverMessage;
       setFormError(
-        serverMsg
-          || (!err?.status
+        serverMsg ||
+          (!err?.status
             ? 'Could not connect to the server. Check your network connection and try again.'
             : 'Invalid credentials. Please try again.'),
       );
@@ -152,8 +176,16 @@ export default function Login() {
             <label className="login-label" htmlFor="login-email">
               Email, phone number, or username
             </label>
-            <div className={focusedField === 'email' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
-              <span className="login-input-icon"><MailIcon /></span>
+            <div
+              className={
+                focusedField === 'email'
+                  ? 'login-input-wrapper login-input-wrapper--focused'
+                  : 'login-input-wrapper'
+              }
+            >
+              <span className="login-input-icon">
+                <MailIcon />
+              </span>
               <input
                 id="login-email"
                 type="text"
@@ -172,8 +204,16 @@ export default function Login() {
             <label className="login-label" htmlFor="login-password">
               Password
             </label>
-            <div className={focusedField === 'password' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}>
-              <span className="login-input-icon"><LockIcon /></span>
+            <div
+              className={
+                focusedField === 'password'
+                  ? 'login-input-wrapper login-input-wrapper--focused'
+                  : 'login-input-wrapper'
+              }
+            >
+              <span className="login-input-icon">
+                <LockIcon />
+              </span>
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
@@ -235,14 +275,20 @@ export default function Login() {
                 <span className="login-dot login-dot--delay-1" />
                 <span className="login-dot login-dot--delay-2" />
               </span>
-            ) : 'Sign in'}
+            ) : (
+              'Sign in'
+            )}
           </button>
 
           <div className="login-forgot-wrap">
             <a
               href="#forgot"
               className="login-forgot-link"
-              onClick={(e) => { e.preventDefault(); setShowForgot((v) => !v); setForgotStatus('idle'); }}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowForgot((v) => !v);
+                setForgotStatus('idle');
+              }}
             >
               Forgot your password?
             </a>
@@ -250,16 +296,29 @@ export default function Login() {
             {showForgot && (
               <div style={{ marginTop: 12 }}>
                 {forgotStatus === 'sent' ? (
-                  <p style={{ color: '#2e7d32', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                  <p
+                    style={{
+                      color: '#2e7d32',
+                      fontSize: '0.85rem',
+                      textAlign: 'center',
+                      margin: 0,
+                    }}
+                  >
                     If that email is registered, you will receive a password reset link shortly.
                   </p>
                 ) : (
                   <div>
                     <div
-                      className={focusedField === 'forgot' ? 'login-input-wrapper login-input-wrapper--focused' : 'login-input-wrapper'}
+                      className={
+                        focusedField === 'forgot'
+                          ? 'login-input-wrapper login-input-wrapper--focused'
+                          : 'login-input-wrapper'
+                      }
                       style={{ marginBottom: 8 }}
                     >
-                      <span className="login-input-icon"><MailIcon /></span>
+                      <span className="login-input-icon">
+                        <MailIcon />
+                      </span>
                       <input
                         type="email"
                         className="login-input"
@@ -268,7 +327,12 @@ export default function Login() {
                         onChange={(e) => setForgotEmail(e.target.value)}
                         onFocus={() => setFocusedField('forgot')}
                         onBlur={() => setFocusedField(null)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleForgotPassword(e); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleForgotPassword(e);
+                          }
+                        }}
                       />
                     </div>
                     <button
@@ -284,7 +348,9 @@ export default function Login() {
                           <span className="login-dot login-dot--delay-1" />
                           <span className="login-dot login-dot--delay-2" />
                         </span>
-                      ) : 'Send reset link'}
+                      ) : (
+                        'Send reset link'
+                      )}
                     </button>
                   </div>
                 )}

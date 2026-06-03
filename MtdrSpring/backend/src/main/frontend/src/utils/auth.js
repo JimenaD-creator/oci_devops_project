@@ -222,9 +222,7 @@ function buildUserForStorage(user) {
   if (!Number.isFinite(session.id)) {
     return null;
   }
-  const pic = user.profilePicture != null
-    ? user.profilePicture
-    : undefined;
+  const pic = user.profilePicture != null ? user.profilePicture : undefined;
   return applyProfilePictureToSession(session, pic);
 }
 
@@ -288,9 +286,7 @@ function shouldAttachToken(input) {
  * fetch() that always sends Bearer when a session exists (OCI-safe; do not rely only on the interceptor).
  */
 export function apiFetch(input, init = {}) {
-  const headers = new Headers(
-    input instanceof Request ? input.headers : init.headers || {},
-  );
+  const headers = new Headers(input instanceof Request ? input.headers : init.headers || {});
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
   }
@@ -299,7 +295,8 @@ export function apiFetch(input, init = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
   const nextInit = { cache: 'no-store', ...init, headers };
-  const run = input instanceof Request ? fetch(new Request(input, nextInit)) : fetch(input, nextInit);
+  const run =
+    input instanceof Request ? fetch(new Request(input, nextInit)) : fetch(input, nextInit);
   return run.then((response) => {
     if (token && isUnauthorizedHttpStatus(response.status) && !isAuthLoginRequest(input, init)) {
       handleSessionExpiredOnce();

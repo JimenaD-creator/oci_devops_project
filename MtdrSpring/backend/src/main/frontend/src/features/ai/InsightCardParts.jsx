@@ -54,12 +54,12 @@ const getSeverity = (severityKey, isDark) => {
       label: 'Warning',
       Icon: AlertTriangle,
     },
-    info: { 
-      color: '#01579B', 
-      bg: isDark ? '#1A3A5C' : '#E3F2FD', 
-      border: isDark ? '#1A4A6C' : '#90CAF9', 
-      label: 'Info', 
-      Icon: Info 
+    info: {
+      color: '#01579B',
+      bg: isDark ? '#1A3A5C' : '#E3F2FD',
+      border: isDark ? '#1A4A6C' : '#90CAF9',
+      label: 'Info',
+      Icon: Info,
     },
   };
   return severities[severityKey] ?? severities.info;
@@ -85,10 +85,7 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
   }
   messageText = alignAlertMessagePercent(messageText, effectiveAlertValue);
   if (currentSprintMetrics?.onTimeDelivery != null) {
-    messageText = stripContradictoryOnTimeDecline(
-      messageText,
-      currentSprintMetrics.onTimeDelivery,
-    );
+    messageText = stripContradictoryOnTimeDecline(messageText, currentSprintMetrics.onTimeDelivery);
     messageText = reconcileOnTimeDeliveryConcernProse(
       messageText,
       currentSprintMetrics.onTimeDelivery,
@@ -123,7 +120,11 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
           />
           {alert.kpi && (
             <Typography
-              sx={{ fontSize: { xs: '0.85rem', md: '0.9rem' }, color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}
+              sx={{
+                fontSize: { xs: '0.85rem', md: '0.9rem' },
+                color: isDark ? '#9A9A9A' : '#607D8B',
+                fontWeight: 600,
+              }}
             >
               {KPI_LABELS[alert.kpi] ?? alert.kpi}
               {effectiveAlertValue != null
@@ -135,7 +136,11 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
           )}
         </Box>
         <Typography
-          sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: isDark ? '#E0E0E0' : '#37474F', lineHeight: 1.5 }}
+          sx={{
+            fontSize: { xs: '0.95rem', md: '1.05rem' },
+            color: isDark ? '#E0E0E0' : '#37474F',
+            lineHeight: 1.5,
+          }}
         >
           {messageText}
         </Typography>
@@ -161,12 +166,21 @@ export function WorkloadCard({ rec }) {
     >
       <Users size={16} color="#7B1FA2" style={{ marginTop: 2, flexShrink: 0 }} />
       <Box>
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#CE93D8' : '#4A148C', mb: 0.25 }}>
+        <Typography
+          sx={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: isDark ? '#CE93D8' : '#4A148C',
+            mb: 0.25,
+          }}
+        >
           Move ~{rec.tasksToMove} task{rec.tasksToMove !== 1 ? 's' : ''}
           {rec.from ? ` from ${rec.from}` : ''}
           {rec.to ? ` → ${rec.to}` : ''}
         </Typography>
-        <Typography sx={{ fontSize: '0.76rem', color: isDark ? '#CE93D8' : '#6A1B9A', lineHeight: 1.4 }}>
+        <Typography
+          sx={{ fontSize: '0.76rem', color: isDark ? '#CE93D8' : '#6A1B9A', lineHeight: 1.4 }}
+        >
           {rec.reason}
         </Typography>
       </Box>
@@ -178,10 +192,10 @@ export function SectionHeading({ icon: Icon, children, dense = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: dense ? 0 : 2, flexWrap: 'wrap' }}>
-      {Icon && (
-        <Icon size={dense ? 18 : 22} color={isDark ? '#9A9A9A' : '#607D8B'} aria-hidden />
-      )}
+    <Box
+      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: dense ? 0 : 2, flexWrap: 'wrap' }}
+    >
+      {Icon && <Icon size={dense ? 18 : 22} color={isDark ? '#9A9A9A' : '#607D8B'} aria-hidden />}
       <Typography
         sx={{
           fontSize: dense ? { xs: '0.92rem', md: '0.98rem' } : { xs: '1.1rem', md: '1.25rem' },
@@ -215,18 +229,32 @@ export function BlockedAssignmentsSnapshot({ rows }) {
       }}
     >
       <Box
-        sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#4A1A1A' : '#FFEBEE', borderBottom: `1px solid ${isDark ? 'rgba(198,40,40,0.3)' : 'rgba(198,40,40,0.2)'}` }}
+        sx={{
+          px: 2,
+          py: 1.25,
+          bgcolor: isDark ? '#4A1A1A' : '#FFEBEE',
+          borderBottom: `1px solid ${isDark ? 'rgba(198,40,40,0.3)' : 'rgba(198,40,40,0.2)'}`,
+        }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
           <AlertTriangle size={22} color="#C62828" aria-hidden style={{ flexShrink: 0 }} />
           <Typography
-            sx={{ fontSize: { xs: '1.05rem', md: '1.2rem' }, fontWeight: 800, color: 'text.primary' }}
+            sx={{
+              fontSize: { xs: '1.05rem', md: '1.2rem' },
+              fontWeight: 800,
+              color: 'text.primary',
+            }}
           >
             Blocked assignments
           </Typography>
         </Box>
         <Typography
-          sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#546E7A', fontWeight: 600, lineHeight: 1.45 }}
+          sx={{
+            fontSize: '0.8rem',
+            color: isDark ? '#9A9A9A' : '#546E7A',
+            fontWeight: 600,
+            lineHeight: 1.45,
+          }}
         >
           Assignments currently flagged as blocked (each assignee reported the block on their own
           work). Updates when you refresh or regenerate insights.
@@ -305,15 +333,31 @@ export function AlertTypesLegend() {
     <TableContainer
       component={Paper}
       variant="outlined"
-      sx={{ mb: 2, borderRadius: 2, borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)', width: '100%', bgcolor: 'background.paper' }}
+      sx={{
+        mb: 2,
+        borderRadius: 2,
+        borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)',
+        width: '100%',
+        bgcolor: 'background.paper',
+      }}
     >
       <Table
         sx={{ '& td, & th': { fontSize: { xs: '0.88rem', md: '0.95rem' }, py: 1.25, px: 1.5 } }}
       >
         <TableHead sx={{ bgcolor: isDark ? 'rgba(103,58,183,0.12)' : 'rgba(103,58,183,0.06)' }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 700, width: { xs: 120, md: 140 }, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Type</TableCell>
-            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Description</TableCell>
+            <TableCell
+              sx={{
+                fontWeight: 700,
+                width: { xs: 120, md: 140 },
+                color: isDark ? '#F0F0F0' : '#1A1A1A',
+              }}
+            >
+              Type
+            </TableCell>
+            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+              Description
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -321,7 +365,13 @@ export function AlertTypesLegend() {
             const RowIcon = r.Icon;
             return (
               <TableRow key={r.label}>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap', color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                    color: isDark ? '#F0F0F0' : '#1A1A1A',
+                  }}
+                >
                   <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                     <RowIcon size={18} color={r.color} aria-hidden />
                     {r.label}
@@ -425,7 +475,14 @@ export function ExecutiveSummaryBlock({
 
   const statusChips = hasBreakdown ? (
     <Box sx={{ mb: hasEsContent || fallbackSummary ? 1.25 : 0 }}>
-      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.75 }}>
+      <Typography
+        sx={{
+          fontSize: '0.8rem',
+          fontWeight: 700,
+          color: isDark ? '#9A9A9A' : '#78909C',
+          mb: 0.75,
+        }}
+      >
         Task status
       </Typography>
       <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
@@ -470,7 +527,14 @@ export function ExecutiveSummaryBlock({
         {statusChips}
         {overviewText && (
           <Box sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: isDark ? '#9A9A9A' : '#78909C',
+                mb: 0.5,
+              }}
+            >
               Overview
             </Typography>
             <Typography
@@ -486,7 +550,14 @@ export function ExecutiveSummaryBlock({
         )}
         {trendsText && (
           <Box sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: isDark ? '#9A9A9A' : '#78909C',
+                mb: 0.5,
+              }}
+            >
               Trends
             </Typography>
             <Typography
@@ -502,7 +573,14 @@ export function ExecutiveSummaryBlock({
         )}
         {improvementAreasText && (
           <Box sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: isDark ? '#9A9A9A' : '#78909C',
+                mb: 0.5,
+              }}
+            >
               Improvement areas
             </Typography>
             <Typography
@@ -518,7 +596,14 @@ export function ExecutiveSummaryBlock({
         )}
         {nextStepsText && (
           <Box>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: isDark ? '#9A9A9A' : '#78909C', mb: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: isDark ? '#9A9A9A' : '#78909C',
+                mb: 0.5,
+              }}
+            >
               Next steps
             </Typography>
             <Typography
@@ -593,7 +678,13 @@ export function DeveloperInsightsTable({ rows }) {
     <TableContainer
       component={Paper}
       variant="outlined"
-      sx={{ borderRadius: 2, borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)', overflow: 'auto', width: '100%', bgcolor: 'background.paper' }}
+      sx={{
+        borderRadius: 2,
+        borderColor: isDark ? '#2A2C32' : 'rgba(0,0,0,0.08)',
+        overflow: 'auto',
+        width: '100%',
+        bgcolor: 'background.paper',
+      }}
     >
       <Table
         sx={{
@@ -603,10 +694,18 @@ export function DeveloperInsightsTable({ rows }) {
       >
         <TableHead sx={{ bgcolor: isDark ? 'rgba(92,107,192,0.15)' : 'rgba(92,107,192,0.08)' }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 700, width: { xs: '28%', md: '22%' }, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+            <TableCell
+              sx={{
+                fontWeight: 700,
+                width: { xs: '28%', md: '22%' },
+                color: isDark ? '#F0F0F0' : '#1A1A1A',
+              }}
+            >
               Developer
             </TableCell>
-            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>Insight</TableCell>
+            <TableCell sx={{ fontWeight: 700, color: isDark ? '#F0F0F0' : '#1A1A1A' }}>
+              Insight
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -660,7 +759,11 @@ export function PredictionsBlock({
   if (!hasExtended && productivityPrediction && !showNextSprintForecast) {
     return (
       <Typography
-        sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' }, color: isDark ? '#9A9A9A' : '#78909C', fontStyle: 'italic' }}
+        sx={{
+          fontSize: { xs: '0.9rem', md: '0.95rem' },
+          color: isDark ? '#9A9A9A' : '#78909C',
+          fontStyle: 'italic',
+        }}
       >
         The next sprint score forecast is hidden for this sprint.
       </Typography>
@@ -781,10 +884,10 @@ export function PredictionCard({
     prediction.trend === 'up' ? TrendingUp : prediction.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
     prediction.trend === 'up' ? '#2E7D32' : prediction.trend === 'down' ? '#C62828' : '#607D8B';
-  
+
   // Mostrar comparación si tenemos el score real del siguiente sprint
   const showComparison = nextSprintActualScore != null && Number.isFinite(nextSprintActualScore);
-  
+
   return (
     <Box
       sx={{
@@ -809,7 +912,14 @@ export function PredictionCard({
         >
           {clampedScore}
         </Typography>
-        <Typography sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, textAlign: 'center' }}>
+        <Typography
+          sx={{
+            fontSize: '0.8rem',
+            color: isDark ? '#9A9A9A' : '#607D8B',
+            fontWeight: 600,
+            textAlign: 'center',
+          }}
+        >
           % productivity
           <Box component="span" sx={{ display: 'block', fontSize: '0.68rem', fontWeight: 500 }}>
             predicted
@@ -834,14 +944,21 @@ export function PredictionCard({
           )}
         </Typography>
         <Typography
-          sx={{ fontSize: { xs: '0.95rem', md: '1.02rem' }, color: isDark ? '#E0E0E0' : '#37474F', lineHeight: 1.55 }}
+          sx={{
+            fontSize: { xs: '0.95rem', md: '1.02rem' },
+            color: isDark ? '#E0E0E0' : '#37474F',
+            lineHeight: 1.55,
+          }}
         >
           {reasoningAligned}
         </Typography>
         {showComparison && (
           <Box sx={{ mt: 1.5, pt: 1, borderTop: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}` }}>
-            <Typography sx={{ fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
-              Actual score for {nextSprintLabel || 'next sprint'}: {Math.round(nextSprintActualScore)}%
+            <Typography
+              sx={{ fontSize: '0.85rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}
+            >
+              Actual score for {nextSprintLabel || 'next sprint'}:{' '}
+              {Math.round(nextSprintActualScore)}%
             </Typography>
           </Box>
         )}

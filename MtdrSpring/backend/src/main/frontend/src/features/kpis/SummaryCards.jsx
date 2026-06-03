@@ -81,7 +81,12 @@ export default function SummaryCards({
       lineHeight: 1.08,
       marginBottom: '0.2rem',
     },
-    subtitle: { fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#666', fontWeight: 500, lineHeight: 1.35 },
+    subtitle: {
+      fontSize: '0.8rem',
+      color: isDark ? '#9A9A9A' : '#666',
+      fontWeight: 500,
+      lineHeight: 1.35,
+    },
   };
 
   return (

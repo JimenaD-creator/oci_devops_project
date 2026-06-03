@@ -10,9 +10,7 @@ let cachedDevelopers = {
 };
 
 function normalizeProjectId(projectId) {
-  return projectId != null && String(projectId).trim() !== ''
-    ? String(projectId).trim()
-    : null;
+  return projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
 }
 
 function isDevelopersCacheValid(pid, now, forceFresh) {

@@ -189,8 +189,7 @@ describe('computeRecommendationList', () => {
         actionableRecommendations: [
           {
             category: 'workload_redistribution',
-            text:
-              'Shift about 2 task(s) toward Diego Carrillo: Erick Sánchez has more In progress tasks than the team.',
+            text: 'Shift about 2 task(s) toward Diego Carrillo: Erick Sánchez has more In progress tasks than the team.',
           },
         ],
         developerInsights: [
@@ -276,8 +275,7 @@ describe('computeRecommendationList', () => {
         actionableRecommendations: [
           {
             category: 'workload_redistribution',
-            text:
-              'Current task status distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.',
+            text: 'Current task status distribution is balanced across developers. Keep assignments stable and focus on unblocking tasks in In progress/In review.',
           },
           { category: 'planning', text: 'Review the remaining To do items.' },
         ],
@@ -311,8 +309,7 @@ describe('computeRecommendationList', () => {
         actionableRecommendations: [
           {
             category: 'workload_redistribution',
-            text:
-              'Current task status distribution is balanced across developers. Keep assignments stable.',
+            text: 'Current task status distribution is balanced across developers. Keep assignments stable.',
           },
         ],
         developerInsights: [

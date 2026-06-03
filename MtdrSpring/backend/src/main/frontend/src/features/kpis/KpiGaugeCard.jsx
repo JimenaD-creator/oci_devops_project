@@ -166,7 +166,7 @@ function CompareKpiRows({ def, orderedSprints, isDark }) {
 export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordered }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const { avg, chartPct } = useMemo(
     () => aggregateGaugeScore(def, selectedSprints, compareMode),
     [def, selectedSprints, compareMode],
@@ -292,7 +292,9 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
         </Box>
       </Box>
 
-      {showCompareRows ? <CompareKpiRows def={def} orderedSprints={ordered} isDark={isDark} /> : null}
+      {showCompareRows ? (
+        <CompareKpiRows def={def} orderedSprints={ordered} isDark={isDark} />
+      ) : null}
     </Paper>
   );
 }

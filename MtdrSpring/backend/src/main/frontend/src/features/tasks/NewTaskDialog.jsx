@@ -30,7 +30,10 @@ import {
   ORACLE_RED_ACTION,
 } from '../sprints/constants/sprintConstants';
 import RichTextDescriptionField from '../../components/common/RichTextDescriptionField';
-import { richDescriptionPlainText, sanitizeRichDescriptionHtml } from '../../utils/richTextDescriptionUtils';
+import {
+  richDescriptionPlainText,
+  sanitizeRichDescriptionHtml,
+} from '../../utils/richTextDescriptionUtils';
 import { buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 import {
   dateInputToEndOfLocalDayIso,
@@ -70,41 +73,6 @@ const TYPE_OPTIONS = [
     border: '#97C459',
     color: '#27500A',
     icon: '◈',
-  },
-];
-
-const STATUS_OPTIONS = [
-  {
-    value: 'TODO',
-    label: 'To Do',
-    bg: '#E0F2F1',
-    border: '#80CBC4',
-    color: '#00695C',
-    dot: '#00897B',
-  },
-  {
-    value: 'IN_PROGRESS',
-    label: 'In Progress',
-    bg: '#FAEEDA',
-    border: '#FAC775',
-    color: '#633806',
-    dot: '#BA7517',
-  },
-  {
-    value: 'IN_REVIEW',
-    label: 'In Review',
-    bg: '#E6F1FB',
-    border: '#85B7EB',
-    color: '#0C447C',
-    dot: '#185FA5',
-  },
-  {
-    value: 'DONE',
-    label: 'Done',
-    bg: '#EAF3DE',
-    border: '#97C459',
-    color: '#27500A',
-    dot: '#3B6D11',
   },
 ];
 
@@ -180,9 +148,9 @@ function SegmentedButtons({ options, value, onChange, sx }) {
               py: 0.875,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
+              border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
+              color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
               fontSize: 15,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -192,7 +160,7 @@ function SegmentedButtons({ options, value, onChange, sx }) {
               justifyContent: 'center',
               gap: 0.5,
               '&:hover': {
-                bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'),
+                bgcolor: active ? opt.bg : isDark ? '#2A2C32' : 'action.hover',
                 borderColor: opt.border,
               },
             }}
@@ -203,7 +171,7 @@ function SegmentedButtons({ options, value, onChange, sx }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  bgcolor: active ? opt.dot : (isDark ? '#5A5A5A' : '#BDBDBD'),
+                  bgcolor: active ? opt.dot : isDark ? '#5A5A5A' : '#BDBDBD',
                   flexShrink: 0,
                 }}
               />
@@ -238,9 +206,9 @@ function TypeGrid({ value, onChange }) {
               py: 1,
               px: 0.5,
               borderRadius: '8px',
-              border: `1px solid ${active ? opt.border : (isDark ? '#2A2C32' : '#E0E0E0')}`,
+              border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
-              color: active ? opt.color : (isDark ? '#9A9A9A' : 'text.secondary'),
+              color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
               fontSize: 15,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
@@ -250,7 +218,7 @@ function TypeGrid({ value, onChange }) {
               gap: 0.5,
               transition: 'all 0.12s',
               '&:hover': {
-                bgcolor: active ? opt.bg : (isDark ? '#2A2C32' : 'action.hover'),
+                bgcolor: active ? opt.bg : isDark ? '#2A2C32' : 'action.hover',
                 borderColor: opt.border,
               },
             }}
@@ -280,7 +248,6 @@ export function NewTaskDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classification, setClassification] = useState('FEATURE');
-  const [status, setStatus] = useState('TODO');
   const [priority, setPriority] = useState('MEDIUM');
   const [assignedHours, setAssignedHours] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -289,6 +256,7 @@ export function NewTaskDialog({
   const [sprintId, setSprintId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const status = 'TODO';
 
   const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
@@ -305,7 +273,6 @@ export function NewTaskDialog({
     setTitle('');
     setDescription('');
     setClassification('FEATURE');
-    setStatus('TODO');
     setPriority('MEDIUM');
     setAssignedHours('');
     setStartDate('');
@@ -485,7 +452,15 @@ export function NewTaskDialog({
       </DialogTitle>
 
       {/* ── Body ── */}
-      <DialogContent sx={{ pt: '32px !important', px: 3, pb: 2, overflowY: 'auto', bgcolor: isDark ? '#111214' : 'transparent' }}>
+      <DialogContent
+        sx={{
+          pt: '32px !important',
+          px: 3,
+          pb: 2,
+          overflowY: 'auto',
+          bgcolor: isDark ? '#111214' : 'transparent',
+        }}
+      >
         <Stack spacing={2}>
           <TextField
             label="Task title *"
@@ -512,13 +487,6 @@ export function NewTaskDialog({
             <SectionLabel>Work item type</SectionLabel>
             <TypeGrid value={classification} onChange={setClassification} />
           </Box>
-
-          {/* Status */}
-          <Box>
-            <SectionLabel>Status</SectionLabel>
-            <SegmentedButtons options={STATUS_OPTIONS} value={status} onChange={setStatus} />
-          </Box>
-
           {/* Priority */}
           <Box>
             <SectionLabel>Priority</SectionLabel>
@@ -629,7 +597,11 @@ export function NewTaskDialog({
                   />
                   <ListItemText
                     primary={u.displayName}
-                    primaryTypographyProps={{ fontSize: 15, fontWeight: 500, color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+                    primaryTypographyProps={{
+                      fontSize: 15,
+                      fontWeight: 500,
+                      color: isDark ? '#F0F0F0' : '#1A1A1A',
+                    }}
                   />
                 </MenuItem>
               ))}

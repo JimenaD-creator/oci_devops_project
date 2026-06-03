@@ -33,7 +33,11 @@ export default function InsightsFreshnessBanner({ generatedAt, status }) {
         border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
       }}
     >
-      <Clock size={16} color={isDark ? '#9A9A9A' : '#607D8B'} style={{ marginTop: 2, flexShrink: 0 }} />
+      <Clock
+        size={16}
+        color={isDark ? '#9A9A9A' : '#607D8B'}
+        style={{ marginTop: 2, flexShrink: 0 }}
+      />
       <Box>
         <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
           AI interpretation generated {label}

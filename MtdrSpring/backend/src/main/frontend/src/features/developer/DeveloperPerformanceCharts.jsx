@@ -37,9 +37,7 @@ function ChartTooltip({ active, payload, label, valueLabel }) {
         boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.08)',
       }}
     >
-      <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color }}>
-        {label}
-      </Typography>
+      <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color }}>{label}</Typography>
       <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'text.primary', mt: 0.5 }}>
         {valueLabel}: {payload[0].value}
       </Typography>
@@ -166,10 +164,7 @@ function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
       return { ...s, score: Number(score), meta };
     })
     .filter(Boolean)
-    .sort(
-      (a, b) =>
-        (a.isCurrentUser ? -1 : 0) - (b.isCurrentUser ? -1 : 0) || b.score - a.score,
-    );
+    .sort((a, b) => (a.isCurrentUser ? -1 : 0) - (b.isCurrentUser ? -1 : 0) || b.score - a.score);
 
   if (!entries.length) return null;
 
@@ -184,20 +179,22 @@ function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
         backgroundColor: panelBg,
         opacity: 1,
         p: 1.25,
-        boxShadow: isDark
-          ? '0 4px 16px rgba(0,0,0,0.55)'
-          : '0 4px 16px rgba(0,0,0,0.14)',
+        boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.55)' : '0 4px 16px rgba(0,0,0,0.14)',
         minWidth: 220,
         maxWidth: 320,
         pointerEvents: 'none',
       }}
     >
-      <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: row.color || SCORE_LINE, mb: 1 }}>
+      <Typography
+        sx={{ fontWeight: 700, fontSize: '0.875rem', color: row.color || SCORE_LINE, mb: 1 }}
+      >
         {label}
       </Typography>
       {entries.map((e) => (
         <Box key={e.dataKey} sx={{ mb: entries.length > 1 ? 0.75 : 0 }}>
-          <Typography sx={{ fontWeight: e.isCurrentUser ? 800 : 600, fontSize: '0.85rem', color: e.color }}>
+          <Typography
+            sx={{ fontWeight: e.isCurrentUser ? 800 : 600, fontSize: '0.85rem', color: e.color }}
+          >
             {e.name}
             {e.isCurrentUser ? ' (you)' : ''}: {formatProductivityScoreDisplay(e.score)}
           </Typography>
@@ -213,7 +210,8 @@ function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
           ) : null}
           {e.meta ? (
             <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', mt: 0.25 }}>
-              {e.meta.completed} of {e.meta.assigned} tasks · {Number(e.meta.hours || 0).toFixed(1)} h
+              {e.meta.completed} of {e.meta.assigned} tasks · {Number(e.meta.hours || 0).toFixed(1)}{' '}
+              h
               {Number(e.meta.estimated) > 0
                 ? ` / ${Number(e.meta.estimated).toFixed(1)} h est.`
                 : ''}
@@ -260,9 +258,7 @@ function CompareLineDot({ cx, cy, payload, seriesItem, isDark }) {
       />
     );
   }
-  return (
-    <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" style={{ opacity }} />
-  );
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" style={{ opacity }} />;
 }
 
 /** Recharts wraps custom tooltip content in a semi-transparent box — strip that layer. */
@@ -461,11 +457,7 @@ export function ProductivityScoreCompareChartEmbed({
           </LineChart>
         </ResponsiveContainer>
       </Box>
-      <ProductivityCompareLegend
-        series={series}
-        isDark={isDark}
-        compact={legendCompact}
-      />
+      <ProductivityCompareLegend series={series} isDark={isDark} compact={legendCompact} />
     </Box>
   );
 }
@@ -488,7 +480,9 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
             : 'Weighted KPI per sprint (completion, on-time, participation, workload).'
         }
       >
-        <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
+        <Typography
+          sx={{ py: 4, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}
+        >
           No sprint activity yet. Complete tasks in a sprint to see your score trend.
         </Typography>
       </ChartShell>
@@ -511,103 +505,103 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
               data={data}
               margin={{ top: 28, right: 16, left: 72, bottom: isCompare ? 58 : 52 }}
             >
-            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 11, fill: tickFill }}
-              angle={-32}
-              textAnchor="end"
-              height={48}
-              tickMargin={8}
-              label={{
-                value: 'Sprint',
-                position: 'bottom',
-                offset: isCompare ? 4 : 12,
-                fill: tickFill,
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            />
-            <YAxis
-              domain={[0, 100]}
-              ticks={[0, 20, 40, 60, 80, 100]}
-              tick={{ fontSize: 11, fill: tickFill }}
-              width={44}
-              tickMargin={6}
-              tickFormatter={(v) => `${v}%`}
-              label={{
-                value: 'Productivity score',
-                angle: -90,
-                position: 'left',
-                offset: 12,
-                fill: SCORE_LINE,
-                fontSize: 12,
-                fontWeight: 700,
-                style: { textAnchor: 'middle' },
-              }}
-            />
-            {isCompare ? (
-              <>
-                <Tooltip
-              {...PRODUCTIVITY_COMPARE_TOOLTIP_PROPS}
-              content={<ProductivityCompareTooltip series={series} />}
-            />
-                {compareSeriesRenderOrder(series).map((s) => {
-                  const stroke = compareLineStroke(s, isDark);
-                  return (
-                    <Line
-                      key={s.dataKey}
-                      type="monotone"
-                      dataKey={s.dataKey}
-                      name={s.name}
-                      stroke={stroke.color}
-                      strokeWidth={stroke.width}
-                      strokeOpacity={stroke.opacity}
-                      connectNulls={false}
-                      dot={(dotProps) => {
-                        const val = dotProps.payload?.[s.dataKey];
-                        if (!Number.isFinite(Number(val))) return null;
-                        return (
-                          <CompareLineDot
-                            cx={dotProps.cx}
-                            cy={dotProps.cy}
-                            payload={val}
-                            seriesItem={s}
-                            isDark={isDark}
-                          />
-                        );
-                      }}
-                      activeDot={
-                        s.isCurrentUser
-                          ? { r: 8, stroke: stroke.color, fill: stroke.color, strokeWidth: 2 }
-                          : { r: 4, stroke: stroke.color, fill: stroke.color, strokeOpacity: 0.6 }
-                      }
-                    />
-                  );
-                })}
-              </>
-            ) : (
-              <>
-                <Tooltip content={<ProductivityScoreTooltip />} />
-                <Line
-                  type="monotone"
-                  dataKey="productivityScore"
-                  stroke={SCORE_LINE}
-                  strokeWidth={3}
-                  dot={<ColoredDot />}
-                  activeDot={{ r: 7, fill: SCORE_LINE, stroke: SCORE_LINE }}
-                >
-                  <LabelList
-                    dataKey="productivityScore"
-                    position="top"
-                    fill={SCORE_LINE}
-                    fontSize={11}
-                    fontWeight={800}
-                    formatter={(v) => formatProductivityScoreDisplay(v)}
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: tickFill }}
+                angle={-32}
+                textAnchor="end"
+                height={48}
+                tickMargin={8}
+                label={{
+                  value: 'Sprint',
+                  position: 'bottom',
+                  offset: isCompare ? 4 : 12,
+                  fill: tickFill,
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 20, 40, 60, 80, 100]}
+                tick={{ fontSize: 11, fill: tickFill }}
+                width={44}
+                tickMargin={6}
+                tickFormatter={(v) => `${v}%`}
+                label={{
+                  value: 'Productivity score',
+                  angle: -90,
+                  position: 'left',
+                  offset: 12,
+                  fill: SCORE_LINE,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  style: { textAnchor: 'middle' },
+                }}
+              />
+              {isCompare ? (
+                <>
+                  <Tooltip
+                    {...PRODUCTIVITY_COMPARE_TOOLTIP_PROPS}
+                    content={<ProductivityCompareTooltip series={series} />}
                   />
-                </Line>
-              </>
-            )}
+                  {compareSeriesRenderOrder(series).map((s) => {
+                    const stroke = compareLineStroke(s, isDark);
+                    return (
+                      <Line
+                        key={s.dataKey}
+                        type="monotone"
+                        dataKey={s.dataKey}
+                        name={s.name}
+                        stroke={stroke.color}
+                        strokeWidth={stroke.width}
+                        strokeOpacity={stroke.opacity}
+                        connectNulls={false}
+                        dot={(dotProps) => {
+                          const val = dotProps.payload?.[s.dataKey];
+                          if (!Number.isFinite(Number(val))) return null;
+                          return (
+                            <CompareLineDot
+                              cx={dotProps.cx}
+                              cy={dotProps.cy}
+                              payload={val}
+                              seriesItem={s}
+                              isDark={isDark}
+                            />
+                          );
+                        }}
+                        activeDot={
+                          s.isCurrentUser
+                            ? { r: 8, stroke: stroke.color, fill: stroke.color, strokeWidth: 2 }
+                            : { r: 4, stroke: stroke.color, fill: stroke.color, strokeOpacity: 0.6 }
+                        }
+                      />
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  <Tooltip content={<ProductivityScoreTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="productivityScore"
+                    stroke={SCORE_LINE}
+                    strokeWidth={3}
+                    dot={<ColoredDot />}
+                    activeDot={{ r: 7, fill: SCORE_LINE, stroke: SCORE_LINE }}
+                  >
+                    <LabelList
+                      dataKey="productivityScore"
+                      position="top"
+                      fill={SCORE_LINE}
+                      fontSize={11}
+                      fontWeight={800}
+                      formatter={(v) => formatProductivityScoreDisplay(v)}
+                    />
+                  </Line>
+                </>
+              )}
             </LineChart>
           </ResponsiveContainer>
         </Box>
@@ -625,10 +619,7 @@ export function HoursWorkedTrendChart({ data = [] }) {
   const lineStroke = data[0]?.color || LINE_FALLBACK;
 
   return (
-    <ChartShell
-      title="Hours worked trend"
-      description="Total hours you logged across sprints."
-    >
+    <ChartShell title="Hours worked trend" description="Total hours you logged across sprints.">
       <Box sx={{ width: '100%', height: CHART_H }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 48 }}>

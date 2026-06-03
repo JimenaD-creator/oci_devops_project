@@ -274,11 +274,7 @@ export function finalizeProductivityManagerGuideText(text, score, sprint = null)
     out = out ? `${lead} ${out}` : lead;
   }
   const timeline = resolveSprintTimelineContext(sprint);
-  if (
-    timeline.isEarly ||
-    timeline.phase === 'not_started' ||
-    timeline.phase === 'in_progress'
-  ) {
+  if (timeline.isEarly || timeline.phase === 'not_started' || timeline.phase === 'in_progress') {
     out = appendProductivityEvolutionNote(out, timeline);
   }
   return polishProductivityGuideProse(out.trim());

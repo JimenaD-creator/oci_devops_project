@@ -13,8 +13,24 @@ const sprintSnapshot = {
   shortLabel: 'Sprint 42',
   dateRange: 'Apr 1 – Apr 30, 2026',
   developers: [
-    { name: 'Ana Ruiz', initials: 'AR', assigned: 3, completed: 2, hours: 18, onTime: 100, workload: 80 },
-    { name: 'Luis Pérez', initials: 'LP', assigned: 2, completed: 1, hours: 9, onTime: 50, workload: 50 },
+    {
+      name: 'Ana Ruiz',
+      initials: 'AR',
+      assigned: 3,
+      completed: 2,
+      hours: 18,
+      onTime: 100,
+      workload: 80,
+    },
+    {
+      name: 'Luis Pérez',
+      initials: 'LP',
+      assigned: 2,
+      completed: 1,
+      hours: 9,
+      onTime: 50,
+      workload: 50,
+    },
   ],
 };
 

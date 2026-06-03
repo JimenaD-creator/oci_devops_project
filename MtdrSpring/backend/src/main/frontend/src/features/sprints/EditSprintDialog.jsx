@@ -21,7 +21,7 @@ import { sprintKpiNumber, toInputDate, oracleRgba } from './utils/sprintUtils';
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [goal, setGoal] = useState('');
@@ -142,7 +142,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
           borderLeft: `4px solid ${ORACLE_RED_ACTION}`,
           bgcolor: 'background.paper',
-          boxShadow: isDark 
+          boxShadow: isDark
             ? `0 16px 40px rgba(0,0,0,0.3)`
             : `0 16px 40px ${oracleRgba(0.1)}, 0 8px 24px rgba(30, 136, 229, 0.08)`,
           overflow: 'hidden',
@@ -321,7 +321,10 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
             px: 2.5,
             borderRadius: 2,
             '&:hover': { bgcolor: '#A83B2D' },
-            '&.Mui-disabled': { bgcolor: isDark ? '#2A2C32' : '#E0E0E0', color: isDark ? '#5A5A5A' : '#9E9E9E' },
+            '&.Mui-disabled': {
+              bgcolor: isDark ? '#2A2C32' : '#E0E0E0',
+              color: isDark ? '#5A5A5A' : '#9E9E9E',
+            },
           }}
         >
           {saving ? 'Saving…' : 'Save changes'}

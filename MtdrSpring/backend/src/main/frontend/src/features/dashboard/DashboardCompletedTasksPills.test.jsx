@@ -24,9 +24,7 @@ describe('DashboardCompletedTasksPills', () => {
     });
 
     test('shows completed vs assigned', () => {
-      renderWithTheme(
-        <DashboardCompletedTasksPills completed={7} assigned={12} />
-      );
+      renderWithTheme(<DashboardCompletedTasksPills completed={7} assigned={12} />);
       expect(screen.getByText('7 / 12 completed')).toBeTruthy();
     });
   });

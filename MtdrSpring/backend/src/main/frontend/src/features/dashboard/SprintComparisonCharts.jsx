@@ -18,14 +18,14 @@ import { RECHARTS_BAR_TOOLTIP_PROPS, CHART_DESC_SX } from './dashboardTypography
 
 const CHART_H_BASE = 188;
 
-const Y_AXIS_TICK = (isDark) => ({ 
-  fontSize: 12, 
-  fill: isDark ? '#9A9A9A' : '#1A1A1A', 
-  fontWeight: 500 
+const Y_AXIS_TICK = (isDark) => ({
+  fontSize: 12,
+  fill: isDark ? '#9A9A9A' : '#1A1A1A',
+  fontWeight: 500,
 });
 
 const X_AXIS_LINE = (isDark) => ({ stroke: isDark ? '#2A2C32' : '#BDBDBD' });
-const GRID_STROKE = (isDark) => isDark ? '#2A2C32' : '#E1BEE7';
+const GRID_STROKE = (isDark) => (isDark ? '#2A2C32' : '#E1BEE7');
 const FALLBACK_SPRINT_COLOR = '#26A69A';
 
 /** Planned hours on TASK rows (assigned_hours). */
@@ -39,15 +39,13 @@ const tooltipPaper = (isDark) => ({
   fontSize: 14,
   padding: '10px 12px',
   background: isDark ? '#1C1E22' : '#fff',
-  boxShadow: isDark 
-    ? '0 2px 10px rgba(0,0,0,0.3)' 
-    : '0 2px 10px rgba(21,101,192,0.15)',
+  boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.3)' : '0 2px 10px rgba(21,101,192,0.15)',
 });
 
 function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const sprintColor = row.accentColor ?? FALLBACK_SPRINT_COLOR;
@@ -96,7 +94,7 @@ function SprintMetricTooltip({ active, payload, metric, valueFormatter }) {
 function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatter }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const n = data?.length ?? 0;
   const chartH = Math.min(280, CHART_H_BASE + Math.max(0, n - 4) * 14);
   const marginBottom = Math.min(64, 40 + Math.max(0, n - 4) * 6);
@@ -127,11 +125,20 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <Typography
-        sx={{ fontWeight: 800, color: 'text.primary', mb: description ? 0.35 : 1, fontSize: '1.02rem' }}
+        sx={{
+          fontWeight: 800,
+          color: 'text.primary',
+          mb: description ? 0.35 : 1,
+          fontSize: '1.02rem',
+        }}
       >
         {title}
       </Typography>
-      {description ? <Typography sx={{ ...CHART_DESC_SX, mb: 1, color: 'text.secondary' }}>{description}</Typography> : null}
+      {description ? (
+        <Typography sx={{ ...CHART_DESC_SX, mb: 1, color: 'text.secondary' }}>
+          {description}
+        </Typography>
+      ) : null}
       <ResponsiveContainer width="100%" height={chartH}>
         <BarChart
           data={data}
@@ -167,7 +174,7 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
 function HoursPlannedVsWorkedTooltip({ active, payload }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const sprintColor = row.accentColor ?? FALLBACK_SPRINT_COLOR;
@@ -222,7 +229,7 @@ function HoursPlannedVsWorkedTooltip({ active, payload }) {
 function SprintHoursCompareBlock({ data }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const n = data?.length ?? 0;
   const chartH = Math.min(300, CHART_H_BASE + Math.max(0, n - 4) * 14);
   const marginBottom = Math.min(72, 48 + Math.max(0, n - 4) * 6);
@@ -281,11 +288,11 @@ function SprintHoursCompareBlock({ data }) {
           />
           <Legend
             verticalAlign="top"
-            wrapperStyle={{ 
-              fontSize: 12, 
-              fontWeight: 600, 
+            wrapperStyle={{
+              fontSize: 12,
+              fontWeight: 600,
               paddingBottom: 4,
-              color: isDark ? '#F0F0F0' : '#1A1A1A'
+              color: isDark ? '#F0F0F0' : '#1A1A1A',
             }}
           />
           <Bar
@@ -314,7 +321,7 @@ function SprintHoursCompareBlock({ data }) {
 export default function SprintComparisonCharts({ selectedSprints = [] }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const data = useMemo(() => {
     if (!selectedSprints?.length || selectedSprints.length < 2) return [];
     return [...selectedSprints]

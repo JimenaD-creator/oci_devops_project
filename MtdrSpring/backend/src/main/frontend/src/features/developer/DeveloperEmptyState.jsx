@@ -59,7 +59,15 @@ export default function DeveloperEmptyState({
       <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
         No sprints or information available
       </Typography>
-      <Typography sx={{ color: 'text.secondary', maxWidth: 520, mx: 'auto', fontSize: '0.95rem', lineHeight: 1.55 }}>
+      <Typography
+        sx={{
+          color: 'text.secondary',
+          maxWidth: 520,
+          mx: 'auto',
+          fontSize: '0.95rem',
+          lineHeight: 1.55,
+        }}
+      >
         {description}
       </Typography>
     </Paper>

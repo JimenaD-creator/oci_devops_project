@@ -35,8 +35,11 @@ export async function fetchTasksPageBundle(effectiveProjectId, options = {}) {
       : null;
 
   const projectKey = pid != null ? String(pid) : null;
-  const { sprints: rawSprints, tasks: rawTasks, userTasks: rawUserTasks } =
-    await fetchProjectBundleRaw(projectKey, options);
+  const {
+    sprints: rawSprints,
+    tasks: rawTasks,
+    userTasks: rawUserTasks,
+  } = await fetchProjectBundleRaw(projectKey, options);
 
   let tasksData = Array.isArray(rawTasks) ? rawTasks : [];
   let sprintsData = Array.isArray(rawSprints) ? rawSprints : [];

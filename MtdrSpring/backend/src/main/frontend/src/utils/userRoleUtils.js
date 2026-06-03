@@ -37,8 +37,10 @@ export function buildUserSessionFromAuth(userFromApi) {
   }
 
   if (
-    userFromApi?.jobTitle
-    && (userFromApi.role === 'ADMIN' || userFromApi.role === 'MANAGER' || userFromApi.role === 'DEVELOPER')
+    userFromApi?.jobTitle &&
+    (userFromApi.role === 'ADMIN' ||
+      userFromApi.role === 'MANAGER' ||
+      userFromApi.role === 'DEVELOPER')
   ) {
     const jobTitle = normalizeUserRole(userFromApi.jobTitle);
     const row = {

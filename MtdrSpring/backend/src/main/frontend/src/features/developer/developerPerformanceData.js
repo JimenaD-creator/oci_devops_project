@@ -79,8 +79,7 @@ export function sprintMetricsForDeveloper(sprint, userId, userName) {
     estimated > 0 ? Math.round((hours / estimated) * 100) : hours > 0 ? 100 : 0;
   const tasksPerHour =
     hours > 0 ? Number((completed / hours).toFixed(2)) : completed > 0 ? completed : 0;
-  const participation =
-    participationRateFromDeveloperHours(hours, estimated) ?? 0;
+  const participation = participationRateFromDeveloperHours(hours, estimated) ?? 0;
   const productivityScore = productivityScoreFromDeveloperMetrics({
     assigned,
     completed,
@@ -122,8 +121,7 @@ export function aggregateDeveloperPerformance(sprints, userId, userName) {
       onTimeCompletedBase += r.completed;
     }
   });
-  const onTime =
-    onTimeCompletedBase > 0 ? Math.round(onTimeWeighted / onTimeCompletedBase) : null;
+  const onTime = onTimeCompletedBase > 0 ? Math.round(onTimeWeighted / onTimeCompletedBase) : null;
   const completionRate = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
   const hoursVsEstimatePct =
     estimated > 0 ? Math.round((hours / estimated) * 100) : hours > 0 ? 100 : 0;

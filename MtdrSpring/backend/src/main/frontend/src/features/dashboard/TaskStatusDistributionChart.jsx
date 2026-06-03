@@ -27,7 +27,7 @@ const cardBase = (isDark) => ({
 function StatusTooltip({ active, payload }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const fill = row.fill || CHART_CARD_ACCENT;
@@ -82,7 +82,7 @@ export default function TaskStatusDistributionChart({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const embeddedCaption = caption ?? 'Task counts by workflow stage for the current sprint.';
   const hasTasks = total > 0;
   const plotHeight = embedded ? CHART_HEIGHT_EMBEDDED : CHART_HEIGHT;
@@ -152,14 +152,23 @@ export default function TaskStatusDistributionChart({
             >
               Tasks by status
             </Typography>
-            <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block', color: 'text.secondary' }}>
+            <Typography
+              sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block', color: 'text.secondary' }}
+            >
               How workload is split across task stages.
             </Typography>
           </div>
         </div>
       ) : (
         <Typography
-          sx={{ ...CHART_DESC_SX, textAlign: 'center', width: '100%', mb: 0.75, px: 0.5, color: 'text.secondary' }}
+          sx={{
+            ...CHART_DESC_SX,
+            textAlign: 'center',
+            width: '100%',
+            mb: 0.75,
+            px: 0.5,
+            color: 'text.secondary',
+          }}
         >
           {embeddedCaption}
         </Typography>
@@ -219,7 +228,9 @@ export default function TaskStatusDistributionChart({
               bgcolor: isDark ? 'rgba(156, 39, 176, 0.1)' : '#F3E5F5',
             }}
           >
-            <Typography sx={{ color: isDark ? '#CE93D8' : '#6A1B9A', fontWeight: 600, fontSize: '0.95rem' }}>
+            <Typography
+              sx={{ color: isDark ? '#CE93D8' : '#6A1B9A', fontWeight: 600, fontSize: '0.95rem' }}
+            >
               No tasks in this sprint
             </Typography>
           </Box>

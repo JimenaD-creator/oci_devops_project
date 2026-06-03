@@ -13,9 +13,7 @@ export function useThemeMode() {
 }
 
 export function AppThemeProvider({ children }) {
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem('darkMode') === 'true'
-  );
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   const toggleDark = () => {
     setDarkMode((prev) => {
@@ -27,10 +25,7 @@ export function AppThemeProvider({ children }) {
 
   // Pone data-mui-color-scheme en <html> para que el CSS lo lea
   useEffect(() => {
-    document.documentElement.setAttribute(
-      'data-mui-color-scheme',
-      darkMode ? 'dark' : 'light'
-    );
+    document.documentElement.setAttribute('data-mui-color-scheme', darkMode ? 'dark' : 'light');
     // También body background para evitar flash de blanco
     document.body.style.backgroundColor = darkMode ? '#111214' : '#F7F8FA';
   }, [darkMode]);

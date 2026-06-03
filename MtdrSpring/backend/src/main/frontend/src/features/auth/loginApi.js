@@ -62,8 +62,7 @@ export async function loginWithCredentials(identifier, password) {
       } else if (response.status === 401) {
         error.serverMessage = 'Invalid credentials. Please try again.';
       } else if (response.status >= 500) {
-        error.serverMessage =
-          'Server error during sign-in. Please try again in a moment.';
+        error.serverMessage = 'Server error during sign-in. Please try again in a moment.';
       }
     }
     if (!error.serverMessage) {

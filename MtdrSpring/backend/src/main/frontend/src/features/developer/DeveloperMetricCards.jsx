@@ -15,14 +15,14 @@ const POSITIVE_ACCENT = { main: '#1D9E75', light: '#E1F5EE', label: '#0F6E56' };
 const NEGATIVE_ACCENT = { main: '#E24B4A', light: '#FCEBEB', label: '#A32D2D' };
 
 const ICON_MAP = {
-  tasks_assigned:   AssignmentOutlinedIcon,
-  tasks_completed:  CheckCircleOutlineIcon,
-  completion_rate:  PieChartOutlineIcon,
-  hours_worked:     AccessTimeOutlinedIcon,
-  trending_up:      TrendingUpIcon,
-  trending_down:    TrendingDownIcon,
-  bar_chart:        BarChartIcon,
-  default:          StarBorderIcon,
+  tasks_assigned: AssignmentOutlinedIcon,
+  tasks_completed: CheckCircleOutlineIcon,
+  completion_rate: PieChartOutlineIcon,
+  hours_worked: AccessTimeOutlinedIcon,
+  trending_up: TrendingUpIcon,
+  trending_down: TrendingDownIcon,
+  bar_chart: BarChartIcon,
+  default: StarBorderIcon,
 };
 
 function clampProgress(n) {
@@ -75,9 +75,8 @@ export default function DeveloperMetricCards({ metrics = [] }) {
         const topBorderColor = accent.main;
         const iconBg = isDark ? alpha(accent.main, 0.18) : accent.light;
         const iconColor = isDark ? accent.light : accent.label;
-const labelColor = isDark ? alpha(accent.light, 0.95) : accent.label;
+        const labelColor = isDark ? alpha(accent.light, 0.95) : accent.label;
         const trackBg = isDark ? 'rgba(255,255,255,0.14)' : alpha(accent.main, 0.15);
-
 
         return (
           <Grid item xs={12} sm={6} md={3} key={m.label}>

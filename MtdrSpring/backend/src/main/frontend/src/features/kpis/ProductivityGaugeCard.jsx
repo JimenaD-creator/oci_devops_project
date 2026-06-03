@@ -13,7 +13,7 @@ const GOAL_PCT = 80;
 export default function ProductivityGaugeCard({ selectedSprints, compareMode }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const score = React.useMemo(() => {
     if (!selectedSprints?.length) return 0;
     if (compareMode && selectedSprints.length > 1) {

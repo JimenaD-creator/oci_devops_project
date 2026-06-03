@@ -1,7 +1,4 @@
-import {
-  mergeUpdatedTask,
-  patchUserTasksAfterTaskSave,
-} from '../features/tasks/utils/taskUtils';
+import { mergeUpdatedTask, patchUserTasksAfterTaskSave } from '../features/tasks/utils/taskUtils';
 
 export const TASKS_MUTATED_EVENT = 'mtdr-tasks-mutated';
 const DELETED_TASK_TTL_MS = 20000;

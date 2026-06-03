@@ -77,7 +77,7 @@ function HorizontalBarEndLabel({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const textColor = isDark ? '#F0F0F0' : fill;
-  
+
   const n = Number(value ?? 0);
   if (!Number.isFinite(n) || n <= 0) return null;
   return (
@@ -117,12 +117,26 @@ function resolveLabelRow(value, index, rows) {
 }
 
 /** Barra apilada con esquinas superiores redondeadas (como horas) cuando es el tope del stack. */
-function CompareWorkloadStackBarShape({ x, y, width, height, fill, roundTop = false, topRadius = 6 }) {
+function CompareWorkloadStackBarShape({
+  x,
+  y,
+  width,
+  height,
+  fill,
+  roundTop = false,
+  topRadius = 6,
+}) {
   const px = Number(x);
   const py = Number(y);
   const pw = Number(width);
   const ph = Number(height);
-  if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pw) || !Number.isFinite(ph) || ph <= 0) {
+  if (
+    !Number.isFinite(px) ||
+    !Number.isFinite(py) ||
+    !Number.isFinite(pw) ||
+    !Number.isFinite(ph) ||
+    ph <= 0
+  ) {
     return null;
   }
   const r = roundTop ? Math.min(topRadius, pw / 2, ph) : 0;
@@ -243,7 +257,7 @@ function CompareWorkloadCompletedOutsideLabel(props) {
 function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   if (!active || !payload?.length || !sprintDefs?.length) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
@@ -286,7 +300,9 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
               borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? '#2A2C32' : '#ECEFF1'}`,
             }}
           >
-            <Typography sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem', mb: 0.5 }}>
+            <Typography
+              sx={{ fontWeight: 700, color: sp.accentColor, fontSize: '0.88rem', mb: 0.5 }}
+            >
               {sp.shortLabel}
             </Typography>
             <Typography
@@ -310,7 +326,7 @@ function CompareWorkloadTooltip({ active, payload, sprintDefs }) {
 function CompareHoursTooltip({ active, payload, sprintDefs }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   if (!active || !payload?.length || !sprintDefs?.length) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
@@ -358,7 +374,13 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
               {sp.shortLabel}
             </Typography>
             <Typography
-              sx={{ color: 'text.secondary', fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.45, pr: 0.25 }}
+              sx={{
+                color: 'text.secondary',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                lineHeight: 1.45,
+                pr: 0.25,
+              }}
             >
               Hours worked: {worked.toFixed(1)} h
             </Typography>
@@ -389,7 +411,14 @@ function TeamProductivityTrendTooltip({ active, payload }) {
         minWidth: 220,
       }}
     >
-      <Typography sx={{ fontWeight: 800, color: row.accentColor || PRODUCTIVITY_SCORE_TREND, fontSize: '0.9rem', mb: 0.75 }}>
+      <Typography
+        sx={{
+          fontWeight: 800,
+          color: row.accentColor || PRODUCTIVITY_SCORE_TREND,
+          fontSize: '0.9rem',
+          mb: 0.75,
+        }}
+      >
         {row.sprintLabel}
       </Typography>
       <Typography sx={{ color: 'text.primary', fontSize: '0.95rem', fontWeight: 800, mb: 0.75 }}>
@@ -460,7 +489,13 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
               {sp.shortLabel}
             </Typography>
             <Typography
-              sx={{ color: 'text.secondary', fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.45, pr: 0.25 }}
+              sx={{
+                color: 'text.secondary',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                lineHeight: 1.45,
+                pr: 0.25,
+              }}
             >
               Completed tasks: {tasks} · Hours worked: {hours.toFixed(1)} h
             </Typography>
@@ -505,7 +540,9 @@ function CompareHoursBarLegend({ sprintDefs }) {
               component="span"
               sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: HOURS_FILL, flexShrink: 0 }}
             />
-            <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Hours worked</Typography>
+            <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>
+              Hours worked
+            </Typography>
           </Box>
         </Box>
       ) : null}
@@ -622,7 +659,11 @@ function CompareWorkloadSymbolLegend({ sprintDefs }) {
           </Typography>
         </Box>
         <Typography
-          sx={{ color: isDark ? '#2A2C32' : '#B0BEC5', fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+          sx={{
+            color: isDark ? '#2A2C32' : '#B0BEC5',
+            fontWeight: 700,
+            fontSize: { xs: '0.7rem', sm: '0.75rem' },
+          }}
         >
           ·
         </Typography>
@@ -689,7 +730,12 @@ function CompareComboLegend({ sprintDefs }) {
           }}
         />
         <Typography
-          sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary', fontWeight: 700, fontSize: labelSize }}
+          sx={{
+            ...CHART_LEGEND_ITEM_SX,
+            color: 'text.primary',
+            fontWeight: 700,
+            fontSize: labelSize,
+          }}
         >
           Bars = completed tasks (left)
         </Typography>
@@ -722,7 +768,12 @@ function CompareComboLegend({ sprintDefs }) {
           />
         </Box>
         <Typography
-          sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary', fontWeight: 700, fontSize: labelSize }}
+          sx={{
+            ...CHART_LEGEND_ITEM_SX,
+            color: 'text.primary',
+            fontWeight: 700,
+            fontSize: labelSize,
+          }}
         >
           Line = hours (right)
         </Typography>
@@ -806,14 +857,18 @@ function SingleWorkloadSymbolLegend({ completedFill = STACK_DONE, pendingFill = 
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: completedFill, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Completed tasks</Typography>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>
+          Completed tasks
+        </Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box
           component="span"
           sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: pendingFill, flexShrink: 0 }}
         />
-        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>Pending tasks</Typography>
+        <Typography sx={{ ...CHART_LEGEND_ITEM_SX, color: 'text.primary' }}>
+          Pending tasks
+        </Typography>
       </Box>
     </Box>
   );
@@ -890,9 +945,7 @@ function ChartShell({
           minWidth: 0,
           overflow: 'visible',
           height: typeof height === 'number' ? height : 400,
-          ...(bareContent
-            ? { display: 'flex', flexDirection: 'column', minHeight: 0 }
-            : {}),
+          ...(bareContent ? { display: 'flex', flexDirection: 'column', minHeight: 0 } : {}),
         };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
@@ -915,7 +968,7 @@ function ChartShell({
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        background: isDark 
+        background: isDark
           ? `linear-gradient(135deg, ${bg} 0%, #1C1E22 48%)`
           : `linear-gradient(135deg, ${bg} 0%, #FFFFFF 48%)`,
         boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
@@ -954,7 +1007,9 @@ function ChartShell({
       </Box>
 
       {description ? (
-        <Typography sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch', color: 'text.secondary' }}>
+        <Typography
+          sx={{ ...CHART_DESC_SX, mb: descMb, maxWidth: '68ch', color: 'text.secondary' }}
+        >
           {description}
         </Typography>
       ) : null}
@@ -979,15 +1034,15 @@ function ChartShell({
 
       {/* Gráfica */}
       <Box ref={chartRef} sx={{ ...chartBoxSx, mt: chartMt }}>
-        {chartVisible
-          ? bareContent
-            ? children
-            : (
-                <ResponsiveContainer width="100%" height="100%">
-                  {children}
-                </ResponsiveContainer>
-              )
-          : null}
+        {chartVisible ? (
+          bareContent ? (
+            children
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              {children}
+            </ResponsiveContainer>
+          )
+        ) : null}
       </Box>
     </MotionPaper>
   );
@@ -1080,7 +1135,7 @@ export default function DashboardDeveloperCharts({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const orderedSelectedSprints = useMemo(
     () => [...(selectedSprints || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
     [selectedSprints],
@@ -1224,14 +1279,18 @@ export default function DashboardDeveloperCharts({
   const compareWorkloadTaskAxis = useMemo(() => {
     if (!compareModel) return buildCompareTaskAxisDomainTicks(0);
     const { workloadRows, sprintDefs } = compareModel;
-    const defs = [...(sprintDefs || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
+    const defs = [...(sprintDefs || [])].sort(
+      (a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b),
+    );
     return buildCompareTaskAxisDomainTicks(maxCompareWorkloadStack(workloadRows, defs));
   }, [compareModel]);
 
   const compareHoursAxis = useMemo(() => {
     if (!compareModel) return buildCompareHoursAxisDomainTicks(0);
     const { hoursRows, sprintDefs } = compareModel;
-    const defs = [...(sprintDefs || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
+    const defs = [...(sprintDefs || [])].sort(
+      (a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b),
+    );
     return buildCompareHoursAxisDomainTicks(maxCompareHoursGrouped(hoursRows, defs));
   }, [compareModel]);
 
@@ -1240,8 +1299,7 @@ export default function DashboardDeveloperCharts({
     Math.round(0.5 * maxSingleHoursGrouped(compareHoursGroupedRows)),
   );
 
-  const hasCompareData =
-    compareMode && orderedSelectedSprints.length >= 2 && developers.length > 0;
+  const hasCompareData = compareMode && orderedSelectedSprints.length >= 2 && developers.length > 0;
   const hasSingleData = !compareMode && developers.length > 0;
 
   const singleSelectedSprintAccent = useMemo(() => {
@@ -1259,10 +1317,7 @@ export default function DashboardDeveloperCharts({
     : 0;
 
   const hWorkloadCompareBase = hasCompareData
-    ? Math.max(
-        280,
-        Math.min(520, 210 + compareWorkloadStack.length * 32 + compareTotalsChartBonus),
-      )
+    ? Math.max(280, Math.min(520, 210 + compareWorkloadStack.length * 32 + compareTotalsChartBonus))
     : null;
   const hHoursCompareBase = hasCompareData
     ? Math.max(
@@ -1450,7 +1505,12 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={workloadRowsWithTotals}
-            margin={{ top: marginTopWorkloadTight, right: 56, left: 8, bottom: bottomAxisWorkloadHours }}
+            margin={{
+              top: marginTopWorkloadTight,
+              right: 56,
+              left: 8,
+              bottom: bottomAxisWorkloadHours,
+            }}
             barCategoryGap={workloadBarCategoryGap}
             barGap={workloadBarGap}
           >
@@ -1832,7 +1892,12 @@ export default function DashboardDeveloperCharts({
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
+            contentStyle={{
+              ...CHART_TOOLTIP_SX,
+              backgroundColor: isDark ? '#1C1E22' : '#fff',
+              color: isDark ? '#F0F0F0' : '#1A1A1A',
+              borderColor: isDark ? '#2A2C32' : '#B0BEC5',
+            }}
             formatter={(value) => [`${value} tasks`, '']}
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload;
@@ -1948,7 +2013,12 @@ export default function DashboardDeveloperCharts({
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
+            contentStyle={{
+              ...CHART_TOOLTIP_SX,
+              backgroundColor: isDark ? '#1C1E22' : '#fff',
+              color: isDark ? '#F0F0F0' : '#1A1A1A',
+              borderColor: isDark ? '#2A2C32' : '#B0BEC5',
+            }}
             formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name]}
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload;
@@ -2048,7 +2118,12 @@ export default function DashboardDeveloperCharts({
           />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
-            contentStyle={{ ...CHART_TOOLTIP_SX, backgroundColor: isDark ? '#1C1E22' : '#fff', color: isDark ? '#F0F0F0' : '#1A1A1A', borderColor: isDark ? '#2A2C32' : '#B0BEC5' }}
+            contentStyle={{
+              ...CHART_TOOLTIP_SX,
+              backgroundColor: isDark ? '#1C1E22' : '#fff',
+              color: isDark ? '#F0F0F0' : '#1A1A1A',
+              borderColor: isDark ? '#2A2C32' : '#B0BEC5',
+            }}
             formatter={(value, name) => {
               if (name === 'Tasks completed') return [`${value}`, 'Tasks completed'];
               if (name === Y_AXIS_HOURS) return [`${Number(value).toFixed(1)} h`, Y_AXIS_HOURS];

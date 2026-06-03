@@ -54,10 +54,7 @@ function buildSprintAccentMap(sprints) {
   const map = new Map();
   sorted.forEach((s, i) => {
     if (s?.id == null) return;
-    map.set(
-      Number(s.id),
-      s.accentColor ?? SPRINT_CHART_COLORS[i % SPRINT_CHART_COLORS.length],
-    );
+    map.set(Number(s.id), s.accentColor ?? SPRINT_CHART_COLORS[i % SPRINT_CHART_COLORS.length]);
   });
   return map;
 }
@@ -287,17 +284,26 @@ export default function MyBlockersPage({ projectId, currentUser }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: pageEase }}
         elevation={0}
-        sx={{ p: 2.5, mb: 2.5, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
+        sx={{
+          p: 2.5,
+          mb: 2.5,
+          borderRadius: 3,
+          border: `1px solid ${borderColor}`,
+          bgcolor: cardBg,
+        }}
       >
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
           <AlertTriangle size={26} color="#C62828" style={{ flexShrink: 0, marginTop: 2 }} />
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.5px', color: 'text.primary' }}>
+            <Typography
+              variant="h4"
+              sx={{ fontWeight: 800, letterSpacing: '-0.5px', color: 'text.primary' }}
+            >
               My Blockers
             </Typography>
             <Typography sx={{ color: 'text.secondary', mt: 0.5, maxWidth: '42rem' }}>
-              Blocker reports you filed in this project (active and resolved). When you have a list, use the
-              filter to show all, blocked only, or resolved only.
+              Blocker reports you filed in this project (active and resolved). When you have a list,
+              use the filter to show all, blocked only, or resolved only.
             </Typography>
           </Box>
         </Box>
@@ -317,7 +323,12 @@ export default function MyBlockersPage({ projectId, currentUser }) {
 
       <Paper
         elevation={0}
-        sx={{ borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg, overflow: 'hidden' }}
+        sx={{
+          borderRadius: 3,
+          border: `1px solid ${borderColor}`,
+          bgcolor: cardBg,
+          overflow: 'hidden',
+        }}
       >
         {rows.length === 0 ? (
           <Box sx={{ py: 6, px: 3, textAlign: 'center' }}>
@@ -325,8 +336,8 @@ export default function MyBlockersPage({ projectId, currentUser }) {
               No blocker reports yet
             </Typography>
             <Typography sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
-              When you flag an assignment as blocked (only via Telegram) with a reason, it will appear here.
-              Resolved reports stay in your history.
+              When you flag an assignment as blocked (only via Telegram) with a reason, it will
+              appear here. Resolved reports stay in your history.
             </Typography>
           </Box>
         ) : filteredRows.length === 0 ? (
@@ -393,8 +404,7 @@ export default function MyBlockersPage({ projectId, currentUser }) {
               <TableBody>
                 {filteredRows.map((row) => {
                   const sid = row.sprintId;
-                  const sprintLabel =
-                    sid != null ? formatSprintLabel(sprintNumberMap, sid) : '—';
+                  const sprintLabel = sid != null ? formatSprintLabel(sprintNumberMap, sid) : '—';
                   const sprintAccent = sid != null ? sprintAccentMap.get(Number(sid)) : null;
                   const reason = String(row.blockedReason ?? '').trim();
                   const resolved = isRowResolved(row);
@@ -470,12 +480,19 @@ export default function MyBlockersPage({ projectId, currentUser }) {
                           }}
                         />
                       </TableCell>
-                      <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>
+                      <TableCell
+                        sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}
+                      >
                         {formatReportedDate(row.reportedAt)}
                       </TableCell>
-                      <TableCell sx={{ color: 'text.primary', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                      <TableCell
+                        sx={{ color: 'text.primary', fontSize: '0.88rem', lineHeight: 1.5 }}
+                      >
                         {reason || (
-                          <Typography component="span" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                          <Typography
+                            component="span"
+                            sx={{ color: 'text.secondary', fontStyle: 'italic' }}
+                          >
                             No reason provided
                           </Typography>
                         )}
@@ -502,7 +519,13 @@ export default function MyBlockersPage({ projectId, currentUser }) {
                             {isResolving ? 'Saving…' : 'Mark resolved'}
                           </Button>
                         ) : (
-                          <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', fontStyle: 'italic' }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.78rem',
+                              color: 'text.secondary',
+                              fontStyle: 'italic',
+                            }}
+                          >
                             —
                           </Typography>
                         )}

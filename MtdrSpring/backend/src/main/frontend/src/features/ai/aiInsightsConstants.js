@@ -158,7 +158,10 @@ export function alignTrendsProductivityScore(text, actualScore) {
   );
   if (explicit !== source) return explicit;
   if (/productiv/i.test(source)) {
-    return source.replace(/(\bscore\s*(?:of|is|:|at)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi, `$1${display}`);
+    return source.replace(
+      /(\bscore\s*(?:of|is|:|at)\s*)(-?\d+(?:\.\d+)?)(?:\s*%)?/gi,
+      `$1${display}`,
+    );
   }
   return source;
 }
@@ -187,10 +190,7 @@ export function alignProductivityScoreProse(text, actualScore) {
     );
   }
   // Gemini often writes "At 67.9%, the composite..." without the words "productivity score".
-  out = out.replace(
-    /^(\s*At\s+)(-?\d+(?:\.\d+)?)(\s*%)/i,
-    `$1${display}`,
-  );
+  out = out.replace(/^(\s*At\s+)(-?\d+(?:\.\d+)?)(\s*%)/i, `$1${display}`);
   out = out.replace(
     /(composite(?:\s+\w+){0,8}?\s+(?:is\s+)?(?:at\s+)?)(-?\d+(?:\.\d+)?)\s*%?/gi,
     `$1${display}`,
@@ -444,11 +444,9 @@ export function stripContradictoryOnTimeDecline(text, onTimePercent) {
 }
 
 /** Placeholder / invalid assignee names — not valid redistribution targets. */
-const INVALID_WORKLOAD_DEVELOPER_RE =
-  /^(n\/?a|unknown|unassigned|none|tbd|—|-)$/i;
+const INVALID_WORKLOAD_DEVELOPER_RE = /^(n\/?a|unknown|unassigned|none|tbd|—|-)$/i;
 
-const PLACEHOLDER_WORKLOAD_DEVELOPER_RE =
-  /(most[- ]?loaded|least[- ]?loaded).{0,24}developer/i;
+const PLACEHOLDER_WORKLOAD_DEVELOPER_RE = /(most[- ]?loaded|least[- ]?loaded).{0,24}developer/i;
 
 /** True when a name can appear in a move-from / move-to workload recommendation. */
 export function isValidWorkloadDeveloperName(name) {

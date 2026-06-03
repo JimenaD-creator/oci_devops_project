@@ -34,9 +34,10 @@ export default function DeveloperPerformanceNarrative({ sprintId, userId, userNa
       };
     }
 
-    if (aiStatusLoading) return () => {
-      cancelled = true;
-    };
+    if (aiStatusLoading)
+      return () => {
+        cancelled = true;
+      };
 
     if (blocked) {
       setSummary('');

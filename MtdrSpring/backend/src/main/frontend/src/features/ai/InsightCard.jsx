@@ -388,7 +388,11 @@ export default function InsightCard({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Sparkles size={20} color="#673AB7" />
           <Typography
-            sx={{ fontWeight: 700, fontSize: { xs: '0.98rem', md: '1.05rem' }, color: 'text.primary' }}
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: '0.98rem', md: '1.05rem' },
+              color: 'text.primary',
+            }}
           >
             {sprintLabel}
           </Typography>
@@ -444,13 +448,16 @@ export default function InsightCard({
                   onClick={handleGenerate}
                   sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}
                 >
-                <RefreshCw size={20} />
-              </IconButton>
+                  <RefreshCw size={20} />
+                </IconButton>
               </span>
             </Tooltip>
           )}
           {status === 'loaded' && (
-            <IconButton onClick={() => setExpanded((v) => !v)} sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}>
+            <IconButton
+              onClick={() => setExpanded((v) => !v)}
+              sx={{ color: isDark ? '#9A9A9A' : '#607D8B', p: 1 }}
+            >
               {expanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
             </IconButton>
           )}
@@ -484,7 +491,9 @@ export default function InsightCard({
       {(status === 'idle' || status === 'error') && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
           {status === 'idle' && (
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
+            <Typography
+              sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}
+            >
               No insights generated yet for this sprint.
             </Typography>
           )}
@@ -513,7 +522,9 @@ export default function InsightCard({
             </Box>
           )}
           {status === 'error' && !isApiKeyInsightError(errorCode) && (
-            <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
+            <Typography
+              sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}
+            >
               {error || 'Could not generate insights for this sprint.'}
             </Typography>
           )}
@@ -608,7 +619,12 @@ export default function InsightCard({
                   {s.value}
                 </Typography>
                 <Typography
-                  sx={{ fontSize: '0.8rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600, mt: 0.25 }}
+                  sx={{
+                    fontSize: '0.8rem',
+                    color: isDark ? '#9A9A9A' : '#607D8B',
+                    fontWeight: 600,
+                    mt: 0.25,
+                  }}
                 >
                   {s.label}
                 </Typography>
@@ -691,11 +707,14 @@ export default function InsightCard({
                 }}
               >
                 <Box
-                  sx={{ px: 2, py: 1.25, bgcolor: isDark ? '#1A3A5C' : '#E3F2FD', borderBottom: `1px solid ${isDark ? '#1A3A5C' : '#BBDEFB'}` }}
+                  sx={{
+                    px: 2,
+                    py: 1.25,
+                    bgcolor: isDark ? '#1A3A5C' : '#E3F2FD',
+                    borderBottom: `1px solid ${isDark ? '#1A3A5C' : '#BBDEFB'}`,
+                  }}
                 >
-                  <SectionHeading icon={FileText}>
-                    Sprint summary
-                  </SectionHeading>
+                  <SectionHeading icon={FileText}>Sprint summary</SectionHeading>
                 </Box>
                 <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                   {(() => {
@@ -744,7 +763,12 @@ export default function InsightCard({
                 }}
               >
                 <Box
-                  sx={{ px: 1.5, py: 0.75, bgcolor: isDark ? '#1A4A2A' : '#E8F5E9', borderBottom: `1px solid ${isDark ? '#2E7D32' : '#C8E6C9'}` }}
+                  sx={{
+                    px: 1.5,
+                    py: 0.75,
+                    bgcolor: isDark ? '#1A4A2A' : '#E8F5E9',
+                    borderBottom: `1px solid ${isDark ? '#2E7D32' : '#C8E6C9'}`,
+                  }}
                 >
                   <SectionHeading icon={Lightbulb} dense>
                     Actionable recommendations
@@ -777,7 +801,12 @@ export default function InsightCard({
                   }}
                 >
                   <Box
-                    sx={{ px: 1.5, py: 0.75, bgcolor: isDark ? '#4A3A1A' : '#FFF8E1', borderBottom: `1px solid ${isDark ? '#7F6A1A' : '#FFECB3'}` }}
+                    sx={{
+                      px: 1.5,
+                      py: 0.75,
+                      bgcolor: isDark ? '#4A3A1A' : '#FFF8E1',
+                      borderBottom: `1px solid ${isDark ? '#7F6A1A' : '#FFECB3'}`,
+                    }}
                   >
                     <SectionHeading icon={Sparkles} dense>
                       Predictions
@@ -835,17 +864,23 @@ export default function InsightCard({
                   borderRadius: 2,
                   bgcolor: '#E53935',
                   color: '#fff',
-                  boxShadow: isDark ? '0 2px 8px rgba(229, 57, 53, 0.35)' : '0 2px 8px rgba(229, 57, 53, 0.45)',
+                  boxShadow: isDark
+                    ? '0 2px 8px rgba(229, 57, 53, 0.35)'
+                    : '0 2px 8px rgba(229, 57, 53, 0.45)',
                   transition:
                     'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
                   '&:hover': {
                     bgcolor: '#C62828',
-                    boxShadow: isDark ? '0 4px 14px rgba(198, 40, 40, 0.45)' : '0 4px 14px rgba(198, 40, 40, 0.55)',
+                    boxShadow: isDark
+                      ? '0 4px 14px rgba(198, 40, 40, 0.45)'
+                      : '0 4px 14px rgba(198, 40, 40, 0.55)',
                     transform: 'translateY(-1px)',
                   },
                   '&:active': {
                     transform: 'translateY(0)',
-                    boxShadow: isDark ? '0 2px 6px rgba(198, 40, 40, 0.4)' : '0 2px 6px rgba(198, 40, 40, 0.5)',
+                    boxShadow: isDark
+                      ? '0 2px 6px rgba(198, 40, 40, 0.4)'
+                      : '0 2px 6px rgba(198, 40, 40, 0.5)',
                   },
                   '& .MuiButton-startIcon': { color: '#fff', mr: 1 },
                 }}

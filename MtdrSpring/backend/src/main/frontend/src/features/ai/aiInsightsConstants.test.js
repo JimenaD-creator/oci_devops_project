@@ -11,8 +11,7 @@ import {
 
 describe('aiInsightsConstants KPI alignment', () => {
   it('aligns on-time delivery "currently at" far from the label', () => {
-    const text =
-      'On-Time Delivery has declined for three consecutive sprints, currently at 63%.';
+    const text = 'On-Time Delivery has declined for three consecutive sprints, currently at 63%.';
     const out = alignKpiProseForMetric(text, 'onTimeDelivery', { onTimeDelivery: 83 });
     expect(out).toContain('currently at 83%');
     expect(out).not.toContain('63%');

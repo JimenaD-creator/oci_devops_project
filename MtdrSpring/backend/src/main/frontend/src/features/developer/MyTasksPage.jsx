@@ -17,11 +17,12 @@ import { TaskDetailDialog } from '../tasks/TaskDetailDialog';
 import DeveloperMetricCards from './DeveloperMetricCards';
 import DeveloperEmptyState from './DeveloperEmptyState';
 import { filterUserTasksForUser } from './developerTaskFilters';
-import { resolveUserTaskUserId, taskSprintId, userTaskWorkedHours } from '../dashboard/dashboardSprintData';
 import {
-  buildSprintTaskTableRows,
-  filterTasksForUser,
-} from '../tasks/sprintTaskTableRows';
+  resolveUserTaskUserId,
+  taskSprintId,
+  userTaskWorkedHours,
+} from '../dashboard/dashboardSprintData';
+import { buildSprintTaskTableRows, filterTasksForUser } from '../tasks/sprintTaskTableRows';
 import {
   isUserTaskAssigneeComplete,
   mergeUpdatedTask,
@@ -39,7 +40,10 @@ import {
   sortTasksForSprintTable,
   sprintProjectIdFromJson,
 } from '../sprints/utils/sprintUtils';
-import { fetchSprintsProjectDevelopers, fetchSprintsTasksAndAssignments } from '../sprints/sprintsPageApi';
+import {
+  fetchSprintsProjectDevelopers,
+  fetchSprintsTasksAndAssignments,
+} from '../sprints/sprintsPageApi';
 import { getCachedProjectDevelopersSnapshot } from '../dashboard/projectApi';
 import { getCachedBundleSnapshot } from '../dashboard/dashboardSprintData';
 import { resolveLoadErrorMessage } from '../../utils/auth';
@@ -72,85 +76,85 @@ export default function MyTasksPage({ projectId, currentUser }) {
   const projectDevelopersRef = useRef(projectDevelopers);
   projectDevelopersRef.current = projectDevelopers;
 
-  const applyBundleToState = useCallback(
-    (sprintsList, tasksList, userTasksList) => {
-      const deleted = new Set(getRecentlyDeletedTaskIdSet());
-      const createdTasks = getRecentlyCreatedTasks();
-      const baseTasks = Array.isArray(tasksList) ? tasksList : [];
-      const mergedTasks = [...createdTasks, ...baseTasks].filter(
-        (task, index, arr) =>
-          arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
-      );
-      const visibleTasks = mergedTasks.filter((t) => !deleted.has(String(t?.id)));
-      const visibleUserTasks = mergeUserTaskLists(
-        getRecentlyCreatedUserTasks(),
-        Array.isArray(userTasksList) ? userTasksList : [],
-      ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
-      const synced = applyRecentUpdatesToTaskLists(
-        visibleTasks,
-        visibleUserTasks,
-        projectDevelopersRef.current,
-      );
-      const sorted = sortSprintsForSelect(Array.isArray(sprintsList) ? sprintsList : []);
-      setSprints(sorted);
-      setTasks(synced.tasks);
-      setUserTasks(synced.userTasks);
-    },
-    [],
-  );
+  const applyBundleToState = useCallback((sprintsList, tasksList, userTasksList) => {
+    const deleted = new Set(getRecentlyDeletedTaskIdSet());
+    const createdTasks = getRecentlyCreatedTasks();
+    const baseTasks = Array.isArray(tasksList) ? tasksList : [];
+    const mergedTasks = [...createdTasks, ...baseTasks].filter(
+      (task, index, arr) => arr.findIndex((t) => Number(t?.id) === Number(task?.id)) === index,
+    );
+    const visibleTasks = mergedTasks.filter((t) => !deleted.has(String(t?.id)));
+    const visibleUserTasks = mergeUserTaskLists(
+      getRecentlyCreatedUserTasks(),
+      Array.isArray(userTasksList) ? userTasksList : [],
+    ).filter((ut) => !deleted.has(String(userTaskRowTaskId(ut))));
+    const synced = applyRecentUpdatesToTaskLists(
+      visibleTasks,
+      visibleUserTasks,
+      projectDevelopersRef.current,
+    );
+    const sorted = sortSprintsForSelect(Array.isArray(sprintsList) ? sprintsList : []);
+    setSprints(sorted);
+    setTasks(synced.tasks);
+    setUserTasks(synced.userTasks);
+  }, []);
 
-  const loadData = useCallback(async (opts = {}) => {
-    const silent = opts.silent === true;
-    const forceFresh = opts.forceFresh === true;
-    const projectKey =
-      effectiveProjectIdNum != null ? String(effectiveProjectIdNum) : null;
+  const loadData = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      const forceFresh = opts.forceFresh === true;
+      const projectKey = effectiveProjectIdNum != null ? String(effectiveProjectIdNum) : null;
 
-    if (!silent) {
-      setLoadError('');
-    }
+      if (!silent) {
+        setLoadError('');
+      }
 
-    if (!silent && !forceFresh && projectKey) {
-      const snap = getCachedBundleSnapshot(projectKey);
-      if (snap) {
-        let sprintsData = snap.sprints;
-        if (effectiveProjectIdNum != null && Array.isArray(sprintsData)) {
-          sprintsData = sprintsData.filter(
-            (s) => sprintProjectIdFromJson(s) === effectiveProjectIdNum,
+      if (!silent && !forceFresh && projectKey) {
+        const snap = getCachedBundleSnapshot(projectKey);
+        if (snap) {
+          let sprintsData = snap.sprints;
+          if (effectiveProjectIdNum != null && Array.isArray(sprintsData)) {
+            sprintsData = sprintsData.filter(
+              (s) => sprintProjectIdFromJson(s) === effectiveProjectIdNum,
+            );
+          }
+          applyBundleToState(
+            Array.isArray(sprintsData) ? sprintsData : [],
+            snap.tasks,
+            snap.userTasks,
           );
+          setLoading(false);
+        } else {
+          setLoading(true);
         }
-        applyBundleToState(
-          Array.isArray(sprintsData) ? sprintsData : [],
-          snap.tasks,
-          snap.userTasks,
-        );
-        setLoading(false);
-      } else {
+      } else if (!silent) {
         setLoading(true);
       }
-    } else if (!silent) {
-      setLoading(true);
-    }
 
-    try {
-      if (forceFresh) {
-        await invalidateAndRefresh();
-      }
-      const { sprintsList, tasksList, userTasksList } =
-        await fetchSprintsTasksAndAssignments(projectId, { forceFresh });
-      applyBundleToState(sprintsList, tasksList, userTasksList);
-    } catch (e) {
-      if (!silent) {
-        setSprints([]);
-        setTasks([]);
-        setUserTasks([]);
-        setLoadError(
-          resolveLoadErrorMessage(e, 'Could not load your tasks. Try signing in again.'),
+      try {
+        if (forceFresh) {
+          await invalidateAndRefresh();
+        }
+        const { sprintsList, tasksList, userTasksList } = await fetchSprintsTasksAndAssignments(
+          projectId,
+          { forceFresh },
         );
+        applyBundleToState(sprintsList, tasksList, userTasksList);
+      } catch (e) {
+        if (!silent) {
+          setSprints([]);
+          setTasks([]);
+          setUserTasks([]);
+          setLoadError(
+            resolveLoadErrorMessage(e, 'Could not load your tasks. Try signing in again.'),
+          );
+        }
+      } finally {
+        if (!silent) setLoading(false);
       }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [projectId, effectiveProjectIdNum, invalidateAndRefresh, applyBundleToState]);
+    },
+    [projectId, effectiveProjectIdNum, invalidateAndRefresh, applyBundleToState],
+  );
 
   useEffect(() => {
     loadData();
@@ -293,7 +297,9 @@ export default function MyTasksPage({ projectId, currentUser }) {
         label: 'Hours worked',
         value: `${hours.toFixed(1)}h`,
         subtitle:
-          estimated > 0 ? `${hours.toFixed(1)}h of ${estimated.toFixed(1)}h estimated` : 'Logged on your assignments',
+          estimated > 0
+            ? `${hours.toFixed(1)}h of ${estimated.toFixed(1)}h estimated`
+            : 'Logged on your assignments',
         progress: estimated > 0 ? Math.min(100, hoursRatio) : hours > 0 ? 100 : 0,
         accent: '#3949AB',
       },
@@ -370,13 +376,13 @@ export default function MyTasksPage({ projectId, currentUser }) {
                 bgcolor: 'background.paper',
                 color: 'text.primary',
               },
-              
-'& .MuiInputLabel-root': {
-  color: 'text.secondary',      
-},
-'& .MuiSelect-select': {
-  color: 'text.primary',       
-},
+
+              '& .MuiInputLabel-root': {
+                color: 'text.secondary',
+              },
+              '& .MuiSelect-select': {
+                color: 'text.primary',
+              },
               '& .MuiSvgIcon-root': {
                 color: 'text.secondary',
               },

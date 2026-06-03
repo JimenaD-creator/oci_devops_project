@@ -73,10 +73,10 @@ describe('productivityScoreUtils (KPI Analytics)', () => {
   });
 
   it('softenProductivityGuideForSprintPhase strips judgment labels before sprint is mature', () => {
-    const out = softenProductivityGuideForSprintPhase(
-      'Performance is weak in the combined view.',
-      { phase: 'not_started', isEarly: true },
-    );
+    const out = softenProductivityGuideForSprintPhase('Performance is weak in the combined view.', {
+      phase: 'not_started',
+      isEarly: true,
+    });
     expect(out).not.toMatch(/weak/i);
   });
 });

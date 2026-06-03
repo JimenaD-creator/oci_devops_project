@@ -17,7 +17,7 @@ import { formatDate, inferSprintStatus } from './utils/sprintUtils';
 export function SprintCard({ sprint, tasks, isSelected, onClick, sprintNumber }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const status = inferSprintStatus(sprint, tasks);
   const statusCfg = STATUS_CONFIG[status];
   const sprintTasks = tasks.filter((t) => t.assignedSprint?.id === sprint.id);
@@ -33,31 +33,33 @@ export function SprintCard({ sprint, tasks, isSelected, onClick, sprintNumber })
   })();
 
   const outlineColor = statusCfg.textColor;
-  
+
   return (
     <Card
       onClick={onClick}
       sx={{
         borderRadius: 3,
-        border: isSelected 
-          ? `2px solid ${outlineColor}` 
+        border: isSelected
+          ? `2px solid ${outlineColor}`
           : `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
-        boxShadow: isSelected 
-          ? `0 4px 14px ${outlineColor}33` 
-          : isDark 
-            ? '0 2px 8px rgba(0,0,0,0.2)' 
+        boxShadow: isSelected
+          ? `0 4px 14px ${outlineColor}33`
+          : isDark
+            ? '0 2px 8px rgba(0,0,0,0.2)'
             : '0 2px 8px rgba(0,0,0,0.04)',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
-        '&:hover': { 
-          boxShadow: isDark 
-            ? '0 4px 16px rgba(0,0,0,0.3)' 
-            : '0 4px 16px rgba(0,0,0,0.08)', 
-          transform: 'translateY(-1px)' 
+        '&:hover': {
+          boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.08)',
+          transform: 'translateY(-1px)',
         },
         bgcolor: isSelected
-  ? (isDark ? alpha(outlineColor, 0.12) : statusCfg.color)
-  : (isDark ? '#1C1E22' : 'white'),
+          ? isDark
+            ? alpha(outlineColor, 0.12)
+            : statusCfg.color
+          : isDark
+            ? '#1C1E22'
+            : 'white',
       }}
     >
       <CardContent sx={{ p: 3 }}>
@@ -70,12 +72,14 @@ export function SprintCard({ sprint, tasks, isSelected, onClick, sprintNumber })
           }}
         >
           <Box>
-            <Typography sx={{ 
-              fontWeight: 800, 
-              fontSize: '1.08rem',
-              color: 'text.primary',
-            }}>
-Sprint {sprintNumber ?? sprint.id}
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: '1.08rem',
+                color: 'text.primary',
+              }}
+            >
+              Sprint {sprintNumber ?? sprint.id}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
               <CalendarTodayIcon sx={{ fontSize: 12, color: isDark ? '#9A9A9A' : '#AAA' }} />
@@ -98,7 +102,10 @@ Sprint {sprintNumber ?? sprint.id}
         {total > 0 && (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: isDark ? '#9A9A9A' : '#888', fontWeight: 600 }}
+              >
                 Progress
               </Typography>
               <Typography
@@ -130,15 +137,24 @@ Sprint {sprintNumber ?? sprint.id}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <CheckCircleIcon sx={{ fontSize: 14, color: '#4CAF50' }} />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#555' }}>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#555' }}
+            >
               {done}
             </Typography>
             <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: ORACLE_RED }} />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#555' }}>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#555' }}
+            >
               {total - done}
             </Typography>
           </Box>
-          <Typography variant="caption" sx={{ color: isDark ? '#9A9A9A' : '#AAA', fontWeight: 600 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: isDark ? '#9A9A9A' : '#AAA', fontWeight: 600 }}
+          >
             {total} tasks
           </Typography>
         </Box>

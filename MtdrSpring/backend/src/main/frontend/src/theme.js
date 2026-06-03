@@ -4,10 +4,10 @@ export const APP_FONT_FAMILY =
   "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Helvetica Neue', sans-serif";
 
 const baseComponents = {
-  MuiInputBase:  { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
+  MuiInputBase: { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
   MuiInputLabel: { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
-  MuiMenuItem:   { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
-  MuiPaper:      { styleOverrides: { root: { backgroundImage: 'none' } } },
+  MuiMenuItem: { styleOverrides: { root: { fontFamily: APP_FONT_FAMILY } } },
+  MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
 };
 
 export const lightTheme = createTheme({
