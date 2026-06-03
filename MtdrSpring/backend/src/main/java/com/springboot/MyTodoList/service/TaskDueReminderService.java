@@ -80,7 +80,7 @@ public class TaskDueReminderService {
         if (ut == null || ut.getUser() == null || ut.getTask() == null) {
             return false;
         }
-        if (ut.isCompletedAssignment()) {
+        if (isAssignmentClosedForReminders(ut)) {
             return false;
         }
         Task task = ut.getTask();
@@ -138,6 +138,22 @@ public class TaskDueReminderService {
         sentReminderKeys.put(dedupeKey, System.currentTimeMillis());
         logger.info("Task due reminder queued for userId={} taskId={} due={}", userId, taskId, due);
         return true;
+    }
+
+    /** No reminder when the assignee or task is already finished (even if completed after the due date). */
+    static boolean isAssignmentClosedForReminders(UserTask ut) {
+        if (ut == null) {
+            return true;
+        }
+        if (ut.isCompletedAssignment() || ut.getCompletedAt() != null) {
+            return true;
+        }
+        Task task = ut.getTask();
+        if (task == null) {
+            return false;
+        }
+        String taskStatus = task.getStatus();
+        return taskStatus != null && "DONE".equalsIgnoreCase(taskStatus.trim());
     }
 
     private static String formatDueLabel(LocalDateTime due, LocalDateTime now) {

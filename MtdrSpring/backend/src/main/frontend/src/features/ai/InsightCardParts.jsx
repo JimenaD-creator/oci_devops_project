@@ -1,4 +1,4 @@
-import React from 'react';
+import { developerInsightDisplayText } from './developerInsightDisplay';
 import {
   Box,
   Typography,
@@ -631,7 +631,9 @@ export function DeveloperInsightsTable({ rows }) {
                   )}
                 </Box>
               </TableCell>
-              <TableCell sx={{ color: isDark ? '#E0E0E0' : '#455A64', lineHeight: 1.55 }}>{row.insight}</TableCell>
+              <TableCell sx={{ color: isDark ? '#E0E0E0' : '#455A64', lineHeight: 1.55 }}>
+                {developerInsightDisplayText(row)}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -74,6 +75,45 @@ class TaskDueReminderServiceTest {
 
         assertEquals(0, taskDueReminderService.processDueReminders());
         verify(emailService, never()).sendTaskDueReminderEmail(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void processDueReminders_sendsForOverdueOpenAssignment() {
+        UserTask ut = openAssignment(7L, 42L, "dev@test.com", "Still open", LocalDateTime.now().minusDays(1));
+
+        when(userTaskRepository.findAssignmentsDueBefore(any(LocalDateTime.class)))
+                .thenReturn(List.of(ut));
+
+        assertEquals(1, taskDueReminderService.processDueReminders());
+        verify(emailService)
+                .sendTaskDueReminderEmail(
+                        eq("dev@test.com"),
+                        eq("Dev"),
+                        eq("Still open"),
+                        any(String.class),
+                        any(),
+                        any(),
+                        any(String.class));
+    }
+
+    @Test
+    void processDueReminders_skipsWhenTaskMarkedDoneEvenIfUserTaskOpen() {
+        UserTask ut = openAssignment(7L, 42L, "dev@test.com", "Late finish", LocalDateTime.now().minusDays(1));
+        ut.getTask().setStatus("DONE");
+        ut.setStatus("IN_PROGRESS");
+
+        when(userTaskRepository.findAssignmentsDueBefore(any(LocalDateTime.class)))
+                .thenReturn(List.of(ut));
+
+        assertEquals(0, taskDueReminderService.processDueReminders());
+        verify(emailService, never()).sendTaskDueReminderEmail(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void isAssignmentClosedForReminders_trueWhenCompletedAfterDueDate() {
+        UserTask ut = openAssignment(7L, 42L, "dev@test.com", "Late", LocalDateTime.now().minusDays(2));
+        ut.setStatus("COMPLETED");
+        assertTrue(TaskDueReminderService.isAssignmentClosedForReminders(ut));
     }
 
     private static UserTask openAssignment(

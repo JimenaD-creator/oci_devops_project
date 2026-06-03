@@ -103,8 +103,22 @@ export default function KpiManagerGuidePanel({
     ? formatProductivityScoreDisplay(resolvedCurrentProductivityScore)
     : '';
   const fallbackGuide = buildFallbackKpiManagerGuide(currentSprintKpis, currentSprint);
-  const effectiveGuide =
-    guide && (guide.intro || guide.byMetric) ? guide : fallbackGuide;
+  const hasPersistedGuide = Boolean(
+    guide &&
+      ((typeof guide.intro === 'string' && guide.intro.trim()) ||
+        (guide.byMetric &&
+          typeof guide.byMetric === 'object' &&
+          METRIC_KEYS.some((k) => {
+            const t = guide.byMetric[k];
+            return typeof t === 'string' && t.trim() !== '';
+          }))),
+  );
+  /** Avoid flashing deterministic fallback text before persisted AI guide arrives. */
+  const effectiveGuide = hasPersistedGuide
+    ? guide
+    : loading
+      ? null
+      : fallbackGuide;
   const byMetric =
     effectiveGuide?.byMetric && typeof effectiveGuide.byMetric === 'object'
       ? effectiveGuide.byMetric

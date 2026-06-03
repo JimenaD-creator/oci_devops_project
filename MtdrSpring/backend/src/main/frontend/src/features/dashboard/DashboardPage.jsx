@@ -375,7 +375,7 @@ export default function DashboardPage({ projectId: propProjectId, onNavigateToTa
     );
   }
 
-  if ((sharedLoading || sharedRefreshing) && allSprints.length === 0) {
+  if (sharedLoading && sharedSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 

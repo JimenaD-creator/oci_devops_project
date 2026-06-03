@@ -65,6 +65,9 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
                     + "LEFT JOIN FETCH s.assignedProject p "
                     + "LEFT JOIN FETCH p.assignedTeam team "
                     + "LEFT JOIN FETCH team.manager "
-                    + "WHERE t.dueDate IS NOT NULL AND t.dueDate <= :windowEnd")
+                    + "WHERE t.dueDate IS NOT NULL AND t.dueDate <= :windowEnd "
+                    + "AND (t.status IS NULL OR UPPER(t.status) <> 'DONE') "
+                    + "AND (ut.status IS NULL OR UPPER(ut.status) NOT IN ('DONE', 'COMPLETED', 'COMPLETE')) "
+                    + "AND ut.completedAt IS NULL")
     List<UserTask> findAssignmentsDueBefore(@Param("windowEnd") java.time.LocalDateTime windowEnd);
 }

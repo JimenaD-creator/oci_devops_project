@@ -89,6 +89,29 @@ function findTeamDeveloper(teamDevelopers, name) {
   );
 }
 
+/** Names of developers with at least one active blocked assignment this sprint. */
+export function blockedDeveloperNamesFromInsights(insights) {
+  const blocked = new Set();
+  const rows = insights?.blockedAssignments;
+  if (!Array.isArray(rows)) return blocked;
+  rows.forEach((row) => {
+    const name = String(
+      row?.reportedByDeveloperName ?? row?.developerName ?? row?.assignee ?? '',
+    )
+      .trim()
+      .toLowerCase();
+    if (name) blocked.add(name);
+  });
+  return blocked;
+}
+
+function isBlockedDeveloperName(name, blockedDeveloperNames) {
+  const key = String(name ?? '')
+    .trim()
+    .toLowerCase();
+  return Boolean(key && blockedDeveloperNames?.has?.(key));
+}
+
 function pendingTasksForDeveloper(dev) {
   if (!dev) return 0;
   if (typeof dev.pending === 'number' && Number.isFinite(dev.pending)) {
@@ -125,14 +148,20 @@ function sortRedistributionReceivers(a, b) {
  * Prefer teammates who finished their assignments but logged fewer hours / lower participation.
  * Falls back to lightest open load when no one has cleared their queue yet.
  */
-export function pickRedistributionReceiver(teamDevelopers, fromName) {
+export function pickRedistributionReceiver(teamDevelopers, fromName, blockedDeveloperNames = null) {
   const fromKey = String(fromName ?? '')
     .trim()
     .toLowerCase();
+  const blocked = blockedDeveloperNames instanceof Set ? blockedDeveloperNames : new Set();
   const candidates = (teamDevelopers || [])
     .filter((d) => {
       const n = String(d?.name ?? '').trim();
-      return n && n.toLowerCase() !== fromKey && isValidWorkloadDeveloperName(n);
+      return (
+        n &&
+        n.toLowerCase() !== fromKey &&
+        isValidWorkloadDeveloperName(n) &&
+        !isBlockedDeveloperName(n, blocked)
+      );
     })
     .map((d) => {
       const assigned = Number(d.assigned) || 0;
@@ -211,9 +240,15 @@ function suggestTasksToMove(fromName, teamDevelopers) {
  * Structured move rows derived from Team-aligned `developerInsights` overload flags.
  * @returns {Array<{ from: string, to: string, tasksToMove: number, reason?: string }>}
  */
-export function workloadRowsFromDeveloperInsights(developerInsights, teamDevelopers = []) {
+export function workloadRowsFromDeveloperInsights(
+  developerInsights,
+  teamDevelopers = [],
+  blockedDeveloperNames = null,
+) {
   if (!Array.isArray(developerInsights)) return [];
 
+  const blocked =
+    blockedDeveloperNames instanceof Set ? blockedDeveloperNames : new Set();
   const rows = [];
   const seenFrom = new Set();
 
@@ -233,7 +268,8 @@ export function workloadRowsFromDeveloperInsights(developerInsights, teamDevelop
         from,
         to: toStructured,
         tasksToMove: nStructured,
-      })
+      }) &&
+      !isBlockedDeveloperName(toStructured, blocked)
     ) {
       rows.push({
         from,
@@ -252,7 +288,8 @@ export function workloadRowsFromDeveloperInsights(developerInsights, teamDevelop
         from,
         to: parsed.to,
         tasksToMove: parsed.tasksToMove,
-      })
+      }) &&
+      !isBlockedDeveloperName(parsed.to, blocked)
     ) {
       rows.push({
         from,
@@ -264,7 +301,7 @@ export function workloadRowsFromDeveloperInsights(developerInsights, teamDevelop
       continue;
     }
 
-    const receiver = pickRedistributionReceiver(teamDevelopers, from);
+    const receiver = pickRedistributionReceiver(teamDevelopers, from, blocked);
     if (receiver) {
       rows.push({
         from,
@@ -356,6 +393,7 @@ export function computeRecommendationList(ins, options = {}) {
   if (!ins) return [];
 
   const teamDevelopers = options.teamDevelopers ?? [];
+  const blockedDevelopers = blockedDeveloperNamesFromInsights(ins);
   const rawActionables = ins.actionableRecommendations ?? [];
   const geminiWorkload = pickGeminiWorkloadFromActionables(rawActionables);
   const nonWorkloadActionables = filterNonWorkloadActionables(rawActionables);
@@ -367,7 +405,7 @@ export function computeRecommendationList(ins, options = {}) {
         from: r?.from,
         to: r?.to,
         tasksToMove: r?.tasksToMove,
-      }),
+      }) && !isBlockedDeveloperName(r?.to, blockedDevelopers),
     )
     .map((r) => ({
       from: String(r.from).trim(),
@@ -381,7 +419,11 @@ export function computeRecommendationList(ins, options = {}) {
 
   const structuredFromOverload = geminiHasExplicitMove
     ? []
-    : workloadRowsFromDeveloperInsights(ins.developerInsights, teamDevelopers);
+    : workloadRowsFromDeveloperInsights(
+        ins.developerInsights,
+        teamDevelopers,
+        blockedDevelopers,
+      );
 
   const structuredRows = mergeStructuredWorkloadRows(structuredFromApi, structuredFromOverload);
 
@@ -395,7 +437,11 @@ export function computeRecommendationList(ins, options = {}) {
     workloadItem = pickSingleWorkloadRecommendation(
       mergeStructuredWorkloadRows(
         structuredFromApi,
-        workloadRowsFromDeveloperInsights(ins.developerInsights, teamDevelopers),
+        workloadRowsFromDeveloperInsights(
+          ins.developerInsights,
+          teamDevelopers,
+          blockedDevelopers,
+        ),
       ),
     );
   }

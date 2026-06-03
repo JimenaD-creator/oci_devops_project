@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.Task;
@@ -263,5 +264,155 @@ class GeminiServiceTest {
             }
             return new String(in.readAllBytes());
         }
+    }
+
+    @Test
+    void stampDeveloperAiNarrativesFromRaw_copiesGeminiInsightBeforeLiveSync() throws Exception {
+        Method m = GeminiService.class.getDeclaredMethod(
+            "stampDeveloperAiNarrativesFromRaw", ObjectNode.class);
+        m.setAccessible(true);
+        ObjectNode root = MAPPER.createObjectNode();
+        ArrayNode dev = root.putArray("developerInsights");
+        ObjectNode row = dev.addObject();
+        row.put("developerName", "Jimena Díaz");
+        row.put(
+            "insight",
+            "Completed 3 tasks on time with 7 hours logged. Strong performance.");
+
+        m.invoke(null, root);
+
+        assertEquals(
+            "Completed 3 tasks on time with 7 hours logged. Strong performance.",
+            row.path("aiNarrative").asText());
+    }
+
+    @Test
+    void preserveAiNarrativeFromPriorInsight_keepsGeminiProseNotLiveTemplate() throws Exception {
+        Method preserve = GeminiService.class.getDeclaredMethod(
+            "preserveAiNarrativeFromPriorInsight",
+            ObjectNode.class,
+            String.class,
+            String.class);
+        preserve.setAccessible(true);
+        ObjectNode row = MAPPER.createObjectNode();
+        String ai =
+            "Completed 2 tasks on time with 14 hours logged. Has 1 Pending task remaining.";
+        String live =
+            "Completed 2 assignments, all finished on or before the due date. "
+                + "Hours logged are below the team average.";
+        preserve.invoke(null, row, ai, live);
+        assertEquals(ai, row.path("aiNarrative").asText());
+    }
+
+    @Test
+    void stripRedistributionGuidanceFromNarrative_keepsFactsAndDropsMoveAdvice() throws Exception {
+        Method m = GeminiService.class.getDeclaredMethod(
+            "stripRedistributionGuidanceFromNarrative", String.class);
+        m.setAccessible(true);
+        String input =
+            "Has completed 2 tasks and has 1 remaining task in the To do status. "
+                + "Currently carrying the highest logged hours, so rebalancing the final task is recommended.";
+        String out = (String) m.invoke(null, input);
+        assertTrue(out.contains("completed 2 tasks"));
+        assertFalse(out.toLowerCase().contains("rebalance"));
+        assertFalse(out.toLowerCase().contains("highest logged hours"));
+    }
+
+    @Test
+    void composeDeveloperInsightDisplay_appendsSnapshotWhenPendingFactsStale() throws Exception {
+        Method m = GeminiService.class.getDeclaredMethod(
+            "composeDeveloperInsightDisplay",
+            ObjectNode.class,
+            String.class,
+            String.class,
+            List.class);
+        m.setAccessible(true);
+        ObjectNode row = MAPPER.createObjectNode();
+        row.put("overloaded", false);
+        row.put("pendingAssignments", 0);
+        row.put("liveCompletedTasks", 3);
+        row.put("liveWorkedHours", 14);
+        String ai =
+            "Completed 2 tasks on time with 12 hours logged. Has 1 Pending task remaining.";
+        String live =
+            "Completed 3 assignments, all finished on or before the due date. "
+                + "Hours logged are within a reasonable range.";
+        String out = (String) m.invoke(null, row, live, ai, Collections.emptyList());
+        assertTrue(out.contains("Current snapshot:"), () -> "unexpected: " + out);
+        assertTrue(out.startsWith(ai));
+    }
+
+    @Test
+    void composeDeveloperInsightDisplay_omitsLiveSnapshotWhenAiCoversBlockedContext() throws Exception {
+        Method m = GeminiService.class.getDeclaredMethod(
+            "composeDeveloperInsightDisplay",
+            ObjectNode.class,
+            String.class,
+            String.class,
+            List.class);
+        m.setAccessible(true);
+        ObjectNode row = MAPPER.createObjectNode();
+        row.put("overloaded", false);
+        row.put("pendingAssignments", 1);
+        row.put("liveCompletedTasks", 1);
+        row.put("liveWorkedHours", 4);
+        String ai =
+            "Currently blocked on the automated test pipeline task due to OCI infrastructure problems; "
+                + "1 task remains in the To do status.";
+        String live =
+            "Completed 1 assignment, all finished on or before the due date. "
+                + "Hours logged are below the team average.";
+        String out = (String) m.invoke(null, row, live, ai, Collections.emptyList());
+        assertEquals(ai, out);
+        assertFalse(out.contains("Current snapshot"));
+    }
+
+    @Test
+    void applyOverloadGuardrails_clearsBlockedDeveloperWithSinglePendingTask() throws Exception {
+        long sprintId = 99L;
+        when(userTaskRepository.findBySprintIdWithUserAndTask(sprintId)).thenReturn(List.of(
+            userTaskWithDoneWork(1L, "Ana López", 10L),
+            blockedOpenUserTask(1L, "Ana López", 11L),
+            openUserTask(2L, "Bob", 12L)));
+        when(userSprintRepository.findBySprintIdWithUser(sprintId)).thenReturn(Collections.emptyList());
+        when(sprintRepository.findById(sprintId)).thenReturn(Optional.empty());
+
+        ObjectNode root = MAPPER.createObjectNode();
+        ArrayNode dev = root.putArray("developerInsights");
+        ObjectNode ana = dev.addObject();
+        ana.put("developerName", "Ana López");
+        ana.put("overloaded", true);
+
+        Method apply = GeminiService.class.getDeclaredMethod(
+            "applyOverloadGuardrails", ObjectNode.class, Long.class);
+        apply.setAccessible(true);
+        apply.invoke(geminiService, root, sprintId);
+
+        assertFalse(ana.path("overloaded").asBoolean(true));
+    }
+
+    private static UserTask openUserTask(long userId, String developerName, long taskId) {
+        User user = new User();
+        user.setId(userId);
+        user.setName(developerName);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setStatus("TODO");
+        task.setTitle("Open task");
+        task.setAssignedHours(4L);
+        UserTask ut = new UserTask(user, task);
+        ut.setStatus("ASSIGNED");
+        ut.setWorkedHours(1.0);
+        return ut;
+    }
+
+    private static UserTask blockedOpenUserTask(long userId, String developerName, long taskId) {
+        UserTask ut = openUserTask(userId, developerName, taskId);
+        ut.getTask().setStatus("IN_PROCESS");
+        ut.setStatus("IN_PROGRESS");
+        ut.setIsBlocked(true);
+        ut.setBlockedReason("Waiting on API access");
+        ut.getTask().setAssignedHours(16L);
+        return ut;
     }
 }

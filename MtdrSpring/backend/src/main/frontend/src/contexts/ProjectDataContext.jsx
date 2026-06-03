@@ -33,19 +33,24 @@ const ProjectDataContext = createContext(null);
  * Uses cache-first on entry; force-refresh only after mutations or stale data.
  */
 export function ProjectDataProvider({ projectId, children, preload = true }) {
-  const [sprints, setSprints] = useState([]);
-  const [taskCount, setTaskCount] = useState(0);
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  const initialSnap = pid ? getCachedBundleSnapshot(pid) : null;
+
+  const [sprints, setSprints] = useState(() =>
+    Array.isArray(initialSnap?.enrichedSprints) ? initialSnap.enrichedSprints : [],
+  );
+  const [taskCount, setTaskCount] = useState(() =>
+    Array.isArray(initialSnap?.tasks) ? initialSnap.tasks.length : initialSnap?.taskCount ?? 0,
+  );
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [dataUpdatedAt, setDataUpdatedAt] = useState(0);
+  const [dataUpdatedAt, setDataUpdatedAt] = useState(() => initialSnap?.timestamp ?? 0);
   const [error, setError] = useState(null);
   const [loadEnabled, setLoadEnabled] = useState(Boolean(preload));
   const refreshPromiseRef = useRef(null);
   const lastSseRefreshAtRef = useRef(0);
   const invalidateAndRefreshRef = useRef(null);
-
-  const pid =
-    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
 
   const applySnapshot = useCallback((snap) => {
     if (!snap) return false;
@@ -126,6 +131,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     const snap = getCachedBundleSnapshot(pid);
     if (snap) {
       applySnapshot(snap);
+      load({ silent: true, forceFresh: false }).catch(() => {});
       return;
     }
     load({ silent: false, forceFresh: false });

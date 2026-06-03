@@ -5,6 +5,7 @@ import {
   isGenericWorkloadRedistributionText,
   parseMoveSuggestionFromInsight,
   pickGeminiWorkloadFromActionables,
+  pickRedistributionReceiver,
   workloadRowsFromDeveloperInsights,
 } from './insightRecommendationsSync';
 
@@ -111,6 +112,40 @@ describe('workloadRowsFromDeveloperInsights', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].from).toBe('Erick Sánchez');
     expect(rows[0].to).toBe('Ana López');
+  });
+
+  it('does not assign redistribution to a developer with active blockers', () => {
+    const blocked = new Set(['ana lópez']);
+    expect(
+      pickRedistributionReceiver(
+        [
+          { name: 'Erick Sánchez', assigned: 3, completed: 1, pending: 2, hours: 20 },
+          { name: 'Ana López', assigned: 1, completed: 0, pending: 1, hours: 4 },
+          { name: 'Luis Pérez', assigned: 2, completed: 2, pending: 0, hours: 10 },
+        ],
+        'Erick Sánchez',
+        blocked,
+      ),
+    ).toBe('Luis Pérez');
+
+    const rows = workloadRowsFromDeveloperInsights(
+      [
+        {
+          developerName: 'Erick Sánchez',
+          overloaded: true,
+          suggestedMoveTo: 'Ana López',
+          suggestedTasksToMove: 1,
+        },
+      ],
+      [
+        { name: 'Erick Sánchez', assigned: 3, completed: 2, pending: 1, hours: 20 },
+        { name: 'Ana López', assigned: 1, completed: 0, pending: 1, hours: 4 },
+        { name: 'Luis Pérez', assigned: 2, completed: 2, pending: 0, hours: 10 },
+      ],
+      blocked,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].to).toBe('Luis Pérez');
   });
 
   it('still builds a move when overloaded but all assignments are done (Team chip sync)', () => {

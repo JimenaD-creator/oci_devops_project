@@ -356,8 +356,6 @@ export default function TeamPage({
                 color="text.secondary"
                 sx={{ display: 'block', mb: 1.25, lineHeight: 1.5 }}
               >
-                Developer insight text comes from the last AI Insights generation; blocked tasks and
-                a short current snapshot are added when needed.{' '}
                 {insightsGeneratedAt
                   ? `AI narrative last generated: ${new Date(insightsGeneratedAt).toLocaleString()}.`
                   : 'Run Generate in AI Insights to store a full sprint narrative.'}
