@@ -23,10 +23,10 @@ Reports: `target/surefire-reports/`
 
 ## Verify ~70% coverage (JaCoCo)
 
-Every `mvn test` generates an HTML report (does **not** fail the build):
+JaCoCo is off by default (Docker/CI package builds skip it). Activate profile `coverage` for an HTML report (does **not** fail the build):
 
 ```bash
-mvn clean test -Dspring.profiles.active=test
+mvn clean test -Pcoverage -Dspring.profiles.active=test
 ```
 
 Open in a browser:
@@ -38,7 +38,7 @@ Use the **Total** row (line coverage) for packages you care about (`controller`,
 **Path B gate** — fails if scoped line coverage is below 70% (AI + `BotActions` excluded):
 
 ```powershell
-mvn clean verify "-Pcoverage-check" "-Dspring.profiles.active=test"
+mvn clean verify "-Pcoverage,coverage-check" "-Dspring.profiles.active=test"
 ```
 
 On PowerShell, always quote `-D` and `-P` arguments.

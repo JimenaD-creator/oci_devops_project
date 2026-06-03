@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,11 +16,13 @@ import com.springboot.MyTodoList.repository.TeamMemberRepository;
 import com.springboot.MyTodoList.repository.TeamRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -32,15 +36,31 @@ class UserServiceTest {
     @Mock
     private TeamRepository teamRepository;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
-    private UserService userService;
+    private UserService service;
+
+    @BeforeEach
+    void stubPasswordEncoder() {
+        lenient().when(passwordEncoder.encode(anyString())).thenAnswer(inv -> "encoded:" + inv.getArgument(0));
+        lenient().when(passwordEncoder.matches(anyString(), anyString())).thenAnswer(inv -> {
+            String raw = inv.getArgument(0);
+            String stored = inv.getArgument(1);
+            if (stored != null && stored.startsWith("encoded:")) {
+                return stored.equals("encoded:" + raw);
+            }
+            return raw != null && raw.equals(stored);
+        });
+    }
 
     @Test
     void authenticateByIdentifierAndPassword_successWithEmail() {
         User user = sampleUser(1L, "alice@test.com", "555", "secret", "DEVELOPER");
         when(userRepository.findByEmailIgnoreCase("alice@test.com")).thenReturn(Optional.of(user));
 
-        Optional<User> result = userService.authenticateByIdentifierAndPassword("alice@test.com", "secret");
+        Optional<User> result = service.authenticateByIdentifierAndPassword("alice@test.com", "secret");
 
         assertTrue(result.isPresent());
         assertEquals(1L, result.get().getId());
@@ -51,12 +71,12 @@ class UserServiceTest {
         User user = sampleUser(2L, "bob@test.com", null, "secret", "MANAGER");
         when(userRepository.findByEmailIgnoreCase("bob@test.com")).thenReturn(Optional.of(user));
 
-        assertTrue(userService.authenticateByIdentifierAndPassword("bob@test.com", "wrong").isEmpty());
+        assertTrue(service.authenticateByIdentifierAndPassword("bob@test.com", "wrong").isEmpty());
     }
 
     @Test
     void authenticateByIdentifierAndPassword_blankIdentifier_returnsEmpty() {
-        assertTrue(userService.authenticateByIdentifierAndPassword("  ", "secret").isEmpty());
+        assertTrue(service.authenticateByIdentifierAndPassword("  ", "secret").isEmpty());
         verify(userRepository, never()).findByEmailIgnoreCase(any());
     }
 
@@ -66,7 +86,7 @@ class UserServiceTest {
         when(userRepository.findByEmailIgnoreCase("5551234")).thenReturn(Optional.empty());
         when(userRepository.findByPhonenumber("5551234")).thenReturn(Optional.of(user));
 
-        assertTrue(userService.authenticateByIdentifierAndPassword("5551234", "pw").isPresent());
+        assertTrue(service.authenticateByIdentifierAndPassword("5551234", "pw").isPresent());
     }
 
     @Test
@@ -74,9 +94,9 @@ class UserServiceTest {
         User user = sampleUser(4L, "dev@test.com", "111", "pass", "DEVELOPER");
         when(userRepository.findById(4L)).thenReturn(Optional.of(user));
 
-        assertTrue(userService.verifyUserCredentials(4L, "dev@test.com", "pass"));
-        assertFalse(userService.verifyUserCredentials(4L, "dev@test.com", "bad"));
-        assertFalse(userService.verifyUserCredentials(4L, "other@test.com", "pass"));
+        assertTrue(service.verifyUserCredentials(4L, "dev@test.com", "pass"));
+        assertFalse(service.verifyUserCredentials(4L, "dev@test.com", "bad"));
+        assertFalse(service.verifyUserCredentials(4L, "other@test.com", "pass"));
     }
 
     @Test
@@ -84,7 +104,7 @@ class UserServiceTest {
         User user = sampleUser(5L, "x@test.com", null, "ok", "MANAGER");
         when(userRepository.findByEmailIgnoreCase("x@test.com")).thenReturn(Optional.of(user));
 
-        Optional<Long> id = userService.verifyCredentialsByPhoneOrEmailAndPassword("x@test.com", "ok");
+        Optional<Long> id = service.verifyCredentialsByPhoneOrEmailAndPassword("x@test.com", "ok");
 
         assertTrue(id.isPresent());
         assertEquals(5L, id.get());
@@ -97,7 +117,7 @@ class UserServiceTest {
         toSave.setType("developer");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User saved = userService.saveUser(toSave);
+        User saved = service.saveUser(toSave);
 
         assertEquals("DEVELOPER", saved.getType());
         verify(userRepository).save(toSave);
@@ -108,7 +128,7 @@ class UserServiceTest {
         User toSave = new User();
         toSave.setType("ADMIN");
 
-        assertThrows(RuntimeException.class, () -> userService.saveUser(toSave));
+        assertThrows(RuntimeException.class, () -> service.saveUser(toSave));
     }
 
     @Test
@@ -118,7 +138,7 @@ class UserServiceTest {
         toSave.setType("frontend developer");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User saved = userService.saveUser(toSave);
+        User saved = service.saveUser(toSave);
 
         assertEquals("Frontend Developer", saved.getType());
     }
@@ -130,7 +150,7 @@ class UserServiceTest {
         toSave.setType("devops engineer");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User saved = userService.saveUser(toSave);
+        User saved = service.saveUser(toSave);
 
         assertEquals("Devops Engineer", saved.getType());
     }
@@ -140,15 +160,15 @@ class UserServiceTest {
         User user = sampleUser(6L, "a@b.com", null, "p", "DEVELOPER");
         when(userRepository.findById(6L)).thenReturn(Optional.of(user));
 
-        assertTrue(userService.getUserById(6L).isPresent());
-        assertEquals("a@b.com", userService.getUserById(6L).get().getEmail());
+        assertTrue(service.getUserById(6L).isPresent());
+        assertEquals("a@b.com", service.getUserById(6L).get().getEmail());
     }
 
     @Test
     void deleteUser_clearsMembershipsAndDeletesUser() {
         when(teamRepository.findByManagerId(7L)).thenReturn(Optional.empty());
 
-        userService.deleteUser(7L);
+        service.deleteUser(7L);
 
         verify(teamMemberRepository).deleteByUserId(7L);
         verify(userRepository).deleteById(7L);
@@ -167,7 +187,7 @@ class UserServiceTest {
         patch.setUserPassword("newpw");
         patch.setType("manager");
 
-        User updated = userService.updateUser(8L, patch);
+        User updated = service.updateUser(8L, patch);
 
         assertEquals("Updated", updated.getName());
         assertEquals("new@test.com", updated.getEmail());
@@ -178,7 +198,7 @@ class UserServiceTest {
     void updateUser_whenMissing_throws() {
         when(userRepository.findById(404L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> userService.updateUser(404L, new User()));
+        assertThrows(RuntimeException.class, () -> service.updateUser(404L, new User()));
     }
 
     private static User sampleUser(Long id, String email, String phone, String password, String type) {

@@ -802,6 +802,12 @@ export function shortDevName(fullName) {
   return fullName.split(' ')[0];
 }
 
+export function normalizeDeveloperName(name) {
+  return String(name ?? '')
+    .trim()
+    .toLowerCase();
+}
+
 const TASK_STATUS_KEYS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const MERGE_STATUS_META = {
@@ -901,17 +907,32 @@ export function buildBlockedReportsForAiSprint(sp) {
   return out;
 }
 
-export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = []) {
+export function aggregateSelectionMetrics(
+  selectedSprints,
+  projectDevelopers = [],
+  selectedDeveloperName = null,
+) {
+  const selectedDeveloperKey = normalizeDeveloperName(selectedDeveloperName);
   let totalTasks = 0;
   let totalCompleted = 0;
   let totalHours = 0;
   const devMap = new Map();
 
   (selectedSprints || []).forEach((sp) => {
-    totalTasks += Number(sp.totalTasks) || 0;
-    totalCompleted += Number(sp.totalCompleted) || 0;
-    totalHours += Number(sp.totalHours) || 0;
+    if (!selectedDeveloperKey) {
+      totalTasks += Number(sp.totalTasks) || 0;
+      totalCompleted += Number(sp.totalCompleted) || 0;
+      totalHours += Number(sp.totalHours) || 0;
+    }
     (sp.developers || []).forEach((d) => {
+      if (selectedDeveloperKey && normalizeDeveloperName(d.name) !== selectedDeveloperKey) {
+        return;
+      }
+      if (selectedDeveloperKey) {
+        totalTasks += Number(d.assigned) || 0;
+        totalCompleted += Number(d.completed) || 0;
+        totalHours += Number(d.hours) || 0;
+      }
       const cur = devMap.get(d.name) || {
         name: d.name,
         assigned: 0,
@@ -945,8 +966,11 @@ export function aggregateSelectionMetrics(selectedSprints, projectDevelopers = [
     };
   });
 
-  const developers = mergeRosterWithSprintDevelopers(projectDevelopers, activityDevelopers);
-  const uniqueDevCount = devMap.size;
+  const mergedDevelopers = mergeRosterWithSprintDevelopers(projectDevelopers, activityDevelopers);
+  const developers = selectedDeveloperKey
+    ? mergedDevelopers.filter((d) => normalizeDeveloperName(d.name) === selectedDeveloperKey)
+    : mergedDevelopers;
+  const uniqueDevCount = selectedDeveloperKey ? developers.length : devMap.size;
   const avgTasksPerDev = uniqueDevCount > 0 ? totalTasks / uniqueDevCount : 0;
   const sumDevWorkedHours = Array.from(devMap.values()).reduce(
     (s, d) => s + (Number(d.hours) || 0),
@@ -977,6 +1001,65 @@ export function avgHoursPerDeveloper(sprint) {
   if (!n) return 0;
   const worked = Number(sprint.totalHours ?? 0);
   return Number((worked / n).toFixed(1));
+}
+
+/**
+ * Average tasks per developer in one sprint: unique sprint tasks ÷ developers with activity.
+ */
+export function avgTasksPerDeveloper(sprint) {
+  const devs = sprint?.developers;
+  const n = Array.isArray(devs) ? devs.length : 0;
+  if (!n) return 0;
+  const tasks = Number(sprint.totalTasks ?? 0);
+  return Number((tasks / n).toFixed(2));
+}
+
+/**
+ * Per-sprint average tasks/hours per developer for multi-sprint scorecard trend lines.
+ */
+export function buildDeveloperAverageTrendSeries(
+  selectedSprints,
+  { selectedDeveloperName = null } = {},
+) {
+  const selectedDeveloperKey = normalizeDeveloperName(selectedDeveloperName);
+  const chronological = [...(selectedSprints || [])]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = new Date(a?.startDate ?? 0).getTime();
+      const tb = new Date(b?.startDate ?? 0).getTime();
+      if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
+      return sprintDbIdSortKey(a) - sprintDbIdSortKey(b);
+    });
+
+  const series = chronological.map((sp, index) => {
+    if (selectedDeveloperKey) {
+      const dev = (sp.developers || []).find(
+        (row) => normalizeDeveloperName(row?.name) === selectedDeveloperKey,
+      );
+      return {
+        sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
+        avgTasksPerDev: Number(dev?.assigned) || 0,
+        avgHoursPerDev: Number(Number(dev?.hours ?? 0).toFixed(1)),
+      };
+    }
+    return {
+      sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
+      avgTasksPerDev: avgTasksPerDeveloper(sp),
+      avgHoursPerDev: avgHoursPerDeveloper(sp),
+    };
+  });
+
+  if (chronological.length < 2) {
+    return { avgTasksTrend: null, avgHoursTrend: null, series };
+  }
+
+  const current = series[series.length - 1];
+  const previous = series[series.length - 2];
+  return {
+    avgTasksTrend: { delta: current.avgTasksPerDev - previous.avgTasksPerDev },
+    avgHoursTrend: { delta: current.avgHoursPerDev - previous.avgHoursPerDev },
+    series,
+  };
 }
 
 export function completionRate(dev) {
@@ -1062,7 +1145,12 @@ export function buildTeamProductivityTrendSeries(selectedSprints) {
   });
 }
 
-export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelopers = []) {
+export function buildCompareDeveloperChartsModel(
+  selectedSprints,
+  projectDevelopers = [],
+  selectedDeveloperName = null,
+) {
+  const selectedDeveloperKey = normalizeDeveloperName(selectedDeveloperName);
   const sprints = [...(selectedSprints || [])]
     .filter(Boolean)
     .sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b));
@@ -1074,7 +1162,10 @@ export function buildCompareDeveloperChartsModel(selectedSprints, projectDevelop
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 
-  const names = collectDeveloperNamesForSelection(sprints, projectDevelopers);
+  let names = collectDeveloperNamesForSelection(sprints, projectDevelopers);
+  if (selectedDeveloperKey) {
+    names = names.filter((name) => normalizeDeveloperName(name) === selectedDeveloperKey);
+  }
 
   const baseRows = names.map((fullName) => {
     const row = { name: fullName, shortName: shortDevName(fullName) };

@@ -1,11 +1,11 @@
 /** One line under chart titles — what the reader should take away. */
 export const CHART_DESC = {
   compare: {
-    workload:
-      'One stacked bar per sprint: completed (solid) with pending (lighter) on top, per developer.',
+    workload: undefined,
     hours:
       'Total hours worked and estimated hours per developer, summed across all selected sprints.',
     teamTrend: 'Team productivity score (0–100%) across selected sprints',
+    developerTrend: 'Individual productivity score (0–100%) across selected sprints for this developer.',
     devScoreByDeveloper: 'One line per developer with activity in the selected sprints.',
     combo:
       'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',

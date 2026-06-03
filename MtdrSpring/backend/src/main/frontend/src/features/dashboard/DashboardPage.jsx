@@ -7,6 +7,10 @@ import {
   Card,
   CardContent,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   FormControlLabel,
   Checkbox,
   Popover,
@@ -33,6 +37,7 @@ import {
   buildBlockedTaskNotificationItems,
   formatBlockedSinceAge,
   SPRINT_CHART_COLORS,
+  buildDeveloperAverageTrendSeries,
 } from './dashboardSprintData';
 import {
   DASHBOARD_CONTENT_MAX_WIDTH,
@@ -49,7 +54,10 @@ import {
   fetchProjectDevelopers,
   getCachedProjectDevelopersSnapshot,
 } from './projectApi';
-import { countTeamDevelopers } from '../../utils/teamRosterUtils';
+import {
+  collectDeveloperNamesForSelection,
+  countTeamDevelopers,
+} from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { resolveLoadErrorMessage } from '../../utils/auth';
 
@@ -97,6 +105,7 @@ export default function DashboardPage({
   const [selectedSprintIds, setSelectedSprintIds] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
+  const [selectedDeveloperName, setSelectedDeveloperName] = useState('all');
   const [blockedNotifAnchor, setBlockedNotifAnchor] = useState(null);
   const [seenBlockedKeysCsv, setSeenBlockedKeysCsv] = useState('');
 
@@ -209,6 +218,20 @@ export default function DashboardPage({
     return sortedSprintsForFilter.filter((s) => idSet.has(String(s.id)));
   }, [sortedSprintsForFilter, selectedSprintIds]);
 
+  const developerNames = useMemo(
+    () => collectDeveloperNamesForSelection(selectedSprints, projectDevelopers),
+    [selectedSprints, projectDevelopers],
+  );
+
+  useEffect(() => {
+    if (selectedDeveloperName !== 'all' && !developerNames.includes(selectedDeveloperName)) {
+      setSelectedDeveloperName('all');
+    }
+  }, [selectedDeveloperName, developerNames]);
+
+  const selectedDeveloperNameForMetrics =
+    selectedDeveloperName === 'all' ? null : selectedDeveloperName;
+
   const compareMode = selectedSprints.length > 1;
   const primarySprint = selectedSprints[0];
 
@@ -271,49 +294,54 @@ export default function DashboardPage({
     [selectedSprints],
   );
   const selectionMetrics = useMemo(
-    () => aggregateSelectionMetrics(selectedSprints, projectDevelopers),
+    () =>
+      aggregateSelectionMetrics(
+        selectedSprints,
+        projectDevelopers,
+        selectedDeveloperNameForMetrics,
+      ),
+    [selectedSprints, projectDevelopers, selectedDeveloperNameForMetrics],
+  );
+
+  /** Unfiltered totals — used for team avg tasks/hours scorecards even when one developer is selected. */
+  const teamSelectionMetrics = useMemo(
+    () => aggregateSelectionMetrics(selectedSprints, projectDevelopers, null),
     [selectedSprints, projectDevelopers],
   );
 
-  const teamDeveloperCount = useMemo(
-    () => countTeamDevelopers(projectDevelopers),
-    [projectDevelopers],
+  const teamDeveloperCountForAverages = useMemo(() => {
+    const rosterCount = countTeamDevelopers(projectDevelopers);
+    if (rosterCount > 0) return rosterCount;
+    return teamSelectionMetrics.uniqueDevCount || 0;
+  }, [projectDevelopers, teamSelectionMetrics.uniqueDevCount]);
+
+  const developerCountForAverages = useMemo(() => {
+    if (selectedDeveloperNameForMetrics) return 1;
+    return teamDeveloperCountForAverages;
+  }, [selectedDeveloperNameForMetrics, teamDeveloperCountForAverages]);
+
+  const averageTrends = useMemo(
+    () => buildDeveloperAverageTrendSeries(selectedSprints),
+    [selectedSprints],
   );
 
   const avgTasksPerTeamDev = useMemo(() => {
-    if (!teamDeveloperCount) return 0;
-    return selectionMetrics.totalTasks / teamDeveloperCount;
-  }, [selectionMetrics.totalTasks, teamDeveloperCount]);
+    if (!teamDeveloperCountForAverages) return teamSelectionMetrics.avgTasksPerDev;
+    return teamSelectionMetrics.totalTasks / teamDeveloperCountForAverages;
+  }, [
+    teamSelectionMetrics.totalTasks,
+    teamSelectionMetrics.avgTasksPerDev,
+    teamDeveloperCountForAverages,
+  ]);
 
   const avgHoursPerTeamDev = useMemo(() => {
-    if (!teamDeveloperCount) return 0;
-    return selectionMetrics.totalHours / teamDeveloperCount;
-  }, [selectionMetrics.totalHours, teamDeveloperCount]);
-
-  const averageTrends = useMemo(() => {
-    const chronological = [...selectedSprints].sort((a, b) => {
-      const ta = new Date(a?.startDate || 0).getTime();
-      const tb = new Date(b?.startDate || 0).getTime();
-      return ta - tb;
-    });
-    const avgTasks = (sp) =>
-      teamDeveloperCount > 0 ? (Number(sp?.totalTasks) || 0) / teamDeveloperCount : 0;
-    const avgHours = (sp) =>
-      teamDeveloperCount > 0 ? (Number(sp?.totalHours) || 0) / teamDeveloperCount : 0;
-    const series = chronological.map((sp, index) => ({
-      sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
-      avgTasksPerDev: Number(avgTasks(sp).toFixed(2)),
-      avgHoursPerDev: Number(avgHours(sp).toFixed(2)),
-    }));
-    if (chronological.length < 2) return { avgTasksTrend: null, avgHoursTrend: null, series };
-    const current = chronological[chronological.length - 1];
-    const previous = chronological[chronological.length - 2];
-    return {
-      avgTasksTrend: { delta: avgTasks(current) - avgTasks(previous) },
-      avgHoursTrend: { delta: avgHours(current) - avgHours(previous) },
-      series,
-    };
-  }, [selectedSprints, teamDeveloperCount]);
+    if (!teamDeveloperCountForAverages) return teamSelectionMetrics.avgHoursPerDev;
+    return teamSelectionMetrics.totalHours / teamDeveloperCountForAverages;
+  }, [
+    teamSelectionMetrics.totalHours,
+    teamSelectionMetrics.avgHoursPerDev,
+    teamDeveloperCountForAverages,
+  ]);
 
   const heroProgress = useMemo(() => {
     if (!taskStatusTotal) return 0;
@@ -959,7 +987,7 @@ export default function DashboardPage({
                 variant="body2"
                 sx={{ fontWeight: 700, color: isDark ? '#E0E0E0' : '#555' }}
               >
-                {teamDeveloperCount} devs
+                {developerCountForAverages} devs
               </Typography>
             </Box>
           </Box>
@@ -1036,8 +1064,9 @@ export default function DashboardPage({
               fontSize: '0.8125rem',
             }}
           >
-            Select one or more sprints. &quot;All Sprints&quot; compares every sprint; you can also
-            pick any combination (e.g. Sprint 1 and Sprint 3).
+            Select one or more sprints and optionally filter by developer. &quot;All Sprints&quot;
+            compares every sprint; choosing a single developer shows tasks and hours charts side by
+            side.
           </Typography>
           <Typography
             id="dashboard-sprint-filter-label"
@@ -1152,6 +1181,48 @@ export default function DashboardPage({
               );
             })}
           </Box>
+          <Box
+            sx={{
+              mt: 1.5,
+              pt: 1.5,
+              borderTop: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <Typography
+              id="dashboard-developer-filter-label"
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                color: isDark ? '#9A9A9A' : '#616161',
+                letterSpacing: '0.02em',
+                flexShrink: 0,
+              }}
+            >
+              Developer
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 220, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}>
+              <InputLabel id="dashboard-developer-filter-select-label">Filter by developer</InputLabel>
+              <Select
+                labelId="dashboard-developer-filter-select-label"
+                label="Filter by developer"
+                value={selectedDeveloperName}
+                onChange={(event) => setSelectedDeveloperName(event.target.value)}
+                aria-labelledby="dashboard-developer-filter-label"
+              >
+                <MenuItem value="all">All developers</MenuItem>
+                {developerNames.map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
         </Paper>
       </ScrollReveal>
 
@@ -1212,7 +1283,7 @@ export default function DashboardPage({
                 totalHours={selectionMetrics.totalHours}
                 avgTasksPerDev={avgTasksPerTeamDev}
                 avgHoursPerDev={avgHoursPerTeamDev}
-                uniqueDevCount={teamDeveloperCount}
+                uniqueDevCount={teamDeveloperCountForAverages}
                 avgTasksTrend={averageTrends.avgTasksTrend}
                 avgHoursTrend={averageTrends.avgHoursTrend}
                 avgTrendSeries={averageTrends.series}
@@ -1305,6 +1376,8 @@ export default function DashboardPage({
           selectedSprints={selectedSprints}
           compareMode={compareMode}
           projectDevelopers={projectDevelopers}
+          selectedDeveloperName={selectedDeveloperNameForMetrics}
+          allSprintsSelected={allSprintsSelected}
         />
 
         <ScrollReveal delay={0.05}>
@@ -1325,6 +1398,7 @@ export default function DashboardPage({
             selectedSprints={selectedSprints}
             compareMode={compareMode}
             projectDevelopers={projectDevelopers}
+            filterDeveloperName={selectedDeveloperNameForMetrics}
             suppressCardTitle
           />
         </ScrollReveal>

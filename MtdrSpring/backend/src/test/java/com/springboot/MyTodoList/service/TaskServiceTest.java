@@ -61,12 +61,6 @@ class TaskServiceTest {
             t.setId(10L);
             return t;
         });
-        when(taskRepository.findById(10L)).thenAnswer(inv -> {
-            Task t = new Task();
-            t.setId(10L);
-            return Optional.of(t);
-        });
-        when(taskRepository.findProjectIdByTaskId(10L)).thenReturn(Optional.of(1L));
 
         Task result = taskService.createTask(task, null);
 

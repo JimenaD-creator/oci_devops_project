@@ -98,18 +98,54 @@ export function maxSingleWorkloadStack(rows) {
   return m;
 }
 
-export function buildTaskAxisDomainTicks(maxStack) {
-  const padded = Math.max(maxStack * 1.25, maxStack + 3, 8);
-  /** Mismo tope que con ticks de 1 en 1 (ceil del padded). */
-  const domainMax = Math.max(1, Math.ceil(padded));
-  /** Ticks más separados: nunca de 1 en 1; el dominio [0, domainMax] no cambia. */
-  let step = 2;
-  if (domainMax > 48) step = 5;
-  if (domainMax > 120) step = 10;
+/** Minimal headroom above data peak (50/50 single-developer). */
+function tightAxisCeiling(maxVal) {
+  const m = Math.max(0, Number(maxVal) || 0);
+  if (m <= 0) return 2;
+  return Math.max(2, Math.ceil(m) + 1);
+}
+
+/** Standard ceiling when showing full team. */
+function axisCeiling(maxVal, { ratio = 1.25, add = 1.5, floor = 1 } = {}) {
+  const m = Math.max(0, Number(maxVal) || 0);
+  if (m <= 0) return Math.max(1, floor);
+  return Math.max(floor, Math.ceil(m * ratio + add));
+}
+
+/** Dense ticks for 50/50 layout: step 1 when range ≤16, else step 2 up to max 40. */
+function buildIntegerTicks(domainMax) {
+  const max = Math.max(1, Math.ceil(Number(domainMax) || 1));
+  const step = max <= 16 ? 1 : 2;
   const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
+  for (let v = 0; v <= max; v += step) ticks.push(v);
+  if (ticks[ticks.length - 1] !== max) ticks.push(max);
+  return ticks;
+}
+
+/** Linear ticks for team-wide charts. */
+function buildLinearTicks(domainMax) {
+  const max = Math.max(1, Math.ceil(Number(domainMax) || 1));
+  let step = 1;
+  if (max > 20) step = 2;
+  if (max > 50) step = 3;
+  if (max > 100) step = 5;
+  if (max > 120) step = 10;
+  const ticks = [];
+  for (let v = 0; v <= max; v += step) ticks.push(v);
+  if (ticks[ticks.length - 1] !== max) ticks.push(max);
+  return ticks;
+}
+
+function buildAxisDomainTicks(maxVal, { focusSingleDeveloper = false } = {}) {
+  const domainMax = focusSingleDeveloper ? tightAxisCeiling(maxVal) : axisCeiling(maxVal);
+  const ticks = focusSingleDeveloper
+    ? buildIntegerTicks(domainMax)
+    : buildLinearTicks(domainMax);
   return { domain: [0, domainMax], ticks, domainMax };
+}
+
+export function buildTaskAxisDomainTicks(maxStack, opts = {}) {
+  return buildAxisDomainTicks(maxStack, opts);
 }
 
 export function maxSingleHoursGrouped(rows) {
@@ -137,46 +173,18 @@ export function maxCompareHoursGrouped(rows, sprintDefs) {
 }
 
 /** Same tick strategy as tasks axis, for hour totals on stacked bullet bars. */
-export function buildHoursAxisDomainTicks(maxHours) {
-  const padded = Math.max(maxHours * 1.45, maxHours + 4, 10);
-  const domainMax = Math.max(1, Math.ceil(padded));
-  let step = 4;
-  if (domainMax > 40) step = 6;
-  if (domainMax > 80) step = 10;
-  if (domainMax > 160) step = 20;
-  const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
-  return { domain: [0, domainMax], ticks, domainMax };
+export function buildHoursAxisDomainTicks(maxHours, opts = {}) {
+  return buildAxisDomainTicks(maxHours, opts);
 }
 
 /** Finer Y-axis ticks for compare-mode workload chart (does not affect combo/single). */
-export function buildCompareTaskAxisDomainTicks(maxStack) {
-  const padded = Math.max(maxStack * 1.06, maxStack + 0.5, 5);
-  const domainMax = Math.max(1, Math.ceil(padded));
-  let step = 1;
-  if (domainMax > 20) step = 2;
-  if (domainMax > 50) step = 3;
-  if (domainMax > 100) step = 5;
-  const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
-  return { domain: [0, domainMax], ticks, domainMax };
+export function buildCompareTaskAxisDomainTicks(maxStack, opts = {}) {
+  return buildAxisDomainTicks(maxStack, opts);
 }
 
 /** Finer Y-axis ticks for compare-mode hours chart (does not affect combo/single). */
-export function buildCompareHoursAxisDomainTicks(maxHours) {
-  const padded = Math.max(maxHours * 1.08, maxHours + 1, 6);
-  const domainMax = Math.max(1, Math.ceil(padded));
-  let step = 1;
-  if (domainMax > 12) step = 2;
-  if (domainMax > 30) step = 3;
-  if (domainMax > 60) step = 4;
-  if (domainMax > 120) step = 6;
-  const ticks = [];
-  for (let v = 0; v < domainMax; v += step) ticks.push(v);
-  if (ticks.length === 0 || ticks[ticks.length - 1] !== domainMax) ticks.push(domainMax);
-  return { domain: [0, domainMax], ticks, domainMax };
+export function buildCompareHoursAxisDomainTicks(maxHours, opts = {}) {
+  return buildAxisDomainTicks(maxHours, opts);
 }
 
 export function maxSingleComboRange(developers) {

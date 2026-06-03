@@ -383,6 +383,8 @@ export default function DashboardTopMetrics({
                               axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                               tickLine={false}
                               domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                              allowDecimals={true}
+                              minTickGap={0}
                             />
                             <Tooltip
                               formatter={(value) => [
