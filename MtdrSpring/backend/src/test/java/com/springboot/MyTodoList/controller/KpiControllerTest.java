@@ -53,7 +53,7 @@ class KpiControllerTest {
         when(kpiRepository.getOnTimeDelivery(3L)).thenReturn(Map.of("ON_TIME_DELIVERY", 60));
         when(kpiRepository.getContributionScore(3L)).thenReturn(List.of(Map.of("dev", "A")));
         when(kpiRepository.getWorkloadBalance(3L)).thenReturn(Map.of("WORKLOAD_BALANCE", 70));
-        when(kpiRepository.getTeamParticipation(3L)).thenReturn(Map.of("TEAM_PARTICIPATION", 90));
+when(kpiRepository.getEfficiencyScore(3L)).thenReturn(Map.of("EFFICIENCY_SCORE", 90));
 
         mockMvc.perform(get("/api/kpi/sprint/3/all"))
                 .andExpect(status().isOk())
@@ -99,21 +99,22 @@ class KpiControllerTest {
         mockMvc.perform(get("/api/kpi/sprint/9/workload-balance")).andExpect(status().isNotFound());
     }
 
-    @Test
-    void getTeamParticipation_whenFound_returnsOk() throws Exception {
-        when(kpiRepository.getTeamParticipation(10L)).thenReturn(Map.of("TEAM_PARTICIPATION", 88));
+ @Test
+void getEfficiencyScore_whenFound_returnsOk() throws Exception {
+    when(kpiRepository.getEfficiencyScore(10L)).thenReturn(Map.of("EFFICIENCY_SCORE", 88));
 
-        mockMvc.perform(get("/api/kpi/sprint/10/team-participation"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.TEAM_PARTICIPATION").value(88));
-    }
+    mockMvc.perform(get("/api/kpi/sprint/10/efficiency-score"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.EFFICIENCY_SCORE").value(88));
+}
 
-    @Test
-    void getTeamParticipation_whenEmpty_returnsNotFound() throws Exception {
-        when(kpiRepository.getTeamParticipation(11L)).thenReturn(Map.of());
+@Test
+void getEfficiencyScore_whenEmpty_returnsNotFound() throws Exception {
+    when(kpiRepository.getEfficiencyScore(11L)).thenReturn(Map.of());
 
-        mockMvc.perform(get("/api/kpi/sprint/11/team-participation")).andExpect(status().isNotFound());
-    }
+    mockMvc.perform(get("/api/kpi/sprint/11/efficiency-score")).andExpect(status().isNotFound());
+}
+
 
     @Test
     void getContributionScore_whenFound_returnsList() throws Exception {

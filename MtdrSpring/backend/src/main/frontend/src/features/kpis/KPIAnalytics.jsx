@@ -10,34 +10,25 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Button,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Target } from 'lucide-react';
 import KpiDonutChart from './KpiDonutChart';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
-import { useProjectData } from '../../contexts/ProjectDataContext';
-import {
-  computeProductivityScore,
-  productivityScoreFromSprintKpis,
-} from './productivityScoreUtils';
+import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
+import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
-import {
-  filterTasksForKpiSprints,
-  pickProjectSprintsForKpi,
-  resolveKpiProjectId,
-} from './kpiAnalyticsProjectData';
 import { fetchSprintInsights } from '../ai/insightsApi';
+import { getErrorMessage } from '../ai/aiInsightsConstants';
 import {
   SECTION_BRAND_DARK,
   SECTION_ACCENT,
   sectionRgba,
 } from '../dashboard/constants/dashboardConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
-import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
 
 const pageEase = [0.22, 1, 0.36, 1];
@@ -45,7 +36,7 @@ const pageEase = [0.22, 1, 0.36, 1];
 const KPI_ANALYTICS_CARD_LABEL_TO_TOOLTIP_KEY = {
   'Completion Rate': 'completionRate',
   'On-Time Delivery': 'onTimeDelivery',
-  'Team Participation': 'teamParticipation',
+  'Efficiency Score': 'efficiencyScore',
   'Workload Balance': 'workloadBalance',
 };
 
@@ -75,24 +66,21 @@ function taskSprintId(task) {
 function ProductivityScoreCard({
   completionRate,
   onTimeDelivery,
-  teamParticipation,
+  efficiencyScore,
   workloadBalance,
   fillColumnHeight = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-
-  const score = computeProductivityScore({
-    completionRate,
-    onTimeDelivery,
-    teamParticipation,
-    workloadBalance,
-  });
+  
+  const score = Math.round(
+    completionRate * 0.4 + onTimeDelivery * 0.3 + efficiencyScore * 0.2 + workloadBalance * 0.1,
+  );
 
   const components = [
     { label: 'Completion rate', value: completionRate, weight: 'x0.4', color: '#1565C0' },
     { label: 'On-time delivery', value: onTimeDelivery, weight: 'x0.3', color: '#1D9E75' },
-    { label: 'Team participation', value: teamParticipation, weight: 'x0.2', color: '#8E24AA' },
+    { label: 'Efficiency score', value: efficiencyScore, weight: 'x0.2', color: '#8E24AA' },
     { label: 'Workload balance', value: workloadBalance, weight: 'x0.1', color: '#FB8C00' },
   ];
 
@@ -163,15 +151,7 @@ function ProductivityScoreCard({
         />
       </Box>
 
-      <Box
-        sx={{
-          height: 8,
-          bgcolor: isDark ? '#2A2C32' : '#F0F0F0',
-          borderRadius: 99,
-          mb: 2,
-          overflow: 'hidden',
-        }}
-      >
+      <Box sx={{ height: 8, bgcolor: isDark ? '#2A2C32' : '#F0F0F0', borderRadius: 99, mb: 2, overflow: 'hidden' }}>
         <Box
           sx={{
             height: '100%',
@@ -192,13 +172,7 @@ function ProductivityScoreCard({
           <Grid item xs={6} key={label}>
             <Box sx={{ bgcolor: isDark ? '#16181C' : '#F8F9FA', borderRadius: 1.5, p: 1.25 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                <Typography
-                  sx={{
-                    fontSize: '0.7rem',
-                    color: isDark ? '#9A9A9A' : '#607D8B',
-                    fontWeight: 600,
-                  }}
-                >
+                <Typography sx={{ fontSize: '0.7rem', color: isDark ? '#9A9A9A' : '#607D8B', fontWeight: 600 }}>
                   {label}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: '#90A4AE' }}>{weight}</Typography>
@@ -242,16 +216,38 @@ function ProductivityScoreCard({
   );
 }
 
-export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateToTasks }) {
+// Función auxiliar para resolver el ID del proyecto
+function resolveKpiProjectId(projectId) {
+  const pid = projectId != null && String(projectId).trim() !== ''
+    ? String(projectId).trim()
+    : typeof localStorage !== 'undefined'
+      ? String(localStorage.getItem('currentProjectId') || '').trim()
+      : '';
+  return pid || null;
+}
+
+// Función para filtrar sprints por proyecto
+function pickProjectSprintsForKpi(enrichedSprints, contextSprints, pid) {
+  let sprintsData = Array.isArray(enrichedSprints) ? enrichedSprints : [];
+  if (pid) {
+    sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
+  }
+  return sprintsData;
+}
+
+// Función para filtrar tareas por sprints
+function filterTasksForKpiSprints(tasks, sprintsData) {
+  const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
+  return tasks.filter((t) => {
+    const sid = taskSprintId(t);
+    return sid != null && sprintIds.has(sid);
+  });
+}
+
+export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isDesktopLayout = useMediaQuery(theme.breakpoints.up('lg'));
-  const {
-    sprints: sharedSprints,
-    ensureLoaded,
-    getRawBundle,
-    getCachedSnapshot,
-  } = useProjectData();
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -259,25 +255,29 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
   const [managerGuide, setManagerGuide] = useState(null);
   const [managerGuideLoading, setManagerGuideLoading] = useState(true);
   const [managerGuideFetchFailed, setManagerGuideFetchFailed] = useState(false);
+  const [managerGuideInsightError, setManagerGuideInsightError] = useState(null);
   const [kpiDataReady, setKpiDataReady] = useState(false);
-  const sharedSprintsRef = useRef(sharedSprints);
+
   const managerGuideBySprintRef = useRef(new Map());
-  sharedSprintsRef.current = sharedSprints;
 
-  /** Sprint 0, 1, 2… (same labels as dashboard). */
-  const getSprintLabel = useCallback(
-    (sprintId) => {
-      if (sprintId == null) return '';
-      const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
-      if (sprint?.shortLabel) return sprint.shortLabel;
-      if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-      const sortedSprints = [...sprints].sort((a, b) => Number(a.id) - Number(b.id));
-      const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
-      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
-    },
-    [sprints],
-  );
+  // Crear mapa de números de sprint secuenciales
+  const getSprintNumber = useCallback((sprintId) => {
+    const sortedSprints = [...sprints].sort((a, b) => a.id - b.id);
+    const index = sortedSprints.findIndex(s => s.id === sprintId);
+    return index >= 0 ? index + 1 : sprintId; // +1 para que Sprint 0 sea Sprint 1
+  }, [sprints]);
 
+  // Una sola definición de getSprintLabel
+  const getSprintLabel = useCallback((sprintId) => {
+    if (sprintId == null) return '';
+    const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
+    if (sprint?.shortLabel) return sprint.shortLabel;
+    if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
+    const sprintNum = getSprintNumber(sprintId);
+    return `Sprint ${sprintNum}`;
+  }, [sprints, getSprintNumber]);
+
+  // Efecto para cargar manager guide
   useEffect(() => {
     if (!kpiDataReady || loading || selectedSprintId == null) return undefined;
 
@@ -307,9 +307,11 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
         const nextGuide = notFound || !data ? null : (data.insights?.kpiManagerGuide ?? null);
         managerGuideBySprintRef.current.set(sprintKey, nextGuide);
         setManagerGuide(nextGuide);
+        setManagerGuideInsightError(null);
       } catch (err) {
         if (controller.signal.aborted || err?.name === 'AbortError') return;
         setManagerGuideFetchFailed(true);
+        setManagerGuideInsightError(getErrorMessage(err));
       } finally {
         if (!controller.signal.aborted) {
           setManagerGuideLoading(false);
@@ -322,6 +324,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     };
   }, [selectedSprintId, loading, kpiDataReady]);
 
+  // Función para aplicar datos de KPI
   const applyKpiBundle = useCallback((snap, pid, contextSprints = []) => {
     const sprintsData = pickProjectSprintsForKpi(snap?.enrichedSprints, contextSprints, pid);
     const tasksData = filterTasksForKpiSprints(
@@ -342,95 +345,64 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     };
   }, []);
 
-  const loadKpiData = useCallback(async () => {
-    const pid = resolveKpiProjectId(projectId);
-    if (!pid) {
-      setSprints([]);
-      setTasks([]);
-      setSelectedSprintId(null);
-      setLoading(false);
-      setKpiDataReady(true);
-      return;
-    }
-
-    let snap = getCachedSnapshot();
-    const preview = applyKpiBundle(snap, pid, sharedSprintsRef.current);
-    const canPaintImmediately = preview.hasSprints && preview.taskCount > 0;
-
-    if (canPaintImmediately) {
-      setLoading(false);
-      setKpiDataReady(true);
-    } else {
-      setLoading(true);
-      setKpiDataReady(false);
-    }
-
+  // Función principal de carga de datos
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setKpiDataReady(false);
+    
     try {
-      await ensureLoaded({ silent: canPaintImmediately });
-      if (!canPaintImmediately) {
-        await getRawBundle();
-      } else {
-        getRawBundle().catch(() => {});
-      }
-      snap = getCachedSnapshot();
-      const applied = applyKpiBundle(snap, pid, sharedSprintsRef.current);
-
-      if (!applied.hasSprints) {
-        await getRawBundle({ forceFresh: true });
-        snap = getCachedSnapshot();
-        applyKpiBundle(snap, pid, sharedSprintsRef.current);
-      }
-    } catch (error) {
-      console.error('Error loading KPI data:', error);
-      if (!canPaintImmediately) {
+      const pid = resolveKpiProjectId(projectId);
+      
+      if (!pid) {
         setSprints([]);
         setTasks([]);
         setSelectedSprintId(null);
+        setLoading(false);
+        setKpiDataReady(true);
+        return;
       }
+
+      const [enrichedSprints, tasksDataRaw] = await Promise.all([
+        fetchDashboardSprints(pid),
+        fetchTasksForKpiProject(pid),
+      ]);
+
+      let sprintsData = Array.isArray(enrichedSprints) ? enrichedSprints : [];
+      let tasksData = Array.isArray(tasksDataRaw) ? tasksDataRaw : [];
+
+      if (pid) {
+        sprintsData = sprintsData.filter((s) => String(s.assignedProject?.id) === String(pid));
+        const sprintIds = new Set(sprintsData.map((s) => Number(s.id)).filter(Number.isFinite));
+        tasksData = tasksData.filter((t) => {
+          const sid = taskSprintId(t);
+          return sid != null && sprintIds.has(sid);
+        });
+      }
+
+      setSprints(sprintsData);
+      setTasks(tasksData);
+
+      setSelectedSprintId((prev) => {
+        if (sprintsData.length === 0) return null;
+        if (prev != null && sprintsData.some((s) => s.id === prev)) return prev;
+        const defaultSprint = pickDefaultSelectedSprint(sprintsData);
+        return defaultSprint?.id ?? sprintsData[0]?.id ?? null;
+      });
+      
+    } catch (error) {
+      console.error('Error loading KPI data:', error);
+      setSprints([]);
+      setTasks([]);
+      setSelectedSprintId(null);
     } finally {
       setLoading(false);
       setKpiDataReady(true);
     }
-  }, [projectId, ensureLoaded, getRawBundle, getCachedSnapshot, applyKpiBundle]);
+  }, [projectId]);
 
   useEffect(() => {
-    loadKpiData();
-  }, [loadKpiData]);
-
-  /** Land on the sprint chosen from AI Insights comparison link. */
-  useEffect(() => {
-    if (sprints.length === 0) return;
-    try {
-      const raw = sessionStorage.getItem('kpiAnalyticsLandingSprintId');
-      if (raw == null || String(raw).trim() === '') return;
-      const id = Number(raw);
-      sessionStorage.removeItem('kpiAnalyticsLandingSprintId');
-      if (!Number.isFinite(id)) return;
-      if (sprints.some((s) => Number(s.id) === id)) {
-        setSelectedSprintId(id);
-      }
-    } catch {
-      sessionStorage.removeItem('kpiAnalyticsLandingSprintId');
-    }
-  }, [sprints]);
-
-  /** Context filled after first paint: refill once without forcing another full-page load cycle. */
-  useEffect(() => {
-    if (!kpiDataReady || loading || sprints.length > 0) return;
-    if (!Array.isArray(sharedSprints) || sharedSprints.length === 0) return;
-    const pid = resolveKpiProjectId(projectId);
-    if (!pid) return;
-    const snap = getCachedSnapshot();
-    applyKpiBundle(snap, pid, sharedSprints);
-  }, [
-    kpiDataReady,
-    loading,
-    sprints.length,
-    sharedSprints,
-    projectId,
-    getCachedSnapshot,
-    applyKpiBundle,
-  ]);
+    loadData();
+  }, [loadData]);
 
   const getSelectedSprint = () => sprints.find((s) => s.id === selectedSprintId);
 
@@ -449,29 +421,35 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     ).length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+    const onTimeTasks = sprintTasks.filter((t) => {
+      if (normalizeTaskStatus(t.status) !== 'DONE') return false;
+      const finishDate = t.finishDate ? new Date(t.finishDate) : new Date();
+      const dueDate = t.dueDate ? new Date(t.dueDate) : new Date();
+      return finishDate <= dueDate;
+    }).length;
     const onTimeDelivery =
-      typeof sprint?.kpis?.onTimeDelivery === 'number' ? sprint.kpis.onTimeDelivery : 0;
+      completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 0;
 
-    const teamParticipation = sprint?.kpis?.teamParticipation ?? 0;
+    const efficiencyScore = sprint?.kpis?.efficiencyScore ?? 0;
     const rawWb = Number(sprint?.kpis?.workloadBalance);
     const workloadBalancePct = Number.isFinite(rawWb)
       ? Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)
       : 0;
-    const teamParticipationPct = Math.min(100, Math.max(0, Number(teamParticipation) || 0));
+    const efficiencyScorePct = Math.min(100, Math.max(0, Number(efficiencyScore) || 0));
     const clampedWorkloadBalance = Math.min(100, Math.max(0, workloadBalancePct));
-    const productivityScore = computeProductivityScore({
-      completionRate,
-      onTimeDelivery,
-      teamParticipation: teamParticipationPct,
-      workloadBalance: clampedWorkloadBalance,
-    });
+    const productivityScore = Math.round(
+      completionRate * 0.4 +
+        onTimeDelivery * 0.3 +
+        efficiencyScorePct * 0.2 +
+        clampedWorkloadBalance * 0.1,
+    );
 
     return {
       completionRate,
       onTimeDelivery,
-      teamParticipation: teamParticipationPct,
+      efficiencyScore: efficiencyScorePct,
       workloadBalance: clampedWorkloadBalance,
-      productivityScore,
+      productivityScore: Math.min(100, Math.max(0, productivityScore)),
       totalTasks,
       completedTasks,
     };
@@ -479,12 +457,12 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
 
   const kpis = calculateKPIs();
   const currentSprint = getSelectedSprint();
-  /** After a finished load: no sprints in this project. */
   const shouldShowEmptyKpiView = kpiDataReady && !loading && sprints.length === 0;
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
   const assignedTotalInSprint = kpis.totalTasks;
   const completedTotalInSprint = kpis.completedTasks;
   const selectedSprintIdForTotals = currentSprint?.id;
+  
   const uniqueTeamTotalsBySprintId = useMemo(() => {
     if (selectedSprintIdForTotals == null) return undefined;
     return {
@@ -494,6 +472,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
       },
     };
   }, [selectedSprintIdForTotals, kpis.totalTasks, kpis.completedTasks]);
+  
   const developerCountForChartLayout = Array.isArray(currentSprint?.developers)
     ? currentSprint.developers.length
     : 0;
@@ -511,7 +490,13 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     Math.max(430, 430 + Math.round(chartDataDensity * 1.5)),
   );
 
-  const productivityDelta = React.useMemo(() => {
+  const normalizeProductivityValue = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(100, Math.max(0, n <= 1 ? Math.round(n * 100) : Math.round(n)));
+  };
+
+  const productivityDelta = useMemo(() => {
     if (!currentSprint) return null;
     const sorted = [...sprints].sort((a, b) => {
       const endA = new Date(a.dueDate ?? 0).getTime();
@@ -528,10 +513,11 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
     }
 
     const previous = sorted[idx - 1];
-    const currentScore = kpis.productivityScore;
-    const previousScore = productivityScoreFromSprintKpis(previous?.kpis);
+    const currentScore = normalizeProductivityValue(kpis.productivityScore);
+    const previousScore = normalizeProductivityValue(previous?.kpis?.productivityScore);
     const delta = currentScore - previousScore;
-
+    
+    const previousSprintNum = getSprintNumber(previous.id);
     const previousSprintLabel = getSprintLabel(previous.id);
 
     if (delta > 0) {
@@ -561,78 +547,21 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
       tone: 'neutral',
       text: `Productivity is stable versus ${previousSprintLabel} (${currentScore}%).`,
     };
-  }, [currentSprint, sprints, kpis.productivityScore, getSprintLabel]);
+  }, [currentSprint, sprints, kpis.productivityScore, getSprintNumber, getSprintLabel]);
 
-  if (loading || !kpiDataReady) return <PageLoadingSpinner />;
+  // Mostrar loading state
+  if (loading) return <PageLoadingSpinner />;
 
+  // Mostrar empty state si no hay sprints
   if (shouldShowEmptyKpiView) {
     return (
-      <Box
-        sx={{
-          maxWidth: 1200,
-          width: '100%',
-          minHeight: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 190px)' },
-          display: 'flex',
-          flexDirection: 'column',
-          boxSizing: 'border-box',
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: 800,
-            color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
-            letterSpacing: '-0.5px',
-            mb: 3,
-          }}
-        >
-          KPI Analytics
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography variant="h6" color="text.secondary">
+          No sprints found for this project
         </Typography>
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            px: 2,
-            py: 3,
-          }}
-        >
-          <Paper
-            elevation={0}
-            sx={{
-              width: '100%',
-              p: { xs: 3, md: 4 },
-              borderRadius: 3,
-              border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
-              textAlign: 'center',
-              bgcolor: 'background.paper',
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
-              KPI data cannot be displayed yet
-            </Typography>
-            <Typography sx={{ color: 'text.secondary', maxWidth: 640, mx: 'auto', mb: 3 }}>
-              There are no sprints or tasks to visualize in this project. Create a sprint and add
-              tasks to see KPI analytics here.
-            </Typography>
-            {typeof onNavigateToTasks === 'function' ? (
-              <Button
-                variant="contained"
-                size="large"
-                onClick={onNavigateToTasks}
-                sx={{
-                  bgcolor: ORACLE_RED_ACTION,
-                  fontWeight: 700,
-                  px: 3,
-                  '&:hover': { bgcolor: '#A3321F' },
-                }}
-              >
-                Go to Tasks
-              </Button>
-            ) : null}
-          </Paper>
-        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Create a sprint to start tracking KPIs
+        </Typography>
       </Box>
     );
   }
@@ -641,253 +570,240 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights, onNavigateTo
   const sortedSprintsForSelect = [...sprints].sort((a, b) => a.id - b.id);
 
   return (
-    <>
+    <Box
+      component={motion.div}
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: pageEase }}
+      sx={{ maxWidth: 1200, width: '100%', mx: 'auto', px: 2 }}
+    >
+      {/* HEADER ACTUALIZADO CON ANIMACIONES Y SOPORTE PARA MODO OSCURO */}
       <Box
         component={motion.div}
-        initial={{ opacity: 0, y: 18 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: pageEase }}
-        sx={{ maxWidth: 1200, width: '100%' }}
+        transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
       >
-        {/* HEADER ACTUALIZADO CON ANIMACIONES Y SOPORTE PARA MODO OSCURO */}
-        <Box
-          component={motion.div}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            mb: 4,
-            flexWrap: 'wrap',
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="h4"
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{ 
+              fontWeight: 800, 
+              color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK, 
+              letterSpacing: '-0.5px' 
+            }}
+          >
+            KPI Analytics
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          {sprints.length > 0 && (
+            <FormControl
+              size="small"
               sx={{
-                fontWeight: 800,
-                color: isDark ? '#F0F0F0' : SECTION_BRAND_DARK,
-                letterSpacing: '-0.5px',
+                minWidth: { xs: '100%', sm: 220 },
+                ...pageFormFieldOutline(isDark),
+                '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : undefined },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#3A3C42' : undefined },
+                '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: isDark ? '#5A5C62' : undefined },
+                '& .MuiSelect-select': {
+                  color: isDark ? '#F0F0F0' : '#1A1A1A',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  pr: 4,
+                },
               }}
             >
-              KPI Analytics
+              <InputLabel id="kpi-analytics-sprint-filter" shrink>
+                Sprint
+              </InputLabel>
+              <Select
+                labelId="kpi-analytics-sprint-filter"
+                value={selectedSprintId ?? ''}
+                label="Sprint"
+                onChange={(e) => setSelectedSprintId(Number(e.target.value))}
+                displayEmpty
+                renderValue={(value) => {
+                  if (value === '' || value == null) return 'Select sprint';
+                  return getSprintLabel(value);
+                }}
+              >
+                {sortedSprintsForSelect.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {getSprintLabel(s.id)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              bgcolor: isDark ? 'rgba(255,255,255,0.06)' : sectionRgba(0.08),
+              border: `1px solid ${isDark ? '#3A3C42' : sectionRgba(0.22)}`,
+              borderRadius: 2,
+              px: 2,
+              py: 1,
+            }}
+          >
+            <Target size={16} color={isDark ? '#64B5F6' : SECTION_ACCENT} aria-hidden />
+            <Typography sx={{ 
+              fontWeight: 700, 
+              fontSize: '0.875rem', 
+              color: isDark ? '#E0E0E0' : SECTION_BRAND_DARK 
+            }}>
+              Goal: +20% productivity
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            {sprints.length > 0 && (
-              <FormControl
-                size="small"
-                sx={{
-                  minWidth: { xs: '100%', sm: 220 },
-                  ...pageFormFieldOutline(isDark),
-                  '& .MuiInputLabel-root': { color: isDark ? '#9A9A9A' : undefined },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? '#3A3C42' : undefined,
-                  },
-                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? '#5A5C62' : undefined,
-                  },
-                  '& .MuiSelect-select': {
-                    color: isDark ? '#F0F0F0' : '#1A1A1A',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    pr: 4,
-                  },
-                }}
-              >
-                <InputLabel id="kpi-analytics-sprint-filter" shrink>
-                  Sprint
-                </InputLabel>
-                <Select
-                  labelId="kpi-analytics-sprint-filter"
-                  value={selectedSprintId ?? ''}
-                  label="Sprint"
-                  onChange={(e) => setSelectedSprintId(Number(e.target.value))}
-                  displayEmpty
-                  renderValue={(value) => {
-                    if (value === '' || value == null) return 'Select sprint';
-                    return getSprintLabel(value);
-                  }}
-                >
-                  {sortedSprintsForSelect.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {getSprintLabel(s.id)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : sectionRgba(0.08),
-                border: `1px solid ${isDark ? '#3A3C42' : sectionRgba(0.22)}`,
-                borderRadius: 2,
-                px: 2,
-                py: 1,
-              }}
-            >
-              <Target size={16} color={isDark ? '#64B5F6' : SECTION_ACCENT} aria-hidden />
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: '0.875rem',
-                  color: isDark ? '#E0E0E0' : SECTION_BRAND_DARK,
-                }}
-              >
-                Goal: +20% productivity
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-
-        <Grid
-          component={motion.div}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
-          container
-          spacing={3}
-          sx={{ mb: 3 }}
-        >
-          {[
-            {
-              label: 'Completion Rate',
-              pct: kpis.completionRate,
-              arcColor: '#1565C0',
-              borderColor: '#5C6BC0',
-            },
-            {
-              label: 'On-Time Delivery',
-              pct: kpis.onTimeDelivery,
-              arcColor: '#FB8C00',
-              borderColor: '#FFB74D',
-            },
-            {
-              label: 'Team Participation',
-              pct: kpis.teamParticipation,
-              arcColor: '#8E24AA',
-              borderColor: '#BA68C8',
-            },
-            {
-              label: 'Workload Balance',
-              pct: kpis.workloadBalance,
-              arcColor: '#1D9E75',
-              borderColor: '#43A047',
-            },
-          ].map(({ label, pct, arcColor, borderColor }) => (
-            <Grid item xs={12} sm={6} md={3} key={label}>
-              <Paper
-                component="div"
-                sx={{
-                  position: 'relative',
-                  p: 2,
-                  pt: 2.5,
-                  textAlign: 'center',
-                  borderRadius: 2,
-                  border: `1px solid ${sectionRgba(0.22)}`,
-                  borderLeft: `4px solid ${borderColor}`,
-                  boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
-                  bgcolor: 'background.paper',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  minHeight: 232,
-                  boxSizing: 'border-box',
-                }}
-              >
-                <KpiInfoCornerButton
-                  id={`kpi-info-analytics-${String(label).replace(/\s+/g, '-').toLowerCase()}`}
-                  bodyProps={KPI_TOOLTIPS[KPI_ANALYTICS_CARD_LABEL_TO_TOOLTIP_KEY[label]]}
-                  ariaLabel={`${label}: how it is calculated`}
-                />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: isDark ? '#9A9A9A' : '#455A64',
-                    fontWeight: 700,
-                    display: 'block',
-                    mb: 0.5,
-                  }}
-                >
-                  {label}
-                </Typography>
-                <KpiDonutChart
-                  pct={Math.min(100, Math.max(0, Number(pct) || 0))}
-                  displayValue={`${Math.round(Math.min(100, Math.max(0, Number(pct) || 0)))}%`}
-                  displaySuffix=""
-                  arcColor={arcColor}
-                  height={{ xs: 150, sm: 160 }}
-                  innerRadius={50}
-                  outerRadius={68}
-                  width={{ xs: '100%', sm: '100%' }}
-                  maxWidth={260}
-                  valueFontSize={{ xs: '1.5rem', sm: '1.65rem' }}
-                />
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-
-        <Box
-          component={motion.div}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
-        >
-          <Grid container spacing={2} sx={{ alignItems: 'stretch', mb: 2 }}>
-            <Grid item xs={12} lg={6} sx={{ display: 'flex', minWidth: 0 }}>
-              <Box sx={{ width: '100%', minWidth: 0 }}>
-                <DeveloperWorkloadCharts
-                  selectedSprints={selectedSprintRows}
-                  showHoursChart={false}
-                  uniqueTeamTotalsBySprintId={uniqueTeamTotalsBySprintId}
-                  assignedCompletedHeight={adaptiveAssignedChartHeight}
-                  assignedCompletedMaxWidth={adaptiveAssignedChartWidth}
-                  suppressOuterMargin={isDesktopLayout}
-                />
-              </Box>
-            </Grid>
-            <Grid
-              item
-              xs={12}
-              lg={6}
-              sx={{
-                display: isDesktopLayout ? 'flex' : 'block',
-                flexDirection: isDesktopLayout ? 'column' : undefined,
-                minWidth: 0,
-              }}
-            >
-              <ProductivityScoreCard
-                completionRate={kpis.completionRate}
-                onTimeDelivery={kpis.onTimeDelivery}
-                teamParticipation={kpis.teamParticipation}
-                workloadBalance={kpis.workloadBalance}
-                fillColumnHeight={isDesktopLayout}
-              />
-            </Grid>
-          </Grid>
-          <KpiManagerGuidePanel
-            sprintLabel={getSprintLabel(selectedSprintId)}
-            guide={managerGuide}
-            loading={managerGuideLoading}
-            fetchFailed={managerGuideFetchFailed}
-            productivityDelta={productivityDelta}
-            currentProductivityScore={kpis.productivityScore}
-            currentSprintKpis={kpis}
-            currentSprint={currentSprint}
-            onOpenAiInsights={onOpenAiInsights}
-          />
         </Box>
       </Box>
-    </>
+
+      <Grid
+        component={motion.div}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
+        container
+        spacing={3}
+        sx={{ mb: 3 }}
+      >
+        {[
+          {
+            label: 'Completion Rate',
+            pct: kpis.completionRate,
+            arcColor: '#1565C0',
+            borderColor: '#5C6BC0',
+          },
+          {
+            label: 'On-Time Delivery',
+            pct: kpis.onTimeDelivery,
+            arcColor: '#FB8C00',
+            borderColor: '#FFB74D',
+          },
+          {
+            label: 'Efficiency Score',
+            pct: kpis.efficiencyScore,
+            arcColor: '#8E24AA',
+            borderColor: '#BA68C8',
+          },
+          {
+            label: 'Workload Balance',
+            pct: kpis.workloadBalance,
+            arcColor: '#1D9E75',
+            borderColor: '#43A047',
+          },
+        ].map(({ label, pct, arcColor, borderColor }) => (
+          <Grid item xs={12} sm={6} md={3} key={label}>
+            <Paper
+              component="div"
+              sx={{
+                position: 'relative',
+                p: 2,
+                pt: 2.5,
+                textAlign: 'center',
+                borderRadius: 2,
+                border: `1px solid ${sectionRgba(0.22)}`,
+                borderLeft: `4px solid ${borderColor}`,
+                boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(0,0,0,0.05)',
+                bgcolor: 'background.paper',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                minHeight: 232,
+                boxSizing: 'border-box',
+              }}
+            >
+              <KpiInfoCornerButton
+                id={`kpi-info-analytics-${String(label).replace(/\s+/g, '-').toLowerCase()}`}
+                bodyProps={KPI_TOOLTIPS[KPI_ANALYTICS_CARD_LABEL_TO_TOOLTIP_KEY[label]]}
+                ariaLabel={`${label}: how it is calculated`}
+              />
+              <Typography
+                variant="caption"
+                sx={{ color: isDark ? '#9A9A9A' : '#455A64', fontWeight: 700, display: 'block', mb: 0.5 }}
+              >
+                {label}
+              </Typography>
+              <KpiDonutChart
+                pct={Math.min(100, Math.max(0, Number(pct) || 0))}
+                displayValue={`${Math.round(Math.min(100, Math.max(0, Number(pct) || 0)))}%`}
+                displaySuffix=""
+                arcColor={arcColor}
+                height={{ xs: 150, sm: 160 }}
+                innerRadius={50}
+                outerRadius={68}
+                width={{ xs: '100%', sm: '100%' }}
+                maxWidth={260}
+                valueFontSize={{ xs: '1.5rem', sm: '1.65rem' }}
+              />
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
+      >
+        <Grid container spacing={2} sx={{ alignItems: 'stretch', mb: 2 }}>
+          <Grid item xs={12} lg={6} sx={{ display: 'flex', minWidth: 0 }}>
+            <Box sx={{ width: '100%', minWidth: 0 }}>
+              <DeveloperWorkloadCharts
+                selectedSprints={selectedSprintRows}
+                showHoursChart={false}
+                uniqueTeamTotalsBySprintId={uniqueTeamTotalsBySprintId}
+                assignedCompletedHeight={adaptiveAssignedChartHeight}
+                assignedCompletedMaxWidth={adaptiveAssignedChartWidth}
+                suppressOuterMargin={isDesktopLayout}
+              />
+            </Box>
+          </Grid>
+          <Grid
+            item
+            xs={12}
+            lg={6}
+            sx={{
+              display: isDesktopLayout ? 'flex' : 'block',
+              flexDirection: isDesktopLayout ? 'column' : undefined,
+              minWidth: 0,
+            }}
+          >
+            <ProductivityScoreCard
+              completionRate={kpis.completionRate}
+              onTimeDelivery={kpis.onTimeDelivery}
+              efficiencyScore={kpis.efficiencyScore}
+              workloadBalance={kpis.workloadBalance}
+              fillColumnHeight={isDesktopLayout}
+            />
+          </Grid>
+        </Grid>
+        <KpiManagerGuidePanel
+          sprintLabel={getSprintLabel(selectedSprintId)}
+          guide={managerGuide}
+          loading={managerGuideLoading}
+          fetchFailed={managerGuideFetchFailed}
+          insightError={managerGuideInsightError}
+          productivityDelta={productivityDelta}
+          currentProductivityScore={kpis.productivityScore}
+          currentSprintKpis={kpis}
+          onOpenAiInsights={onOpenAiInsights}
+        />
+      </Box>
+    </Box>
   );
 }

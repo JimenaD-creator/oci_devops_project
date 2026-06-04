@@ -975,7 +975,7 @@ public class GeminiService {
         Map<String, Object> currentLive = resolveLiveKpisForSprint(currentSprint);
         double cr  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "completionRate");
         double otd = GeminiInsightKpiAlignUtil.intMetric(currentLive, "onTimeDelivery");
-        double tp  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "teamParticipation");
+        double es  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "efficiencyScore");
         double wb  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "workloadBalance");
         double ps  = GeminiInsightKpiAlignUtil.intMetric(currentLive, "productivityScore");
 
@@ -1004,12 +1004,12 @@ public class GeminiService {
             historyJson.append(String.format(
                 Locale.ROOT,
                 "{\"sprintId\":%d,\"orderIndex\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f,"
-                    + "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f%s}",
+                    + "\"efficiencyScore\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f%s}",
                 s.getId(),
                 i + 1,
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "completionRate"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "onTimeDelivery"),
-                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "teamParticipation"),
+                (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "efficiencyScore"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "workloadBalance"),
                 (double) GeminiInsightKpiAlignUtil.intMetric(histLive, "productivityScore"),
                 goalField
@@ -1037,8 +1037,8 @@ public class GeminiService {
             "## Current Sprint (ID: " + currentSprint.getId() + ")\n" +
             String.format(
                 "{\"sprintId\":%d,\"completionRate\":%.1f,\"onTimeDelivery\":%.1f," +
-                "\"teamParticipation\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f}\n\n",
-                currentSprint.getId(), cr, otd, tp, wb, ps) +
+                "\"efficiencyScore\":%.1f,\"workloadBalance\":%.1f,\"productivityScore\":%.1f}\n\n",
+                currentSprint.getId(), cr, otd, es, wb, ps) +
             "## Canonical comparison vs ALL prior sprints (authoritative; oldest-to-newest columns match UI table)\n" +
             vsAllPriorJson + "\n\n" +
             "## Sprint timeline (live snapshot; phase is authoritative for whether the sprint has ended)\n" +
@@ -1058,7 +1058,7 @@ public class GeminiService {
             blockedUserTaskReportsJson + "\n\n" +
             "## Context\n" +
             "- KPI scale: 0-100 (100 = perfect)\n" +
-            "- productivityScore = (completionRate x 0.4) + (onTimeDelivery x 0.3) + (teamParticipation x 0.2) + (workloadBalance x 0.1)\n" +
+            "- productivityScore = (completionRate x 0.4) + (onTimeDelivery x 0.3) + (efficiencyScore x 0.2) + (workloadBalance x 0.1)\n" +
             "- workloadBalance < 70 means task distribution is uneven across developers\n" +
             "- Task status workflow is strictly: To do → In progress → In review → Done (same order as the canonical tally keys above — never print those codes in narrative text).\n" +
             "- Treat status movement as forward only when it follows that order; regressions are moves to an earlier stage.\n" +
@@ -1086,7 +1086,7 @@ public class GeminiService {
             "\"sprintChangeSummary\":\"\"," +
             "\"kpiManagerGuide\":{\"intro\":\"One-sentence headline for an engineering manager.\",\"byMetric\":{" +
             "\"completionRate\":\"1-2 sentences tied to the current %.\",\"onTimeDelivery\":\"...\"," +
-            "\"teamParticipation\":\"...\",\"workloadBalance\":\"...\",\"productivityScore\":\"...\"}}," +
+            "\"efficiencyScore\":\"...\",\"workloadBalance\":\"...\",\"productivityScore\":\"...\"}}," +
             "\"summary\":\"Brief 2-3 sentence assessment and the top priority action.\"}\n\n" +
             "## Rules\n" +
             "- Sprint not started yet: If Sprint timeline.phase is not_started (asOf before startDate), KPIs are pre-execution baselines — not evidence the team is behind. Do NOT frame low completion, on-time delivery, or productivity as performance problems, delivery risk, or \"missing the sprint\" because work has not begun. Do NOT use 'warning' or 'critical' alerts for KPI shortfalls caused only by the calendar. predictions must be conditional and calm (e.g. revisit after the sprint starts); avoid urgent \"at current pace\" delivery judgments. Still produce workloadRecommendations and overloaded flags when workloadBalance < 70 or planned assignments/assignedHoursSum are clearly uneven across developers — frame as planning guidance (rebalance before the sprint starts), not execution failure. actionableRecommendations: up to 3 preparatory items (workload_redistribution, planning, blockers from the blocked list); use [] only when assignments are balanced and there are no blockers. executiveSummary and summary: briefly state the sprint has not started (plain English dates), acknowledge roster/tasks as planned, and mention workload balance or overload risks when assignment data supports it.\n" +
@@ -1098,8 +1098,8 @@ public class GeminiService {
             + "Counts must still match the integers in \"Canonical status totals\".\n"
             + "- Anti-meta: Do not quote, paraphrase, or paste long internal instructions, metric definitions, or methodology from this prompt into user-facing strings. Write naturally for a PM or engineering lead — short, concrete coaching, not spec language.\n" +
             "- alerts: severity must follow the numeric 'value' on the 0-100 scale for the five main KPIs: 'critical' only if value < 40 (or the message states a 20+ point drop across 2+ sprints), " +
-            "'warning' only if 40 <= value < 60, and 'info' if value >= 60. For teamParticipation and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
-            "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: use alerts: [] OR only blocker/workload-planning alerts — never critical/warning for completionRate, onTimeDelivery, teamParticipation, or productivityScore at 0% because work has not started or just began. " +
+            "'warning' only if 40 <= value < 60, and 'info' if value >= 60. For efficiencyScore and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
+            "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: use alerts: [] OR only blocker/workload-planning alerts — never critical/warning for completionRate, onTimeDelivery, efficiencyScore, or productivityScore at 0% because work has not started or just began. " +
             "For workloadBalance, values >= 70 mean reasonably balanced work distribution; 'warning' typically applies when value is below 70. For blocker-related alerts, prefer severity 'warning' when the blocked-assignment list is non-empty; do not put a 0-100 percentage in 'value' for those — omit 'value' or use the count of blocked rows. Use [] if there are no alerts.\n" +
             "- actionableRecommendations: 3-8 items when useful if phase is in_progress or ended; if phase is not_started, follow the \"Sprint not started yet\" limits above instead. If phase is in_progress and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload (respecting task startDate vs asOf), blocked-assignment list above, or KPIs — but do not add filler recommendations for tasks whose startDate is after asOf. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data, or when not_started rules cap recommendations.\n" +
             "  Examples: workload_redistribution → move tasks between people to balance load; estimates → tasks taking much longer than team average; planning → adjust next sprint scope/story points for on-time delivery; training → developer needs support in a skill (infer from task titles/classification when possible); blockers → name the task and assignee in plain language when blocked work appears in the data above.\n" +
@@ -1120,18 +1120,18 @@ public class GeminiService {
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
             "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
-            "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload with concise English (workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero. If phase is not_started, keep these neutral (planned/upcoming work only; no implied underperformance).\n" +
+            "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload (concise English with workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero. If phase is not_started, keep these neutral (planned/upcoming work only; no implied underperformance).\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
             "- workloadRecommendations: only if workloadBalance < 70 or planned assignment counts/hours are materially uneven; else []. When generated, base from/to on assignedTaskRows and assignedHoursSum (for not_started, prefer planned load over workedHoursSum). For in_progress sprints, also use workedHoursSum and open urgent work. Avoid assigning additional tasks to the most-loaded developer when a teammate has lower planned or logged load.\n" +
             "  Never set 'to' / destination to a developer who appears in the blocked-assignments list above — they already have blocked work and cannot take more tasks until unblocked. Never move tasks onto someone who already logged the most hours this sprint when another eligible teammate has lower hours.\n" +
             "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
-            "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, teamParticipation, workloadBalance, productivityScore — " +
+            "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, efficiencyScore, workloadBalance, productivityScore — " +
             "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
             "Always put a space after a percent sign before the next word (write \"0% as\", never \"0%as\"). " +
             "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: do not write kpiManagerGuide prose that sounds like poor execution solely because KPIs are 0 — describe planned/upcoming work neutrally. " +
             "For workloadBalance: if the value is >= 70, state that task assignment is evenly distributed; do NOT claim uneven distribution or uneven execution solely because completion pace differs — that KPI does not measure execution speed.\n" +
-            "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, teamParticipation, and workloadBalance — "
+            "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, efficiencyScore, and workloadBalance — "
             + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
             + "When phase is in_progress, add one brief line only if needed: the score updates as work is marked Done and is not a final grade while the sprint is open. "
             + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
@@ -2055,7 +2055,7 @@ public class GeminiService {
         Map<String, Object> live = resolveLiveKpisForSprint(sprint);
         int cr = GeminiInsightKpiAlignUtil.intMetric(live, "completionRate");
         int otd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
-        int tp = GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation");
+        int es = GeminiInsightKpiAlignUtil.intMetric(live, "efficiencyScore");
         int wb = GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance");
         int ps = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
 
@@ -2066,8 +2066,8 @@ public class GeminiService {
             String.format("Completion rate is %d%% — share of sprint tasks marked done.", cr));
         byMetric.put("onTimeDelivery",
             String.format("On-time delivery is %d%% — completed work finished by the due date.", otd));
-        byMetric.put("teamParticipation",
-            String.format("Team participation is %d%% — team engagement in this sprint.", tp));
+        byMetric.put("efficiencyScore",
+            String.format("Efficiency score is %d%% — ratio of estimated vs actual hours (above 100 = ahead of schedule).", es));
         byMetric.put("workloadBalance",
             String.format("Workload balance is %d%% — how evenly tasks are distributed.", wb));
         byMetric.put("productivityScore", normalizeProductivityScoreGuideText("", ps, sprint));
@@ -4124,7 +4124,7 @@ public class GeminiService {
             String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
             if (o.has("value") && o.get("value").isNumber()) {
                 double v = o.get("value").asDouble();
-                if ("teamparticipation".equals(kpi)
+                if ("efficiencyscore".equals(kpi)
                     || "completionrate".equals(kpi)
                     || "ontimedelivery".equals(kpi)
                     || "productivityscore".equals(kpi)) {
@@ -4167,7 +4167,7 @@ public class GeminiService {
     private static final Set<String> EXECUTION_KPI_ALERT_KEYS = Set.of(
         "completionrate",
         "ontimedelivery",
-        "teamparticipation",
+        "efficiencyscore",
         "productivityscore"
     );
 
@@ -4523,7 +4523,7 @@ public class GeminiService {
         Map<String, Object> live = resolveLiveKpisForSprint(sprint);
         sprint.setCompletionRate(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "completionRate")));
         sprint.setOnTimeDelivery(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery")));
-        sprint.setTeamParticipation(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation")));
+        sprint.setEfficiencyScore(BigDecimal.valueOf(GeminiInsightKpiAlignUtil.intMetric(live, "efficiencyScore")));
         sprintRepository.save(sprint);
     }
 
@@ -4590,11 +4590,11 @@ public class GeminiService {
             priorArr.append(String.format(
                 Locale.ROOT,
                 "{\"sprintId\":%d,\"completionRate\":%d,\"onTimeDelivery\":%d,"
-                    + "\"teamParticipation\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}",
+                    + "\"efficiencyScore\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}",
                 s.getId(),
                 GeminiInsightKpiAlignUtil.intMetric(m, "completionRate"),
                 GeminiInsightKpiAlignUtil.intMetric(m, "onTimeDelivery"),
-                GeminiInsightKpiAlignUtil.intMetric(m, "teamParticipation"),
+                GeminiInsightKpiAlignUtil.intMetric(m, "efficiencyScore"),
                 GeminiInsightKpiAlignUtil.intMetric(m, "workloadBalance"),
                 GeminiInsightKpiAlignUtil.intMetric(m, "productivityScore")));
         }
@@ -4605,8 +4605,8 @@ public class GeminiService {
             - GeminiInsightKpiAlignUtil.intMetric(prev, "completionRate");
         int dOtd = GeminiInsightKpiAlignUtil.intMetric(cur, "onTimeDelivery")
             - GeminiInsightKpiAlignUtil.intMetric(prev, "onTimeDelivery");
-        int dTp = GeminiInsightKpiAlignUtil.intMetric(cur, "teamParticipation")
-            - GeminiInsightKpiAlignUtil.intMetric(prev, "teamParticipation");
+        int dEs = GeminiInsightKpiAlignUtil.intMetric(cur, "efficiencyScore")
+            - GeminiInsightKpiAlignUtil.intMetric(prev, "efficiencyScore");
         int dWb = GeminiInsightKpiAlignUtil.intMetric(cur, "workloadBalance")
             - GeminiInsightKpiAlignUtil.intMetric(prev, "workloadBalance");
         int dPs = GeminiInsightKpiAlignUtil.intMetric(cur, "productivityScore")
@@ -4616,29 +4616,29 @@ public class GeminiService {
             "{\"hasPriorSprints\":true,\"hasPreviousSprint\":true,\"priorSprintCount\":%d,"
                 + "\"priorSprintsChronological\":%s,"
                 + "\"immediatePreviousSprintId\":%d,\"currentSprintId\":%d,"
-                + "\"immediatePrevious\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"teamParticipation\":%d,"
+                + "\"immediatePrevious\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"efficiencyScore\":%d,"
                 + "\"workloadBalance\":%d,\"productivityScore\":%d},"
-                + "\"current\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"teamParticipation\":%d,"
+                + "\"current\":{\"completionRate\":%d,\"onTimeDelivery\":%d,\"efficiencyScore\":%d,"
                 + "\"workloadBalance\":%d,\"productivityScore\":%d},"
                 + "\"deltaVsImmediatePrevious\":{\"completionRate\":%d,\"onTimeDelivery\":%d,"
-                + "\"teamParticipation\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}}",
+                + "\"efficiencyScore\":%d,\"workloadBalance\":%d,\"productivityScore\":%d}}",
             allPrior.size(),
             priorArr,
             previous.getId(),
             current.getId(),
             GeminiInsightKpiAlignUtil.intMetric(prev, "completionRate"),
             GeminiInsightKpiAlignUtil.intMetric(prev, "onTimeDelivery"),
-            GeminiInsightKpiAlignUtil.intMetric(prev, "teamParticipation"),
+            GeminiInsightKpiAlignUtil.intMetric(prev, "efficiencyScore"),
             GeminiInsightKpiAlignUtil.intMetric(prev, "workloadBalance"),
             GeminiInsightKpiAlignUtil.intMetric(prev, "productivityScore"),
             GeminiInsightKpiAlignUtil.intMetric(cur, "completionRate"),
             GeminiInsightKpiAlignUtil.intMetric(cur, "onTimeDelivery"),
-            GeminiInsightKpiAlignUtil.intMetric(cur, "teamParticipation"),
+            GeminiInsightKpiAlignUtil.intMetric(cur, "efficiencyScore"),
             GeminiInsightKpiAlignUtil.intMetric(cur, "workloadBalance"),
             GeminiInsightKpiAlignUtil.intMetric(cur, "productivityScore"),
             dCr,
             dOtd,
-            dTp,
+            dEs,
             dWb,
             dPs);
     }
@@ -4724,8 +4724,8 @@ public class GeminiService {
         if ("ontimedelivery".equals(kpi)) {
             return GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
         }
-        if ("teamparticipation".equals(kpi)) {
-            return GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation");
+        if ("efficiencyscore".equals(kpi)) {
+            return GeminiInsightKpiAlignUtil.intMetric(live, "efficiencyScore");
         }
         if ("workloadbalance".equals(kpi)) {
             return GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance");
@@ -4760,7 +4760,7 @@ public class GeminiService {
         int dPs = 0;
         int dCr = 0;
         int dOtd = 0;
-        int dTp = 0;
+        int dEs = 0;
         int dWb = 0;
         GeminiInsightKpiAlignUtil.SprintChangeContext changeCtx = null;
         if (!allPrior.isEmpty()) {
@@ -4772,8 +4772,8 @@ public class GeminiService {
                 - GeminiInsightKpiAlignUtil.intMetric(prevLive, "completionRate");
             dOtd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery")
                 - GeminiInsightKpiAlignUtil.intMetric(prevLive, "onTimeDelivery");
-            dTp = GeminiInsightKpiAlignUtil.intMetric(live, "teamParticipation")
-                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "teamParticipation");
+            dEs = GeminiInsightKpiAlignUtil.intMetric(live, "efficiencyScore")
+                - GeminiInsightKpiAlignUtil.intMetric(prevLive, "efficiencyScore");
             dWb = GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance")
                 - GeminiInsightKpiAlignUtil.intMetric(prevLive, "workloadBalance");
             Map<Long, Integer> sprintDisplayMap = buildSprintDisplayIndexMap(projectId);
@@ -4788,13 +4788,22 @@ public class GeminiService {
                     dPs,
                     dCr,
                     dOtd,
-                    dTp,
+                    dEs,
                     dWb,
                     changeCtx);
                 es.put("trends", trends);
             }
         }
-        alignExecutiveSummaryProseFields(es, live, chronoOtd);
+        for (String field : List.of("overview", "trends", "improvementAreas", "nextSteps")) {
+            if (!es.path(field).isTextual()) {
+                continue;
+            }
+            String text = GeminiInsightKpiAlignUtil.normalizePercentagePointsLabel(es.get(field).asText(""));
+            text = GeminiInsightKpiAlignUtil.alignAllLiveKpisInProse(text, live);
+            text = GeminiInsightKpiAlignUtil.fixProductivityPercentMisattributedToOnTime(text, live);
+            text = GeminiInsightKpiAlignUtil.removeContradictoryOnTimeDeclineSentences(text, chronoOtd);
+            es.put(field, text);
+        }
     }
 
     private void alignKpiManagerGuideWithLiveKpis(ObjectNode root, Map<String, Object> live) {
@@ -4812,7 +4821,7 @@ public class GeminiService {
         }
         ObjectNode byMetric = (ObjectNode) byMetricNode;
         for (String key : List.of(
-            "completionRate", "onTimeDelivery", "teamParticipation", "workloadBalance", "productivityScore")) {
+            "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore")) {
             if (!byMetric.path(key).isTextual()) {
                 continue;
             }
@@ -4867,9 +4876,9 @@ public class GeminiService {
     private double computeProductivityScore(Sprint s) {
         double cr  = toPercent(s.getCompletionRate());
         double otd = toPercent(s.getOnTimeDelivery());
-        double tp  = toPercent(s.getTeamParticipation());
+        double es  = toPercent(s.getEfficiencyScore());
         double wb  = toPercent(s.getWorkloadBalance());
-        double score = (cr * 0.4) + (otd * 0.3) + (tp * 0.2) + (wb * 0.1);
+        double score = (cr * 0.4) + (otd * 0.3) + (es * 0.2) + (wb * 0.1);
         return Math.max(0.0, Math.min(100.0, Math.round(score)));
     }
 

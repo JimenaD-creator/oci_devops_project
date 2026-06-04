@@ -86,7 +86,7 @@ public class SprintController {
             existingSprint.setDueDate(sprintDetails.getDueDate());
             existingSprint.setCompletionRate(sprintDetails.getCompletionRate());
             existingSprint.setOnTimeDelivery(sprintDetails.getOnTimeDelivery());
-            existingSprint.setTeamParticipation(sprintDetails.getTeamParticipation());
+existingSprint.setEfficiencyScore(sprintDetails.getEfficiencyScore());
             existingSprint.setWorkloadBalance(sprintDetails.getWorkloadBalance());
             existingSprint.setGoal(sprintDetails.getGoal());
             Sprint updatedSprint = sprintRepository.save(existingSprint);

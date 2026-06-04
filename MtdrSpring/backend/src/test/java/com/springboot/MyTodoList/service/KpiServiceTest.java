@@ -47,7 +47,7 @@ class KpiServiceTest {
         when(sprintRepository.findById(1L)).thenReturn(Optional.of(sprint));
         when(kpiRepository.getCompletionRate(1L)).thenReturn(Map.of("COMPLETION_RATE", 75.5));
         when(kpiRepository.getOnTimeDelivery(1L)).thenReturn(Map.of("ON_TIME_DELIVERY", 80));
-        when(kpiRepository.getTeamParticipation(1L)).thenReturn(Map.of("TEAM_PARTICIPATION", 90));
+when(kpiRepository.getEfficiencyScore(1L)).thenReturn(Map.of("EFFICIENCY_SCORE", 90));
         when(kpiRepository.getWorkloadBalance(1L)).thenReturn(Map.of("WORKLOAD_BALANCE", 65));
         when(sprintRepository.save(any(Sprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -66,7 +66,7 @@ class KpiServiceTest {
         when(sprintRepository.findById(2L)).thenReturn(Optional.of(sprint));
         when(kpiRepository.getCompletionRate(2L)).thenThrow(new RuntimeException("db"));
         when(kpiRepository.getOnTimeDelivery(2L)).thenReturn(Map.of());
-        when(kpiRepository.getTeamParticipation(2L)).thenReturn(Map.of());
+when(kpiRepository.getEfficiencyScore(2L)).thenReturn(Map.of());
         when(kpiRepository.getWorkloadBalance(2L)).thenReturn(Map.of());
         when(sprintRepository.save(any(Sprint.class))).thenAnswer(inv -> inv.getArgument(0));
 

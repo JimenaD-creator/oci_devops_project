@@ -205,15 +205,15 @@ export const KPI_TOOLTIPS = {
       suffix: '× 100',
     },
   },
-  teamParticipation: {
-    what: 'How logged hours compare to the estimated hours on tasks this sprint.',
-    representation: 'Percentage from 0 to 100.',
+  efficiencyScore: {
+    what: 'How efficiently the team completed tasks relative to the estimated time. Higher means tasks were finished faster than planned.',
+    representation: 'Score from 0 to 150. Above 100 means the team finished ahead of schedule.',
     formula: {
       type: 'fraction',
-      label: 'Participation (%) =',
-      numerator: 'hours logged',
-      denominator: 'planned hours on tasks',
-      suffix: '× 100',
+      label: 'Efficiency (%) =',
+      numerator: 'estimated hours',
+      denominator: 'actual hours logged',
+      suffix: '× 100  (capped at 150)',
     },
   },
   workloadBalance: {
@@ -234,7 +234,7 @@ export const KPI_TOOLTIPS = {
         { type: 'plain', text: 'Productivity (%) = weighted sum' },
         {
           type: 'plain',
-          text: '(Completion × 40%) + (On-time × 30%) + (Participation × 20%) + (Workload balance × 10%)',
+          text: '(Completion × 40%) + (On-time × 30%) + (Efficiency × 20%) + (Workload balance × 10%)',
         },
       ],
     },
