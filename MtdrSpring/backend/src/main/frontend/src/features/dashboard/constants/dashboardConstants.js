@@ -16,6 +16,9 @@ export const SECTION_ACCENT_SOFT = '#5C6BC0';
 /** Bar fill when sprint/task progress is complete (indigo, not green). */
 export const SECTION_PROGRESS_COMPLETE = '#3949AB';
 
+/** Productivity score KPI — matches KPI Analytics hero / developer productivity section. */
+export const PRODUCTIVITY_SCORE_ACCENT = '#2E7D32';
+
 /** rgba(21, 101, 192, α) for borders/focus rings. */
 export function sectionRgba(alpha) {
   return `rgba(21, 101, 192, ${alpha})`;

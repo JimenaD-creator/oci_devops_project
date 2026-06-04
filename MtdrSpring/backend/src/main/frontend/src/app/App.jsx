@@ -53,7 +53,6 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import GroupIcon from '@mui/icons-material/Group';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
@@ -67,7 +66,6 @@ const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const KPIAnalytics = lazy(() => import('../features/kpis/KPIAnalytics'));
 const ProjectSelector = lazy(() => import('../features/project/ProjectSelector'));
 const AIInsightsPage = lazy(() => import('../features/ai/AIInsightsPage'));
-const TeamPage = lazy(() => import('../features/team/TeamPage'));
 const ManagerChatbot = lazy(() => import('../features/ai/ManagerChatbot'));
 const MyPerformancePage = lazy(() => import('../features/developer/MyPerformancePage'));
 const MyTasksPage = lazy(() => import('../features/developer/MyTasksPage'));
@@ -140,7 +138,6 @@ function App() {
   const [devProjectStatus, setDevProjectStatus] = useState(() =>
     localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
   );
-  const [teamLandingSprintId, setTeamLandingSprintId] = useState(null);
   /** Pages already opened stay mounted (hidden) to avoid refetch on every sidebar click. */
   const [visitedPages, setVisitedPages] = useState(() => {
     try {
@@ -160,16 +157,6 @@ function App() {
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
   // ────────────────────────────────────────────────────────────────────────────
 
-  const handleTeamLandingConsumed = useCallback(() => {
-    setTeamLandingSprintId(null);
-  }, []);
-  const handleOpenTeamFromAi = useCallback((sprintId) => {
-    setTeamLandingSprintId(sprintId != null ? Number(sprintId) : null);
-    setActivePage('team');
-  }, []);
-  const handleOpenAiInsightsFromTeam = useCallback(() => {
-    setActivePage('ai-insights');
-  }, []);
   const handleNavigateToProjectTasks = useCallback(() => {
     setSprintsNavOpen(true);
     setActivePage('sprints');
@@ -454,7 +441,6 @@ function App() {
       id: 'analytics',
       roles: ['ADMIN', 'MANAGER'],
     },
-    { text: 'Team', icon: <GroupIcon />, id: 'team', roles: ['ADMIN', 'MANAGER'] },
     {
       text: 'Change project',
       icon: <SwapHorizIcon />,
@@ -902,6 +888,7 @@ function App() {
               <Box sx={pageVisibilitySx('dashboard')}>
                 <DashboardPage
                   onNavigateToTasks={handleNavigateToProjectTasks}
+                  onNavigateToAnalytics={() => setActivePage('analytics')}
                   projectId={selectedProjectId}
                   isPageActive={activePage === 'dashboard'}
                 />
@@ -933,18 +920,7 @@ function App() {
               <Box sx={pageVisibilitySx('ai-insights')}>
                 <AIInsightsPage
                   projectId={selectedProjectId}
-                  onOpenTeam={handleOpenTeamFromAi}
                   isPageActive={activePage === 'ai-insights'}
-                />
-              </Box>
-            )}
-            {visitedPages.has('team') && (
-              <Box sx={pageVisibilitySx('team')}>
-                <TeamPage
-                  projectId={selectedProjectId}
-                  landingSprintId={teamLandingSprintId}
-                  onLandingConsumed={handleTeamLandingConsumed}
-                  onOpenAiInsights={handleOpenAiInsightsFromTeam}
                 />
               </Box>
             )}
@@ -976,7 +952,6 @@ function App() {
           'analytics',
           'tasks',
           'ai-insights',
-          'team',
           'my-tasks',
           'my-kanban',
           'my-blockers',

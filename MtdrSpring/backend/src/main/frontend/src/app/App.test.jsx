@@ -45,11 +45,6 @@ vi.mock('../features/ai/AIInsightsPage', () => ({
   default: () => <div data-testid="mock-ai">AI</div>,
 }));
 
-vi.mock('../features/team/TeamPage', () => ({
-  __esModule: true,
-  default: () => <div data-testid="mock-team">Team</div>,
-}));
-
 vi.mock('../features/project/ProjectSelector', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-project-selector">Project selector</div>,

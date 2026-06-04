@@ -1240,6 +1240,17 @@ export default function DashboardDeveloperCharts({
     [singleDeveloperFocus],
   );
 
+  const developerNameAxisTickStyle = useMemo(
+    () => ({
+      ...axisTickStyle,
+      fontSize: singleDeveloperFocus ? 15 : axisTickStyle.fontSize,
+      fontWeight: singleDeveloperFocus ? 700 : axisTickStyle.fontWeight,
+    }),
+    [axisTickStyle, singleDeveloperFocus],
+  );
+
+  const developerNameAxisWidth = singleDeveloperFocus ? 148 : 168;
+
   const barValueLabelSize = singleDeveloperFocus ? 10 : 12;
   const stackValueLabelSize = singleDeveloperFocus ? 11 : 14;
 
@@ -2156,8 +2167,8 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={singleDeveloperFocus ? 120 : 168}
-            tick={{ ...axisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+            width={developerNameAxisWidth}
+            tick={{ ...developerNameAxisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
           />
@@ -2274,8 +2285,8 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={singleDeveloperFocus ? 120 : 168}
-            tick={{ ...axisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+            width={developerNameAxisWidth}
+            tick={{ ...developerNameAxisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
           />

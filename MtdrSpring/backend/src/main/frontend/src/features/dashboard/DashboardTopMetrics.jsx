@@ -49,9 +49,10 @@ const COMPARE_TREND_GRID_PLACEMENT = {
 
 /**
  * Scorecards: quick numeric KPIs for the selected sprint(s).
- * @param {{ showSectionHeader?: boolean, multiSprint?: boolean, scorecardsFourColumn?: boolean }} props
+ * @param {{ showSectionHeader?: boolean, multiSprint?: boolean, scorecardsFourColumn?: boolean, scorecardsHorizontalRow?: boolean }} props
  * — When several sprints are selected, `scorecardsFourColumn` uses a 3-column layout on md+:
  *   summary cards stacked on the left, trend charts full-height on the right.
+ * — `scorecardsHorizontalRow` puts all four KPI cards in one row from sm+ (single-developer focus).
  */
 export default function DashboardTopMetrics({
   totalTasks = 0,
@@ -64,6 +65,7 @@ export default function DashboardTopMetrics({
   showSectionHeader = true,
   multiSprint = false,
   scorecardsFourColumn = false,
+  scorecardsHorizontalRow = false,
   avgTasksTrend = null,
   avgHoursTrend = null,
   avgTrendSeries = [],
@@ -140,6 +142,8 @@ export default function DashboardTopMetrics({
 
   const showTrendCharts = multiSprint && Array.isArray(avgTrendSeries) && avgTrendSeries.length > 1;
   const compactCompareRow = scorecardsFourColumn && showTrendCharts;
+  const useCompactScorecardStyle = scorecardsFourColumn || scorecardsHorizontalRow;
+  const equalHeightCards = !compactCompareRow;
 
   const trendChartTooltipStyles = {
     contentStyle: {
@@ -181,7 +185,7 @@ export default function DashboardTopMetrics({
             ? {
                 gridTemplateColumns: {
                   xs: '1fr',
-                  sm: 'repeat(2, minmax(0, 1fr))',
+                  sm: scorecardsHorizontalRow ? 'repeat(4, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))',
                   md: compactCompareRow
                     ? 'minmax(0, 0.72fr) minmax(0, 1.14fr) minmax(0, 1.14fr)'
                     : 'repeat(4, minmax(0, 1fr))',
@@ -193,10 +197,17 @@ export default function DashboardTopMetrics({
                     }
                   : {}),
               }
-            : {
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-              }),
-          gap: { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
+            : scorecardsHorizontalRow
+              ? {
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: 'repeat(4, minmax(0, 1fr))',
+                  },
+                }
+              : {
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                }),
+          gap: { xs: useCompactScorecardStyle ? 1 : 1.5, sm: 1.5 },
           width: '100%',
           minWidth: 0,
           justifyContent: 'start',
@@ -228,21 +239,27 @@ export default function DashboardTopMetrics({
                       display: { md: 'flex' },
                       flexDirection: { md: 'column' },
                     }
-                  : {}),
+                  : equalHeightCards
+                    ? {
+                        display: 'flex',
+                        flexDirection: 'column',
+                        height: '100%',
+                      }
+                    : {}),
               }}
             >
               <Paper
                 elevation={0}
                 sx={{
                   px: {
-                    xs: scorecardsFourColumn ? (isSummaryMetric ? 0.85 : 1) : 1.5,
+                    xs: useCompactScorecardStyle ? (isSummaryMetric ? 0.85 : 1) : 1.5,
                     sm: isSummaryMetric ? 1.1 : 1.5,
                   },
                   py: showTrendCharts
                     ? isTrendMetric
                       ? { xs: 1.2, sm: 1.35 }
                       : { xs: 0.85, sm: 1 }
-                    : { xs: scorecardsFourColumn ? 1.35 : 1.5, sm: 1.5 },
+                    : { xs: useCompactScorecardStyle ? 1.35 : 1.5, sm: 1.5 },
                   borderRadius: 3,
                   border: '1px solid',
                   borderColor: isDark ? '#2A2C32' : '#E8EAF0',
@@ -253,11 +270,11 @@ export default function DashboardTopMetrics({
                       ? { xs: 210, sm: 228, md: compactCompareRow ? '100%' : 240 }
                       : { xs: 118, sm: 128, md: compactCompareRow ? '100%' : 136 }
                     : {
-                        xs: scorecardsFourColumn ? 148 : 140,
-                        sm: scorecardsFourColumn ? 156 : 148,
+                        xs: useCompactScorecardStyle ? 148 : 140,
+                        sm: useCompactScorecardStyle ? 156 : 148,
                       },
-                  height: compactCompareRow ? { md: '100%' } : 'auto',
-                  flex: compactCompareRow ? { md: 1 } : undefined,
+                  height: equalHeightCards ? '100%' : compactCompareRow ? { md: '100%' } : 'auto',
+                  flex: equalHeightCards || compactCompareRow ? 1 : undefined,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -275,11 +292,11 @@ export default function DashboardTopMetrics({
                   <Box
                     sx={{
                       width: {
-                        xs: isSummaryMetric ? 32 : scorecardsFourColumn ? 40 : 48,
+                        xs: isSummaryMetric ? 32 : useCompactScorecardStyle ? 40 : 48,
                         sm: isSummaryMetric ? 34 : 48,
                       },
                       height: {
-                        xs: isSummaryMetric ? 32 : scorecardsFourColumn ? 40 : 48,
+                        xs: isSummaryMetric ? 32 : useCompactScorecardStyle ? 40 : 48,
                         sm: isSummaryMetric ? 34 : 48,
                       },
                       borderRadius: 2,
@@ -292,14 +309,14 @@ export default function DashboardTopMetrics({
                         ? isTrendMetric
                           ? { xs: 0.75, sm: 1 }
                           : { xs: 0.35, sm: 0.45 }
-                        : { xs: scorecardsFourColumn ? 1 : 1.5, sm: 1.5 },
+                        : { xs: useCompactScorecardStyle ? 1 : 1.5, sm: 1.5 },
                       border: `1px solid ${item.accent}22`,
                     }}
                   >
                     <item.icon
                       sx={{
                         fontSize: {
-                          xs: isSummaryMetric ? 18 : scorecardsFourColumn ? 22 : 26,
+                          xs: isSummaryMetric ? 18 : useCompactScorecardStyle ? 22 : 26,
                           sm: isSummaryMetric ? 20 : 26,
                         },
                         color: item.accent,
@@ -315,19 +332,27 @@ export default function DashboardTopMetrics({
                           ? 0.5
                           : isSummaryMetric
                             ? 0.35
-                            : scorecardsFourColumn
+                            : useCompactScorecardStyle
                               ? 0.75
                               : 1.25,
                         sm: isTrendMetric ? 0.65 : isSummaryMetric ? 0.4 : 1.25,
                       },
-                      px: { xs: scorecardsFourColumn ? 0.25 : 1, sm: 1 },
-                      ...(scorecardsFourColumn || isSummaryMetric
+                      px: { xs: useCompactScorecardStyle ? 0.25 : 1, sm: 1 },
+                      ...(useCompactScorecardStyle || isSummaryMetric
                         ? {
                             fontSize: {
                               xs: isSummaryMetric ? '0.6rem' : '0.65rem',
                               sm: isSummaryMetric ? '0.68rem' : '0.75rem',
                             },
                             lineHeight: 1.25,
+                            ...(useCompactScorecardStyle && !showTrendCharts
+                              ? {
+                                  minHeight: { xs: 32, sm: 36 },
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }
+                              : {}),
                           }
                         : {}),
                     }}
@@ -412,9 +437,9 @@ export default function DashboardTopMetrics({
                           ...METRIC_HELPER_SX,
                           textAlign: 'center',
                           pt: 0.25,
-                          px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
+                          px: { xs: useCompactScorecardStyle ? 0.15 : 0.75, sm: 0.75 },
                           fontSize: {
-                            xs: scorecardsFourColumn ? '0.62rem' : '0.8125rem',
+                            xs: useCompactScorecardStyle ? '0.62rem' : '0.8125rem',
                             sm: '0.72rem',
                           },
                           lineHeight: 1.3,
@@ -435,7 +460,7 @@ export default function DashboardTopMetrics({
                           ...(item.valueCompact
                             ? {
                                 fontSize: {
-                                  xs: scorecardsFourColumn ? '0.9rem' : '1rem',
+                                  xs: useCompactScorecardStyle ? '0.9rem' : '1rem',
                                   sm: '1.05rem',
                                 },
                                 lineHeight: 1.35,
@@ -443,7 +468,7 @@ export default function DashboardTopMetrics({
                               }
                             : isSummaryMetric
                               ? { fontSize: { xs: '1.15rem', sm: '1.35rem', md: '1.4rem' } }
-                              : scorecardsFourColumn
+                              : useCompactScorecardStyle
                                 ? { fontSize: { xs: '1.35rem', sm: '1.65rem', md: '1.75rem' } }
                                 : {}),
                         }}
@@ -457,11 +482,11 @@ export default function DashboardTopMetrics({
                             textAlign: 'center',
                             mt: isSummaryMetric && compactCompareRow ? 0 : 0,
                             pt: isSummaryMetric ? 0.35 : 0.5,
-                            px: { xs: scorecardsFourColumn ? 0.15 : 0.75, sm: 0.75 },
+                            px: { xs: useCompactScorecardStyle ? 0.15 : 0.75, sm: 0.75 },
                             fontSize: {
                               xs: isSummaryMetric
                                 ? '0.62rem'
-                                : scorecardsFourColumn
+                                : useCompactScorecardStyle
                                   ? '0.68rem'
                                   : '0.8125rem',
                               sm: isSummaryMetric ? '0.7rem' : '0.8125rem',

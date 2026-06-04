@@ -11,8 +11,8 @@ export const CHART_DESC = {
       'Total completed tasks (bars) and hours worked (line) per developer across selected sprints.',
   },
   single: {
-    workload: 'Completed and pending tasks assigned to each developer in this sprint.',
-    hours: 'Hours worked (logged) next to estimated hours from task estimates per developer.',
+    workload: undefined,
+    hours: undefined,
     combo: 'Side-by-side view of completed tasks (bars) and hours worked (line) per developer.',
   },
 };

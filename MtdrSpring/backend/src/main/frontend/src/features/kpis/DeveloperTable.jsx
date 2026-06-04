@@ -312,6 +312,7 @@ function SprintMetricsTable({
   }, [selectedSprints, projectDevelopers, filterDeveloperName]);
 
   const hideSearch = Boolean(String(filterDeveloperName ?? '').trim());
+  const focusSingleDeveloper = hideSearch && !compareMode;
   const highlightName = String(highlightDeveloperName ?? '').trim();
 
   const isHighlightedRow = (rowName) => {
@@ -553,25 +554,29 @@ function SprintMetricsTable({
                             Total Hours {sortIcon(`${sp.id}_hours`)}
                           </div>
                         </th>
-                        <th className="sortable" onClick={() => toggleSort(`${sp.id}_onTime`)}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
-                          </div>
-                        </th>
-                        <th
-                          className="sortable"
-                          title={PARTICIPATION_COLUMN_HINT}
-                          onClick={() => toggleSort(`${sp.id}_participation`)}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
-                          </div>
-                        </th>
-                        <th>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Workload Balance
-                          </div>
-                        </th>
+                        {!focusSingleDeveloper ? (
+                          <>
+                            <th className="sortable" onClick={() => toggleSort(`${sp.id}_onTime`)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                On-Time Delivery {sortIcon(`${sp.id}_onTime`)}
+                              </div>
+                            </th>
+                            <th
+                              className="sortable"
+                              title={PARTICIPATION_COLUMN_HINT}
+                              onClick={() => toggleSort(`${sp.id}_participation`)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
+                              </div>
+                            </th>
+                            <th>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                Workload Balance
+                              </div>
+                            </th>
+                          </>
+                        ) : null}
                       </>
                     );
                   })()}
@@ -652,19 +657,24 @@ function SprintMetricsTable({
                               <td className="text-center cell-muted">
                                 {renderHours(r[`${sp.id}_hours`])}
                               </td>
-                              <td className="text-center">
-                                {renderOnTimeCell(r[`${sp.id}_onTime`])}
-                              </td>
-                              <td className="text-center">
-                                {renderParticipationCell(r[`${sp.id}_participation`])}
-                              </td>
-                              <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
+                              {!focusSingleDeveloper ? (
+                                <>
+                                  <td className="text-center">
+                                    {renderOnTimeCell(r[`${sp.id}_onTime`])}
+                                  </td>
+                                  <td className="text-center">
+                                    {renderParticipationCell(r[`${sp.id}_participation`])}
+                                  </td>
+                                  <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
+                                </>
+                              ) : null}
                             </>
                           );
                         })()}
                   </tr>
                 );
               })}
+              {!focusSingleDeveloper ? (
               <tr className="summary-row">
                 <td className="summary-cell">Team Average</td>
                 {compareMode
@@ -745,6 +755,7 @@ function SprintMetricsTable({
                       );
                     })()}
               </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

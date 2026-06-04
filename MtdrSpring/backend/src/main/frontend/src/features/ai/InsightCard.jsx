@@ -22,7 +22,6 @@ import {
   BarChart2,
   FileText,
   Lightbulb,
-  Users,
 } from 'lucide-react';
 import {
   API_BASE,
@@ -56,7 +55,7 @@ export default function InsightCard({
   currentSprintMetrics = null,
   refreshToken = 0,
   autoGenerateOnMissing = true,
-  onOpenTeam = null,
+  onPersistedInsightsChange = null,
   sprintDevelopers = [],
 }) {
   const theme = useTheme();
@@ -76,6 +75,12 @@ export default function InsightCard({
   const statusRef = useRef(status);
   statusRef.current = status;
   const lastSprintIdRef = useRef(null);
+  const onPersistedInsightsChangeRef = useRef(onPersistedInsightsChange);
+  onPersistedInsightsChangeRef.current = onPersistedInsightsChange;
+
+  const notifyPersistedInsightsChange = useCallback(() => {
+    onPersistedInsightsChangeRef.current?.();
+  }, []);
 
   const parseGeneratedAtMs = (value) => {
     const ms = new Date(value ?? '').getTime();
@@ -129,6 +134,7 @@ export default function InsightCard({
             setError(null);
             setStatus('loaded');
             setPollCount(attempt + 1);
+            notifyPersistedInsightsChange();
             return;
           }
           setPollCount(attempt + 1);
@@ -143,7 +149,7 @@ export default function InsightCard({
         setStatus('error');
       }
     },
-    [sprintId],
+    [sprintId, notifyPersistedInsightsChange],
   );
 
   const startGeneration = useCallback(async () => {
@@ -228,12 +234,13 @@ export default function InsightCard({
       setErrorCode(null);
       setError(null);
       setStatus('loaded');
+      notifyPersistedInsightsChange();
       return { action: 'none' };
     } catch {
       setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
       return { action: 'autoGenerate' };
     }
-  }, [sprintId]);
+  }, [sprintId, notifyPersistedInsightsChange]);
 
   const maybeAutoGenerateAfterLoad = useCallback(
     async (loadAction) => {
@@ -845,50 +852,6 @@ export default function InsightCard({
             </Box>
           </Box>
 
-          {/* Link to Team (metrics & radars) */}
-          {typeof onOpenTeam === 'function' && (
-            <Box sx={{ mb: { xs: 2, md: 3 } }}>
-              <Divider sx={{ mb: 2, borderColor: isDark ? '#2A2C32' : '#E0E0E0' }} />
-              <Button
-                variant="contained"
-                size="medium"
-                startIcon={<Users size={22} color="#fff" strokeWidth={2.25} />}
-                onClick={() => onOpenTeam(sprintId)}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 800,
-                  fontSize: { xs: '0.95rem', sm: '1rem' },
-                  minHeight: 48,
-                  py: 1.25,
-                  px: 2.75,
-                  borderRadius: 2,
-                  bgcolor: '#E53935',
-                  color: '#fff',
-                  boxShadow: isDark
-                    ? '0 2px 8px rgba(229, 57, 53, 0.35)'
-                    : '0 2px 8px rgba(229, 57, 53, 0.45)',
-                  transition:
-                    'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
-                  '&:hover': {
-                    bgcolor: '#C62828',
-                    boxShadow: isDark
-                      ? '0 4px 14px rgba(198, 40, 40, 0.45)'
-                      : '0 4px 14px rgba(198, 40, 40, 0.55)',
-                    transform: 'translateY(-1px)',
-                  },
-                  '&:active': {
-                    transform: 'translateY(0)',
-                    boxShadow: isDark
-                      ? '0 2px 6px rgba(198, 40, 40, 0.4)'
-                      : '0 2px 6px rgba(198, 40, 40, 0.5)',
-                  },
-                  '& .MuiButton-startIcon': { color: '#fff', mr: 1 },
-                }}
-              >
-                Open Team
-              </Button>
-            </Box>
-          )}
           {!acknowledged && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.25 }}>
               <Button

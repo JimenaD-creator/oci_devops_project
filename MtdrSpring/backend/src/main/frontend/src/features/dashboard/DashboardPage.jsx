@@ -17,6 +17,7 @@ import {
   Stack,
   Button,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -24,6 +25,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupIcon from '@mui/icons-material/Group';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
+import DeveloperProductivityDonutChart from './DeveloperProductivityDonutChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
 import DashboardDeveloperCharts from './DashboardDeveloperCharts';
 import DeveloperTable from '../kpis/DeveloperTable';
@@ -58,6 +60,7 @@ import {
   collectDeveloperNamesForSelection,
   countTeamDevelopers,
 } from '../../utils/teamRosterUtils';
+import { productivityScoreFromDeveloperMetrics, participationRateFromDeveloperHours, productivityScoreFromSprintKpis, formatProductivityScoreDisplay } from '../kpis/productivityScoreUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { resolveLoadErrorMessage } from '../../utils/auth';
 
@@ -84,6 +87,7 @@ const AVATAR_PALETTE_DARK = [
 export default function DashboardPage({
   projectId: propProjectId,
   onNavigateToTasks,
+  onNavigateToAnalytics = null,
   isPageActive = true,
 }) {
   const theme = useTheme();
@@ -343,11 +347,72 @@ export default function DashboardPage({
     teamDeveloperCountForAverages,
   ]);
 
+  const showDeveloperProductivityDonut =
+    !compareMode && Boolean(selectedDeveloperNameForMetrics);
+
+  const showTeamProductivityPill =
+    !compareMode && !selectedDeveloperNameForMetrics && Boolean(primarySprint);
+
+  const sprintTeamProductivityScore = useMemo(() => {
+    if (!showTeamProductivityPill || !primarySprint) return null;
+    const score = productivityScoreFromSprintKpis(primarySprint.kpis);
+    return Number.isFinite(score) ? Math.min(100, Math.max(0, Math.round(score))) : null;
+  }, [showTeamProductivityPill, primarySprint]);
+
+  const sprintTeamProductivityColor = useMemo(
+    () =>
+      sprintTeamProductivityScore != null
+        ? completionRateProgressColor(sprintTeamProductivityScore)
+        : completionRateProgressColor(0),
+    [sprintTeamProductivityScore],
+  );
+
+  const selectedDeveloperProductivity = useMemo(() => {
+    if (!showDeveloperProductivityDonut) return null;
+    const dev = selectionMetrics.developers[0];
+    if (!dev) return null;
+    const assigned = Math.max(0, Number(dev.assigned) || 0);
+    const completed = Math.max(0, Number(dev.completed) || 0);
+    const hours = Math.max(0, Number(dev.hours) || 0);
+    const estimate = Math.max(0, Number(dev.assignedHoursEstimate) || 0);
+    const completionRate = assigned > 0 ? Math.round((100 * completed) / assigned) : 0;
+    const onTimeDelivery = typeof dev.onTime === 'number' ? dev.onTime : 0;
+    const teamParticipation = participationRateFromDeveloperHours(hours, estimate) ?? 0;
+    const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(dev.workload) || 0)));
+    const score = productivityScoreFromDeveloperMetrics({
+      assigned,
+      completed,
+      hours,
+      assignedHoursEstimate: estimate,
+      onTime: dev.onTime,
+      workload: dev.workload,
+    });
+    return {
+      score,
+      completionRate,
+      onTimeDelivery,
+      teamParticipation,
+      workloadBalance,
+    };
+  }, [showDeveloperProductivityDonut, selectionMetrics.developers]);
+
   const heroProgress = useMemo(() => {
+    if (showDeveloperProductivityDonut && selectedDeveloperProductivity) {
+      return selectedDeveloperProductivity.completionRate;
+    }
     if (!taskStatusTotal) return 0;
     const done = taskStatusDistribution.find((r) => r.key === 'DONE')?.count ?? 0;
     return Math.round((100 * done) / taskStatusTotal);
-  }, [taskStatusDistribution, taskStatusTotal]);
+  }, [
+    showDeveloperProductivityDonut,
+    selectedDeveloperProductivity,
+    taskStatusDistribution,
+    taskStatusTotal,
+  ]);
+
+  const heroProgressLabel = showDeveloperProductivityDonut
+    ? `${selectedDeveloperName} — task completion`
+    : 'Sprint completion (all tasks)';
 
   const completionRateColor = useMemo(
     () => completionRateProgressColor(heroProgress),
@@ -622,6 +687,74 @@ export default function DashboardPage({
                 </Typography>
               )}
             </Box>
+
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: { xs: 1, sm: 1.25 },
+                flexShrink: 0,
+              }}
+            >
+              {showTeamProductivityPill && sprintTeamProductivityScore != null ? (
+                <Tooltip
+                  title="Sprint productivity score — click to open the full KPI breakdown in KPI Analytics."
+                  arrow
+                  placement="bottom"
+                >
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => onNavigateToAnalytics?.()}
+                    aria-label={`Sprint productivity score ${formatProductivityScoreDisplay(sprintTeamProductivityScore)}. Open KPI Analytics.`}
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      px: 1.25,
+                      py: 0.45,
+                      borderRadius: '999px',
+                      fontSize: { xs: '0.75rem', sm: '0.8125rem' },
+                      fontWeight: 700,
+                      lineHeight: 1.2,
+                      letterSpacing: '0.01em',
+                      fontFamily: 'inherit',
+                      cursor: typeof onNavigateToAnalytics === 'function' ? 'pointer' : 'default',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      m: 0,
+                      color: sprintTeamProductivityColor,
+                      bgcolor: alpha(sprintTeamProductivityColor, isDark ? 0.16 : 0.1),
+                      border: `1px solid ${alpha(sprintTeamProductivityColor, isDark ? 0.42 : 0.35)}`,
+                      flexShrink: 0,
+                      '@keyframes productivityPillPulse': {
+                        '0%, 100%': {
+                          boxShadow: `0 0 0 2px ${alpha(sprintTeamProductivityColor, isDark ? 0.28 : 0.22)}`,
+                        },
+                        '50%': {
+                          boxShadow: `0 0 0 7px ${alpha(sprintTeamProductivityColor, isDark ? 0.07 : 0.05)}`,
+                        },
+                      },
+                      animation: 'productivityPillPulse 2.6s ease-in-out infinite',
+                      transition:
+                        'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        bgcolor: alpha(sprintTeamProductivityColor, isDark ? 0.24 : 0.15),
+                        borderColor: alpha(sprintTeamProductivityColor, isDark ? 0.58 : 0.48),
+                        animation: 'none',
+                        boxShadow: `0 2px 10px ${alpha(sprintTeamProductivityColor, isDark ? 0.28 : 0.2)}`,
+                      },
+                      '&:focus-visible': {
+                        outline: `2px solid ${alpha(sprintTeamProductivityColor, 0.65)}`,
+                        outlineOffset: 2,
+                      },
+                    }}
+                  >
+                    Productivity {formatProductivityScoreDisplay(sprintTeamProductivityScore)}
+                  </Box>
+                </Tooltip>
+              ) : null}
 
             {/* ── Notification bell ── */}
             <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -972,6 +1105,7 @@ export default function DashboardPage({
               )}
             </Popover>
           </Box>
+            </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
@@ -1016,7 +1150,7 @@ export default function DashboardPage({
                 variant="body2"
                 sx={{ fontWeight: 600, color: isDark ? '#E0E0E0' : '#333' }}
               >
-                Completion rate
+                {heroProgressLabel}
               </Typography>
               <Typography
                 variant="h6"
@@ -1064,9 +1198,7 @@ export default function DashboardPage({
               fontSize: '0.8125rem',
             }}
           >
-            Select one or more sprints and optionally filter by developer. &quot;All Sprints&quot;
-            compares every sprint; choosing a single developer shows tasks and hours charts side by
-            side.
+            Select one or more sprints and optionally filter by developer.
           </Typography>
           <Typography
             id="dashboard-sprint-filter-label"
@@ -1233,7 +1365,10 @@ export default function DashboardPage({
           <Box
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', md: compareMode ? 'column' : 'row' },
+              flexDirection: {
+                xs: 'column',
+                md: compareMode || showDeveloperProductivityDonut ? 'column' : 'row',
+              },
               alignItems: 'stretch',
               gap: DASHBOARD_BLOCK_GAP,
               width: '100%',
@@ -1243,8 +1378,9 @@ export default function DashboardPage({
           >
             <Box
               sx={{
-                flex: { md: compareMode ? 'none' : '1 1 0' },
+                flex: { md: compareMode || showDeveloperProductivityDonut ? 'none' : '1 1 0' },
                 minWidth: 0,
+                width: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'flex-start',
@@ -1262,21 +1398,11 @@ export default function DashboardPage({
               >
                 Scorecards
               </Typography>
-              <Typography
-                sx={{
-                  ...SECTION_DESC_SX,
-                  mb: 1,
-                  width: '100%',
-                  textAlign: 'left',
-                  color: 'text.secondary',
-                }}
-              >
-                Quick totals and averages for the sprint(s) currently selected above.
-              </Typography>
               <DashboardTopMetrics
                 showSectionHeader={false}
                 multiSprint={compareMode}
                 scorecardsFourColumn={compareMode}
+                scorecardsHorizontalRow={showDeveloperProductivityDonut}
                 totalTasks={selectionMetrics.totalTasks}
                 totalCompleted={selectionMetrics.totalCompleted}
                 totalAssigned={selectionMetrics.totalAssigned}
@@ -1289,7 +1415,7 @@ export default function DashboardPage({
                 avgTrendSeries={averageTrends.series}
               />
             </Box>
-            {!compareMode ? (
+            {!compareMode && !showDeveloperProductivityDonut ? (
               <Box
                 sx={{
                   flex: { md: '1 1 0' },
@@ -1364,10 +1490,10 @@ export default function DashboardPage({
               component="h2"
               sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}
             >
-              Developer performance
+              Workload & hours
             </Typography>
             <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>
-              Workload and hours by developer
+              Assigned tasks and logged hours by developer
             </Typography>
           </Box>
         </ScrollReveal>
@@ -1380,28 +1506,75 @@ export default function DashboardPage({
           allSprintsSelected={allSprintsSelected}
         />
 
-        <ScrollReveal delay={0.05}>
-          <Box sx={{ mt: 2.5, mb: 0 }}>
-            <Typography
-              component="h2"
-              sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}
+        {showDeveloperProductivityDonut ? (
+          <ScrollReveal delay={0.05}>
+            <Box sx={{ mt: 2.5, mb: 0 }}>
+              <Typography
+                component="h2"
+                sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}
+              >
+                Developer productivity
+              </Typography>
+              <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>
+                Score and components for this sprint.
+              </Typography>
+            </Box>
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                width: '100%',
+                borderRadius: 3,
+                border: `1px solid ${isDark ? '#1B4332' : '#C8E6C9'}`,
+                borderLeft: '5px solid #2E7D32',
+                background: isDark
+                  ? 'linear-gradient(135deg, rgba(46,125,50,0.12) 0%, #1C1E22 50%)'
+                  : 'linear-gradient(135deg, rgba(46,125,50,0.07) 0%, #FFFFFF 50%)',
+                boxShadow: isDark
+                  ? '0 2px 10px rgba(0,0,0,0.2)'
+                  : '0 2px 10px rgba(46,125,50,0.08)',
+                boxSizing: 'border-box',
+              }}
             >
-              Developer productivity breakdown
-            </Typography>
-            <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>
-              Detailed per-developer numbers and sprint columns when comparing.
-            </Typography>
-          </Box>
-        </ScrollReveal>
-        <ScrollReveal delay={0.06}>
-          <DeveloperTable
-            selectedSprints={selectedSprints}
-            compareMode={compareMode}
-            projectDevelopers={projectDevelopers}
-            filterDeveloperName={selectedDeveloperNameForMetrics}
-            suppressCardTitle
-          />
-        </ScrollReveal>
+              <DeveloperProductivityDonutChart
+                score={selectedDeveloperProductivity?.score ?? 0}
+                completionRate={selectedDeveloperProductivity?.completionRate ?? 0}
+                onTimeDelivery={selectedDeveloperProductivity?.onTimeDelivery ?? 0}
+                teamParticipation={selectedDeveloperProductivity?.teamParticipation ?? 0}
+                workloadBalance={selectedDeveloperProductivity?.workloadBalance ?? 0}
+                embedded
+                wide
+              />
+            </Paper>
+          </ScrollReveal>
+        ) : null}
+
+        {!showDeveloperProductivityDonut ? (
+          <>
+            <ScrollReveal delay={0.05}>
+              <Box sx={{ mt: 2.5, mb: 0 }}>
+                <Typography
+                  component="h2"
+                  sx={{ ...SECTION_TITLE_SX, color: 'text.primary', mb: 0.35 }}
+                >
+                  Detailed metrics
+                </Typography>
+                <Typography sx={{ ...SECTION_DESC_SX, mb: 1, color: 'text.secondary' }}>
+                  Per-developer numbers and sprint columns when comparing.
+                </Typography>
+              </Box>
+            </ScrollReveal>
+            <ScrollReveal delay={0.06}>
+              <DeveloperTable
+                selectedSprints={selectedSprints}
+                compareMode={compareMode}
+                projectDevelopers={projectDevelopers}
+                filterDeveloperName={selectedDeveloperNameForMetrics}
+                suppressCardTitle
+              />
+            </ScrollReveal>
+          </>
+        ) : null}
       </Box>
     </Box>
   );
