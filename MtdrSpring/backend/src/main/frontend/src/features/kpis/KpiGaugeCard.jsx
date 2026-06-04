@@ -11,7 +11,7 @@ const GAUGE_HEADER_ACCENT = '#1565C0';
 /** Chart arc is 0–100; participation can exceed 100% — cap fill only. */
 const GAUGE_GOALS = {
   onTimeDelivery: 80,
-  teamParticipation: 100,
+  efficiencyScore: 100,
   workloadBalance: 80,
 };
 

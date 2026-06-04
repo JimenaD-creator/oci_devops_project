@@ -21,14 +21,16 @@ public class KpiService {
     private SprintRepository sprintRepository;
 
     private BigDecimal extractBigDecimal(Map<String, Object> map, String key) {
-        if (map == null || !map.containsKey(key) || map.get(key) == null) return null;
-        Object value = map.get(key);
-        if (value instanceof BigDecimal) return (BigDecimal) value;
-        if (value instanceof Double)     return BigDecimal.valueOf((Double) value);
-        if (value instanceof Number)     return new BigDecimal(value.toString());
-        return null;
-    }
-
+    if (map == null) return null;
+    Object value = map.get(key);
+    if (value == null) value = map.get(key.toUpperCase());
+    if (value == null) value = map.get(key.toLowerCase());
+    if (value == null) return null;
+    if (value instanceof BigDecimal) return (BigDecimal) value;
+    if (value instanceof Double)     return BigDecimal.valueOf((Double) value);
+    if (value instanceof Number)     return new BigDecimal(value.toString());
+    return null;
+}
     @Transactional
     public void calculateAndSaveKpisForSprint(Long sprintId) {
         Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
@@ -58,13 +60,13 @@ public class KpiService {
         }
 
         try {
-            Map<String, Object> result = kpiRepository.getTeamParticipation(sprintId);
-            System.out.println("[KpiService] teamParticipation raw: " + result);
-            BigDecimal val = extractBigDecimal(result, "TEAM_PARTICIPATION");
-            sprint.setTeamParticipation(val != null ? val : BigDecimal.ZERO);
+            Map<String, Object> result = kpiRepository.getEfficiencyScore(sprintId);
+            System.out.println("[KpiService] efficiencyScore raw: " + result);
+            BigDecimal val = extractBigDecimal(result, "EFFICIENCY_SCORE");
+            sprint.setEfficiencyScore(val != null ? val : BigDecimal.ZERO);
         } catch (Exception e) {
-            System.err.println("[KpiService] teamParticipation failed: " + e.getMessage());
-            sprint.setTeamParticipation(BigDecimal.ZERO);
+            System.err.println("[KpiService] efficiencyScore failed: " + e.getMessage());
+            sprint.setEfficiencyScore(BigDecimal.ZERO);
         }
 
         try {
@@ -81,7 +83,7 @@ public class KpiService {
         System.out.println("[KpiService] Saved KPIs for sprint " + sprintId +
             " → CR=" + sprint.getCompletionRate() +
             " OT=" + sprint.getOnTimeDelivery() +
-            " TP=" + sprint.getTeamParticipation() +
+            " ES=" + sprint.getEfficiencyScore() +
             " WB=" + sprint.getWorkloadBalance());
     }
 

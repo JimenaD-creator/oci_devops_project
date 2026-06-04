@@ -63,16 +63,16 @@ public class KpiController {
         }
     }
 
-    @GetMapping("/sprint/{sprintId}/team-participation")
-    public ResponseEntity<Map<String, Object>> getTeamParticipation(@PathVariable Long sprintId) {
-        try {
-            Map<String, Object> result = kpiRepository.getTeamParticipation(sprintId);
-            if (result != null && !result.isEmpty()) return ResponseEntity.ok(result);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
+    @GetMapping("/sprint/{sprintId}/efficiency-score")
+public ResponseEntity<Map<String, Object>> getEfficiencyScore(@PathVariable Long sprintId) {
+    try {
+        Map<String, Object> result = kpiRepository.getEfficiencyScore(sprintId);
+        if (result != null && !result.isEmpty()) return ResponseEntity.ok(result);
+        return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+        return ResponseEntity.status(500).build();
     }
+}
 
     @GetMapping("/sprint/{sprintId}/all")
     public ResponseEntity<Map<String, Object>> getAllKpis(@PathVariable Long sprintId) {
@@ -82,7 +82,7 @@ public class KpiController {
             allKpis.put("onTimeDelivery", kpiRepository.getOnTimeDelivery(sprintId));
             allKpis.put("contributionScore", kpiRepository.getContributionScore(sprintId));
             allKpis.put("workloadBalance", kpiRepository.getWorkloadBalance(sprintId));
-            allKpis.put("teamParticipation", kpiRepository.getTeamParticipation(sprintId));
+allKpis.put("efficiencyScore", kpiRepository.getEfficiencyScore(sprintId));
             return ResponseEntity.ok(allKpis);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();

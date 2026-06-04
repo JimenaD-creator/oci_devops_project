@@ -75,7 +75,7 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
 export const KPI_LABELS = {
   completionRate: 'Completion Rate',
   onTimeDelivery: 'On-Time Delivery',
-  teamParticipation: 'Team Participation',
+  teamParticipation: 'Efficiency Score',
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
   blockers: 'Blockers',

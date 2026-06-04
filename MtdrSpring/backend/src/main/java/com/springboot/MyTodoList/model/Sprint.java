@@ -28,8 +28,8 @@ public class Sprint {
     @Column(name = "ON_TIME_DELIVERY")
     private BigDecimal onTimeDelivery;
     
-    @Column(name = "TEAM_PARTICIPATION")
-    private BigDecimal teamParticipation;
+    @Column(name = "TEAM_PARTICIPATION") // misma columna en DB, sin migración
+    private BigDecimal efficiencyScore;
     
     @Column(name = "WORKLOAD_BALANCE")
     private BigDecimal workloadBalance;
@@ -94,12 +94,12 @@ public class Sprint {
         this.onTimeDelivery = onTimeDelivery;
     }
     
-    public BigDecimal getTeamParticipation() {
-        return teamParticipation;
+    public BigDecimal getEfficiencyScore() {
+        return efficiencyScore;
     }
     
-    public void setTeamParticipation(BigDecimal teamParticipation) {
-        this.teamParticipation = teamParticipation;
+    public void setEfficiencyScore(BigDecimal efficiencyScore) {
+        this.efficiencyScore = efficiencyScore;
     }
     
     public BigDecimal getWorkloadBalance() {

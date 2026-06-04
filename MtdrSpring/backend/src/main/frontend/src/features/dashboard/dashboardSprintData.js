@@ -284,7 +284,7 @@ function mapApiSprint(apiSprint, sprintNumber) {
     kpis: {
       completionRate: Math.round((apiSprint.completionRate ?? 0) * 100),
       onTimeDelivery: Math.round((apiSprint.onTimeDelivery ?? 0) * 100),
-      teamParticipation: Math.round((apiSprint.teamParticipation ?? 0) * 100),
+  efficiencyScore: Math.round((apiSprint.efficiencyScore ?? 0) * 100),
       workloadBalance: apiSprint.workloadBalance ?? 0,
       productivityScore: Math.round((apiSprint.completionRate ?? 0) * 100),
     },
@@ -329,9 +329,10 @@ function deriveKpisFromLiveData(
     if (Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return sum;
     return sum + userTaskWorkedHours(ut);
   }, 0);
-  const teamParticipationPct =
-    totalExpectedHours > 0 ? Math.round((totalWorkedHours / totalExpectedHours) * 100) : 0;
-
+const efficiencyScorePct =
+  totalWorkedHours > 0
+    ? Math.min(150, Math.round((totalExpectedHours / totalWorkedHours) * 100))
+    : 0;
   const workloadBalancePct = (() => {
     const raw = Number(storedKpis?.workloadBalance ?? 0);
     if (!Number.isFinite(raw)) return 0;
@@ -342,12 +343,11 @@ function deriveKpisFromLiveData(
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
-    teamParticipation: Math.min(100, Math.max(0, teamParticipationPct)),
     workloadBalance: workloadBalancePct,
     productivityScore: computeProductivityScore({
       completionRate: completionRatePct,
       onTimeDelivery: onTimeDeliveryPct,
-      teamParticipation: teamParticipationPct,
+    efficiencyScore: efficiencyScorePct,
       workloadBalance: workloadBalancePct,
     }),
   };
@@ -1137,7 +1137,7 @@ export function buildTeamProductivityTrendSeries(selectedSprints) {
       scoreDisplay: `${productivityScore}%`,
       completionRate: Number(kpis.completionRate) || 0,
       onTimeDelivery: Number(kpis.onTimeDelivery) || 0,
-      teamParticipation: Number(kpis.teamParticipation) || 0,
+efficiencyScore: Number(kpis.efficiencyScore) || 0,
       workloadBalance: Number(kpis.workloadBalance) || 0,
       totalCompleted: Number(sp.totalCompleted) || 0,
       totalTasks: Number(sp.totalTasks) || 0,

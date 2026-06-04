@@ -67,10 +67,10 @@ public interface KpiRepository extends JpaRepository<Sprint, Long> {
 
     @Query(nativeQuery = true, value =
         "SELECT s.id AS sprint_id," +
-        " NVL(w.total_worked_hours, 0) AS total_worked_hours," +
         " NVL(e.total_expected_hours, 0) AS total_expected_hours," +
-        " ROUND(CASE WHEN NVL(e.total_expected_hours, 0) = 0 THEN 0" +
-        " ELSE NVL(w.total_worked_hours, 0) / e.total_expected_hours END, 4) AS team_participation" +
+        " NVL(w.total_worked_hours, 0) AS total_worked_hours," +
+        " ROUND(CASE WHEN NVL(w.total_worked_hours, 0) = 0 THEN 0" +
+        " ELSE LEAST(NVL(e.total_expected_hours, 0) / w.total_worked_hours, 1.5) END, 4) AS efficiency_score" +
         " FROM sprint s" +
         " LEFT JOIN (" +
         "   SELECT t.assigned_sprint AS sprint_id, SUM(ut.worked_hours) AS total_worked_hours" +
@@ -85,5 +85,5 @@ public interface KpiRepository extends JpaRepository<Sprint, Long> {
         " ) e ON e.sprint_id = s.id" +
         " WHERE s.id = :sprintId"
     )
-    Map<String, Object> getTeamParticipation(@Param("sprintId") Long sprintId);
+    Map<String, Object> getEfficiencyScore(@Param("sprintId") Long sprintId);
 }

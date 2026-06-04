@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Clock, Users, Scale } from 'lucide-react';
+import { Clock, Zap, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 import KpiGaugeCard from './KpiGaugeCard';
 import ProductivityGaugeCard from './ProductivityGaugeCard';
@@ -16,11 +16,11 @@ export const KPI_DEFS = [
     tooltip: KPI_TOOLTIPS.onTimeDelivery,
   },
   {
-    key: 'teamParticipation',
-    title: 'Team Participation',
+    key: 'efficiencyScore',
+    title: 'Efficiency Score',
     format: (v) => `${v}%`,
-    icon: Users,
-    tooltip: KPI_TOOLTIPS.teamParticipation,
+    icon: Zap,
+    tooltip: KPI_TOOLTIPS.efficiencyScore,
   },
   {
     key: 'workloadBalance',
