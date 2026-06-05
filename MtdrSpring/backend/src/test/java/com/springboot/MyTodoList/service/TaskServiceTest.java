@@ -106,6 +106,21 @@ class TaskServiceTest {
     }
 
     @Test
+    void createTask_withMultipleAssignees_throws() {
+        Task task = new Task();
+        when(taskRepository.save(task)).thenAnswer(inv -> {
+            Task t = inv.getArgument(0);
+            t.setId(31L);
+            return t;
+        });
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> taskService.createTask(task, List.of(2L, 3L)));
+        verify(userTaskRepository, never()).save(any());
+    }
+
+    @Test
     void createTask_unknownAssignee_throws() {
         Task task = new Task();
         when(taskRepository.save(task)).thenAnswer(inv -> {

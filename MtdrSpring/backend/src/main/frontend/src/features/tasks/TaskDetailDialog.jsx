@@ -14,9 +14,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput,
-  Checkbox,
-  ListItemText,
   Button,
   IconButton,
   Chip,
@@ -30,7 +27,6 @@ import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import {
   developerNumericId,
   finiteUserIds,
-  multiselectNumericIds,
   normalizeUserId,
 } from '../../utils/userIds';
 import {
@@ -349,6 +345,11 @@ function userTasksForTaskId(rows, taskId) {
   });
 }
 
+function primaryAssigneeId(ids) {
+  const list = finiteUserIds(Array.isArray(ids) ? ids : ids != null && ids !== '' ? [ids] : []);
+  return list.length > 0 ? list[0] : '';
+}
+
 function assigneeStateFromUserTasks(list) {
   const rows = Array.isArray(list) ? list : [];
   const ids = [
@@ -399,7 +400,7 @@ export function TaskDetailDialog({
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [sprintId, setSprintId] = useState('');
-  const [assignedUserIds, setAssignedUserIds] = useState([]);
+  const [assignedUserId, setAssignedUserId] = useState('');
   const [pickerDevelopers, setPickerDevelopers] = useState([]);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [taskUserTasks, setTaskUserTasks] = useState([]);
@@ -513,15 +514,15 @@ export function TaskDetailDialog({
   useEffect(() => {
     if (!editMode) return;
     if (availableDevelopers.length === 0) return;
-    setAssignedUserIds((prev) => {
+    setAssignedUserId((prev) => {
       const allowed = new Set(
         (availableDevelopers || [])
           .map((u) => developerNumericId(u))
           .filter((id) => id != null && Number.isFinite(id)),
       );
-      const next = finiteUserIds(prev).filter((id) => allowed.has(id));
-      if (next.length === prev.length) return prev;
-      return next;
+      const id = Number(prev);
+      if (!Number.isFinite(id) || allowed.has(id)) return prev;
+      return '';
     });
   }, [availableDevelopers, editMode]);
 
@@ -536,7 +537,7 @@ export function TaskDetailDialog({
     setStartDate(isoToDateInputValue(t.startDate));
     setDueDate(isoToDateInputValue(t.dueDate));
     setSprintId(t.assignedSprint?.id != null ? String(t.assignedSprint.id) : '');
-    setAssignedUserIds(finiteUserIds(loadedAssigneeUserIds));
+    setAssignedUserId(primaryAssigneeId(loadedAssigneeUserIds));
   };
 
   useEffect(() => {
@@ -577,13 +578,15 @@ export function TaskDetailDialog({
     setSaving(true);
     setError('');
     try {
-      const nextIds = [...finiteUserIds(assignedUserIds)].sort();
-      const prevIds = [...finiteUserIds(loadedAssigneeUserIds)].sort();
-      const assigneesChanged =
-        nextIds.length !== prevIds.length || nextIds.some((id, i) => id !== prevIds[i]);
-      const newlyAddedAssigneeIds = assigneesChanged
-        ? nextIds.filter((id) => !prevIds.includes(id))
-        : [];
+      const nextId = primaryAssigneeId(assignedUserId);
+      const prevId = primaryAssigneeId(loadedAssigneeUserIds);
+      const nextIds = nextId !== '' ? [nextId] : [];
+      const prevIds = prevId !== '' ? [prevId] : [];
+      const assigneesChanged = nextId !== prevId;
+      const newlyAddedAssigneeIds =
+        assigneesChanged && nextId !== '' && nextId !== prevId && !prevIds.includes(nextId)
+          ? [nextId]
+          : [];
       const sameSet = !assigneesChanged;
       if (!sameSet) {
         const tid = task.id;
@@ -654,10 +657,10 @@ export function TaskDetailDialog({
             ? { ...task, ...body }
             : { ...task, ...payload };
         setTask(updated);
-        const stillHasAssignees = finiteUserIds(assignedUserIds).length > 0;
+        const stillHasAssignees = nextId !== '';
         let saveMeta;
         if (assigneesChanged) {
-          saveMeta = { assigneesChanged: true, assigneeUserIds: finiteUserIds(assignedUserIds) };
+          saveMeta = { assigneesChanged: true, assigneeUserIds: nextIds };
         } else if (stillHasAssignees && updated?.status != null) {
           saveMeta = { syncAssignmentStatuses: true, assignmentStatus: updated.status };
         } else {
@@ -709,7 +712,7 @@ export function TaskDetailDialog({
     () => finiteUserIds(loadedAssigneeUserIds),
     [loadedAssigneeUserIds],
   );
-  const editAssigneeIds = useMemo(() => finiteUserIds(assignedUserIds), [assignedUserIds]);
+  const editAssigneeId = useMemo(() => primaryAssigneeId(assignedUserId), [assignedUserId]);
 
   const assigneeTaskMeta = useMemo(
     () => ({
@@ -1331,78 +1334,33 @@ export function TaskDetailDialog({
                   />
                 </Stack>
 
-                <FormControl
-                  fullWidth
-                  size="small"
-                  sx={{
-                    ...fieldSx,
-                    '& .MuiSelect-select': {
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      minHeight: 40,
-                      whiteSpace: 'normal',
-                      overflow: 'visible',
-                      textOverflow: 'clip',
-                      py: 0.75,
-                    },
-                  }}
-                >
+                <FormControl fullWidth size="small" sx={fieldSx}>
                   <InputLabel id="task-assignees-label">Assigned to</InputLabel>
                   <Select
                     labelId="task-assignees-label"
-                    multiple
-                    value={editAssigneeIds}
-                    onChange={(e) => setAssignedUserIds(multiselectNumericIds(e.target.value))}
-                    input={<OutlinedInput label="Assigned to" />}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.25 }}>
-                        {selected.length === 0 ? (
-                          <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
-                            Unassigned
-                          </Typography>
-                        ) : (
-                          selected.map((id, i) => {
-                            const name = displayNameForAssignee(id);
-                            const pal = CHIP_PALETTES[i % CHIP_PALETTES.length];
-                            return (
-                              <Chip
-                                key={id}
-                                size="small"
-                                label={name}
-                                sx={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  bgcolor: pal.bg,
-                                  color: pal.color,
-                                  border: `1px solid ${pal.border}`,
-                                  borderRadius: '20px',
-                                }}
-                              />
-                            );
-                          })
-                        )}
-                      </Box>
-                    )}
+                    value={editAssigneeId}
+                    onChange={(e) => setAssignedUserId(e.target.value)}
+                    label="Assigned to"
+                    renderValue={(value) =>
+                      value ? (
+                        displayNameForAssignee(value)
+                      ) : (
+                        <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+                          Unassigned
+                        </Typography>
+                      )
+                    }
                     MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
                   >
+                    <MenuItem value="">
+                      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Unassigned</Typography>
+                    </MenuItem>
                     {availableDevelopers.map((u) => {
                       const uid = developerNumericId(u);
                       if (uid == null || !Number.isFinite(uid)) return null;
                       return (
                         <MenuItem key={uid} value={uid} sx={{ fontSize: 13 }}>
-                          <Checkbox
-                            checked={editAssigneeIds.includes(uid)}
-                            size="small"
-                            sx={{ py: 0, '&.Mui-checked': { color: ORACLE_RED_ACTION } }}
-                          />
-                          <ListItemText
-                            primary={u.name}
-                            primaryTypographyProps={{
-                              sx: { fontSize: 13, color: isDark ? '#F0F0F0' : '#1A1A1A' },
-                            }}
-                          />
+                          {u.name}
                         </MenuItem>
                       );
                     })}

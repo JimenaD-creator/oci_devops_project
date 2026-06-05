@@ -22,6 +22,8 @@ export default function RichTextDescriptionField({
   minRows = 3,
   required = false,
   disabled = false,
+  contentFontSize = 14,
+  labelFontSize = 12,
   sx = {},
 }) {
   const theme = useTheme();
@@ -67,7 +69,7 @@ export default function RichTextDescriptionField({
         component="label"
         sx={{
           display: 'block',
-          fontSize: 12,
+          fontSize: labelFontSize,
           fontWeight: 600,
           color: 'text.secondary',
           mb: 0.75,
@@ -146,14 +148,15 @@ export default function RichTextDescriptionField({
             minHeight,
             px: 1.5,
             py: 1.25,
-            fontSize: 14,
-            lineHeight: 1.5,
+            fontSize: contentFontSize,
+            lineHeight: 1.45,
             color: 'text.primary',
             outline: 'none',
             '&:empty:before': {
               content: 'attr(data-placeholder)',
               color: 'text.disabled',
               pointerEvents: 'none',
+              fontSize: '0.75rem',
             },
             '& ul': { pl: 2.5, my: 0.5 },
             '& ol': { pl: 2.5, my: 0.5 },

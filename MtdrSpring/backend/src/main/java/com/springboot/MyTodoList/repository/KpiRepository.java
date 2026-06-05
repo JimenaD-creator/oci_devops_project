@@ -23,12 +23,29 @@ public interface KpiRepository extends JpaRepository<Sprint, Long> {
 
     @Query(nativeQuery = true, value =
         "SELECT s.id AS sprint_id," +
-        " SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END) AS completed_tasks," +
-        " SUM(CASE WHEN t.status = 'DONE' AND t.finish_date <= t.due_date THEN 1 ELSE 0 END) AS on_time_tasks," +
-        " ROUND(CASE WHEN SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END) = 0 THEN 0" +
-        " ELSE SUM(CASE WHEN t.status = 'DONE' AND t.finish_date <= t.due_date THEN 1 ELSE 0 END)" +
-        " / SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END) END, 4) AS on_time_delivery" +
-        " FROM sprint s LEFT JOIN task t ON t.assigned_sprint = s.id" +
+        " COUNT(CASE WHEN ut.task_id IS NOT NULL" +
+        "   AND UPPER(TRIM(ut.status)) IN ('COMPLETED','DONE','COMPLETE') THEN 1 END) AS completed_tasks," +
+        " COUNT(CASE WHEN ut.task_id IS NOT NULL" +
+        "   AND UPPER(TRIM(ut.status)) IN ('COMPLETED','DONE','COMPLETE')" +
+        "   AND t.due_date IS NOT NULL" +
+        "   AND TRUNC(COALESCE(ut.completed_at," +
+        "     CASE WHEN (SELECT COUNT(*) FROM user_task utc WHERE utc.task_id = t.id) <= 1" +
+        "          THEN t.finish_date END)) <= TRUNC(t.due_date)" +
+        "   THEN 1 END) AS on_time_tasks," +
+        " ROUND(CASE WHEN COUNT(CASE WHEN ut.task_id IS NOT NULL" +
+        "   AND UPPER(TRIM(ut.status)) IN ('COMPLETED','DONE','COMPLETE') THEN 1 END) = 0 THEN 0" +
+        " ELSE COUNT(CASE WHEN ut.task_id IS NOT NULL" +
+        "   AND UPPER(TRIM(ut.status)) IN ('COMPLETED','DONE','COMPLETE')" +
+        "   AND t.due_date IS NOT NULL" +
+        "   AND TRUNC(COALESCE(ut.completed_at," +
+        "     CASE WHEN (SELECT COUNT(*) FROM user_task utc2 WHERE utc2.task_id = t.id) <= 1" +
+        "          THEN t.finish_date END)) <= TRUNC(t.due_date)" +
+        "   THEN 1 END)" +
+        " / COUNT(CASE WHEN ut.task_id IS NOT NULL" +
+        "   AND UPPER(TRIM(ut.status)) IN ('COMPLETED','DONE','COMPLETE') THEN 1 END) END, 4) AS on_time_delivery" +
+        " FROM sprint s" +
+        " LEFT JOIN task t ON t.assigned_sprint = s.id" +
+        " LEFT JOIN user_task ut ON ut.task_id = t.id" +
         " WHERE s.id = :sprintId GROUP BY s.id"
     )
     Map<String, Object> getOnTimeDelivery(@Param("sprintId") Long sprintId);
@@ -70,7 +87,7 @@ public interface KpiRepository extends JpaRepository<Sprint, Long> {
         " NVL(e.total_expected_hours, 0) AS total_expected_hours," +
         " NVL(w.total_worked_hours, 0) AS total_worked_hours," +
         " ROUND(CASE WHEN NVL(w.total_worked_hours, 0) = 0 THEN 0" +
-        " ELSE LEAST(NVL(e.total_expected_hours, 0) / w.total_worked_hours, 1.5) END, 4) AS efficiency_score" +
+        " ELSE LEAST(NVL(e.total_expected_hours, 0) / w.total_worked_hours, 1) END, 4) AS efficiency_score" +
         " FROM sprint s" +
         " LEFT JOIN (" +
         "   SELECT t.assigned_sprint AS sprint_id, SUM(ut.worked_hours) AS total_worked_hours" +

@@ -72,6 +72,9 @@ public class TaskService {
         if (distinct.isEmpty()) {
             return saved;
         }
+        if (distinct.size() > 1) {
+            throw new IllegalArgumentException("A task can only have one assignee");
+        }
 
         String initialStatus =
                 saved.getStatus() != null && !saved.getStatus().isBlank()

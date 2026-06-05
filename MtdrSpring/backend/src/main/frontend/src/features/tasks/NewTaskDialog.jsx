@@ -10,10 +10,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput,
-  Checkbox,
-  ListItemText,
-  Chip,
   Button,
   IconButton,
   Typography,
@@ -21,9 +17,8 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
-import CheckIcon from '@mui/icons-material/Check';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
-import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
+import { developerNumericId } from '../../utils/userIds';
 import {
   API_BASE,
   FORM_FIELD_TINT_BG,
@@ -39,6 +34,15 @@ import {
   dateInputToEndOfLocalDayIso,
   dateInputToStartOfLocalDayIso,
   isDateInputOnOrBefore,
+  createTaskFormFieldSx,
+  createTaskDeveloperSelectFieldSx,
+  createTaskDeveloperSelectMenuProps,
+  createTaskDeveloperSelectValueSx,
+  createTaskSelectMenuProps,
+  CREATE_TASK_BODY_FONT_SIZE,
+  CREATE_TASK_LABEL_FONT_SIZE,
+  CREATE_TASK_OPTION_LABEL_FONT_SIZE,
+  createTaskSelectPlaceholderSx,
 } from './utils/taskUtils';
 
 const TYPE_OPTIONS = [
@@ -116,7 +120,7 @@ function SectionLabel({ children }) {
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
       <Typography
         sx={{
-          fontSize: 12,
+          fontSize: CREATE_TASK_LABEL_FONT_SIZE,
           fontWeight: 600,
           color: 'text.secondary',
           letterSpacing: '0.05em',
@@ -151,7 +155,7 @@ function SegmentedButtons({ options, value, onChange, sx }) {
               border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
-              fontSize: 15,
+              fontSize: CREATE_TASK_OPTION_LABEL_FONT_SIZE,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
               transition: 'all 0.12s',
@@ -209,7 +213,7 @@ function TypeGrid({ value, onChange }) {
               border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
-              fontSize: 15,
+              fontSize: CREATE_TASK_OPTION_LABEL_FONT_SIZE,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
               display: 'flex',
@@ -223,7 +227,7 @@ function TypeGrid({ value, onChange }) {
               },
             }}
           >
-            <Box sx={{ fontSize: 18, lineHeight: 1 }}>{opt.icon}</Box>
+            <Box sx={{ fontSize: '1rem', lineHeight: 1 }}>{opt.icon}</Box>
             {opt.label}
           </Box>
         );
@@ -252,7 +256,7 @@ export function NewTaskDialog({
   const [assignedHours, setAssignedHours] = useState('');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [assignedToIds, setAssignedToIds] = useState([]);
+  const [assignedUserId, setAssignedUserId] = useState('');
   const [sprintId, setSprintId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -277,7 +281,7 @@ export function NewTaskDialog({
     setAssignedHours('');
     setStartDate('');
     setDueDate('');
-    setAssignedToIds([]);
+    setAssignedUserId('');
     setError('');
   }, [open, defaultSprintId, sprints]);
 
@@ -298,7 +302,8 @@ export function NewTaskDialog({
     startDate &&
     dueDate &&
     sprintId &&
-    assignedToIds.length > 0,
+    assignedUserId !== '' &&
+    Number.isFinite(Number(assignedUserId)),
   );
 
   const handleClose = () => {
@@ -307,7 +312,7 @@ export function NewTaskDialog({
 
   const handleSave = async () => {
     if (!canSave) {
-      setError('Please fill in all required fields (including at least one developer).');
+      setError('Please fill in all required fields (including a developer).');
       return;
     }
     if (!isDateInputOnOrBefore(startDate, dueDate)) {
@@ -317,7 +322,8 @@ export function NewTaskDialog({
     setSaving(true);
     setError('');
     try {
-      const userIds = finiteUserIds(assignedToIds);
+      const userId = Number(assignedUserId);
+      const userIds = Number.isFinite(userId) && userId > 0 ? [userId] : [];
       const dueIso = dateInputToEndOfLocalDayIso(dueDate);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
@@ -350,36 +356,27 @@ export function NewTaskDialog({
     }
   };
 
-  const fieldSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '8px',
-      fontSize: 15,
-      bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
-      '& input, & textarea, & .MuiSelect-select': { fontSize: 15, bgcolor: 'transparent' },
-      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
-      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-        borderColor: '#C74126',
-        boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
-      },
-    },
-    '& .MuiInputLabel-root': { fontSize: 15, color: isDark ? '#9A9A9A' : undefined },
-    '& .MuiInputLabel-root.Mui-focused': { color: '#C74126' },
-    '& .MuiMenuItem-root': { fontSize: 15, color: isDark ? '#F0F0F0' : '#1A1A1A' },
-  };
+  const fieldSx = useMemo(
+    () =>
+      createTaskFormFieldSx(isDark, {
+        fieldTintBg: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      }),
+    [isDark],
+  );
 
-  const chipPalettes = isDark
-    ? [
-        { bg: '#2D2A4A', border: '#6A5ACD', color: '#B39DDB' },
-        { bg: '#1A4A3A', border: '#4DB6AC', color: '#80CBC4' },
-        { bg: '#4A2A1A', border: '#FFB74D', color: '#FFCC80' },
-        { bg: '#4A1A1A', border: '#EF9A9A', color: '#FFAB91' },
-      ]
-    : [
-        { bg: '#EEEDFE', border: '#AFA9EC', color: '#3C3489' },
-        { bg: '#E1F5EE', border: '#5DCAA5', color: '#085041' },
-        { bg: '#FAEEDA', border: '#FAC775', color: '#633806' },
-        { bg: '#FAECE7', border: '#F0997B', color: '#712B13' },
-      ];
+  const developerFieldSx = useMemo(
+    () =>
+      createTaskDeveloperSelectFieldSx(isDark, {
+        fieldTintBg: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      }),
+    [isDark],
+  );
+
+  const selectedDeveloperName = useMemo(() => {
+    const id = Number(assignedUserId);
+    if (!Number.isFinite(id)) return '';
+    return validDevelopers.find((u) => u.uid === id)?.displayName ?? '';
+  }, [assignedUserId, validDevelopers]);
 
   return (
     <Dialog
@@ -428,10 +425,10 @@ export function NewTaskDialog({
               <AccountTreeOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 16, lineHeight: 1.2 }}>
+              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 17, lineHeight: 1.2 }}>
                 Create task
               </Typography>
-              <Typography sx={{ fontSize: 14, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
+              <Typography sx={{ fontSize: 15, color: 'rgba(255,255,255,0.72)', display: 'block' }}>
                 Details, planning & assignees
               </Typography>
             </Box>
@@ -479,6 +476,8 @@ export function NewTaskDialog({
             onChange={setDescription}
             minRows={3}
             required
+            contentFontSize={CREATE_TASK_BODY_FONT_SIZE}
+            labelFontSize={CREATE_TASK_LABEL_FONT_SIZE}
             sx={fieldSx}
           />
 
@@ -500,6 +499,7 @@ export function NewTaskDialog({
                 value={sprintId}
                 onChange={(e) => setSprintId(e.target.value)}
                 label="Sprint *"
+                MenuProps={createTaskSelectMenuProps}
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
                   return formatSprintLabel(sprintNumberMap, value);
@@ -528,81 +528,30 @@ export function NewTaskDialog({
             />
           </Stack>
 
-          {/* Developers */}
-          <FormControl
-            fullWidth
-            size="small"
-            sx={{
-              ...fieldSx,
-              '& .MuiSelect-select': {
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 0.5,
-                minHeight: 40,
-                whiteSpace: 'normal',
-                overflow: 'visible',
-                textOverflow: 'clip',
-                py: 0.75,
-              },
-            }}
-          >
-            <InputLabel id="dev-label">Developers *</InputLabel>
+          {/* Developer */}
+          <FormControl fullWidth size="small" sx={developerFieldSx}>
+            <InputLabel id="dev-label">Developer *</InputLabel>
             <Select
               labelId="dev-label"
-              multiple
-              value={finiteUserIds(assignedToIds)}
-              onChange={(e) => setAssignedToIds(multiselectNumericIds(e.target.value))}
-              input={<OutlinedInput label="Developers *" />}
-              renderValue={(selected) => {
-                const ids = finiteUserIds(selected);
-                return (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.25 }}>
-                    {ids.length === 0 ? (
-                      <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 15 }}>
-                        Select developers
-                      </Typography>
-                    ) : (
-                      ids.map((id, i) => {
-                        const name =
-                          validDevelopers.find((u) => u.uid === id)?.displayName ?? `#${id}`;
-                        const pal = chipPalettes[i % chipPalettes.length];
-                        return (
-                          <Chip
-                            key={id}
-                            size="small"
-                            label={name}
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: 14,
-                              bgcolor: pal.bg,
-                              color: pal.color,
-                              border: `1px solid ${pal.border}`,
-                              borderRadius: '20px',
-                            }}
-                          />
-                        );
-                      })
-                    )}
-                  </Box>
-                );
-              }}
-              MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
+              value={assignedUserId}
+              onChange={(e) => setAssignedUserId(e.target.value)}
+              label="Developer *"
+              renderValue={(value) =>
+                value ? (
+                  <Typography component="span" sx={createTaskDeveloperSelectValueSx}>
+                    {selectedDeveloperName || `#${value}`}
+                  </Typography>
+                ) : (
+                  <Typography component="span" sx={createTaskSelectPlaceholderSx}>
+                    Select developer
+                  </Typography>
+                )
+              }
+              MenuProps={createTaskDeveloperSelectMenuProps}
             >
               {validDevelopers.map((u) => (
                 <MenuItem key={u.uid} value={u.uid}>
-                  <Checkbox
-                    checked={finiteUserIds(assignedToIds).includes(u.uid)}
-                    size="small"
-                    sx={{ '&.Mui-checked': { color: ORACLE_RED_ACTION } }}
-                  />
-                  <ListItemText
-                    primary={u.displayName}
-                    primaryTypographyProps={{
-                      fontSize: 15,
-                      fontWeight: 500,
-                      color: isDark ? '#F0F0F0' : '#1A1A1A',
-                    }}
-                  />
+                  {u.displayName}
                 </MenuItem>
               ))}
             </Select>
@@ -633,7 +582,7 @@ export function NewTaskDialog({
           </Stack>
 
           {error && (
-            <Typography sx={{ fontSize: 13, color: '#C62828', fontWeight: 600 }}>
+            <Typography sx={{ fontSize: CREATE_TASK_BODY_FONT_SIZE, color: '#C62828', fontWeight: 600 }}>
               {error}
             </Typography>
           )}
@@ -651,7 +600,7 @@ export function NewTaskDialog({
           justifyContent: 'space-between',
         }}
       >
-        <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+        <Typography sx={{ fontSize: CREATE_TASK_BODY_FONT_SIZE, color: 'text.disabled' }}>
           Fields marked with{' '}
           <Box component="span" sx={{ color: ORACLE_RED_ACTION, fontWeight: 700 }}>
             *
@@ -663,7 +612,7 @@ export function NewTaskDialog({
             onClick={handleClose}
             disabled={saving}
             sx={{
-              fontSize: 14,
+              fontSize: CREATE_TASK_BODY_FONT_SIZE,
               color: 'text.secondary',
               textTransform: 'none',
               fontWeight: 600,
@@ -680,9 +629,8 @@ export function NewTaskDialog({
             disabled={saving || !canSave}
             variant="contained"
             disableElevation
-            startIcon={<CheckIcon sx={{ fontSize: '18px !important' }} />}
             sx={{
-              fontSize: 14,
+              fontSize: CREATE_TASK_BODY_FONT_SIZE,
               bgcolor: ORACLE_RED_ACTION,
               textTransform: 'none',
               fontWeight: 600,

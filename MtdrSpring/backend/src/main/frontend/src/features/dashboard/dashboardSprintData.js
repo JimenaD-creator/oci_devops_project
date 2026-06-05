@@ -1,6 +1,9 @@
 import { inferStatusByDate } from '../sprints/utils/sprintUtils';
-import { computeProductivityScore } from '../kpis/productivityScoreUtils';
-import { productivityScoreFromSprintKpis } from '../kpis/productivityScoreUtils';
+import {
+  computeProductivityScore,
+  normalizeEfficiencyPercent,
+  productivityScoreFromSprintKpis,
+} from '../kpis/productivityScoreUtils';
 import { isAssigneeCompletionOnTime } from '../tasks/utils/assigneeOnTimeUtils';
 import {
   collectDeveloperNamesForSelection,
@@ -281,13 +284,24 @@ function mapApiSprint(apiSprint, sprintNumber) {
     totalAssignedHoursTasks: 0,
     taskStatusDistribution: [],
     taskStatusTotal: 0,
-    kpis: {
-      completionRate: Math.round((apiSprint.completionRate ?? 0) * 100),
-      onTimeDelivery: Math.round((apiSprint.onTimeDelivery ?? 0) * 100),
-  efficiencyScore: Math.round((apiSprint.efficiencyScore ?? 0) * 100),
-      workloadBalance: apiSprint.workloadBalance ?? 0,
-      productivityScore: Math.round((apiSprint.completionRate ?? 0) * 100),
-    },
+    kpis: (() => {
+      const completionRate = Math.round((apiSprint.completionRate ?? 0) * 100);
+      const onTimeDelivery = Math.round((apiSprint.onTimeDelivery ?? 0) * 100);
+      const efficiencyScore = normalizeEfficiencyPercent(apiSprint.efficiencyScore ?? 0);
+      const workloadBalance = apiSprint.workloadBalance ?? 0;
+      return {
+        completionRate,
+        onTimeDelivery,
+        efficiencyScore,
+        workloadBalance,
+        productivityScore: computeProductivityScore({
+          completionRate,
+          onTimeDelivery,
+          efficiencyScore,
+          workloadBalance,
+        }),
+      };
+    })(),
     developers: [],
   };
 }
@@ -318,7 +332,7 @@ function deriveKpisFromLiveData(
   const onTimeDeliveryPct =
     doneAssignments > 0 ? Math.round((onTimeAssignments / doneAssignments) * 100) : 0;
 
-  // Live Team Participation = logged USER_TASK hours / planned TASK hours (same sprint).
+  // Sprint efficiency = planned task hours ÷ logged USER_TASK hours (same as KPI Analytics).
   const totalExpectedHours = tasksInSprint.reduce((sum, t) => {
     const n = Number(t?.assignedHours ?? t?.assigned_hours ?? 0);
     return sum + (Number.isFinite(n) ? n : 0);
@@ -329,10 +343,10 @@ function deriveKpisFromLiveData(
     if (Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return sum;
     return sum + userTaskWorkedHours(ut);
   }, 0);
-const efficiencyScorePct =
-  totalWorkedHours > 0
-    ? Math.min(150, Math.round((totalExpectedHours / totalWorkedHours) * 100))
-    : 0;
+  const efficiencyScorePct =
+    totalWorkedHours > 0
+      ? Math.min(100, Math.round((totalExpectedHours / totalWorkedHours) * 100))
+      : 0;
   const workloadBalancePct = (() => {
     const raw = Number(storedKpis?.workloadBalance ?? 0);
     if (!Number.isFinite(raw)) return 0;
@@ -343,11 +357,12 @@ const efficiencyScorePct =
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
+    efficiencyScore: efficiencyScorePct,
     workloadBalance: workloadBalancePct,
     productivityScore: computeProductivityScore({
       completionRate: completionRatePct,
       onTimeDelivery: onTimeDeliveryPct,
-    efficiencyScore: efficiencyScorePct,
+      efficiencyScore: efficiencyScorePct,
       workloadBalance: workloadBalancePct,
     }),
   };
@@ -1137,7 +1152,7 @@ export function buildTeamProductivityTrendSeries(selectedSprints) {
       scoreDisplay: `${productivityScore}%`,
       completionRate: Number(kpis.completionRate) || 0,
       onTimeDelivery: Number(kpis.onTimeDelivery) || 0,
-efficiencyScore: Number(kpis.efficiencyScore) || 0,
+      efficiencyScore: Number(kpis.efficiencyScore) || 0,
       workloadBalance: Number(kpis.workloadBalance) || 0,
       totalCompleted: Number(sp.totalCompleted) || 0,
       totalTasks: Number(sp.totalTasks) || 0,

@@ -47,11 +47,21 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out.toLowerCase()).not.toContain('97% improvement in on-time');
   });
 
+  it('realigns legacy participation prose to efficiency score card value', () => {
+    const raw =
+      'A participation score of 2.0 indicates a focused team effort on the assigned sprint goals.';
+    const out = alignSingleMetricBlock(raw, 'efficiencyScore', 85);
+    expect(out.toLowerCase()).toContain('efficiency');
+    expect(out).toContain('85%');
+    expect(out).not.toContain('2.0');
+    expect(out).not.toMatch(/participation score of 2/i);
+  });
+
   it('keeps a space after percent (avoids "0as" in manager guide)', () => {
     const out = alignKpiProseForMetric(
-      'Team participation is 0% as work has not yet commenced on the assigned tasks.',
-      'teamParticipation',
-      { teamParticipation: 0 },
+      'Efficiency score is 0% as work has not yet commenced on the assigned tasks.',
+      'efficiencyScore',
+      { efficiencyScore: 0 },
     );
     expect(out).toMatch(/0%\s+as/i);
     expect(out).not.toMatch(/0as/i);

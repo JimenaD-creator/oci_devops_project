@@ -8,7 +8,7 @@ import KpiDonutChart from './KpiDonutChart';
 
 const GAUGE_HEADER_ACCENT = '#1565C0';
 
-/** Chart arc is 0–100; participation can exceed 100% — cap fill only. */
+/** Chart arc is 0–100; efficiency is normalized to 0–100 for the gauge fill. */
 const GAUGE_GOALS = {
   onTimeDelivery: 80,
   efficiencyScore: 100,

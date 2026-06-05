@@ -7,11 +7,11 @@ import {
   collectDeveloperNamesForSelection,
   resolveProfilePictureFromRoster,
 } from '../../utils/teamRosterUtils';
-import { participationRateFromDeveloperHours } from './productivityScoreUtils';
+import { efficiencyScoreFromDeveloperHours } from './productivityScoreUtils';
 
-const PARTICIPATION_COLUMN_LABEL = 'Participation';
-const PARTICIPATION_COLUMN_HINT =
-  'Hours logged ÷ estimated hours on assigned tasks (20% of productivity score).';
+const EFFICIENCY_COLUMN_LABEL = 'Efficiency Score';
+const EFFICIENCY_COLUMN_HINT =
+  'Estimated hours ÷ hours logged on assigned tasks (0–100%). 100% means on or ahead of estimates; below 100% means more time was logged than planned.';
 
 const initialData = [
   {
@@ -21,7 +21,7 @@ const initialData = [
     completed: 6,
     hours: 32.5,
     onTime: 70,
-    participation: 100,
+    efficiencyScore: 100,
     workload: 80,
   },
   {
@@ -31,7 +31,7 @@ const initialData = [
     completed: 8,
     hours: 45.0,
     onTime: 85,
-    participation: 90,
+    efficiencyScore: 90,
     workload: 100,
   },
   {
@@ -41,7 +41,7 @@ const initialData = [
     completed: 5,
     hours: 20.0,
     onTime: 60,
-    participation: 80,
+    efficiencyScore: 80,
     workload: 60,
   },
   {
@@ -51,7 +51,7 @@ const initialData = [
     completed: 6,
     hours: 31.0,
     onTime: 75,
-    participation: 95,
+    efficiencyScore: 95,
     workload: 70,
   },
 ];
@@ -244,7 +244,12 @@ const fullColumns = [
   { key: 'hours', label: 'Total Hours', sortable: true },
   { key: 'avgHours', label: 'Average Hrs / Task', sortable: true },
   { key: 'onTime', label: 'On-Time Delivery', sortable: true },
-  { key: 'participation', label: 'Participation Rate', sortable: true },
+  {
+    key: 'efficiencyScore',
+    label: EFFICIENCY_COLUMN_LABEL,
+    sortable: true,
+    hint: EFFICIENCY_COLUMN_HINT,
+  },
   { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
@@ -294,8 +299,8 @@ function SprintMetricsTable({
         const spHours = d ? Number(d.hours) || 0 : 0;
         row[`${sp.id}_onTime`] = d && typeof d.onTime === 'number' ? d.onTime : '—';
         const spEstimate = d ? Number(d.assignedHoursEstimate) || 0 : 0;
-        row[`${sp.id}_participation`] = d
-          ? participationRateFromDeveloperHours(spHours, spEstimate)
+        row[`${sp.id}_efficiencyScore`] = d
+          ? efficiencyScoreFromDeveloperHours(spHours, spEstimate)
           : null;
         row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : 0;
       });
@@ -384,8 +389,8 @@ function SprintMetricsTable({
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
 
-  const participationAvgForSprint = (spId) => {
-    const nums = sorted.map((r) => r[`${spId}_participation`]).filter((v) => typeof v === 'number');
+  const efficiencyAvgForSprint = (spId) => {
+    const nums = sorted.map((r) => r[`${spId}_efficiencyScore`]).filter((v) => typeof v === 'number');
     if (!nums.length) return null;
     return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
   };
@@ -397,7 +402,7 @@ function SprintMetricsTable({
     ) : (
       <span className="cell-muted">—</span>
     );
-  const renderParticipationCell = (v) =>
+  const renderEfficiencyCell = (v) =>
     typeof v === 'number' ? (
       <Badge val={v} green={90} yellow={70} />
     ) : (
@@ -512,11 +517,11 @@ function SprintMetricsTable({
                         <th
                           key={`${sp.id}-part`}
                           className="sortable"
-                          title={PARTICIPATION_COLUMN_HINT}
-                          onClick={() => toggleSort(`${sp.id}_participation`)}
+                          title={EFFICIENCY_COLUMN_HINT}
+                          onClick={() => toggleSort(`${sp.id}_efficiencyScore`)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
+                            {EFFICIENCY_COLUMN_LABEL} {sortIcon(`${sp.id}_efficiencyScore`)}
                           </div>
                         </th>,
                         <th key={`${sp.id}-w`}>
@@ -563,11 +568,11 @@ function SprintMetricsTable({
                             </th>
                             <th
                               className="sortable"
-                              title={PARTICIPATION_COLUMN_HINT}
-                              onClick={() => toggleSort(`${sp.id}_participation`)}
+                              title={EFFICIENCY_COLUMN_HINT}
+                              onClick={() => toggleSort(`${sp.id}_efficiencyScore`)}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {PARTICIPATION_COLUMN_LABEL} {sortIcon(`${sp.id}_participation`)}
+                                {EFFICIENCY_COLUMN_LABEL} {sortIcon(`${sp.id}_efficiencyScore`)}
                               </div>
                             </th>
                             <th>
@@ -641,7 +646,7 @@ function SprintMetricsTable({
                               {renderOnTimeCell(r[`${sp.id}_onTime`])}
                             </td>,
                             <td key={`${r.name}-${sp.id}-part`} className="text-center">
-                              {renderParticipationCell(r[`${sp.id}_participation`])}
+                              {renderEfficiencyCell(r[`${sp.id}_efficiencyScore`])}
                             </td>,
                             <td key={`${r.name}-${sp.id}-w`}>
                               {renderWorkloadCell(r[`${sp.id}_workload`])}
@@ -663,7 +668,7 @@ function SprintMetricsTable({
                                     {renderOnTimeCell(r[`${sp.id}_onTime`])}
                                   </td>
                                   <td className="text-center">
-                                    {renderParticipationCell(r[`${sp.id}_participation`])}
+                                    {renderEfficiencyCell(r[`${sp.id}_efficiencyScore`])}
                                   </td>
                                   <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
                                 </>
@@ -682,7 +687,7 @@ function SprintMetricsTable({
                       const bc = si > 0 ? ' td-sprint-compare-first' : '';
                       const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
-                      const partAvg = participationAvgForSprint(sp.id);
+                      const effAvg = efficiencyAvgForSprint(sp.id);
                       return [
                         <td key={`avg-${sp.id}-a`} className={`summary-cell text-center${bc}`}>
                           {avgForKey(`${sp.id}_assigned`)}
@@ -701,8 +706,8 @@ function SprintMetricsTable({
                           )}
                         </td>,
                         <td key={`avg-${sp.id}-part`} className="summary-cell text-center">
-                          {partAvg != null ? (
-                            <span className="summary-cell">{partAvg}%</span>
+                          {effAvg != null ? (
+                            <span className="summary-cell">{effAvg}%</span>
                           ) : (
                             <span className="cell-muted">—</span>
                           )}
@@ -720,7 +725,7 @@ function SprintMetricsTable({
                       const sp = selectedSprints[0];
                       const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
-                      const partAvg = participationAvgForSprint(sp.id);
+                      const effAvg = efficiencyAvgForSprint(sp.id);
                       return (
                         <>
                           <td className="summary-cell text-center">
@@ -738,8 +743,8 @@ function SprintMetricsTable({
                             )}
                           </td>
                           <td className="summary-cell text-center">
-                            {partAvg != null ? (
-                              <span className="summary-cell">{partAvg}%</span>
+                            {effAvg != null ? (
+                              <span className="summary-cell">{effAvg}%</span>
                             ) : (
                               <span className="cell-muted">—</span>
                             )}
@@ -836,6 +841,7 @@ function FullAnalyticsTable() {
                 {fullColumns.map((col) => (
                   <th
                     key={col.key}
+                    title={col.hint}
                     onClick={() => col.sortable && toggleSort(col.key)}
                     className={col.sortable ? 'sortable' : ''}
                   >
@@ -883,7 +889,7 @@ function FullAnalyticsTable() {
                       <Badge val={r.onTime} green={90} yellow={70} />
                     </td>
                     <td className="text-center">
-                      <Badge val={r.participation} green={90} yellow={70} />
+                      <Badge val={r.efficiencyScore} green={90} yellow={70} />
                     </td>
                     <td>
                       <WorkloadBar val={r.workload} />
@@ -904,7 +910,7 @@ function FullAnalyticsTable() {
                   <span className="summary-cell">{avg('onTime')}%</span>
                 </td>
                 <td className="text-center">
-                  <span className="summary-cell">{avg('participation')}%</span>
+                  <span className="summary-cell">{avg('efficiencyScore')}%</span>
                 </td>
                 <td>
                   <WorkloadBar val={parseFloat(avg('workload'))} />

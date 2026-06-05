@@ -1,7 +1,9 @@
 import {
   buildProductivityKpiAnalyticsGuideLine,
   computeProductivityScore,
+  formatEfficiencyScoreDisplay,
   formatProductivityScoreDisplay,
+  normalizeEfficiencyPercent,
   resolveSprintTimelineContext,
 } from '../kpis/productivityScoreUtils';
 
@@ -42,12 +44,12 @@ export function isValidSprintId(sprintId) {
 export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
   const cr = Math.round(Number(kpis.completionRate) || 0);
   const otd = Math.round(Number(kpis.onTimeDelivery) || 0);
-  const tp = Math.round(Math.min(100, Math.max(0, Number(kpis.teamParticipation) || 0)));
+  const es = normalizeEfficiencyPercent(kpis.efficiencyScore ?? kpis.teamParticipation);
   const wb = Math.round(Math.min(100, Math.max(0, Number(kpis.workloadBalance) || 0)));
   const ps = computeProductivityScore({
     completionRate: cr,
     onTimeDelivery: otd,
-    teamParticipation: tp,
+    efficiencyScore: es,
     workloadBalance: wb,
   });
   const timeline = resolveSprintTimelineContext(sprint);
@@ -65,7 +67,7 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
     byMetric: {
       completionRate: `Completion rate is ${cr}% — share of sprint tasks marked done.`,
       onTimeDelivery: `On-time delivery is ${otd}% — completed work finished by the due date.`,
-      teamParticipation: `Team participation is ${tp}% — how actively the team engaged in this sprint.`,
+      efficiencyScore: `Efficiency score is ${es}% — estimated hours vs hours logged (100% means on or ahead of estimates).`,
       workloadBalance: `Workload balance is ${wb}% — how evenly tasks are distributed across assignees.`,
       productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint),
     },
@@ -75,6 +77,8 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
 export const KPI_LABELS = {
   completionRate: 'Completion Rate',
   onTimeDelivery: 'On-Time Delivery',
+  efficiencyScore: 'Efficiency Score',
+  /** @deprecated Persisted insights may still use this key */
   teamParticipation: 'Efficiency Score',
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
@@ -85,7 +89,7 @@ export const KPI_LABELS = {
 export const KPI_ALERT_PERCENT_KEYS = new Set([
   'completionRate',
   'onTimeDelivery',
-  'teamParticipation',
+  'efficiencyScore',
   'workloadBalance',
   'productivityScore',
 ]);
@@ -217,9 +221,11 @@ const KPI_METRIC_PATTERNS = {
     /(on[- ]time\s*delivery(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
     /(on[- ]time\s*delivery\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
   ],
-  teamParticipation: [
+  efficiencyScore: [
+    /(efficiency\s*score(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+    /(efficiency\s*score\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
     /(team\s*participation(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
   ],
   workloadBalance: [
     /(workload\s*balance(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
@@ -241,9 +247,11 @@ const KPI_METRIC_PROXIMITY = {
     /(completion\s*rate[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
     /(current\s+completion\s*rate\s+of\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
-  teamParticipation: [
+  efficiencyScore: [
+    /(efficiency\s*score[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(efficiency\s*score\s+is\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
     /(team\s*participation[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
-    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
   workloadBalance: [
     /(workload\s*balance[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
@@ -350,7 +358,17 @@ export function alignSingleMetricBlock(text, metricKey, actual) {
   if (text == null || actual == null || !Number.isFinite(Number(actual))) return text;
   const metrics = { [metricKey]: actual };
   let out = alignKpiProseForMetric(String(text), metricKey, metrics);
-  const display = formatKpiMetricValue(actual);
+  const display =
+    metricKey === 'efficiencyScore'
+      ? formatEfficiencyScoreDisplay(actual)
+      : formatKpiMetricValue(actual);
+  if (metricKey === 'efficiencyScore') {
+    out = applyKpiMetricPatterns(out, 'teamParticipation', actual);
+    out = out.replace(
+      /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
+      `efficiency score is ${display}`,
+    );
+  }
   let replacedFirst = false;
   out = out.replace(/(-?\d+(?:\.\d+)?)\s*%/g, (match) => {
     if (replacedFirst) return match;
@@ -380,8 +398,11 @@ export function alignKpiMetricsInText(text, metrics = {}) {
  */
 export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   if (text == null) return text;
-  const aligned = alignKpiMetricsInText(text, metrics);
+  let aligned = alignKpiMetricsInText(text, metrics);
   const actual = metrics[metricKey];
+  if (metricKey === 'efficiencyScore' && actual != null) {
+    aligned = applyKpiMetricPatterns(aligned, 'teamParticipation', actual);
+  }
   if (actual == null) return aligned;
   let out = alignAlertLoosePercents(aligned, actual);
   if (metricKey === 'productivityScore') {

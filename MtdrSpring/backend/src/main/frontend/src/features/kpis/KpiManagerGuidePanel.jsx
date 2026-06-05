@@ -12,10 +12,14 @@ import {
   normalizeWorkloadBalanceGuideText,
 } from '../ai/aiInsightsConstants';
 import {
+  buildEfficiencyKpiAnalyticsGuideLine,
   buildProductivityKpiAnalyticsGuideLine,
   finalizeProductivityManagerGuideText,
   formatProductivityScoreDisplay,
+  normalizeEfficiencyPercent,
+  realignEfficiencyGuideProse,
   resolveSprintTimelineContext,
+  shouldReplaceEfficiencyGuideWithCanonical,
   softenProductivityGuideForSprintPhase,
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
@@ -29,15 +33,25 @@ import {
 const METRIC_KEYS = [
   'completionRate',
   'onTimeDelivery',
-  'teamParticipation',
+  'efficiencyScore',
   'workloadBalance',
   'productivityScore',
 ];
 
+function guideMetricText(byMetric, key) {
+  if (!byMetric || typeof byMetric !== 'object') return null;
+  const direct = byMetric[key];
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (key === 'efficiencyScore' && typeof byMetric.teamParticipation === 'string') {
+    return byMetric.teamParticipation.trim();
+  }
+  return null;
+}
+
 const METRIC_STYLES_LIGHT = {
   completionRate: { title: '#1565C0', bg: '#E3F2FD', border: '#BBDEFB' },
   onTimeDelivery: { title: '#EF6C00', bg: '#FFF3E0', border: '#FFE0B2' },
-  teamParticipation: { title: '#7B1FA2', bg: '#F3E5F5', border: '#E1BEE7' },
+  efficiencyScore: { title: '#7B1FA2', bg: '#F3E5F5', border: '#E1BEE7' },
   workloadBalance: { title: '#2E7D32', bg: '#E8F5E9', border: '#C8E6C9' },
   productivityScore: { title: '#37474F', bg: '#ECEFF1', border: '#CFD8DC' },
 };
@@ -45,7 +59,7 @@ const METRIC_STYLES_LIGHT = {
 const METRIC_STYLES_DARK = {
   completionRate: { title: '#64B5F6', bg: '#1A3A5C', border: '#2A4A6C' },
   onTimeDelivery: { title: '#FFB74D', bg: '#4A2A1A', border: '#6A4A2A' },
-  teamParticipation: { title: '#CE93D8', bg: '#2A1A3D', border: '#3A2A4D' },
+  efficiencyScore: { title: '#CE93D8', bg: '#2A1A3D', border: '#3A2A4D' },
   workloadBalance: { title: '#81C784', bg: '#1A4A2A', border: '#2A5A3A' },
   productivityScore: { title: '#90A4AE', bg: '#2A2C32', border: '#3A3C42' },
 };
@@ -108,10 +122,7 @@ export default function KpiManagerGuidePanel({
     ((typeof guide.intro === 'string' && guide.intro.trim()) ||
       (guide.byMetric &&
         typeof guide.byMetric === 'object' &&
-        METRIC_KEYS.some((k) => {
-          const t = guide.byMetric[k];
-          return typeof t === 'string' && t.trim() !== '';
-        }))),
+        METRIC_KEYS.some((k) => Boolean(guideMetricText(guide.byMetric, k))))),
   );
   /** Avoid flashing deterministic fallback text before persisted AI guide arrives. */
   const effectiveGuide = hasPersistedGuide ? guide : loading ? null : fallbackGuide;
@@ -125,7 +136,9 @@ export default function KpiManagerGuidePanel({
   const alignedIntroText = alignKpiMetricsInText(introTextRaw, {
     completionRate: currentSprintKpis.completionRate,
     onTimeDelivery: currentSprintKpis.onTimeDelivery,
-    teamParticipation: currentSprintKpis.teamParticipation,
+    efficiencyScore: normalizeEfficiencyPercent(
+      currentSprintKpis.efficiencyScore ?? currentSprintKpis.teamParticipation,
+    ),
     workloadBalance: currentSprintKpis.workloadBalance,
     productivityScore: resolvedCurrentProductivityScore,
   });
@@ -139,19 +152,16 @@ export default function KpiManagerGuidePanel({
   const productivityDeltaTextAligned = alignKpiMetricsInText(productivityDeltaTextRaw, {
     completionRate: currentSprintKpis.completionRate,
     onTimeDelivery: currentSprintKpis.onTimeDelivery,
-    teamParticipation: currentSprintKpis.teamParticipation,
+    efficiencyScore: normalizeEfficiencyPercent(
+      currentSprintKpis.efficiencyScore ?? currentSprintKpis.teamParticipation,
+    ),
     workloadBalance: currentSprintKpis.workloadBalance,
     productivityScore: resolvedCurrentProductivityScore,
   });
   const productivityDeltaText = hasCurrentProductivityScore
     ? alignProductivityScoreProse(productivityDeltaTextAligned, resolvedCurrentProductivityScore)
     : productivityDeltaTextAligned;
-  const hasMetricLines =
-    byMetric &&
-    METRIC_KEYS.some((k) => {
-      const t = byMetric[k];
-      return typeof t === 'string' && t.trim() !== '';
-    });
+  const hasMetricLines = METRIC_KEYS.some((k) => Boolean(guideMetricText(byMetric, k)));
   const hasGuide = introText !== '' || hasMetricLines;
 
   // Colores para el delta de productividad
@@ -339,20 +349,31 @@ export default function KpiManagerGuidePanel({
           )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {METRIC_KEYS.map((key) => {
-              const text = byMetric ? byMetric[key] : null;
-              if (typeof text !== 'string' || !text.trim()) return null;
-              const sanitizedText = clampOver100ForDisplay(text.trim(), {
-                aggressive: key === 'teamParticipation' || key === 'productivityScore',
+              const text = guideMetricText(byMetric, key);
+              if (!text) return null;
+              const sanitizedText = clampOver100ForDisplay(text, {
+                aggressive: key === 'productivityScore',
               });
               const metricsForAlign = {
                 ...currentSprintKpis,
+                efficiencyScore: normalizeEfficiencyPercent(
+                  currentSprintKpis.efficiencyScore ?? currentSprintKpis.teamParticipation,
+                ),
                 productivityScore: resolvedCurrentProductivityScore,
               };
               const cardValue =
                 key === 'productivityScore'
                   ? resolvedCurrentProductivityScore
-                  : metricsForAlign[key];
+                  : key === 'efficiencyScore'
+                    ? metricsForAlign.efficiencyScore
+                    : metricsForAlign[key];
               let displayText = alignSingleMetricBlock(sanitizedText, key, cardValue);
+              if (key === 'efficiencyScore' && Number.isFinite(Number(cardValue))) {
+                displayText = realignEfficiencyGuideProse(displayText, cardValue);
+                if (shouldReplaceEfficiencyGuideWithCanonical(displayText)) {
+                  displayText = buildEfficiencyKpiAnalyticsGuideLine(cardValue);
+                }
+              }
               if (key === 'productivityScore') {
                 displayText = stripProductivityGuideInstructionEcho(displayText);
                 displayText = stripProductivityLowScoreExcuses(displayText, sprintTimeline);

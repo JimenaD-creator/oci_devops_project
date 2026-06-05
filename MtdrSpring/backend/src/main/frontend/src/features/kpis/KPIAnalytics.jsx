@@ -18,6 +18,7 @@ import KpiDonutChart from './KpiDonutChart';
 import DeveloperWorkloadCharts from './DeveloperWorkloadCharts';
 import { fetchDashboardSprints } from '../dashboard/dashboardSprintData';
 import { fetchTasksForKpiProject } from './kpiAnalyticsApi';
+import { resolveOnTimeDeliveryPercent } from './kpiAnalyticsProjectData';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
@@ -30,6 +31,7 @@ import {
 } from '../dashboard/constants/dashboardConstants';
 import { pageFormFieldOutline } from '../tasks/utils/taskUtils';
 import { KPI_TOOLTIPS, KpiInfoCornerButton } from './KpiTooltipParts';
+import { normalizeEfficiencyPercent } from './productivityScoreUtils';
 
 const pageEase = [0.22, 1, 0.36, 1];
 
@@ -421,21 +423,14 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     ).length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    const onTimeTasks = sprintTasks.filter((t) => {
-      if (normalizeTaskStatus(t.status) !== 'DONE') return false;
-      const finishDate = t.finishDate ? new Date(t.finishDate) : new Date();
-      const dueDate = t.dueDate ? new Date(t.dueDate) : new Date();
-      return finishDate <= dueDate;
-    }).length;
-    const onTimeDelivery =
-      completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 0;
+    const onTimeDelivery = resolveOnTimeDeliveryPercent(sprint);
 
     const efficiencyScore = sprint?.kpis?.efficiencyScore ?? 0;
     const rawWb = Number(sprint?.kpis?.workloadBalance);
     const workloadBalancePct = Number.isFinite(rawWb)
       ? Math.round(rawWb <= 1 ? rawWb * 100 : rawWb)
       : 0;
-    const efficiencyScorePct = Math.min(100, Math.max(0, Number(efficiencyScore) || 0));
+    const efficiencyScorePct = normalizeEfficiencyPercent(efficiencyScore);
     const clampedWorkloadBalance = Math.min(100, Math.max(0, workloadBalancePct));
     const productivityScore = Math.round(
       completionRate * 0.4 +
