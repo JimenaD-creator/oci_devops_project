@@ -1300,6 +1300,14 @@ export default function DashboardDeveloperCharts({
     [singleDevMultiSprintCompare, axisTitleStyle],
   );
 
+  const compareDeveloperAxisLabelProps = useMemo(
+    () =>
+      singleDevMultiSprintCompare
+        ? { position: 'bottom', offset: 14 }
+        : { position: 'insideBottom', offset: -4 },
+    [singleDevMultiSprintCompare],
+  );
+
   const developerNameAxisWidth = singleDeveloperFocus ? 148 : 168;
 
   const barValueLabelSize = singleDeveloperFocus ? 10 : 12;
@@ -1759,6 +1767,9 @@ export default function DashboardDeveloperCharts({
       78,
       50 + Math.max(0, nSprints - 3) * 5 + Math.min(12, Math.max(0, nWorkloadHoursRows - 6) * 2),
     );
+    const bottomAxisWorkloadHoursAdjusted = singleDevMultiSprintCompare
+      ? bottomAxisWorkloadHours + 16
+      : bottomAxisWorkloadHours;
     const xAxisTickHeightWorkloadHours = Math.min(
       64,
       44 + Math.max(0, nSprints - 4) * 5 + Math.min(8, Math.max(0, nWorkloadHoursRows - 5) * 2),
@@ -1836,7 +1847,7 @@ export default function DashboardDeveloperCharts({
               top: marginTopWorkloadTight,
               right: 56,
               left: 8,
-              bottom: bottomAxisWorkloadHours,
+              bottom: bottomAxisWorkloadHoursAdjusted,
             }}
             barCategoryGap={workloadBarCategoryGap}
             barGap={workloadBarGap}
@@ -1856,8 +1867,7 @@ export default function DashboardDeveloperCharts({
               padding={{ left: 4, right: 4 }}
               label={{
                 value: 'Developer',
-                position: 'insideBottom',
-                offset: -4,
+                ...compareDeveloperAxisLabelProps,
                 fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...compareDeveloperAxisTitleStyle,
               }}
@@ -1982,7 +1992,7 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={hoursRowsKeyed}
-            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHours }}
+            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHoursAdjusted }}
             barCategoryGap={hoursBarCategoryGap}
             barGap={hoursBarGap}
           >
@@ -2001,8 +2011,7 @@ export default function DashboardDeveloperCharts({
               padding={{ left: 4, right: 4 }}
               label={{
                 value: 'Developer',
-                position: 'insideBottom',
-                offset: -4,
+                ...compareDeveloperAxisLabelProps,
                 fill: isDark ? '#9A9A9A' : '#1A1A1A',
                 ...compareDeveloperAxisTitleStyle,
               }}
