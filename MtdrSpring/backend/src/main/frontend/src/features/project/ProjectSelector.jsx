@@ -24,6 +24,8 @@ import {
   Paper,
   Alert,
   InputAdornment,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
@@ -31,6 +33,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import SearchIcon from '@mui/icons-material/Search';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { TEAM_MEMBER_TYPE_SUGGESTIONS } from '../../utils/userRoleUtils';
 import { getApiBase } from '../../utils/apiBase';
 import { apiFetch } from '../../utils/auth';
@@ -38,8 +41,6 @@ import { apiFetch } from '../../utils/auth';
 const API_BASE =
   process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : getApiBase() || '';
 
-// Colapsa el array de userDetails (que tiene una fila por user+proyecto)
-// en una sola fila por usuario, juntando los proyectos en un array
 const deduplicateUsers = (users) => {
   const map = {};
   users.forEach((u) => {
@@ -54,7 +55,6 @@ const deduplicateUsers = (users) => {
   return Object.values(map);
 };
 
-// ─── Helper: campo de búsqueda reutilizable ───────────────────────────────────
 const SearchField = ({ value, onChange, placeholder, sx = {}, inputSx = {} }) => (
   <TextField
     fullWidth
@@ -80,6 +80,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const isDark = theme.palette.mode === 'dark';
 
   const [projects, setProjects] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [userDetails, setUserDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,16 +88,14 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const [openModal, setOpenModal] = useState(null);
   const [formData, setFormData] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // ── Filtros ─────────────────────────────────────────────────────────────────
-  // Tabla de usuarios
   const [userSearch, setUserSearch] = useState('');
-
-  // Modals: búsqueda inline para elegir equipos, usuarios y proyectos
-  const [teamSearch, setTeamSearch] = useState(''); // modal New Project → filtrar equipos
-  const [managerSearch, setManagerSearch] = useState(''); // modal New Team    → filtrar managers
-  const [memberSearch, setMemberSearch] = useState(''); // modal Assign      → filtrar usuarios
-  const [assignTeamSearch, setAssignTeamSearch] = useState(''); // modal Assign  → filtrar equipos
+  const [teamSearch, setTeamSearch] = useState('');
+  const [managerSearch, setManagerSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [assignTeamSearch, setAssignTeamSearch] = useState('');
+  const [teamTableSearch, setTeamTableSearch] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -113,6 +112,12 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         setProjects(projectsData);
       } else {
         console.error('Failed to load projects:', projectsResponse.status);
+      }
+
+      const teamsResponse = await fetch(`${API_BASE}/api/admin/teams`);
+      if (teamsResponse.ok) {
+        const teamsData = await teamsResponse.json();
+        setTeams(Array.isArray(teamsData) ? teamsData : []);
       }
 
       if (usersResponse.ok) {
@@ -208,9 +213,7 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     if (openModal === 'user') endpoint = '/users/create';
 
     try {
-      // Sin hash aquí — el backend (UserService.saveUser) ya hashea con BCrypt
       const payload = { ...formData };
-
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,6 +230,47 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     } catch (err) {
       alert('CONNECTION ERROR');
     }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      } else {
+        alert('ERROR deleting project: ' + (await res.text()));
+      }
+    } catch {
+      alert('CONNECTION ERROR');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/teams/${teamId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setTeams((prev) => prev.filter((t) => t.id !== teamId));
+        fetchData();
+      } else {
+        alert('ERROR deleting team: ' + (await res.text()));
+      }
+    } catch {
+      alert('CONNECTION ERROR');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'project') handleDeleteProject(deleteTarget.id);
+    if (deleteTarget.type === 'team') handleDeleteTeam(deleteTarget.id);
   };
 
   const handleImageUpload = (e) => {
@@ -255,7 +299,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     try {
       const res = await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
-        // Actualizar estado local inmediatamente sin refetch
         setUserDetails((prev) => prev.filter((u) => u.id !== userId));
       } else {
         alert('ERROR deleting user');
@@ -268,19 +311,15 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
   const handleEditAction = async () => {
     try {
       const payload = { ...formData };
-      // Si no ingresó password nuevo, no mandarlo (el backend lo preserva)
       if (!payload.userPassword || payload.userPassword.trim() === '') {
         delete payload.userPassword;
       }
-      // Sin hash aquí — el backend (UserService.updateUser) ya hashea con BCrypt
-
       const res = await fetch(`${API_BASE}/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        // Actualizar estado local inmediatamente sin esperar refetch
         setUserDetails((prev) =>
           prev.map((u) =>
             u.id === selectedUser.id
@@ -306,9 +345,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     }
   };
 
-  // ── Datos filtrados ──────────────────────────────────────────────────────────
-
-  // Tabla de usuarios
   const filteredUsers = userDetails.filter((u) => {
     const q = userSearch.toLowerCase();
     if (!q) return true;
@@ -321,18 +357,27 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
     );
   });
 
-  // Modal New Project → lista de equipos para elegir
-  const teamsForProject = userDetails
+  const teamsFromUsers = userDetails
     .filter((u) => u.teamName || u.managedTeamName)
     .reduce((acc, u) => {
       const name = u.teamName || u.managedTeamName;
       const teamId = u.teamId;
       if (teamId && !acc.find((t) => t.id === teamId)) acc.push({ id: teamId, name });
       return acc;
-    }, [])
-    .filter((t) => t.name?.toLowerCase().includes(teamSearch.toLowerCase()));
+    }, []);
 
-  // Modal New Team → lista de posibles managers
+  const allTeams = teams.length > 0 ? teams : teamsFromUsers;
+
+  const filteredTeams = allTeams.filter((t) => {
+    const q = teamTableSearch.toLowerCase();
+    if (!q) return true;
+    return (t.name || '').toLowerCase().includes(q) || String(t.id).includes(q);
+  });
+
+  const teamsForProject = teamsFromUsers.filter((t) =>
+    t.name?.toLowerCase().includes(teamSearch.toLowerCase()),
+  );
+
   const managersForTeam = userDetails
     .filter((u) => {
       const role = (u.role || '').toUpperCase();
@@ -344,24 +389,16 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         String(u.id).includes(managerSearch),
     );
 
-  // Modal Assign Member → lista de usuarios
   const usersForMember = userDetails.filter(
     (u) =>
       (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
       String(u.id).includes(memberSearch),
   );
 
-  // Modal Assign Member → lista de equipos
-  const teamsForAssign = userDetails
-    .reduce((acc, u) => {
-      const name = u.teamName || u.managedTeamName;
-      const teamId = u.teamId;
-      if (teamId && !acc.find((t) => t.id === teamId)) acc.push({ id: teamId, name });
-      return acc;
-    }, [])
-    .filter((t) => (t.name || '').toLowerCase().includes(assignTeamSearch.toLowerCase()));
+  const teamsForAssign = teamsFromUsers.filter((t) =>
+    (t.name || '').toLowerCase().includes(assignTeamSearch.toLowerCase()),
+  );
 
-  // ── Estilos (sin cambios) ────────────────────────────────────────────────────
   const bgColor = isDark ? '#1C1E22' : '#FFFFFF';
   const textColor = isDark ? '#F0F0F0' : '#000000';
   const textSecondary = isDark ? '#9A9A9A' : '#666666';
@@ -396,9 +433,13 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
       color: '#fff',
       '&:hover': { bgcolor: '#C62828' },
     },
+    delete: {
+      bgcolor: '#E53935',
+      color: '#fff',
+      '&:hover': { bgcolor: '#C62828' },
+    },
   };
 
-  // ── Subcomponente: lista seleccionable dentro de modals ──────────────────────
   const SelectableList = ({
     items,
     selectedId,
@@ -561,10 +602,8 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             {projects.map((proj) => (
               <Grid item xs={12} sm={4} key={proj.id}>
                 <Card
-                  onClick={() => onSelect && onSelect(proj)}
                   sx={{
                     p: 3,
-                    cursor: 'pointer',
                     border: `1px solid ${cardBorder}`,
                     bgcolor: isDark ? '#1C1E22' : '#FFFFFF',
                     display: 'flex',
@@ -578,8 +617,49 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                     },
                   }}
                 >
-                  <Typography sx={{ fontWeight: 700, color: textColor }}>{proj.name}</Typography>
-                  <ArrowForwardIosIcon sx={{ fontSize: 12, color: isDark ? '#5A5A5A' : '#CCC' }} />
+                  <Box
+                    onClick={() => onSelect && onSelect(proj)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      flex: 1,
+                      cursor: 'pointer',
+                      minWidth: 0,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        color: textColor,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {proj.name}
+                    </Typography>
+                    <ArrowForwardIosIcon sx={{ fontSize: 12, color: isDark ? '#5A5A5A' : '#CCC', flexShrink: 0 }} />
+                  </Box>
+
+                  {mode === 'admin' && (
+                    <Tooltip title="Delete project">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget({ type: 'project', id: proj.id, name: proj.name });
+                        }}
+                        sx={{
+                          ml: 1,
+                          color: isDark ? '#5A5A5A' : '#CCC',
+                          '&:hover': { color: '#E53935', bgcolor: 'transparent' },
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Card>
               </Grid>
             ))}
@@ -589,10 +669,112 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         {mode === 'admin' && (
           <>
             <Divider sx={{ mb: 3, borderColor: dividerColor }}>
+              <Typography sx={{ color: textSecondary }}>TEAMS</Typography>
+            </Divider>
+
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                placeholder="Search by team name or ID…"
+                value={teamTableSearch}
+                onChange={(e) => setTeamTableSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: textSecondary }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    color: textColor,
+                    '& fieldset': { borderColor: borderColor },
+                    '&:hover fieldset': { borderColor: '#E53935' },
+                    '&.Mui-focused fieldset': { borderColor: '#E53935' },
+                  },
+                }}
+              />
+              {teamTableSearch && (
+                <Typography sx={{ mt: 0.5, fontSize: '0.75rem', color: textSecondary }}>
+                  {filteredTeams.length} result{filteredTeams.length !== 1 ? 's' : ''} of{' '}
+                  {allTeams.length}
+                </Typography>
+              )}
+            </Box>
+
+            <TableContainer
+              component={Paper}
+              sx={{
+                border: `1px solid ${tableBorder}`,
+                boxShadow: 'none',
+                mb: 6,
+                bgcolor: bgColor,
+              }}
+            >
+              <Table>
+                <TableHead sx={{ bgcolor: tableHeaderBg }}>
+                  <TableRow>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>ID</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>TEAM NAME</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>MANAGER</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>MEMBERS</TableCell>
+                    <TableCell sx={{ color: textColor, fontWeight: 700 }}>ACTIONS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredTeams.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} sx={{ textAlign: 'center', color: textSecondary }}>
+                        {teamTableSearch
+                          ? `No teams match "${teamTableSearch}".`
+                          : 'No teams found.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTeams.map((team) => {
+                      const manager = userDetails.find(
+                        (u) =>
+                          u.teamId === team.id &&
+                          (u.role || '').toUpperCase().includes('MANAGER'),
+                      );
+                      const memberCount = userDetails.filter((u) => u.teamId === team.id).length;
+                      return (
+                        <TableRow key={team.id} sx={{ borderBottom: `1px solid ${tableBorder}` }}>
+                          <TableCell sx={{ color: textSecondary }}>{team.id}</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: textColor }}>
+                            {(team.name || '---').toUpperCase()}
+                          </TableCell>
+                          <TableCell sx={{ color: textSecondary }}>
+                            {manager ? manager.name : (team.managerName || '---')}
+                          </TableCell>
+                          <TableCell sx={{ color: textSecondary }}>{memberCount}</TableCell>
+                          <TableCell>
+                            <Button
+                              size="small"
+                              startIcon={<DeleteIcon />}
+                              onClick={() =>
+                                setDeleteTarget({ type: 'team', id: team.id, name: team.name })
+                              }
+                              sx={{ color: '#E53935' }}
+                            >
+                              DELETE
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Divider sx={{ mb: 3, borderColor: dividerColor }}>
               <Typography sx={{ color: textSecondary }}>USER DETAILS</Typography>
             </Divider>
 
-            {/* ── Filtro tabla de usuarios ── */}
             <Box sx={{ mb: 2 }}>
               <TextField
                 fullWidth
@@ -674,7 +856,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
                         <TableCell sx={{ color: textSecondary }}>
                           {(user.teamName || user.managedTeamName || '---').toUpperCase()}
                         </TableCell>
-                        {/* Una celda con todos los proyectos del usuario separados por coma */}
                         <TableCell sx={{ color: textSecondary }}>
                           {user.projects && user.projects.length > 0
                             ? user.projects.join(', ')
@@ -705,7 +886,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
           </>
         )}
 
-        {/* Modal NEW PROJECT */}
         <Dialog
           open={openModal === 'project'}
           onClose={() => setOpenModal(null)}
@@ -724,8 +904,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               sx={inputSx}
             />
-
-            {/* ── Búsqueda de equipo ── */}
             <Typography variant="caption" sx={{ color: textSecondary, mt: 1.5, display: 'block' }}>
               ASSIGN TEAM
             </Typography>
@@ -765,16 +943,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
-              CANCEL
-            </Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
-              CREATE
-            </Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>CREATE</Button>
           </DialogActions>
         </Dialog>
 
-        {/* Modal NEW TEAM */}
         <Dialog
           open={openModal === 'team'}
           onClose={() => setOpenModal(null)}
@@ -793,8 +966,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               sx={inputSx}
             />
-
-            {/* ── Búsqueda de manager ── */}
             <Typography variant="caption" sx={{ color: textSecondary, mt: 1.5, display: 'block' }}>
               ASSIGN MANAGER
             </Typography>
@@ -834,16 +1005,11 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
-              CANCEL
-            </Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
-              CREATE
-            </Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>CREATE</Button>
           </DialogActions>
         </Dialog>
 
-        {/* Modal ASSIGN MEMBER */}
         <Dialog
           open={openModal === 'member'}
           onClose={() => setOpenModal(null)}
@@ -855,7 +1021,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         >
           <DialogTitle sx={{ color: textColor }}>ASSIGN MEMBER</DialogTitle>
           <DialogContent>
-            {/* ── Búsqueda de usuario ── */}
             <Typography variant="caption" sx={{ color: textSecondary, mt: 0.5, display: 'block' }}>
               SELECT USER
             </Typography>
@@ -892,8 +1057,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               }
               sx={inputSx}
             />
-
-            {/* ── Búsqueda de equipo ── */}
             <Typography variant="caption" sx={{ color: textSecondary, mt: 1, display: 'block' }}>
               SELECT TEAM
             </Typography>
@@ -930,7 +1093,6 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               }
               sx={inputSx}
             />
-
             <TextField
               fullWidth
               select
@@ -940,25 +1102,16 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(e) => setFormData({ ...formData, role: e.target.value.toUpperCase() })}
               sx={inputSx}
             >
-              <MenuItem value="MANAGER" sx={{ color: textColor }}>
-                MANAGER
-              </MenuItem>
-              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>
-                DEVELOPER
-              </MenuItem>
+              <MenuItem value="MANAGER" sx={{ color: textColor }}>MANAGER</MenuItem>
+              <MenuItem value="DEVELOPER" sx={{ color: textColor }}>DEVELOPER</MenuItem>
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
-              CANCEL
-            </Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>
-              ASSIGN
-            </Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.create}>ASSIGN</Button>
           </DialogActions>
         </Dialog>
 
-        {/* Modal REGISTER USER */}
         <Dialog
           open={openModal === 'user'}
           onClose={() => setOpenModal(null)}
@@ -970,35 +1123,10 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
         >
           <DialogTitle sx={{ color: textColor }}>REGISTER USER</DialogTitle>
           <DialogContent>
-            <TextField
-              fullWidth
-              label="NAME"
-              margin="dense"
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="EMAIL"
-              margin="dense"
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="PHONE NUMBER"
-              margin="dense"
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="PASSWORD"
-              type="password"
-              margin="dense"
-              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
-              sx={inputSx}
-            />
+            <TextField fullWidth label="NAME" margin="dense" onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="EMAIL" margin="dense" onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="PHONE NUMBER" margin="dense" onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="PASSWORD" type="password" margin="dense" onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })} sx={inputSx} />
             <Autocomplete
               freeSolo
               options={TEAM_MEMBER_TYPE_SUGGESTIONS}
@@ -1006,55 +1134,27 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  label="TYPE / ROLE"
-                  margin="dense"
-                  placeholder="e.g. Frontend Developer"
-                  helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
-                  sx={inputSx}
-                />
+                <TextField {...params} fullWidth label="TYPE / ROLE" margin="dense" placeholder="e.g. Frontend Developer" helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here." sx={inputSx} />
               )}
             />
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                style={{ width: '100%', color: textColor }}
-              />
+              <input type="file" accept="image/*" onChange={handleImageUpload} style={{ width: '100%', color: textColor }} />
               {formData.profilePicture && (
                 <Box sx={{ mt: 1, textAlign: 'center' }}>
-                  <img
-                    src={formData.profilePicture}
-                    alt="preview"
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid #E53935',
-                    }}
-                  />
+                  <img src={formData.profilePicture} alt="preview" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E53935' }} />
                 </Box>
               )}
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
-              CANCEL
-            </Button>
-            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.register}>
-              REGISTER
-            </Button>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
+            <Button onClick={handleAction} variant="contained" sx={dialogButtonSx.register}>REGISTER</Button>
           </DialogActions>
         </Dialog>
 
-        {/* Modal EDIT USER */}
         <Dialog
           open={openModal === 'editUser'}
           onClose={() => setOpenModal(null)}
@@ -1068,38 +1168,10 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
             EDIT USER — {selectedUser?.name?.toUpperCase()}
           </DialogTitle>
           <DialogContent>
-            <TextField
-              fullWidth
-              label="NAME"
-              margin="dense"
-              value={formData.name || ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="EMAIL"
-              margin="dense"
-              value={formData.email || ''}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="PHONE NUMBER"
-              margin="dense"
-              value={formData.phoneNumber || ''}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-              sx={inputSx}
-            />
-            <TextField
-              fullWidth
-              label="PASSWORD (leave blank to keep current)"
-              type="password"
-              margin="dense"
-              onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
-              sx={inputSx}
-            />
+            <TextField fullWidth label="NAME" margin="dense" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="EMAIL" margin="dense" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="PHONE NUMBER" margin="dense" value={formData.phoneNumber || ''} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} sx={inputSx} />
+            <TextField fullWidth label="PASSWORD (leave blank to keep current)" type="password" margin="dense" onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })} sx={inputSx} />
             <Autocomplete
               freeSolo
               options={TEAM_MEMBER_TYPE_SUGGESTIONS}
@@ -1107,50 +1179,57 @@ const ProjectSelector = ({ onSelect, mode = 'admin', skipAutoSelect = false }) =
               onChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               onInputChange={(_, value) => setFormData({ ...formData, type: value || '' })}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  label="TYPE / ROLE"
-                  margin="dense"
-                  placeholder="e.g. Backend Developer"
-                  helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here."
-                  sx={inputSx}
-                />
+                <TextField {...params} fullWidth label="TYPE / ROLE" margin="dense" placeholder="e.g. Backend Developer" helperText="Team role (e.g. DevOps Engineer) or MANAGER. ADMIN is not allowed here." sx={inputSx} />
               )}
             />
             <Box sx={{ mt: 2 }}>
               <Typography variant="caption" sx={{ color: textSecondary, mb: 1, display: 'block' }}>
                 PROFILE PICTURE (optional)
               </Typography>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                style={{ width: '100%', color: textColor }}
-              />
+              <input type="file" accept="image/*" onChange={handleImageUpload} style={{ width: '100%', color: textColor }} />
               {formData.profilePicture && (
                 <Box sx={{ mt: 1, textAlign: 'center' }}>
-                  <img
-                    src={formData.profilePicture}
-                    alt="preview"
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid #E53935',
-                    }}
-                  />
+                  <img src={formData.profilePicture} alt="preview" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E53935' }} />
                 </Box>
               )}
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>
+            <Button onClick={() => setOpenModal(null)} sx={dialogButtonSx.cancel}>CANCEL</Button>
+            <Button onClick={handleEditAction} variant="contained" sx={dialogButtonSx.save}>SAVE</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: isDark ? '#1C1E22' : '#FFFFFF', border: `1px solid ${borderColor}` },
+          }}
+        >
+          <DialogTitle sx={{ color: textColor }}>
+            DELETE {deleteTarget?.type?.toUpperCase()}
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ color: textSecondary }}>
+              Are you sure you want to delete{' '}
+              <Box component="span" sx={{ color: textColor, fontWeight: 700 }}>
+                {deleteTarget?.name || `ID ${deleteTarget?.id}`}
+              </Box>
+              ?{' '}
+              {deleteTarget?.type === 'project'
+                ? 'This action cannot be undone and will remove the project permanently.'
+                : 'This action cannot be undone. All team members will be unlinked.'}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteTarget(null)} sx={dialogButtonSx.cancel}>
               CANCEL
             </Button>
-            <Button onClick={handleEditAction} variant="contained" sx={dialogButtonSx.save}>
-              SAVE
+            <Button onClick={confirmDelete} variant="contained" sx={dialogButtonSx.delete}>
+              DELETE
             </Button>
           </DialogActions>
         </Dialog>
