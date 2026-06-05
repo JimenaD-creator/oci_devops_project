@@ -53,7 +53,11 @@ public final class GeminiInsightKpiAlignUtil {
 
     private static final Pattern OPEN_SPRINT_PENDING_ALREADY = Pattern.compile(
         "(?i)\\b(?:not done yet|not finished|sprint is still|still open|still running|"
-            + "open tasks?|unfinished|score is lower because|score may rise)\\b");
+            + "still in progress|work is still|open tasks?|unfinished|score is lower because|score may rise)\\b");
+
+    /** Gemini often writes relative % change (e.g. 24%) instead of absolute score points (e.g. 15). */
+    private static final Pattern PRODUCTIVITY_TREND_DELTA_PERCENT = Pattern.compile(
+        "(?i)(productivity(?:\\s+score)?\\s+(?:has\\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*%");
 
     /** Trends are UI-facing coaching lines — keep them brief and direct. */
     private static final int EXECUTIVE_TRENDS_MAX_CHARS = 180;
@@ -437,6 +441,24 @@ public final class GeminiInsightKpiAlignUtil {
             return text;
         }
         return text.replaceAll("(?i)\\b(\\d+(?:\\.\\d+)?)\\s+percentage points?\\b", "$1%");
+    }
+
+    /**
+     * Rewrites productivity sprint-over-sprint deltas to absolute score points (matches KPI Analytics).
+     * Example: "decreased by 24%" with live delta -15 → "decreased by 15 points".
+     */
+    public static String alignProductivityTrendDeltaInProse(String text, int deltaProductivityPoints) {
+        if (text == null || text.isBlank() || deltaProductivityPoints == 0) {
+            return text;
+        }
+        if (!PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).find()) {
+            return text;
+        }
+        int absPoints = Math.abs(deltaProductivityPoints);
+        String pointsLabel = absPoints == 1 ? " point" : " points";
+        String verb = deltaProductivityPoints > 0 ? "increased" : "decreased";
+        return PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).replaceAll(
+            "Productivity " + verb + " by " + absPoints + pointsLabel);
     }
 
     /** Repairs prose broken when legacy summaries had % stripped (e.g. "from to completion"). */

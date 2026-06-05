@@ -405,7 +405,7 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
   );
 }
 
-function TeamProductivityTrendTooltip({ active, payload }) {
+function TeamProductivityTrendTooltip({ active, payload, showWorkloadBalance = true }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -439,8 +439,9 @@ function TeamProductivityTrendTooltip({ active, payload }) {
         Productivity score: {score}%
       </Typography>
       <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', lineHeight: 1.45 }}>
-        Completion {row.completionRate}% · On-time {row.onTimeDelivery}% · Participation{' '}
-        {row.teamParticipation}% · Workload balance {row.workloadBalance}%
+        Completion {row.completionRate}% · On-time {row.onTimeDelivery}% · Efficiency{' '}
+        {row.efficiencyScore}%
+        {showWorkloadBalance ? ` · Workload balance ${row.workloadBalance}%` : ''}
       </Typography>
       {row.totalTasks > 0 ? (
         <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', mt: 0.5, lineHeight: 1.4 }}>
@@ -524,7 +525,12 @@ function CompareComboTooltip({ active, payload, sprintDefs }) {
 // Leyendas
 // ---------------------------------------------------------------------------
 
-function CompareHoursBarLegend({ sprintDefs, smallSprintLabels = false, largeSprintLabels = false }) {
+function CompareHoursBarLegend({
+  sprintDefs,
+  smallSprintLabels = false,
+  largeSprintLabels = false,
+  emphasizedSprintLabels = false,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const multiSprint = (sprintDefs?.length ?? 0) > 1;
@@ -564,6 +570,7 @@ function CompareHoursBarLegend({ sprintDefs, smallSprintLabels = false, largeSpr
         sprintDefs={sprintDefs}
         smallSprintLabels={smallSprintLabels}
         largeSprintLabels={largeSprintLabels}
+        emphasizedSprintLabels={emphasizedSprintLabels}
       />
     </Box>
   );
@@ -575,12 +582,31 @@ function CompareSprintLegend({
   manySprints,
   smallSprintLabels = false,
   largeSprintLabels = false,
+  emphasizedSprintLabels = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const n = sprintDefs?.length ?? 0;
-  const squeeze = !largeSprintLabels && (Boolean(manySprints) || (dense && n >= 6));
-  const chip = smallSprintLabels ? 12 : largeSprintLabels ? 16 : squeeze ? 14 : 16;
+  const squeeze = !largeSprintLabels && !emphasizedSprintLabels && (Boolean(manySprints) || (dense && n >= 6));
+  const emphasizedFontSize =
+    n >= 7
+      ? { xs: '0.625rem', sm: '0.6875rem' }
+      : n >= 5
+        ? { xs: '0.6875rem', sm: '0.75rem' }
+        : { xs: '0.75rem', sm: '0.8125rem' };
+  const chip = smallSprintLabels
+    ? 12
+    : emphasizedSprintLabels
+      ? n >= 7
+        ? 13
+        : n >= 5
+          ? 14
+          : 15
+      : largeSprintLabels
+        ? 16
+        : squeeze
+          ? 14
+          : 16;
   return (
     <Box
       sx={{
@@ -612,13 +638,16 @@ function CompareSprintLegend({
               color: 'text.primary',
               fontSize: smallSprintLabels
                 ? { xs: '0.5rem', sm: '0.5625rem' }
-                : largeSprintLabels
-                  ? { xs: '0.8125rem', sm: '0.875rem' }
-                  : squeeze
-                    ? { xs: '0.6875rem', sm: '0.75rem' }
-                    : dense
-                      ? { xs: '0.75rem', sm: '0.8125rem' }
-                      : undefined,
+                : emphasizedSprintLabels
+                  ? emphasizedFontSize
+                  : largeSprintLabels
+                    ? { xs: '0.8125rem', sm: '0.875rem' }
+                    : squeeze
+                      ? { xs: '0.6875rem', sm: '0.75rem' }
+                      : dense
+                        ? { xs: '0.75rem', sm: '0.8125rem' }
+                        : undefined,
+              fontWeight: emphasizedSprintLabels ? 600 : undefined,
               lineHeight: 1.25,
             }}
           >
@@ -634,6 +663,7 @@ function CompareWorkloadSymbolLegend({
   sprintDefs,
   smallSprintLabels = false,
   largeSprintLabels = false,
+  emphasizedSprintLabels = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -730,6 +760,7 @@ function CompareWorkloadSymbolLegend({
           manySprints={n >= 6}
           smallSprintLabels={smallSprintLabels}
           largeSprintLabels={largeSprintLabels}
+          emphasizedSprintLabels={emphasizedSprintLabels}
         />
       </Box>
     </Box>
@@ -1208,8 +1239,11 @@ export default function DashboardDeveloperCharts({
   }, [compareMode, orderedSelectedSprints, projectDevelopers]);
 
   const singleDeveloperFocus = Boolean(selectedDeveloperName);
-  const compactSprintLegendLabels = singleDeveloperFocus;
-  const largeSprintLegendLabels = !singleDeveloperFocus && allSprintsSelected;
+  const singleDevMultiSprintCompare = singleDeveloperFocus && compareMode;
+  const compactSprintLegendLabels = false;
+  const emphasizedSprintLegendLabels = singleDevMultiSprintCompare;
+  const largeSprintLegendLabels =
+    !singleDevMultiSprintCompare && !singleDeveloperFocus && allSprintsSelected;
 
   const selectedDeveloperNameNormalized = useMemo(
     () => normalizeDeveloperName(selectedDeveloperName),
@@ -1249,9 +1283,36 @@ export default function DashboardDeveloperCharts({
     [axisTickStyle, singleDeveloperFocus],
   );
 
+  /** Compare mode + one developer: developer name on the X axis (tasks / hours charts). */
+  const compareDeveloperNameTickStyle = useMemo(
+    () => ({
+      ...CHART_TICK(isDark),
+      fontSize: singleDevMultiSprintCompare ? 14 : axisTickStyle.fontSize,
+      fontWeight: singleDevMultiSprintCompare ? 700 : axisTickStyle.fontWeight,
+    }),
+    [isDark, singleDevMultiSprintCompare, axisTickStyle],
+  );
+
+  const compareDeveloperAxisTitleStyle = useMemo(
+    () =>
+      singleDevMultiSprintCompare
+        ? { fontSize: 13, fontWeight: 700 }
+        : axisTitleStyle,
+    [singleDevMultiSprintCompare, axisTitleStyle],
+  );
+
+  const compareDeveloperAxisLabelProps = useMemo(
+    () =>
+      singleDevMultiSprintCompare
+        ? { position: 'bottom', offset: 14 }
+        : { position: 'insideBottom', offset: -4 },
+    [singleDevMultiSprintCompare],
+  );
+
   const developerNameAxisWidth = singleDeveloperFocus ? 148 : 168;
 
   const barValueLabelSize = singleDeveloperFocus ? 10 : 12;
+  const productivityTrendValueLabelSize = singleDeveloperFocus ? 15 : 12;
   const stackValueLabelSize = singleDeveloperFocus ? 11 : 14;
 
   const axisFocusOpts = useMemo(
@@ -1330,8 +1391,7 @@ export default function DashboardDeveloperCharts({
       productivityScore: row.productivityScore,
       completionRate: row.completionRate ?? 0,
       onTimeDelivery: row.onTime ?? 0,
-      teamParticipation: row.participation ?? 0,
-      workloadBalance: row.workload ?? 0,
+      efficiencyScore: row.efficiencyScore ?? row.participation ?? 0,
       totalCompleted: row.completed ?? 0,
       totalTasks: row.assigned ?? 0,
     }));
@@ -1347,6 +1407,14 @@ export default function DashboardDeveloperCharts({
     ? developerProductivityTrend
     : teamProductivityTrend;
 
+  const productivityTrendChartKey = useMemo(
+    () =>
+      productivityTrendData
+        .map((row) => `${row.sprintLabel ?? row.name}:${row.productivityScore ?? ''}`)
+        .join('|'),
+    [productivityTrendData],
+  );
+
   const filteredDevProductivityComparison = useMemo(() => {
     if (!selectedDeveloperName || !devProductivityComparison?.series?.length) {
       return devProductivityComparison;
@@ -1358,6 +1426,20 @@ export default function DashboardDeveloperCharts({
       ),
     };
   }, [devProductivityComparison, selectedDeveloperName, selectedDeveloperNameNormalized]);
+
+  const devProductivityCompareKey = useMemo(
+    () =>
+      `${filteredDevProductivityComparison?.chartData?.length ?? 0}:${(filteredDevProductivityComparison?.series ?? [])
+        .map((s) => s.dataKey)
+        .join(',')}:${(filteredDevProductivityComparison?.chartData ?? [])
+        .map((row) =>
+          (filteredDevProductivityComparison?.series ?? [])
+            .map((s) => row[s.dataKey])
+            .join(','),
+        )
+        .join('|')}`,
+    [filteredDevProductivityComparison],
+  );
 
   const teamTrendAxis = useMemo(() => buildProductivityScoreAxisDomainTicks(), []);
 
@@ -1515,16 +1597,23 @@ export default function DashboardDeveloperCharts({
     ? Math.min(72, 18 + Math.ceil(developers.length / 2) * 16)
     : 0;
 
-  const compareChartHeightCap = singleDeveloperFocus ? 420 : 520;
-  const compareChartHeightFloor = singleDeveloperFocus ? 300 : 280;
+  /** One developer + many sprints: bars share one row — scale height with sprint count. */
+  const singleDevCompareSprintBonus =
+    singleDevMultiSprintCompare && hasCompareData
+      ? Math.min(200, 36 + orderedSelectedSprints.length * 20)
+      : 0;
+
+  const compareChartHeightCap = singleDevMultiSprintCompare ? 620 : singleDeveloperFocus ? 780 : 520;
+  const compareChartHeightFloor = singleDevMultiSprintCompare ? 380 : singleDeveloperFocus ? 480 : 280;
 
   const hWorkloadCompareBase = hasCompareData
     ? Math.max(
         compareChartHeightFloor,
         Math.min(
           compareChartHeightCap,
-          (singleDeveloperFocus ? 240 : 210) +
-            compareWorkloadStack.length * (singleDeveloperFocus ? 24 : 32) +
+          (singleDevMultiSprintCompare ? 280 : singleDeveloperFocus ? 360 : 210) +
+            compareWorkloadStack.length * (singleDevMultiSprintCompare ? 24 : singleDeveloperFocus ? 32 : 32) +
+            singleDevCompareSprintBonus +
             (singleDeveloperFocus ? 0 : compareTotalsChartBonus),
         ),
       )
@@ -1534,9 +1623,10 @@ export default function DashboardDeveloperCharts({
         compareChartHeightFloor,
         Math.min(
           compareChartHeightCap,
-          (singleDeveloperFocus ? 240 : 210) +
-            compareHoursGroupedRows.length * (singleDeveloperFocus ? 24 : 32) +
-            Math.round(compareHoursScaleExtra * (singleDeveloperFocus ? 0.25 : 0.45)) +
+          (singleDevMultiSprintCompare ? 280 : singleDeveloperFocus ? 360 : 210) +
+            compareHoursGroupedRows.length * (singleDevMultiSprintCompare ? 24 : singleDeveloperFocus ? 32 : 32) +
+            Math.round(compareHoursScaleExtra * (singleDeveloperFocus ? 0.35 : 0.45)) +
+            singleDevCompareSprintBonus +
             (singleDeveloperFocus ? 0 : compareTotalsChartBonus),
         ),
       )
@@ -1549,21 +1639,21 @@ export default function DashboardDeveloperCharts({
     120,
     Math.round(0.5 * maxSingleHoursGrouped(hoursGroupedRows)),
   );
-  const singleChartHeightCap = singleDeveloperFocus ? 420 : 700;
-  const singleChartHeightFloor = singleDeveloperFocus ? 300 : 340;
+  const singleChartHeightCap = singleDeveloperFocus ? 560 : 700;
+  const singleChartHeightFloor = singleDeveloperFocus ? 380 : 340;
   const hWorkloadSingleBase = Math.max(
     singleChartHeightFloor,
     Math.min(
       singleChartHeightCap,
-      (singleDeveloperFocus ? 260 : 235) + workloadStack.length * (singleDeveloperFocus ? 28 : 42),
+      (singleDeveloperFocus ? 320 : 235) + workloadStack.length * (singleDeveloperFocus ? 36 : 42),
     ),
   );
   const hHoursSingleBase = Math.max(
     singleChartHeightFloor,
     Math.min(
       singleChartHeightCap,
-      (singleDeveloperFocus ? 260 : 235) +
-        hoursGroupedRows.length * (singleDeveloperFocus ? 28 : 42) +
+      (singleDeveloperFocus ? 320 : 235) +
+        hoursGroupedRows.length * (singleDeveloperFocus ? 36 : 42) +
         (singleDeveloperFocus ? 0 : hoursScaleExtraSingle),
     ),
   );
@@ -1677,6 +1767,9 @@ export default function DashboardDeveloperCharts({
       78,
       50 + Math.max(0, nSprints - 3) * 5 + Math.min(12, Math.max(0, nWorkloadHoursRows - 6) * 2),
     );
+    const bottomAxisWorkloadHoursAdjusted = singleDevMultiSprintCompare
+      ? bottomAxisWorkloadHours + 16
+      : bottomAxisWorkloadHours;
     const xAxisTickHeightWorkloadHours = Math.min(
       64,
       44 + Math.max(0, nSprints - 4) * 5 + Math.min(8, Math.max(0, nWorkloadHoursRows - 5) * 2),
@@ -1754,7 +1847,7 @@ export default function DashboardDeveloperCharts({
               top: marginTopWorkloadTight,
               right: 56,
               left: 8,
-              bottom: bottomAxisWorkloadHours,
+              bottom: bottomAxisWorkloadHoursAdjusted,
             }}
             barCategoryGap={workloadBarCategoryGap}
             barGap={workloadBarGap}
@@ -1762,19 +1855,21 @@ export default function DashboardDeveloperCharts({
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
               dataKey="shortName"
-              tick={{ ...axisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+              tick={{
+                ...compareDeveloperNameTickStyle,
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
+              }}
               interval={0}
-              angle={-32}
+              angle={singleDevMultiSprintCompare ? -28 : -32}
               textAnchor="end"
               height={xAxisTickHeightWorkloadHours}
-              tickMargin={12}
+              tickMargin={singleDevMultiSprintCompare ? 14 : 12}
               padding={{ left: 4, right: 4 }}
               label={{
                 value: 'Developer',
-                position: 'insideBottom',
-                offset: -4,
+                ...compareDeveloperAxisLabelProps,
                 fill: isDark ? '#9A9A9A' : '#1A1A1A',
-                ...axisTitleStyle,
+                ...compareDeveloperAxisTitleStyle,
               }}
             />
             <YAxis
@@ -1808,6 +1903,7 @@ export default function DashboardDeveloperCharts({
                   sprintDefs={sprintDefs}
                   smallSprintLabels={compactSprintLegendLabels}
                   largeSprintLabels={largeSprintLegendLabels}
+                  emphasizedSprintLabels={emphasizedSprintLegendLabels}
                 />
               )}
             />
@@ -1896,26 +1992,28 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={hoursRowsKeyed}
-            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHours }}
+            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHoursAdjusted }}
             barCategoryGap={hoursBarCategoryGap}
             barGap={hoursBarGap}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis
               dataKey="shortName"
-              tick={{ ...axisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
+              tick={{
+                ...compareDeveloperNameTickStyle,
+                fill: isDark ? '#9A9A9A' : '#1A1A1A',
+              }}
               interval={0}
-              angle={-32}
+              angle={singleDevMultiSprintCompare ? -28 : -32}
               textAnchor="end"
               height={xAxisTickHeightWorkloadHours}
-              tickMargin={12}
+              tickMargin={singleDevMultiSprintCompare ? 14 : 12}
               padding={{ left: 4, right: 4 }}
               label={{
                 value: 'Developer',
-                position: 'insideBottom',
-                offset: -4,
+                ...compareDeveloperAxisLabelProps,
                 fill: isDark ? '#9A9A9A' : '#1A1A1A',
-                ...axisTitleStyle,
+                ...compareDeveloperAxisTitleStyle,
               }}
             />
             <YAxis
@@ -1943,6 +2041,7 @@ export default function DashboardDeveloperCharts({
                   sprintDefs={sprintDefs}
                   smallSprintLabels={compactSprintLegendLabels}
                   largeSprintLabels={largeSprintLegendLabels}
+                  emphasizedSprintLabels={emphasizedSprintLegendLabels}
                 />
               )}
             />
@@ -2014,8 +2113,14 @@ export default function DashboardDeveloperCharts({
             )}
           >
             <LineChart
+              key={productivityTrendChartKey}
               data={productivityTrendData}
-              margin={{ top: 36, right: 20, left: 72, bottom: 52 }}
+              margin={{
+                top: singleDeveloperFocus ? 44 : 36,
+                right: 20,
+                left: 72,
+                bottom: 52,
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis
@@ -2052,7 +2157,12 @@ export default function DashboardDeveloperCharts({
               />
               <Tooltip
                 {...RECHARTS_BAR_TOOLTIP_PROPS}
-                content={(props) => <TeamProductivityTrendTooltip {...props} />}
+                content={(props) => (
+                  <TeamProductivityTrendTooltip
+                    {...props}
+                    showWorkloadBalance={!singleDeveloperFocus}
+                  />
+                )}
               />
               <Line
                 type="monotone"
@@ -2065,8 +2175,7 @@ export default function DashboardDeveloperCharts({
                 }
                 strokeWidth={3}
                 connectNulls={false}
-                animationDuration={CHART_BAR_ANIM_MS}
-                animationEasing={CHART_BAR_EASING}
+                isAnimationActive={false}
                 dot={(dotProps) => {
                   const { cx, cy, payload } = dotProps || {};
                   if (cx == null || cy == null || !Number.isFinite(payload?.productivityScore)) {
@@ -2098,7 +2207,7 @@ export default function DashboardDeveloperCharts({
                       ? developerProductivityTrend[0]?.accentColor ?? PRODUCTIVITY_SCORE_TREND
                       : teamTrendAccent
                   }
-                  fontSize={barValueLabelSize}
+                  fontSize={productivityTrendValueLabelSize}
                   fontWeight={800}
                   formatter={(v) => `${Math.round(Number(v) || 0)}%`}
                 />
@@ -2117,6 +2226,7 @@ export default function DashboardDeveloperCharts({
               tint={isDark ? 'rgba(21, 101, 192, 0.12)' : 'rgba(21, 101, 192, 0.07)'}
             >
               <ProductivityScoreCompareChartEmbed
+                key={devProductivityCompareKey}
                 data={filteredDevProductivityComparison.chartData}
                 series={filteredDevProductivityComparison.series}
                 fillParent

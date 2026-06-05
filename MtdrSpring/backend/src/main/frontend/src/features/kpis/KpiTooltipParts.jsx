@@ -195,25 +195,25 @@ export const KPI_TOOLTIPS = {
     },
   },
   onTimeDelivery: {
-    what: 'Share of completed tasks that were delivered on or before the due date.',
+    what: 'Share of completed developer assignments delivered on or before the task due date (by calendar day).',
     representation: 'Percentage from 0–100%',
     formula: {
       type: 'fraction',
       label: 'On-time (%) =',
-      numerator: 'completed on or before due date',
-      denominator: 'completed tasks',
+      numerator: 'completed assignments on or before due date',
+      denominator: 'completed assignments in the sprint',
       suffix: '× 100',
     },
   },
   efficiencyScore: {
     what: 'How efficiently the team completed tasks relative to the estimated time. Higher means tasks were finished faster than planned.',
-    representation: 'Score from 0 to 150. Above 100 means the team finished ahead of schedule.',
+    representation: 'Shown as a whole number from 0 to 100. 100% means on or ahead of estimates.',
     formula: {
       type: 'fraction',
       label: 'Efficiency (%) =',
       numerator: 'estimated hours',
       denominator: 'actual hours logged',
-      suffix: '× 100  (capped at 150)',
+      suffix: '× 100  (capped at 100)',
     },
   },
   workloadBalance: {

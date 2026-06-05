@@ -36,6 +36,9 @@ import {
   stripContradictoryOnTimeDecline,
   reconcileOnTimeDeliveryConcernProse,
   alignProductivityScoreProse,
+  alignProductivityTrendDelta,
+  resolveProductivityPredictionDisplay,
+  formatProductivityForecastDeltaLine,
 } from './aiInsightsConstants';
 
 const getSeverity = (severityKey, isDark) => {
@@ -443,6 +446,7 @@ export function ExecutiveSummaryBlock({
   taskStatusBreakdown,
   currentSprintActualScore = null,
   currentSprintMetrics = null,
+  productivityDeltaPoints = null,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -461,6 +465,9 @@ export function ExecutiveSummaryBlock({
     if (alignedMetrics?.onTimeDelivery != null) {
       out = stripContradictoryOnTimeDecline(out, alignedMetrics.onTimeDelivery);
       out = reconcileOnTimeDeliveryConcernProse(out, alignedMetrics.onTimeDelivery);
+    }
+    if (productivityDeltaPoints != null) {
+      out = alignProductivityTrendDelta(out, productivityDeltaPoints);
     }
     return out;
   };
@@ -858,20 +865,9 @@ export function PredictionCard({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const rawScore = Number(prediction?.predictedScore);
-  const livePs = Number(currentSprintMetrics?.productivityScore);
-  const resolvedScore =
-    Number.isFinite(livePs) &&
-    Number.isFinite(rawScore) &&
-    ((Math.abs(rawScore - Number(currentSprintMetrics?.onTimeDelivery)) <= 3 &&
-      Math.abs(rawScore - livePs) > 5) ||
-      (Math.abs(rawScore - Number(currentSprintMetrics?.completionRate)) <= 3 &&
-        Math.abs(rawScore - livePs) > 5))
-      ? livePs
-      : rawScore;
-  const clampedScore = Number.isFinite(resolvedScore)
-    ? Math.max(0, Math.min(100, Math.round(resolvedScore)))
-    : 0;
+  const resolved = resolveProductivityPredictionDisplay(prediction, currentSprintMetrics);
+  const clampedScore = resolved.predictedScore;
+  const forecastDeltaLine = formatProductivityForecastDeltaLine(resolved);
   const reasoningRaw = prediction?.reasoning ?? '';
   const reasoningAligned =
     currentSprintMetrics && reasoningRaw
@@ -881,9 +877,9 @@ export function PredictionCard({
         )
       : reasoningRaw;
   const TrendIcon =
-    prediction.trend === 'up' ? TrendingUp : prediction.trend === 'down' ? TrendingDown : Minus;
+    resolved.trend === 'up' ? TrendingUp : resolved.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
-    prediction.trend === 'up' ? '#2E7D32' : prediction.trend === 'down' ? '#C62828' : '#607D8B';
+    resolved.trend === 'up' ? '#2E7D32' : resolved.trend === 'down' ? '#C62828' : '#607D8B';
 
   // Mostrar comparación si tenemos el score real del siguiente sprint
   const showComparison = nextSprintActualScore != null && Number.isFinite(nextSprintActualScore);
@@ -926,6 +922,21 @@ export function PredictionCard({
           </Box>
         </Typography>
         <TrendIcon size={24} color={trendColor} style={{ marginTop: 6 }} />
+        {forecastDeltaLine ? (
+          <Typography
+            sx={{
+              fontSize: '0.68rem',
+              color: isDark ? '#9A9A9A' : '#607D8B',
+              fontWeight: 600,
+              textAlign: 'center',
+              mt: 0.75,
+              maxWidth: 120,
+              lineHeight: 1.35,
+            }}
+          >
+            {forecastDeltaLine}
+          </Typography>
+        ) : null}
       </Box>
       <Box sx={{ flex: 1 }}>
         <Typography

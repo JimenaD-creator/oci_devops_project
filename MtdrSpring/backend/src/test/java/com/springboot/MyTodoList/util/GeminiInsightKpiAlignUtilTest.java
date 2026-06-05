@@ -507,6 +507,16 @@ class GeminiInsightKpiAlignUtilTest {
     }
 
     @Test
+    void alignProductivityTrendDeltaInProse_replacesRelativePercentWithPoints() {
+        String gemini =
+            "Productivity decreased by 24% compared to the previous sprint as work is still in progress.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityTrendDeltaInProse(gemini, -15);
+        assertTrue(out.contains("decreased by 15 points"));
+        assertFalse(out.contains("24%"));
+        assertTrue(out.contains("work is still in progress"));
+    }
+
+    @Test
     void reconcileOnTimeDeliveryConcernProse_fixesPrimaryConcernAt100() {
         String in = "On-Time Delivery is the primary concern, having is at 100%. "
             + "Prioritizing the resolution of blocked tasks is essential.";

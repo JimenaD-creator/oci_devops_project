@@ -27,12 +27,12 @@ import {
 import InsightCard from './InsightCard';
 import { DeveloperInsightsTable } from './InsightCardParts';
 import DeveloperRadarCards from './DeveloperRadarCards';
-import { fetchSprintInsights } from './insightsApi';
 import { fetchProjectDevelopers } from '../dashboard/projectApi';
+import { fetchSprintInsights } from './insightsApi';
 import { mergeDeveloperInsightRows } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
-export default function AIInsightsPage({ projectId, isPageActive = true }) {
+export default function AIInsightsPage({ projectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -40,27 +40,13 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
   const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
-  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0);
-  const [developerInsightsRefreshKey, setDeveloperInsightsRefreshKey] = useState(0);
   const [projectDevelopers, setProjectDevelopers] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [rawDeveloperInsightRows, setRawDeveloperInsightRows] = useState(null);
   const [insightsGeneratedAt, setInsightsGeneratedAt] = useState(null);
   const [insightsError, setInsightsError] = useState(null);
-  const [sprintsReady, setSprintsReady] = useState(false);
-
-  const handlePersistedInsightsChange = useCallback(() => {
-    setDeveloperInsightsRefreshKey((k) => k + 1);
-  }, []);
 
   const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
-
-  /** Reload persisted insights when the user opens this page again (no 15s polling). */
-  useEffect(() => {
-    if (isPageActive) {
-      setInsightsRefreshKey((k) => k + 1);
-    }
-  }, [isPageActive]);
 
   useEffect(() => {
     const pid =
@@ -96,7 +82,6 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
     if (!pid) {
       setSprints([]);
       setLoading(false);
-      setSprintsReady(false);
       return;
     }
     setLoading(sharedLoading);
@@ -110,7 +95,6 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
       const defaultSprint = pickDefaultSelectedSprint(filtered);
       return defaultSprint?.id ?? filtered[filtered.length - 1]?.id ?? null;
     });
-    setSprintsReady(!sharedLoading);
     if (!sharedLoading) setLoading(false);
   }, [projectId, sharedSprints, sharedLoading]);
 
@@ -135,6 +119,11 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
     }
   }, [sprints]);
 
+  useEffect(() => {
+    if (selectedSprintId == null) return;
+    fetchSprintInsights(selectedSprintId).catch(() => {});
+  }, [selectedSprintId]);
+
   const selectedSprint = sprints.find((s) => Number(s.id) === Number(selectedSprintId));
 
   const rosterForInsights = useMemo(() => {
@@ -148,68 +137,31 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
     return mergeDeveloperInsightRows(rosterForInsights, rawDeveloperInsightRows);
   }, [rosterForInsights, rawDeveloperInsightRows]);
 
-  const sprintInsightsRefreshKey = selectedSprint
-    ? JSON.stringify({
-        id: selectedSprint.id,
-        devs: (selectedSprint.developers || []).map((d) => [
-          d.name,
-          d.assigned,
-          d.completed,
-          d.onTime,
-          d.hours,
-        ]),
-      })
-    : '';
-
-  useEffect(() => {
-    if (!sprintsReady || selectedSprintId == null) {
-      setRawDeveloperInsightRows(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setInsightsLoading(true);
-    setRawDeveloperInsightRows(null);
-    setInsightsError(null);
-    fetchSprintInsights(selectedSprintId)
-      .then(({ notFound, data }) => {
-        if (cancelled) return;
-        if (notFound || !data) {
-          setRawDeveloperInsightRows([]);
-          setInsightsGeneratedAt(null);
-          setInsightsError(null);
-          return;
-        }
-        const rows = data.insights?.developerInsights;
-        const aiRows = Array.isArray(rows) ? rows : [];
-        if (data.error && aiRows.length === 0) {
-          setInsightsError(getErrorMessage(data.error));
-          setRawDeveloperInsightRows([]);
-          setInsightsGeneratedAt(null);
-          return;
-        }
-        setInsightsError(null);
-        setRawDeveloperInsightRows(aiRows);
-        setInsightsGeneratedAt(data.generatedAt ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRawDeveloperInsightRows([]);
-          setInsightsError(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setInsightsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    selectedSprintId,
-    sprintsReady,
-    sprintInsightsRefreshKey,
-    developerInsightsRefreshKey,
-    insightsRefreshKey,
-  ]);
+  const handleInsightsFetchResult = useCallback(
+    ({ sprintId: sid, loading, notFound, data, fetchFailed }) => {
+      if (sid == null || Number(sid) !== Number(selectedSprintId)) return;
+      setInsightsLoading(Boolean(loading));
+      if (loading) return;
+      if (notFound || !data) {
+        setRawDeveloperInsightRows([]);
+        setInsightsGeneratedAt(null);
+        setInsightsError(fetchFailed ? 'Could not load insights.' : null);
+        return;
+      }
+      const rows = data.insights?.developerInsights;
+      const aiRows = Array.isArray(rows) ? rows : [];
+      if (data.error && aiRows.length === 0) {
+        setInsightsError(getErrorMessage(data.error));
+        setRawDeveloperInsightRows([]);
+        setInsightsGeneratedAt(null);
+        return;
+      }
+      setInsightsError(null);
+      setRawDeveloperInsightRows(aiRows);
+      setInsightsGeneratedAt(data.generatedAt ?? null);
+    },
+    [selectedSprintId],
+  );
 
   const normalizeKpiPercent = (v) => {
     const n = Number(v);
@@ -253,7 +205,17 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
 
   const showNextSprintForecast = selectedSprintId != null;
 
-  if (loading) return <PageLoadingSpinner />;
+  const productivityDeltaPoints = useMemo(() => {
+    if (selectedSprintId == null || sortedSprints.length < 2) return null;
+    const idx = sortedSprints.findIndex((s) => Number(s.id) === Number(selectedSprintId));
+    if (idx <= 0) return null;
+    const current = productivityScoreFromSprintKpis(sortedSprints[idx]?.kpis);
+    const previous = productivityScoreFromSprintKpis(sortedSprints[idx - 1]?.kpis);
+    if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+    return Math.round(current) - Math.round(previous);
+  }, [selectedSprintId, sortedSprints]);
+
+  if (loading && sprints.length === 0) return <PageLoadingSpinner />;
 
   // Obtener etiquetas de sprint con números secuenciales
   const getSprintLabel = (sprintId) => {
@@ -401,9 +363,10 @@ export default function AIInsightsPage({ projectId, isPageActive = true }) {
             nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
             currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
             currentSprintMetrics={currentSprintKpiMetrics}
-            refreshToken={insightsRefreshKey}
-            autoGenerateOnMissing
-            onPersistedInsightsChange={handlePersistedInsightsChange}
+            productivityDeltaPoints={productivityDeltaPoints}
+            refreshToken={0}
+            autoGenerateOnMissing={false}
+            onInsightsFetchResult={handleInsightsFetchResult}
             sprintDevelopers={
               Array.isArray(selectedSprint.developers) ? selectedSprint.developers : []
             }

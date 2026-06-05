@@ -31,7 +31,7 @@ import {
   AI_INSIGHTS_EMPTY,
 } from './aiInsightsConstants';
 import { computeRecommendationList } from './insightRecommendationsSync';
-import { fetchSprintInsights } from './insightsApi';
+import { clearSprintInsightsCache, fetchSprintInsights, peekSprintInsightsCache } from './insightsApi';
 import { fetchAiStatus } from './aiStatusApi';
 import {
   AlertCard,
@@ -53,9 +53,11 @@ export default function InsightCard({
   nextSprintActualScore = null,
   currentSprintActualScore = null,
   currentSprintMetrics = null,
+  productivityDeltaPoints = null,
   refreshToken = 0,
   autoGenerateOnMissing = true,
   onPersistedInsightsChange = null,
+  onInsightsFetchResult = null,
   sprintDevelopers = [],
 }) {
   const theme = useTheme();
@@ -77,10 +79,19 @@ export default function InsightCard({
   const lastSprintIdRef = useRef(null);
   const onPersistedInsightsChangeRef = useRef(onPersistedInsightsChange);
   onPersistedInsightsChangeRef.current = onPersistedInsightsChange;
+  const onInsightsFetchResultRef = useRef(onInsightsFetchResult);
+  onInsightsFetchResultRef.current = onInsightsFetchResult;
 
   const notifyPersistedInsightsChange = useCallback(() => {
     onPersistedInsightsChangeRef.current?.();
   }, []);
+
+  const publishInsightsFetch = useCallback(
+    (payload) => {
+      onInsightsFetchResultRef.current?.({ sprintId, ...payload });
+    },
+    [sprintId],
+  );
 
   const parseGeneratedAtMs = (value) => {
     const ms = new Date(value ?? '').getTime();
@@ -91,13 +102,18 @@ export default function InsightCard({
   // so the attempt counter increments correctly and the loop terminates at MAX_ATTEMPTS.
   const pollForResults = useCallback(
     async (minGeneratedAtMs = null) => {
-      const MAX_ATTEMPTS = 12;
-      const INTERVAL_MS = 2500;
+      // Gemini can take up to ~60s per attempt (with server-side retries on 503).
+      const MAX_ATTEMPTS = 50;
+      const INTERVAL_MS = 3000;
       for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
         await new Promise((r) => setTimeout(r, INTERVAL_MS));
         if (cancelPollRef.current) return;
         try {
-          const { notFound, data } = await fetchSprintInsights(sprintId, { retries: 1 });
+          const { notFound, data } = await fetchSprintInsights(sprintId, {
+            retries: 1,
+            skipCache: true,
+            cacheMs: 0,
+          });
           if (cancelPollRef.current) return;
           if (!notFound && data) {
             if (data.error) {
@@ -135,6 +151,7 @@ export default function InsightCard({
             setStatus('loaded');
             setPollCount(attempt + 1);
             notifyPersistedInsightsChange();
+            publishInsightsFetch({ loading: false, notFound: false, data });
             return;
           }
           setPollCount(attempt + 1);
@@ -145,16 +162,19 @@ export default function InsightCard({
       }
       if (!cancelPollRef.current) {
         setErrorCode(null);
-        setError('Took too long to generate. Please try again.');
+        setError(
+          'Took too long to generate. Gemini may still be processing — wait a minute and click Try again, or check the server logs.',
+        );
         setStatus('error');
       }
     },
-    [sprintId, notifyPersistedInsightsChange],
+    [sprintId, notifyPersistedInsightsChange, publishInsightsFetch],
   );
 
   const startGeneration = useCallback(async () => {
     if (!isValidSprintId(sprintId)) return;
     cancelPollRef.current = true;
+    clearSprintInsightsCache(sprintId);
     setStatus('generating');
     setError(null);
     setErrorCode(null);
@@ -185,8 +205,27 @@ export default function InsightCard({
 
   const loadExisting = useCallback(async () => {
     if (!isValidSprintId(sprintId)) return { action: 'none' };
+
+    const cached = peekSprintInsightsCache(sprintId);
+    if (cached?.data?.insights) {
+      const cachedData = cached.data;
+      const generatedMs = parseGeneratedAtMs(cachedData.generatedAt);
+      lastGeneratedAtMsRef.current = generatedMs;
+      setLastGeneratedAtMs(generatedMs);
+      setInsights(cachedData.insights);
+      setAcknowledged(cachedData.acknowledged ?? false);
+      setErrorCode(null);
+      setError(null);
+      setStatus('loaded');
+      publishInsightsFetch({ loading: false, notFound: false, data: cachedData });
+    } else {
+      publishInsightsFetch({ loading: true, notFound: false, data: null });
+      setStatus('checking');
+    }
+
     try {
       const { notFound, data } = await fetchSprintInsights(sprintId);
+      publishInsightsFetch({ loading: false, notFound, data });
       if (notFound || !data) {
         setInsights(null);
         setErrorCode(null);
@@ -237,10 +276,11 @@ export default function InsightCard({
       notifyPersistedInsightsChange();
       return { action: 'none' };
     } catch {
+      publishInsightsFetch({ loading: false, notFound: true, data: null, fetchFailed: true });
       setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
       return { action: 'autoGenerate' };
     }
-  }, [sprintId, notifyPersistedInsightsChange]);
+  }, [sprintId, notifyPersistedInsightsChange, publishInsightsFetch]);
 
   const maybeAutoGenerateAfterLoad = useCallback(
     async (loadAction) => {
@@ -309,15 +349,30 @@ export default function InsightCard({
 
     cancelPollRef.current = true;
     autoGenInFlightRef.current = false;
-    setInsights(null);
-    setStatus('checking');
-    setAcknowledged(false);
     setError(null);
     setErrorCode(null);
     setPollCount(0);
     setLastGeneratedAtMs(null);
     lastGeneratedAtMsRef.current = null;
     cancelPollRef.current = false;
+
+    const cached = peekSprintInsightsCache(sprintId);
+    if (cached?.data?.insights) {
+      const cachedData = cached.data;
+      const generatedMs = parseGeneratedAtMs(cachedData.generatedAt);
+      lastGeneratedAtMsRef.current = generatedMs;
+      setLastGeneratedAtMs(generatedMs);
+      setInsights(cachedData.insights);
+      setAcknowledged(cachedData.acknowledged ?? false);
+      setErrorCode(null);
+      setError(null);
+      setStatus('loaded');
+      publishInsightsFetch({ loading: false, notFound: false, data: cachedData });
+    } else {
+      setInsights(null);
+      setStatus('checking');
+      setAcknowledged(false);
+    }
 
     let cancelled = false;
     (async () => {
@@ -563,7 +618,7 @@ export default function InsightCard({
           <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
             {status === 'generating'
               ? 'Sending to Gemini…'
-              : `Waiting for response${pollCount > 0 ? ` (${pollCount * 2}s elapsed)` : ''}…`}
+              : `Waiting for response${pollCount > 0 ? ` (~${pollCount * 3}s elapsed)` : ''}…`}
           </Typography>
         </Box>
       )}
@@ -740,6 +795,7 @@ export default function InsightCard({
                           taskStatusBreakdown={tsb}
                           currentSprintActualScore={currentSprintActualScore}
                           currentSprintMetrics={currentSprintMetrics}
+                          productivityDeltaPoints={productivityDeltaPoints}
                         />
                       );
                     }

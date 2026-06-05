@@ -12,18 +12,14 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput,
-  Checkbox,
   Button,
   IconButton,
-  Chip,
   Alert,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
-import { developerAvatarColors } from '../../utils/developerColors';
-import { developerNumericId, finiteUserIds, multiselectNumericIds } from '../../utils/userIds';
+import { developerNumericId } from '../../utils/userIds';
 import { API_BASE, ORACLE_RED } from './constants/taskConstants';
 import {
   FORM_FIELD_TINT_BG,
@@ -32,7 +28,13 @@ import {
   TASK_STATUS_LABEL,
 } from '../sprints/constants/sprintConstants';
 import {
+  createTaskFormFieldSx,
+  createTaskDeveloperSelectFieldSx,
+  createTaskDeveloperSelectMenuProps,
+  createTaskDeveloperSelectValueSx,
   createTaskSelectFillSx,
+  createTaskSelectMenuProps,
+  createTaskSelectPlaceholderSx,
   dateInputToEndOfLocalDayIso,
   dateInputToStartOfLocalDayIso,
   isDateInputOnOrBefore,
@@ -60,7 +62,7 @@ export function TasksNewTaskDialog({
   const [assignedHours, setAssignedHours] = useState('');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [assignedToIds, setAssignedToIds] = useState([]);
+  const [assignedUserId, setAssignedUserId] = useState('');
   const [sprintId, setSprintId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -84,7 +86,7 @@ export function TasksNewTaskDialog({
     setAssignedHours('');
     setStartDate('');
     setDueDate('');
-    setAssignedToIds([]);
+    setAssignedUserId('');
     setSprintId('');
     setError('');
     setFetchedDevelopers(null);
@@ -161,9 +163,11 @@ export function TasksNewTaskDialog({
   }, [normalizedAvailableDevelopers]);
 
   useEffect(() => {
-    setAssignedToIds((prev) => {
-      const allowed = new Set(validAvailableDevelopers.map((u) => u.uid));
-      return finiteUserIds(prev).filter((id) => allowed.has(id));
+    const allowed = new Set(validAvailableDevelopers.map((u) => u.uid));
+    setAssignedUserId((prev) => {
+      const id = Number(prev);
+      if (!Number.isFinite(id) || allowed.has(id)) return prev;
+      return '';
     });
   }, [validAvailableDevelopers]);
 
@@ -178,9 +182,10 @@ export function TasksNewTaskDialog({
       !startDate ||
       !dueDate ||
       !hasSprintPick ||
-      assignedToIds.length === 0
+      assignedUserId !== '' &&
+      Number.isFinite(Number(assignedUserId))
     ) {
-      setError('Please fill in all required fields (including at least one developer).');
+      setError('Please fill in all required fields (including a developer).');
       return;
     }
     if (!isDateInputOnOrBefore(startDate, dueDate)) {
@@ -190,7 +195,8 @@ export function TasksNewTaskDialog({
     setSaving(true);
     setError('');
     try {
-      const assigneeUserIds = finiteUserIds(assignedToIds);
+      const userId = Number(assignedUserId);
+      const assigneeUserIds = Number.isFinite(userId) && userId > 0 ? [userId] : [];
       const dueIso = dateInputToEndOfLocalDayIso(dueDate);
       const res = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
@@ -234,11 +240,12 @@ export function TasksNewTaskDialog({
     startDate &&
     dueDate &&
     sprintId &&
-    finiteUserIds(assignedToIds).length > 0,
+    assignedUserId !== '' &&
+    Number.isFinite(Number(assignedUserId)),
   );
 
   const fieldOutlineTint = useMemo(() => {
-    const b = pageFormFieldOutline();
+    const b = pageFormFieldOutline(isDark);
     return {
       ...b,
       '& .MuiOutlinedInput-root': {
@@ -247,6 +254,24 @@ export function TasksNewTaskDialog({
       },
     };
   }, [isDark]);
+
+  const primaryFieldSx = useMemo(
+    () =>
+      createTaskFormFieldSx(isDark, {
+        fieldTintBg: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      }),
+    [isDark],
+  );
+
+  const developerFieldSx = useMemo(
+    () =>
+      createTaskDeveloperSelectFieldSx(isDark, {
+        fieldTintBg: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
+      }),
+    [isDark],
+  );
+
+  const compactSelectFieldSx = useMemo(() => createTaskSelectFillSx(isDark), [isDark]);
 
   return (
     <Dialog
@@ -334,13 +359,8 @@ export function TasksNewTaskDialog({
             fullWidth
             multiline
             minRows={2}
-            sx={{
-              ...fieldOutlineTint,
-              '& .MuiOutlinedInput-root': {
-                ...fieldOutlineTint['& .MuiOutlinedInput-root'],
-                bgcolor: isDark ? 'rgba(255,255,255,0.03)' : FORM_FIELD_TINT_BG,
-              },
-            }}
+            size="small"
+            sx={primaryFieldSx}
           />
           <TextField
             label="Task description"
@@ -349,15 +369,17 @@ export function TasksNewTaskDialog({
             fullWidth
             multiline
             minRows={5}
-            sx={fieldOutlineTint}
+            size="small"
+            sx={primaryFieldSx}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
+            <FormControl size="small" fullWidth sx={compactSelectFieldSx}>
               <InputLabel>Work item type</InputLabel>
               <Select
                 value={classification}
                 onChange={(e) => setClassification(e.target.value)}
                 label="Work item type"
+                MenuProps={createTaskSelectMenuProps}
               >
                 <MenuItem value="FEATURE">Feature</MenuItem>
                 <MenuItem value="BUG">Bug</MenuItem>
@@ -404,12 +426,13 @@ export function TasksNewTaskDialog({
                 </MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
+            <FormControl size="small" fullWidth sx={compactSelectFieldSx}>
               <InputLabel>Priority</InputLabel>
               <Select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 label="Priority"
+                MenuProps={createTaskSelectMenuProps}
               >
                 <MenuItem value="LOW">Low</MenuItem>
                 <MenuItem value="MEDIUM">Medium</MenuItem>
@@ -419,7 +442,7 @@ export function TasksNewTaskDialog({
             </FormControl>
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size="small" fullWidth sx={createTaskSelectFillSx()}>
+            <FormControl size="small" fullWidth sx={compactSelectFieldSx}>
               <InputLabel>Sprint</InputLabel>
               <Select
                 value={sprintId}
@@ -478,81 +501,35 @@ export function TasksNewTaskDialog({
               .
             </Alert>
           ) : null}
-          <FormControl
-            fullWidth
-            size="small"
-            sx={{
-              ...fieldOutlineTint,
-              '& .MuiSelect-select': {
-                color: 'text.primary',
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                alignContent: 'center',
-                gap: 0.5,
-                minHeight: 40,
-                whiteSpace: 'normal',
-                overflow: 'visible',
-                textOverflow: 'clip',
-                py: 0.75,
-              },
-            }}
-          >
-            <InputLabel id="create-task-assigned-label">Developers</InputLabel>
+          <FormControl fullWidth size="small" sx={developerFieldSx}>
+            <InputLabel id="create-task-assigned-label">Developer</InputLabel>
             <Select
               labelId="create-task-assigned-label"
-              multiple
-              value={finiteUserIds(assignedToIds)}
-              onChange={(e) => setAssignedToIds(multiselectNumericIds(e.target.value))}
-              input={<OutlinedInput label="Developers" />}
-              renderValue={(selected) => (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 0.5,
-                    maxHeight: 80,
-                    overflowY: 'auto',
-                    py: 0.25,
-                    width: '100%',
-                  }}
-                >
-                  {finiteUserIds(selected).map((id) => {
-                    const u = normalizedAvailableDevelopers.find((x) => x.uid === id);
-                    const name = u?.displayName ?? `#${id}`;
-                    const av = developerAvatarColors(name);
-                    return (
-                      <Chip
-                        key={id}
-                        size="small"
-                        label={name}
-                        variant="outlined"
-                        sx={{
-                          fontWeight: 600,
-                          bgcolor: 'transparent',
-                          color: av.color,
-                          borderColor: av.color,
-                          borderWidth: 1,
-                        }}
-                      />
-                    );
-                  })}
-                </Box>
-              )}
-              MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
-            >
-              {validAvailableDevelopers.map((u) => {
-                const uid = u.uid;
-                const selectedIds = finiteUserIds(assignedToIds);
-                return (
-                  <MenuItem key={uid} value={uid}>
-                    <Checkbox checked={selectedIds.includes(uid)} size="small" sx={{ py: 0 }} />
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {u.displayName}
+              value={assignedUserId}
+              onChange={(e) => setAssignedUserId(e.target.value)}
+              label="Developer"
+              renderValue={(value) => {
+                if (!value) {
+                  return (
+                    <Typography component="span" sx={createTaskSelectPlaceholderSx}>
+                      Select developer
                     </Typography>
-                  </MenuItem>
+                  );
+                }
+                const u = normalizedAvailableDevelopers.find((x) => x.uid === Number(value));
+                return (
+                  <Typography component="span" sx={createTaskDeveloperSelectValueSx}>
+                    {u?.displayName ?? `#${value}`}
+                  </Typography>
                 );
-              })}
+              }}
+              MenuProps={createTaskDeveloperSelectMenuProps}
+            >
+              {validAvailableDevelopers.map((u) => (
+                <MenuItem key={u.uid} value={u.uid}>
+                  {u.displayName}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

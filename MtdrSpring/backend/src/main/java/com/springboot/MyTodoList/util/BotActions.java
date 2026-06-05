@@ -1290,22 +1290,19 @@ public class BotActions {
 
         Double hours = userTaskService.getWorkedHours(assigneeUserId, (long) task.getID());
         String hoursLabel = WorkedHoursUtil.formatForDisplay(hours != null ? hours : 0.0);
-        String teamStatus = formatTaskStatusForDisplay(task.getStatus());
         String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
         String dueDateLine = TaskDueDateFormatUtil.formatDueDateForTelegram(task.getDueDate());
 
         String message = String.format(
-                "✅ *Your part is complete*\n\n"
+                "✅ *Task complete*\n\n"
                         + "*Title:* %s\n\n"
                         + "*Description:* %s\n\n"
-                        + "*Your status:* ✅ Done\n"
-                        + "*Hours you logged:* %s\n\n"
-                        + "*Team task status:* %s\n\n"
+                        + "*Status:* ✅ Done\n"
+                        + "*Hours logged:* %s\n\n"
                         + "*Due date:* %s",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
                 hoursLabel,
-                escapeMarkdown(teamStatus),
                 escapeMarkdown(dueDateLine));
 
         stateManager.setSelectingTaskStatus(chatId, task.getID(), sprintId, assigneeUserId);
@@ -1331,10 +1328,9 @@ public class BotActions {
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
                 .keyboard(keyboard).resizeKeyboard(true).selective(true).build();
 
-        String myStatus = userTaskService.getAssignmentStatus(assigneeUserId, (long) task.getID())
+        String status = userTaskService.getAssignmentStatus(assigneeUserId, (long) task.getID())
                 .map(BotActions::formatTaskStatusForDisplay)
                 .orElse(formatTaskStatusForDisplay(task.getStatus()));
-        String teamStatus = formatTaskStatusForDisplay(task.getStatus());
         String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
         String dueDateLine = TaskDueDateFormatUtil.formatDueDateForTelegram(task.getDueDate());
 
@@ -1342,14 +1338,12 @@ public class BotActions {
                 "📋 *Task Details*\n\n" +
                 "*Title:* %s\n\n" +
                 "*Description:* %s\n\n" +
-                "*Your status:* %s\n" +
-                "*Team status:* %s\n\n" +
+                "*Status:* %s\n\n" +
                 "*Due date:* %s\n\n" +
                 "Select a new status:",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
-                escapeMarkdown(myStatus),
-                escapeMarkdown(teamStatus),
+                escapeMarkdown(status),
                 escapeMarkdown(dueDateLine)
         );
 
@@ -1365,7 +1359,7 @@ public class BotActions {
         String taskDescription = formatTaskDescriptionForDisplay(task.getDescription());
 
         String message = String.format(
-                "📋 *Task Details*\n\n*Title:* %s\n\n*Description:* %s\n\n*Current Status:* %s\n\n*Due date:* %s",
+                "📋 *Task Details*\n\n*Title:* %s\n\n*Description:* %s\n\n*Status:* %s\n\n*Due date:* %s",
                 escapeMarkdown(task.getTitle()),
                 escapeMarkdown(taskDescription),
                 escapeMarkdown(formatTaskStatusForDisplay(task.getStatus())),

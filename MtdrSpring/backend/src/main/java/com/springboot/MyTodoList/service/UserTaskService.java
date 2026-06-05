@@ -260,6 +260,10 @@ public class UserTaskService {
         if (userTaskRepository.findById(id).isPresent()) {
             return;
         }
+        List<UserTask> existingOnTask = userTaskRepository.findByTask_Id(taskId);
+        if (!existingOnTask.isEmpty()) {
+            throw new IllegalArgumentException("Task already has an assignee");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         Task task = taskRepository.findById(taskId)

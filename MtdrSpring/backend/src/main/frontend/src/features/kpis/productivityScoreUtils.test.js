@@ -6,7 +6,93 @@ import {
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
   softenProductivityGuideForSprintPhase,
+  computeIndividualWorkloadBalance,
+  computeIndividualProductivityScore,
+  computeProductivityScore,
+  productivityScoreFromDeveloperMetrics,
 } from './productivityScoreUtils';
+
+describe('computeIndividualWorkloadBalance', () => {
+  it('rewards developers who cleared all assignments despite lighter load vs peers', () => {
+    const team = [
+      { name: 'A', assigned: 10, completed: 8, hours: 40 },
+      { name: 'B', assigned: 4, completed: 4, hours: 12 },
+      { name: 'C', assigned: 6, completed: 5, hours: 28 },
+    ];
+    expect(computeIndividualWorkloadBalance(team[1], team)).toBe(85);
+  });
+
+  it('scores 100 when assignment count matches team average', () => {
+    const team = [
+      { assigned: 5, completed: 5, hours: 20 },
+      { assigned: 5, completed: 4, hours: 30 },
+      { assigned: 5, completed: 3, hours: 10 },
+    ];
+    expect(computeIndividualWorkloadBalance(team[0], team)).toBe(100);
+  });
+
+  it('returns 0 for developers with no sprint activity', () => {
+    const team = [{ assigned: 3, completed: 2, hours: 8 }];
+    expect(computeIndividualWorkloadBalance({ assigned: 0, completed: 0, hours: 0 }, team)).toBe(0);
+  });
+});
+
+describe('computeIndividualProductivityScore', () => {
+  it('uses 45/35/20 weights and ignores workload', () => {
+    expect(
+      computeIndividualProductivityScore({
+        completionRate: 100,
+        onTimeDelivery: 100,
+        efficiencyScore: 100,
+      }),
+    ).toBe(100);
+    expect(
+      computeIndividualProductivityScore({
+        completionRate: 80,
+        onTimeDelivery: 60,
+        efficiencyScore: 50,
+      }),
+    ).toBe(Math.round(80 * 0.45 + 60 * 0.35 + 50 * 0.2));
+  });
+
+  it('productivityScoreFromDeveloperMetrics matches individual formula', () => {
+    const score = productivityScoreFromDeveloperMetrics({
+      assigned: 10,
+      completed: 8,
+      hours: 20,
+      assignedHoursEstimate: 18,
+      onTime: 90,
+      workload: 70,
+    });
+    const expected = computeIndividualProductivityScore({
+      completionRate: 80,
+      onTimeDelivery: 90,
+      efficiencyScore: 90,
+    });
+    expect(score).toBe(expected);
+  });
+});
+
+describe('computeProductivityScore (team / sprint)', () => {
+  it('keeps 40/30/20/10 weights including workload', () => {
+    expect(
+      computeProductivityScore({
+        completionRate: 100,
+        onTimeDelivery: 100,
+        efficiencyScore: 100,
+        workloadBalance: 100,
+      }),
+    ).toBe(100);
+    expect(
+      computeProductivityScore({
+        completionRate: 80,
+        onTimeDelivery: 60,
+        efficiencyScore: 50,
+        workloadBalance: 70,
+      }),
+    ).toBe(Math.round(80 * 0.4 + 60 * 0.3 + 50 * 0.2 + 70 * 0.1));
+  });
+});
 
 describe('productivityScoreUtils (KPI Analytics)', () => {
   it('buildProductivityKpiAnalyticsGuideLine is a short fallback (value + what it measures)', () => {

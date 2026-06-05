@@ -7,6 +7,9 @@ import {
   alignSingleMetricBlock,
   stripContradictoryOnTimeDecline,
   reconcileOnTimeDeliveryConcernProse,
+  resolveProductivityPredictionDisplay,
+  formatProductivityForecastDeltaLine,
+  alignProductivityTrendDelta,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -38,6 +41,49 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out.toLowerCase()).not.toContain('93% completion rate');
   });
 
+  it('resolveProductivityPredictionDisplay marks down when forecast is below current sprint', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 47, trend: 'up', reasoning: 'Improved vs last sprint.' },
+      { productivityScore: 68, completionRate: 70, onTimeDelivery: 100 },
+    );
+    expect(resolved.predictedScore).toBe(47);
+    expect(resolved.trend).toBe('down');
+    expect(resolved.deltaVsCurrent).toBe(-21);
+    expect(formatProductivityForecastDeltaLine(resolved)).toContain('vs current sprint (68%)');
+  });
+
+  it('resolveProductivityPredictionDisplay marks up when forecast exceeds current sprint', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 82, trend: 'down' },
+      { productivityScore: 68 },
+    );
+    expect(resolved.trend).toBe('up');
+    expect(resolved.deltaVsCurrent).toBe(14);
+  });
+
+  it('resolveProductivityPredictionDisplay marks down for a 2-point drop (85 vs 87)', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 85, trend: 'stable' },
+      { productivityScore: 87 },
+    );
+    expect(resolved.trend).toBe('down');
+    expect(resolved.deltaVsCurrent).toBe(-2);
+    expect(formatProductivityForecastDeltaLine(resolved)).toBe(
+      '−2 points vs current sprint (87%)',
+    );
+  });
+
+  it('resolveProductivityPredictionDisplay stays stable only when scores match', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 87, trend: 'down' },
+      { productivityScore: 87 },
+    );
+    expect(resolved.trend).toBe('stable');
+    expect(formatProductivityForecastDeltaLine(resolved)).toBe(
+      'About the same as current sprint (87%)',
+    );
+  });
+
   it('does not swap productivity score into on-time improvement clause', () => {
     const out = alignKpiMetricsInText(
       'Productivity increased by 6 points compared to the previous sprint, driven by a 97% improvement in on-time delivery.',
@@ -47,11 +93,21 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out.toLowerCase()).not.toContain('97% improvement in on-time');
   });
 
+  it('realigns legacy participation prose to efficiency score card value', () => {
+    const raw =
+      'A participation score of 2.0 indicates a focused team effort on the assigned sprint goals.';
+    const out = alignSingleMetricBlock(raw, 'efficiencyScore', 85);
+    expect(out.toLowerCase()).toContain('efficiency');
+    expect(out).toContain('85%');
+    expect(out).not.toContain('2.0');
+    expect(out).not.toMatch(/participation score of 2/i);
+  });
+
   it('keeps a space after percent (avoids "0as" in manager guide)', () => {
     const out = alignKpiProseForMetric(
-      'Team participation is 0% as work has not yet commenced on the assigned tasks.',
-      'teamParticipation',
-      { teamParticipation: 0 },
+      'Efficiency score is 0% as work has not yet commenced on the assigned tasks.',
+      'efficiencyScore',
+      { efficiencyScore: 0 },
     );
     expect(out).toMatch(/0%\s+as/i);
     expect(out).not.toMatch(/0as/i);
@@ -93,5 +149,14 @@ describe('aiInsightsConstants KPI alignment', () => {
     const out = stripContradictoryOnTimeDecline(text, 100);
     expect(out.toLowerCase()).not.toContain('declined');
     expect(out).toContain('Focus on tasks');
+  });
+
+  it('alignProductivityTrendDelta replaces relative percent with score points', () => {
+    const text =
+      'Productivity decreased by 24% compared to the previous sprint as work is still in progress.';
+    const out = alignProductivityTrendDelta(text, -15);
+    expect(out).toContain('decreased by 15 points');
+    expect(out).not.toContain('24%');
+    expect(out).toContain('work is still in progress');
   });
 });

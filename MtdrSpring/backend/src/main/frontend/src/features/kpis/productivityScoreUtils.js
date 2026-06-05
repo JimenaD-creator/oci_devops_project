@@ -1,7 +1,21 @@
 /**
- * Single source of truth for Productivity Score (matches KPI Analytics card).
- * Formula: completion×0.4 + on-time×0.3 + participation×0.2 + workload×0.1
+ * Productivity score formulas:
+ * - Team / sprint (KPI Analytics): completion×0.4 + on-time×0.3 + efficiency×0.2 + workload×0.1
+ * - Individual developer: completion×0.45 + on-time×0.35 + efficiency×0.2 (workload shown separately)
  */
+
+export const TEAM_PRODUCTIVITY_WEIGHTS = {
+  completionRate: 0.4,
+  onTimeDelivery: 0.3,
+  efficiencyScore: 0.2,
+  workloadBalance: 0.1,
+};
+
+export const INDIVIDUAL_PRODUCTIVITY_WEIGHTS = {
+  completionRate: 0.45,
+  onTimeDelivery: 0.35,
+  efficiencyScore: 0.2,
+};
 
 const MS_PER_DAY = 86400000;
 /** First N calendar days of a sprint: avoid "weak/mixed" performance labels. */
@@ -35,17 +49,98 @@ export function normalizeWorkloadBalancePercent(rawWb) {
   return Math.min(100, Math.max(0, Math.round(wb)));
 }
 
+/**
+ * Per-developer workload balance (0–100) for tables and charts — not part of individual productivity score.
+ * Measures assignment parity vs teammates (not logged hours vs the busiest person).
+ * Developers who finish all assigned work are not over-penalized for a lighter assignment load.
+ *
+ * @param {{ assigned?: number, completed?: number, hours?: number }} dev
+ * @param {Array<{ assigned?: number, completed?: number, hours?: number }>} teamDevs
+ */
+export function computeIndividualWorkloadBalance(dev, teamDevs = []) {
+  const assigned = Math.max(0, Number(dev?.assigned) || 0);
+  const completed = Math.max(0, Number(dev?.completed) || 0);
+  const hours = Math.max(0, Number(dev?.hours) || 0);
+
+  const active = (teamDevs || []).filter(
+    (d) => Math.max(0, Number(d?.assigned) || 0) > 0 || Math.max(0, Number(d?.hours) || 0) > 0,
+  );
+  if (assigned === 0 && hours === 0) return 0;
+  if (active.length <= 1) return 100;
+
+  const counts = active.map((d) => Math.max(0, Number(d?.assigned) || 0));
+  const avg = counts.reduce((sum, n) => sum + n, 0) / active.length;
+  const max = Math.max(...counts);
+  const min = Math.min(...counts);
+  const spread = Math.max(max - min, 1);
+
+  const distance = Math.abs(assigned - avg);
+  let balance = Math.round(100 * (1 - distance / spread));
+  balance = Math.min(100, Math.max(0, balance));
+
+  const pending = Math.max(0, assigned - completed);
+  if (assigned > 0 && pending === 0) {
+    balance = Math.max(balance, 85);
+  }
+
+  return balance;
+}
+
+/** Efficiency score on KPI cards: 0–100% (estimated ÷ logged hours, capped at 100). */
+export function normalizeEfficiencyPercent(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  const pct = n <= 1 ? n * 100 : n;
+  return Math.min(100, Math.max(0, Math.round(pct)));
+}
+
+export function formatEfficiencyScoreDisplay(score) {
+  return `${normalizeEfficiencyPercent(score)}%`;
+}
+
 export function computeProductivityScore({
   completionRate = 0,
   onTimeDelivery = 0,
-  teamParticipation = 0,
+  efficiencyScore = 0,
+  teamParticipation,
   workloadBalance = 0,
 } = {}) {
   const cr = normalizeKpiComponentPercent(completionRate);
   const otd = normalizeKpiComponentPercent(onTimeDelivery);
-  const tp = normalizeKpiComponentPercent(teamParticipation);
+  const esRaw =
+    efficiencyScore != null && efficiencyScore !== ''
+      ? efficiencyScore
+      : teamParticipation;
+  const esForWeight = normalizeEfficiencyPercent(esRaw);
   const wb = normalizeWorkloadBalancePercent(workloadBalance);
-  const score = Math.round(cr * 0.4 + otd * 0.3 + tp * 0.2 + wb * 0.1);
+  const w = TEAM_PRODUCTIVITY_WEIGHTS;
+  const score = Math.round(
+    cr * w.completionRate +
+      otd * w.onTimeDelivery +
+      esForWeight * w.efficiencyScore +
+      wb * w.workloadBalance,
+  );
+  return Math.min(100, Math.max(0, score));
+}
+
+/** Individual developer productivity — delivery quality only (no workload term). */
+export function computeIndividualProductivityScore({
+  completionRate = 0,
+  onTimeDelivery = 0,
+  efficiencyScore = 0,
+  teamParticipation,
+} = {}) {
+  const cr = normalizeKpiComponentPercent(completionRate);
+  const otd = normalizeKpiComponentPercent(onTimeDelivery);
+  const esRaw =
+    efficiencyScore != null && efficiencyScore !== ''
+      ? efficiencyScore
+      : teamParticipation;
+  const esForWeight = normalizeEfficiencyPercent(esRaw);
+  const w = INDIVIDUAL_PRODUCTIVITY_WEIGHTS;
+  const score = Math.round(
+    cr * w.completionRate + otd * w.onTimeDelivery + esForWeight * w.efficiencyScore,
+  );
   return Math.min(100, Math.max(0, score));
 }
 
@@ -62,18 +157,54 @@ export function productivityScoreFromSprintKpis(kpis) {
   return computeProductivityScore({
     completionRate: kpis.completionRate,
     onTimeDelivery: kpis.onTimeDelivery,
-    teamParticipation: kpis.teamParticipation,
+    efficiencyScore: kpis.efficiencyScore ?? kpis.teamParticipation,
     workloadBalance: kpis.workloadBalance,
   });
 }
 
 /**
- * Per-developer productivity score (same weights as sprint KPI).
- * Participation = worked hours vs estimated hours on assigned tasks.
- * Workload balance uses relative hours share within the sprint (dashboard dev.workload).
+ * Canonical manager-guide line for Efficiency Score (matches KPI Analytics card).
  */
+export function buildEfficiencyKpiAnalyticsGuideLine(score) {
+  const n = normalizeEfficiencyPercent(score);
+  if (n === 0) {
+    return 'Efficiency score is 0% — no worked hours logged yet, or task estimates are missing for comparison.';
+  }
+  if (n >= 100) {
+    return `Efficiency score is ${n}% — estimated hours vs hours logged (100% means on or ahead of estimates).`;
+  }
+  return `Efficiency score is ${n}% — estimated hours compared to hours logged (below 100 means more time was spent than planned).`;
+}
+
+const EFFICIENCY_PARTICIPATION_ECHO_RE =
+  /\b(?:team\s+)?participation\b|\bfocused team effort\b|\bparticipation\s+score\b/i;
+
+/** Rewrites legacy participation prose and aligns cited values to the efficiency KPI card. */
+export function realignEfficiencyGuideProse(text, score) {
+  if (!Number.isFinite(Number(score))) return text;
+  const display = formatEfficiencyScoreDisplay(score);
+  let out = String(text ?? '').trim();
+  out = out.replace(/\bteam\s+participation\b/gi, 'efficiency score');
+  out = out.replace(/\bparticipation\s+score\b/gi, 'efficiency score');
+  out = out.replace(
+    /efficiency\s+score(?:\s+is\s+|\s+of\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    `efficiency score is ${display}`,
+  );
+  out = out.replace(
+    /(?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    `efficiency score is ${display}`,
+  );
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
+export function shouldReplaceEfficiencyGuideWithCanonical(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return true;
+  return EFFICIENCY_PARTICIPATION_ECHO_RE.test(t);
+}
+
 /**
- * Hours logged vs estimated hours on assigned tasks (20% of individual productivity score).
+ * Hours logged vs estimated hours on assigned tasks (legacy participation metric).
  * @returns {number|null} 0–100, or null when there is no estimate to compare against.
  */
 export function participationRateFromDeveloperHours(hours = 0, assignedHoursEstimate = 0) {
@@ -81,6 +212,16 @@ export function participationRateFromDeveloperHours(hours = 0, assignedHoursEsti
   const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
   if (estimate <= 0) return h > 0 ? 0 : null;
   return Math.min(100, Math.round((100 * h) / estimate));
+}
+
+/**
+ * Per-developer / sprint efficiency: estimated hours ÷ logged hours (0–100%, same as KPI Analytics).
+ */
+export function efficiencyScoreFromDeveloperHours(hours = 0, assignedHoursEstimate = 0) {
+  const worked = Math.max(0, Number(hours) || 0);
+  const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
+  if (worked <= 0) return 0;
+  return Math.min(100, Math.round((estimate / worked) * 100));
 }
 
 export function productivityScoreFromDeveloperMetrics({
@@ -97,15 +238,47 @@ export function productivityScoreFromDeveloperMetrics({
   const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
   const completionRate = a > 0 ? Math.round((100 * c) / a) : 0;
   const onTimeDelivery = typeof onTime === 'number' ? onTime : 0;
-  const teamParticipation = participationRateFromDeveloperHours(h, estimate) ?? 0;
-  const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(workload) || 0)));
+  const efficiencyScore = efficiencyScoreFromDeveloperHours(h, estimate);
 
-  return computeProductivityScore({
+  return computeIndividualProductivityScore({
     completionRate,
     onTimeDelivery,
-    teamParticipation,
-    workloadBalance,
+    efficiencyScore,
   });
+}
+
+/** Productivity score plus KPI component breakdown for dashboard donut / tooltips. */
+export function developerProductivityBreakdown({
+  assigned = 0,
+  completed = 0,
+  hours = 0,
+  assignedHoursEstimate = 0,
+  onTime = null,
+  workload = 0,
+} = {}) {
+  const a = Math.max(0, Number(assigned) || 0);
+  const c = Math.max(0, Number(completed) || 0);
+  const h = Math.max(0, Number(hours) || 0);
+  const estimate = Math.max(0, Number(assignedHoursEstimate) || 0);
+  const completionRate = a > 0 ? Math.round((100 * c) / a) : 0;
+  const onTimeDelivery = typeof onTime === 'number' ? onTime : 0;
+  const efficiencyScore = efficiencyScoreFromDeveloperHours(h, estimate);
+  const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(workload) || 0)));
+  const score = productivityScoreFromDeveloperMetrics({
+    assigned: a,
+    completed: c,
+    hours: h,
+    assignedHoursEstimate: estimate,
+    onTime,
+    workload,
+  });
+  return {
+    score,
+    completionRate,
+    onTimeDelivery,
+    efficiencyScore,
+    workloadBalance,
+  };
 }
 
 /** Remove Gemini echoes of prompt instructions (KPI Analytics productivity block only). */

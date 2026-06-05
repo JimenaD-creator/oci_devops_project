@@ -52,7 +52,7 @@ test('columns show per-person assigned tasks, completed tasks, and hours', () =>
   // Worked hours
   expect(within(anaRow).getByText('18h')).toBeInTheDocument();
 
-  // On-time delivery (badge, distinct from workload bar text)
+  // On-time delivery badge
   expect(within(anaRow).getByText('100%', { selector: '.badge-base' })).toBeInTheDocument();
 });
 

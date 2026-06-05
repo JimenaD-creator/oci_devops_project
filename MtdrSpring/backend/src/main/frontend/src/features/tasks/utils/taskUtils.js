@@ -148,12 +148,102 @@ export function pageFormFieldOutline(isDark = false) {
     },
   };
 }
-export function createTaskSelectFillSx() {
+
+/** Typography scale for Create task dialogs. */
+export const CREATE_TASK_BODY_FONT_SIZE = '0.875rem';
+export const CREATE_TASK_LABEL_FONT_SIZE = '0.8125rem';
+export const CREATE_TASK_PLACEHOLDER_FONT_SIZE = '0.75rem';
+export const CREATE_TASK_OPTION_LABEL_FONT_SIZE = CREATE_TASK_BODY_FONT_SIZE;
+
+/** Empty select prompt styling (Create task dialogs). */
+export const createTaskSelectPlaceholderSx = {
+  color: 'text.disabled',
+  fontSize: CREATE_TASK_PLACEHOLDER_FONT_SIZE,
+  lineHeight: 1.4,
+};
+
+/** Field + placeholder typography for Create task dialogs. */
+export function createTaskFormFieldSx(isDark = false, { fieldTintBg } = {}) {
+  const outline = pageFormFieldOutline(isDark);
+  const inputBg =
+    fieldTintBg ?? (isDark ? 'rgba(255,255,255,0.03)' : outline['& .MuiOutlinedInput-root']?.bgcolor);
   return {
-    ...pageFormFieldOutline(),
-    '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'rgba(199, 70, 52, 0.08)' },
+    ...outline,
+    '& .MuiOutlinedInput-root': {
+      ...outline['& .MuiOutlinedInput-root'],
+      borderRadius: '8px',
+      fontSize: CREATE_TASK_BODY_FONT_SIZE,
+      bgcolor: inputBg,
+      '& input, & textarea, & .MuiSelect-select': {
+        fontSize: CREATE_TASK_BODY_FONT_SIZE,
+        bgcolor: 'transparent',
+      },
+      '& input::placeholder, & textarea::placeholder': {
+        fontSize: CREATE_TASK_PLACEHOLDER_FONT_SIZE,
+        opacity: 1,
+      },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#C74126' },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#C74126',
+        boxShadow: '0 0 0 3px rgba(199,65,38,0.08)',
+      },
+    },
+    '& .MuiInputLabel-root': {
+      ...outline['& .MuiInputLabel-root'],
+      fontSize: CREATE_TASK_LABEL_FONT_SIZE,
+    },
+    '& .MuiMenuItem-root': {
+      fontSize: CREATE_TASK_BODY_FONT_SIZE,
+      color: isDark ? '#F0F0F0' : '#1A1A1A',
+    },
+    '& [contenteditable]': {
+      fontSize: CREATE_TASK_BODY_FONT_SIZE,
+      lineHeight: 1.45,
+    },
+    '& [contenteditable][data-placeholder]:empty:before': {
+      fontSize: CREATE_TASK_PLACEHOLDER_FONT_SIZE,
+    },
   };
 }
+export function createTaskSelectFillSx(isDark = false) {
+  return createTaskFormFieldSx(isDark, { fieldTintBg: 'rgba(199, 70, 52, 0.08)' });
+}
+
+/** Developer selector uses the same body size as other create-task fields. */
+export function createTaskDeveloperSelectFieldSx(isDark = false, options = {}) {
+  return createTaskFormFieldSx(isDark, options);
+}
+
+export const createTaskDeveloperSelectMenuProps = {
+  PaperProps: {
+    sx: {
+      maxHeight: 280,
+      '& .MuiMenuItem-root': {
+        fontSize: CREATE_TASK_BODY_FONT_SIZE,
+        lineHeight: 1.45,
+        py: 0.75,
+      },
+    },
+  },
+};
+
+export const createTaskSelectMenuProps = {
+  PaperProps: {
+    sx: {
+      maxHeight: 280,
+      '& .MuiMenuItem-root': {
+        fontSize: CREATE_TASK_OPTION_LABEL_FONT_SIZE,
+        lineHeight: 1.45,
+        py: 0.75,
+      },
+    },
+  },
+};
+
+export const createTaskDeveloperSelectValueSx = {
+  fontSize: CREATE_TASK_BODY_FONT_SIZE,
+  lineHeight: 1.45,
+};
 
 export function normalizeTaskStatus(value) {
   const normalized = String(value || '')

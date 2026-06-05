@@ -8,7 +8,7 @@ import KpiDonutChart from './KpiDonutChart';
 
 const GAUGE_HEADER_ACCENT = '#1565C0';
 
-/** Chart arc is 0–100; participation can exceed 100% — cap fill only. */
+/** Chart arc is 0–100; efficiency is normalized to 0–100 for the gauge fill. */
 const GAUGE_GOALS = {
   onTimeDelivery: 80,
   efficiencyScore: 100,
@@ -250,7 +250,12 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
           mt: 0.5,
         }}
       >
-        <KpiDonutChart pct={chartPct} displayValue={main} displaySuffix={suffix} />
+        <KpiDonutChart
+          key={`${def.key}-${chartPct}`}
+          pct={chartPct}
+          displayValue={main}
+          displaySuffix={suffix}
+        />
 
         <Box
           sx={{

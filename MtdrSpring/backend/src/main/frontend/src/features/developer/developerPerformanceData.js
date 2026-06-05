@@ -1,7 +1,7 @@
 import { SPRINT_CHART_COLORS } from '../dashboard/dashboardSprintData';
 import {
-  participationRateFromDeveloperHours,
-  productivityScoreFromDeveloperMetrics,
+  developerProductivityBreakdown,
+  efficiencyScoreFromDeveloperHours,
 } from '../kpis/productivityScoreUtils';
 import { collectDeveloperNamesForSelection } from '../../utils/teamRosterUtils';
 import { developerNumericId } from '../../utils/userIds';
@@ -79,8 +79,8 @@ export function sprintMetricsForDeveloper(sprint, userId, userName) {
     estimated > 0 ? Math.round((hours / estimated) * 100) : hours > 0 ? 100 : 0;
   const tasksPerHour =
     hours > 0 ? Number((completed / hours).toFixed(2)) : completed > 0 ? completed : 0;
-  const participation = participationRateFromDeveloperHours(hours, estimated) ?? 0;
-  const productivityScore = productivityScoreFromDeveloperMetrics({
+  const efficiencyScore = efficiencyScoreFromDeveloperHours(hours, estimated);
+  const breakdown = developerProductivityBreakdown({
     assigned,
     completed,
     hours,
@@ -101,9 +101,11 @@ export function sprintMetricsForDeveloper(sprint, userId, userName) {
     workload,
     completionRate,
     hoursVsEstimatePct,
-    participation,
+    efficiencyScore,
+    /** @deprecated Use efficiencyScore — kept for chart payloads that still read .participation */
+    participation: efficiencyScore,
     tasksPerHour,
-    productivityScore,
+    productivityScore: breakdown.score,
   };
 }
 
@@ -127,16 +129,17 @@ export function aggregateDeveloperPerformance(sprints, userId, userName) {
     estimated > 0 ? Math.round((hours / estimated) * 100) : hours > 0 ? 100 : 0;
   const tasksPerHour =
     hours > 0 ? Number((completed / hours).toFixed(2)) : completed > 0 ? completed : 0;
-  const productivityScore = productivityScoreFromDeveloperMetrics({
+  const avgWorkload = perSprint.length
+    ? Math.round(perSprint.reduce((s, r) => s + (r.workload || 0), 0) / perSprint.length)
+    : 0;
+  const productivityScore = developerProductivityBreakdown({
     assigned,
     completed,
     hours,
     assignedHoursEstimate: estimated,
     onTime,
-    workload: perSprint.length
-      ? Math.round(perSprint.reduce((s, r) => s + (r.workload || 0), 0) / perSprint.length)
-      : 0,
-  });
+    workload: avgWorkload,
+  }).score;
 
   return {
     perSprint,
@@ -188,7 +191,7 @@ export function buildProductivityScoreTrendChart(sprints, userId, userName) {
         hours: m.hours,
         completionRate: m.completionRate,
         onTime: m.onTime,
-        participation: m.participation,
+        efficiencyScore: m.efficiencyScore,
         workload: m.workload,
         estimated: m.estimated,
         color: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
@@ -262,7 +265,7 @@ export function buildProductivityScoreComparisonTrend(
               hours: m.hours,
               completionRate: m.completionRate,
               onTime: m.onTime,
-              participation: m.participation,
+              efficiencyScore: m.efficiencyScore,
               workload: m.workload,
               estimated: m.estimated,
             }

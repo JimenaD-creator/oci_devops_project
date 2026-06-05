@@ -45,3 +45,10 @@ export function filterTasksForKpiSprints(tasks, sprintRows) {
     return sid != null && sprintIds.has(sid);
   });
 }
+
+/** On-time % from enriched sprint KPIs (USER_TASK completion vs due date, same as dashboard). */
+export function resolveOnTimeDeliveryPercent(sprint) {
+  const v = Number(sprint?.kpis?.onTimeDelivery);
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(100, Math.max(0, Math.round(v)));
+}

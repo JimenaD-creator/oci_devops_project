@@ -138,6 +138,15 @@ public class UserTaskController {
             return ResponseEntity.notFound().build();
         }
 
+        List<UserTask> existingOnTask = userTaskRepository.findByTask_Id(taskId);
+        if (!existingOnTask.isEmpty()) {
+            boolean forThisUser = existingOnTask.stream()
+                    .anyMatch(ut -> userId.equals(ut.getUser().getId()));
+            if (!forThisUser || existingOnTask.size() > 1) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+            }
+        }
+
         UserTaskId id = new UserTaskId(userId, taskId);
         UserTask userTask = userTaskRepository.findById(id)
                 .orElseGet(() -> new UserTask(user, task));

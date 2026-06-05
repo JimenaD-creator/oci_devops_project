@@ -2,17 +2,34 @@ import { API_BASE } from './aiInsightsConstants';
 
 const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 400;
-const DEFAULT_INSIGHTS_CACHE_MS = 60_000;
+/** Cache successful reads so Dashboard + AI Insights do not each pay for server enrich. */
+const DEFAULT_INSIGHTS_CACHE_MS = 180_000;
 
 /** @type {Map<string, { at: number, result: { notFound: boolean, data: object|null } }>} */
 const sprintInsightsCache = new Map();
 
+/** @type {Map<string, Promise<{ notFound: boolean, data: object|null }>>} */
+const sprintInsightsInFlight = new Map();
+
 export function clearSprintInsightsCache(sprintId = null) {
   if (sprintId == null) {
     sprintInsightsCache.clear();
+    sprintInsightsInFlight.clear();
     return;
   }
-  sprintInsightsCache.delete(String(sprintId));
+  const key = String(sprintId);
+  sprintInsightsCache.delete(key);
+  sprintInsightsInFlight.delete(key);
+}
+
+/** Instant read of a recent client cache hit (no network). */
+export function peekSprintInsightsCache(sprintId, cacheMs = DEFAULT_INSIGHTS_CACHE_MS) {
+  if (sprintId == null) return null;
+  const hit = sprintInsightsCache.get(String(sprintId));
+  if (hit && Date.now() - hit.at < cacheMs) {
+    return hit.result;
+  }
+  return null;
 }
 
 function sleep(ms) {
@@ -57,52 +74,73 @@ export async function fetchSprintInsights(sprintId, options = {}) {
     }
   }
 
-  const url = `${API_BASE}/api/insights/sprint/${sprintId}`;
-  let lastError = null;
-
-  for (let attempt = 0; attempt < retries; attempt += 1) {
-    if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
+  if (!skipCache) {
+    const pending = sprintInsightsInFlight.get(cacheKey);
+    if (pending) {
+      return pending;
     }
+  }
 
-    try {
-      const res = await fetch(url, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-        signal,
-      });
+  const url = `${API_BASE}/api/insights/sprint/${sprintId}`;
 
-      if (res.status === 404) {
-        const result = { notFound: true, data: null };
+  const request = (async () => {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+
+      try {
+        const res = await fetch(url, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+          signal,
+        });
+
+        if (res.status === 404) {
+          const result = { notFound: true, data: null };
+          if (cacheMs > 0) {
+            sprintInsightsCache.set(cacheKey, { at: Date.now(), result });
+          }
+          return result;
+        }
+
+        if (!res.ok) {
+          throw new Error(`insights HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data != null && typeof data === 'object') {
+          data.insights = parseInsightsField(data.insights);
+        }
+        const result = { notFound: false, data };
         if (cacheMs > 0) {
           sprintInsightsCache.set(cacheKey, { at: Date.now(), result });
         }
         return result;
+      } catch (err) {
+        if (signal?.aborted || err?.name === 'AbortError') {
+          throw err;
+        }
+        lastError = err;
+        if (attempt < retries - 1) {
+          await sleep(retryDelayMs * (attempt + 1));
+        }
       }
+    }
 
-      if (!res.ok) {
-        throw new Error(`insights HTTP ${res.status}`);
-      }
+    throw lastError ?? new Error('insights fetch failed');
+  })();
 
-      const data = await res.json();
-      if (data != null && typeof data === 'object') {
-        data.insights = parseInsightsField(data.insights);
-      }
-      const result = { notFound: false, data };
-      if (cacheMs > 0) {
-        sprintInsightsCache.set(cacheKey, { at: Date.now(), result });
-      }
-      return result;
-    } catch (err) {
-      if (signal?.aborted || err?.name === 'AbortError') {
-        throw err;
-      }
-      lastError = err;
-      if (attempt < retries - 1) {
-        await sleep(retryDelayMs * (attempt + 1));
-      }
+  if (!skipCache) {
+    sprintInsightsInFlight.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      sprintInsightsInFlight.delete(cacheKey);
     }
   }
 
-  throw lastError ?? new Error('insights fetch failed');
+  return request;
 }

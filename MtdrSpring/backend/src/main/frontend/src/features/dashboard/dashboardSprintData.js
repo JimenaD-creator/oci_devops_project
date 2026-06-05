@@ -1,6 +1,10 @@
 import { inferStatusByDate } from '../sprints/utils/sprintUtils';
-import { computeProductivityScore } from '../kpis/productivityScoreUtils';
-import { productivityScoreFromSprintKpis } from '../kpis/productivityScoreUtils';
+import {
+  computeIndividualWorkloadBalance,
+  computeProductivityScore,
+  normalizeEfficiencyPercent,
+  productivityScoreFromSprintKpis,
+} from '../kpis/productivityScoreUtils';
 import { isAssigneeCompletionOnTime } from '../tasks/utils/assigneeOnTimeUtils';
 import {
   collectDeveloperNamesForSelection,
@@ -281,13 +285,24 @@ function mapApiSprint(apiSprint, sprintNumber) {
     totalAssignedHoursTasks: 0,
     taskStatusDistribution: [],
     taskStatusTotal: 0,
-    kpis: {
-      completionRate: Math.round((apiSprint.completionRate ?? 0) * 100),
-      onTimeDelivery: Math.round((apiSprint.onTimeDelivery ?? 0) * 100),
-  efficiencyScore: Math.round((apiSprint.efficiencyScore ?? 0) * 100),
-      workloadBalance: apiSprint.workloadBalance ?? 0,
-      productivityScore: Math.round((apiSprint.completionRate ?? 0) * 100),
-    },
+    kpis: (() => {
+      const completionRate = Math.round((apiSprint.completionRate ?? 0) * 100);
+      const onTimeDelivery = Math.round((apiSprint.onTimeDelivery ?? 0) * 100);
+      const efficiencyScore = normalizeEfficiencyPercent(apiSprint.efficiencyScore ?? 0);
+      const workloadBalance = apiSprint.workloadBalance ?? 0;
+      return {
+        completionRate,
+        onTimeDelivery,
+        efficiencyScore,
+        workloadBalance,
+        productivityScore: computeProductivityScore({
+          completionRate,
+          onTimeDelivery,
+          efficiencyScore,
+          workloadBalance,
+        }),
+      };
+    })(),
     developers: [],
   };
 }
@@ -318,7 +333,7 @@ function deriveKpisFromLiveData(
   const onTimeDeliveryPct =
     doneAssignments > 0 ? Math.round((onTimeAssignments / doneAssignments) * 100) : 0;
 
-  // Live Team Participation = logged USER_TASK hours / planned TASK hours (same sprint).
+  // Sprint efficiency = planned task hours ÷ logged USER_TASK hours (same as KPI Analytics).
   const totalExpectedHours = tasksInSprint.reduce((sum, t) => {
     const n = Number(t?.assignedHours ?? t?.assigned_hours ?? 0);
     return sum + (Number.isFinite(n) ? n : 0);
@@ -329,10 +344,10 @@ function deriveKpisFromLiveData(
     if (Number(taskSprintMap[taskId]?.sprintId) !== Number(sprintId)) return sum;
     return sum + userTaskWorkedHours(ut);
   }, 0);
-const efficiencyScorePct =
-  totalWorkedHours > 0
-    ? Math.min(150, Math.round((totalExpectedHours / totalWorkedHours) * 100))
-    : 0;
+  const efficiencyScorePct =
+    totalWorkedHours > 0
+      ? Math.min(100, Math.round((totalExpectedHours / totalWorkedHours) * 100))
+      : 0;
   const workloadBalancePct = (() => {
     const raw = Number(storedKpis?.workloadBalance ?? 0);
     if (!Number.isFinite(raw)) return 0;
@@ -343,11 +358,12 @@ const efficiencyScorePct =
     ...storedKpis,
     completionRate: completionRatePct,
     onTimeDelivery: onTimeDeliveryPct,
+    efficiencyScore: efficiencyScorePct,
     workloadBalance: workloadBalancePct,
     productivityScore: computeProductivityScore({
       completionRate: completionRatePct,
       onTimeDelivery: onTimeDeliveryPct,
-    efficiencyScore: efficiencyScorePct,
+      efficiencyScore: efficiencyScorePct,
       workloadBalance: workloadBalancePct,
     }),
   };
@@ -506,7 +522,6 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
     const { _devMap, _statusCounts, _blockedTaskMapByDeveloper, ...rest } = entry;
     const devEntries = Object.entries(_devMap);
     const devs = devEntries.map(([, d]) => d);
-    const maxHours = Math.max(...devs.map((d) => d.hours), 1);
     devEntries.forEach(([devKey, d]) => {
       const taskIds = d._taskIds;
       const completedIds = d._completedTaskIds;
@@ -531,8 +546,10 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
       delete d._onTimeAssignments;
       d.assignedHoursEstimate = Number(d._assignedHoursEstimate) || 0;
       delete d._assignedHoursEstimate;
-      d.workload = Math.round((d.hours / maxHours) * 100);
       d.pending = Math.max(0, (d.assigned ?? 0) - (d.completed ?? 0));
+    });
+    devs.forEach((d) => {
+      d.workload = computeIndividualWorkloadBalance(d, devs);
     });
     const blockedDevelopers = devs
       .filter((d) => Number(d.blockedCount) > 0)
@@ -907,6 +924,52 @@ export function buildBlockedReportsForAiSprint(sp) {
   return out;
 }
 
+/** Full sprint roster for workload parity (not the filtered developer subset). */
+function buildTeamContextForWorkload(selectedSprints = []) {
+  if (selectedSprints.length === 1) {
+    return (selectedSprints[0].developers || []).map((dev) => ({
+      assigned: dev.assigned,
+      completed: dev.completed,
+      hours: dev.hours,
+    }));
+  }
+  const teamMap = new Map();
+  selectedSprints.forEach((sp) => {
+    (sp.developers || []).forEach((dev) => {
+      const key = normalizeDeveloperName(dev.name);
+      const cur = teamMap.get(key) || { assigned: 0, completed: 0, hours: 0 };
+      cur.assigned += Number(dev.assigned) || 0;
+      cur.completed += Number(dev.completed) || 0;
+      cur.hours += Number(dev.hours) || 0;
+      teamMap.set(key, cur);
+    });
+  });
+  return Array.from(teamMap.values());
+}
+
+/**
+ * Keep donut / scorecard workload in sync with DeveloperTable sprint columns.
+ * Table uses per-sprint workload vs the full team; filtering to one developer must not
+ * recompute against a team of one (which always yields 100%).
+ */
+function resolveAggregatedDeveloperWorkload(dev, selectedSprints = []) {
+  const perSprintValues = [];
+  selectedSprints.forEach((sp) => {
+    const sprintDev = (sp.developers || []).find(
+      (x) => normalizeDeveloperName(x.name) === normalizeDeveloperName(dev.name),
+    );
+    if (sprintDev == null || typeof sprintDev.workload !== 'number') return;
+    const hasActivity =
+      Math.max(0, Number(sprintDev.assigned) || 0) > 0 ||
+      Math.max(0, Number(sprintDev.hours) || 0) > 0;
+    if (hasActivity) perSprintValues.push(sprintDev.workload);
+  });
+  if (perSprintValues.length) {
+    return Math.round(perSprintValues.reduce((sum, n) => sum + n, 0) / perSprintValues.length);
+  }
+  return computeIndividualWorkloadBalance(dev, buildTeamContextForWorkload(selectedSprints));
+}
+
 export function aggregateSelectionMetrics(
   selectedSprints,
   projectDevelopers = [],
@@ -949,9 +1012,6 @@ export function aggregateSelectionMetrics(
       cur.completed += Number(d.completed) || 0;
       cur.hours += Number(d.hours) || 0;
       cur.assignedHoursEstimate += Number(d.assignedHoursEstimate) || 0;
-      if (typeof d.workload === 'number') {
-        cur.workload = Math.max(cur.workload, d.workload);
-      }
       devMap.set(d.name, cur);
     });
   });
@@ -964,6 +1024,9 @@ export function aggregateSelectionMetrics(
       shortName: shortDevName(d.name),
       pending: Math.max(0, assigned - completed),
     };
+  });
+  activityDevelopers.forEach((d) => {
+    d.workload = resolveAggregatedDeveloperWorkload(d, selectedSprints);
   });
 
   const mergedDevelopers = mergeRosterWithSprintDevelopers(projectDevelopers, activityDevelopers);
@@ -1137,7 +1200,7 @@ export function buildTeamProductivityTrendSeries(selectedSprints) {
       scoreDisplay: `${productivityScore}%`,
       completionRate: Number(kpis.completionRate) || 0,
       onTimeDelivery: Number(kpis.onTimeDelivery) || 0,
-efficiencyScore: Number(kpis.efficiencyScore) || 0,
+      efficiencyScore: Number(kpis.efficiencyScore) || 0,
       workloadBalance: Number(kpis.workloadBalance) || 0,
       totalCompleted: Number(sp.totalCompleted) || 0,
       totalTasks: Number(sp.totalTasks) || 0,

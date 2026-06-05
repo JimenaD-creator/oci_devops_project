@@ -60,7 +60,11 @@ import {
   collectDeveloperNamesForSelection,
   countTeamDevelopers,
 } from '../../utils/teamRosterUtils';
-import { productivityScoreFromDeveloperMetrics, participationRateFromDeveloperHours, productivityScoreFromSprintKpis, formatProductivityScoreDisplay } from '../kpis/productivityScoreUtils';
+import {
+  developerProductivityBreakdown,
+  productivityScoreFromSprintKpis,
+  formatProductivityScoreDisplay,
+} from '../kpis/productivityScoreUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { resolveLoadErrorMessage } from '../../utils/auth';
 
@@ -375,11 +379,7 @@ export default function DashboardPage({
     const completed = Math.max(0, Number(dev.completed) || 0);
     const hours = Math.max(0, Number(dev.hours) || 0);
     const estimate = Math.max(0, Number(dev.assignedHoursEstimate) || 0);
-    const completionRate = assigned > 0 ? Math.round((100 * completed) / assigned) : 0;
-    const onTimeDelivery = typeof dev.onTime === 'number' ? dev.onTime : 0;
-    const teamParticipation = participationRateFromDeveloperHours(hours, estimate) ?? 0;
-    const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(dev.workload) || 0)));
-    const score = productivityScoreFromDeveloperMetrics({
+    return developerProductivityBreakdown({
       assigned,
       completed,
       hours,
@@ -387,13 +387,6 @@ export default function DashboardPage({
       onTime: dev.onTime,
       workload: dev.workload,
     });
-    return {
-      score,
-      completionRate,
-      onTimeDelivery,
-      teamParticipation,
-      workloadBalance,
-    };
   }, [showDeveloperProductivityDonut, selectionMetrics.developers]);
 
   const heroProgress = useMemo(() => {
@@ -412,7 +405,7 @@ export default function DashboardPage({
 
   const heroProgressLabel = showDeveloperProductivityDonut
     ? `${selectedDeveloperName} — task completion`
-    : 'Sprint completion (all tasks)';
+    : 'Completion Rate';
 
   const completionRateColor = useMemo(
     () => completionRateProgressColor(heroProgress),
@@ -1537,11 +1530,11 @@ export default function DashboardPage({
               }}
             >
               <DeveloperProductivityDonutChart
+                key={`dev-prod-${selectedDeveloperProductivity?.score ?? 0}-${selectedDeveloperProductivity?.completionRate ?? 0}-${selectedDeveloperProductivity?.onTimeDelivery ?? 0}-${selectedDeveloperProductivity?.efficiencyScore ?? 0}`}
                 score={selectedDeveloperProductivity?.score ?? 0}
                 completionRate={selectedDeveloperProductivity?.completionRate ?? 0}
                 onTimeDelivery={selectedDeveloperProductivity?.onTimeDelivery ?? 0}
-                teamParticipation={selectedDeveloperProductivity?.teamParticipation ?? 0}
-                workloadBalance={selectedDeveloperProductivity?.workloadBalance ?? 0}
+                efficiencyScore={selectedDeveloperProductivity?.efficiencyScore ?? 0}
                 embedded
                 wide
               />

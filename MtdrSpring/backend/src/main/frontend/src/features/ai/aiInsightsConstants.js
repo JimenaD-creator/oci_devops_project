@@ -1,7 +1,9 @@
 import {
   buildProductivityKpiAnalyticsGuideLine,
   computeProductivityScore,
+  formatEfficiencyScoreDisplay,
   formatProductivityScoreDisplay,
+  normalizeEfficiencyPercent,
   resolveSprintTimelineContext,
 } from '../kpis/productivityScoreUtils';
 
@@ -42,12 +44,12 @@ export function isValidSprintId(sprintId) {
 export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
   const cr = Math.round(Number(kpis.completionRate) || 0);
   const otd = Math.round(Number(kpis.onTimeDelivery) || 0);
-  const tp = Math.round(Math.min(100, Math.max(0, Number(kpis.teamParticipation) || 0)));
+  const es = normalizeEfficiencyPercent(kpis.efficiencyScore ?? kpis.teamParticipation);
   const wb = Math.round(Math.min(100, Math.max(0, Number(kpis.workloadBalance) || 0)));
   const ps = computeProductivityScore({
     completionRate: cr,
     onTimeDelivery: otd,
-    teamParticipation: tp,
+    efficiencyScore: es,
     workloadBalance: wb,
   });
   const timeline = resolveSprintTimelineContext(sprint);
@@ -65,7 +67,7 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
     byMetric: {
       completionRate: `Completion rate is ${cr}% — share of sprint tasks marked done.`,
       onTimeDelivery: `On-time delivery is ${otd}% — completed work finished by the due date.`,
-      teamParticipation: `Team participation is ${tp}% — how actively the team engaged in this sprint.`,
+      efficiencyScore: `Efficiency score is ${es}% — estimated hours vs hours logged (100% means on or ahead of estimates).`,
       workloadBalance: `Workload balance is ${wb}% — how evenly tasks are distributed across assignees.`,
       productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint),
     },
@@ -75,6 +77,8 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
 export const KPI_LABELS = {
   completionRate: 'Completion Rate',
   onTimeDelivery: 'On-Time Delivery',
+  efficiencyScore: 'Efficiency Score',
+  /** @deprecated Persisted insights may still use this key */
   teamParticipation: 'Efficiency Score',
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
@@ -85,7 +89,7 @@ export const KPI_LABELS = {
 export const KPI_ALERT_PERCENT_KEYS = new Set([
   'completionRate',
   'onTimeDelivery',
-  'teamParticipation',
+  'efficiencyScore',
   'workloadBalance',
   'productivityScore',
 ]);
@@ -147,6 +151,27 @@ export function clampTrendsPercentLikeValues(text) {
  * Align "productivity score" phrases in Trends to the selected sprint's real score.
  * Example: "score of 100" -> "score of 97" when actual score is 97.
  */
+/**
+ * Rewrites productivity sprint-over-sprint deltas to absolute score points (matches KPI Analytics).
+ * Gemini often writes relative % (e.g. 24%) when the score fell 15 points (63% → 48%).
+ */
+export function alignProductivityTrendDelta(text, deltaProductivityPoints) {
+  if (text == null || !Number.isFinite(Number(deltaProductivityPoints))) return text;
+  const delta = Math.round(Number(deltaProductivityPoints));
+  if (delta === 0) return text;
+  const source = String(text);
+  const pattern =
+    /(productivity(?:\s+score)?\s+(?:has\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\s+by\s+)\d+(?:\.\d+)?\s*%/i;
+  if (!pattern.test(source)) return source;
+  const absPoints = Math.abs(delta);
+  const verb = delta > 0 ? 'increased' : 'decreased';
+  const pointsLabel = absPoints === 1 ? ' point' : ' points';
+  return source.replace(
+    pattern,
+    `Productivity ${verb} by ${absPoints}${pointsLabel}`,
+  );
+}
+
 export function alignTrendsProductivityScore(text, actualScore) {
   if (text == null || actualScore == null) return text;
   const display = formatProductivityScoreDisplay(actualScore);
@@ -217,9 +242,11 @@ const KPI_METRIC_PATTERNS = {
     /(on[- ]time\s*delivery(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
     /(on[- ]time\s*delivery\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
   ],
-  teamParticipation: [
+  efficiencyScore: [
+    /(efficiency\s*score(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
+    /(efficiency\s*score\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
     /(team\s*participation(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
-    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)\s*%?/gi,
+    /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
   ],
   workloadBalance: [
     /(workload\s*balance(?:\s+is\s+(?:currently\s+)?|\s*(?:of|is|was|at)\s*))(-?\d+(?:\.\d+)?)\s*%?/gi,
@@ -241,9 +268,11 @@ const KPI_METRIC_PROXIMITY = {
     /(completion\s*rate[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
     /(current\s+completion\s*rate\s+of\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
-  teamParticipation: [
+  efficiencyScore: [
+    /(efficiency\s*score[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /(efficiency\s*score\s+is\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
     /(team\s*participation[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
-    /(team\s*participation\s+is\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
+    /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)(\s*%)/gi,
   ],
   workloadBalance: [
     /(workload\s*balance[^.!?]{0,280}?\bcurrently\s+at\s+)(-?\d+(?:\.\d+)?)(\s*%)/gi,
@@ -350,7 +379,17 @@ export function alignSingleMetricBlock(text, metricKey, actual) {
   if (text == null || actual == null || !Number.isFinite(Number(actual))) return text;
   const metrics = { [metricKey]: actual };
   let out = alignKpiProseForMetric(String(text), metricKey, metrics);
-  const display = formatKpiMetricValue(actual);
+  const display =
+    metricKey === 'efficiencyScore'
+      ? formatEfficiencyScoreDisplay(actual)
+      : formatKpiMetricValue(actual);
+  if (metricKey === 'efficiencyScore') {
+    out = applyKpiMetricPatterns(out, 'teamParticipation', actual);
+    out = out.replace(
+      /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
+      `efficiency score is ${display}`,
+    );
+  }
   let replacedFirst = false;
   out = out.replace(/(-?\d+(?:\.\d+)?)\s*%/g, (match) => {
     if (replacedFirst) return match;
@@ -380,8 +419,11 @@ export function alignKpiMetricsInText(text, metrics = {}) {
  */
 export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   if (text == null) return text;
-  const aligned = alignKpiMetricsInText(text, metrics);
+  let aligned = alignKpiMetricsInText(text, metrics);
   const actual = metrics[metricKey];
+  if (metricKey === 'efficiencyScore' && actual != null) {
+    aligned = applyKpiMetricPatterns(aligned, 'teamParticipation', actual);
+  }
   if (actual == null) return aligned;
   let out = alignAlertLoosePercents(aligned, actual);
   if (metricKey === 'productivityScore') {
@@ -490,6 +532,83 @@ export function normalizeWorkloadBalanceGuideText(text, workloadBalancePct) {
     'This KPI measures how evenly tasks are distributed, not how fast each person completes them — ' +
     'use completion rate or developer insights if execution pace differs between teammates.'
   );
+}
+
+/** Any integer-point gap on a 0–100 score is meaningful for forecast vs current. */
+const FORECAST_TREND_EPSILON = 0;
+
+/** Trend for next-sprint forecast vs the selected sprint's live productivity score. */
+export function productivityForecastTrendFromDelta(deltaPoints) {
+  const d = Number(deltaPoints);
+  if (!Number.isFinite(d)) return 'stable';
+  if (d > FORECAST_TREND_EPSILON) return 'up';
+  if (d < -FORECAST_TREND_EPSILON) return 'down';
+  return 'stable';
+}
+
+/**
+ * Normalizes next-sprint productivity forecast display.
+ * Trend is always vs current sprint productivity — not vs the previous sprint.
+ */
+export function resolveProductivityPredictionDisplay(
+  prediction,
+  currentSprintMetrics = null,
+) {
+  const rawScore = Number(prediction?.predictedScore);
+  const currentPs = Number(currentSprintMetrics?.productivityScore);
+  const liveOtd = Number(currentSprintMetrics?.onTimeDelivery);
+  const liveCr = Number(currentSprintMetrics?.completionRate);
+
+  let predictedScore = rawScore;
+  if (
+    Number.isFinite(rawScore) &&
+    Number.isFinite(currentPs) &&
+    ((Math.abs(rawScore - liveOtd) <= 3 && Math.abs(rawScore - currentPs) > 5) ||
+      (Math.abs(rawScore - liveCr) <= 3 && Math.abs(rawScore - currentPs) > 5))
+  ) {
+    // Gemini stored a single KPI as predicted productivity — keep score but do not swap in current PS.
+    predictedScore = rawScore;
+  }
+
+  const clampedScore = Number.isFinite(predictedScore)
+    ? Math.max(0, Math.min(100, Math.round(predictedScore)))
+    : 0;
+  const currentProductivityScore = Number.isFinite(currentPs)
+    ? Math.max(0, Math.min(100, Math.round(currentPs)))
+    : null;
+  const deltaVsCurrent =
+    currentProductivityScore != null ? clampedScore - currentProductivityScore : null;
+  const trend =
+    deltaVsCurrent != null
+      ? productivityForecastTrendFromDelta(deltaVsCurrent)
+      : prediction?.trend === 'up' || prediction?.trend === 'down'
+        ? prediction.trend
+        : 'stable';
+
+  return {
+    predictedScore: clampedScore,
+    trend,
+    deltaVsCurrent,
+    currentProductivityScore,
+  };
+}
+
+export function formatProductivityForecastDeltaLine(resolved) {
+  if (
+    !resolved ||
+    resolved.currentProductivityScore == null ||
+    resolved.deltaVsCurrent == null
+  ) {
+    return null;
+  }
+  const abs = Math.abs(resolved.deltaVsCurrent);
+  if (resolved.deltaVsCurrent > FORECAST_TREND_EPSILON) {
+    return `+${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
+  }
+  if (resolved.deltaVsCurrent < -FORECAST_TREND_EPSILON) {
+    return `−${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
+  }
+  return `About the same as current sprint (${resolved.currentProductivityScore}%)`;
 }
 
 /** Shown when a sprint insight section has no AI content yet */

@@ -3,16 +3,24 @@ import { Box, Grid, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { TrendingUp } from 'lucide-react';
 import KpiDonutChart from '../kpis/KpiDonutChart';
-import { formatProductivityScoreDisplay } from '../kpis/productivityScoreUtils';
+import {
+  formatEfficiencyScoreDisplay,
+  formatProductivityScoreDisplay,
+  normalizeEfficiencyPercent,
+} from '../kpis/productivityScoreUtils';
 import { completionRateProgressColor } from './constants/dashboardConstants';
 import { CHART_DESC_SX } from './dashboardTypography';
 
 const PRODUCTIVITY_COMPONENTS = [
-  { key: 'completionRate', label: 'Completion rate', weight: 'x0.4', color: '#1565C0' },
-  { key: 'onTimeDelivery', label: 'On-time delivery', weight: 'x0.3', color: '#1D9E75' },
-  { key: 'teamParticipation', label: 'Participation', weight: 'x0.2', color: '#8E24AA' },
-  { key: 'workloadBalance', label: 'Workload balance', weight: 'x0.1', color: '#FB8C00' },
+  { key: 'completionRate', label: 'Completion rate', weight: 'x0.45', color: '#1565C0' },
+  { key: 'onTimeDelivery', label: 'On-time delivery', weight: 'x0.35', color: '#1D9E75' },
+  { key: 'efficiencyScore', label: 'Efficiency score', weight: 'x0.2', color: '#8E24AA' },
 ];
+
+function formatComponentPct(key, value) {
+  if (key === 'efficiencyScore') return formatEfficiencyScoreDisplay(value);
+  return `${Math.round(value)}%`;
+}
 
 function ProductivityBreakdown({ components, compact = false }) {
   const theme = useTheme();
@@ -20,8 +28,8 @@ function ProductivityBreakdown({ components, compact = false }) {
 
   return (
     <Grid container spacing={compact ? 0.75 : 1.5} sx={{ width: '100%' }}>
-      {components.map(({ label, value, weight, color }) => (
-        <Grid item xs={6} key={label}>
+      {components.map(({ key, label, value, weight, color }) => (
+        <Grid item xs={12} sm={4} key={label}>
           <Box
             sx={{
               bgcolor: isDark ? '#16181C' : '#F8F9FA',
@@ -66,7 +74,7 @@ function ProductivityBreakdown({ components, compact = false }) {
                 <Box
                   sx={{
                     height: '100%',
-                    width: `${Math.min(100, Math.max(0, value))}%`,
+                    width: `${Math.min(100, Math.max(0, key === 'efficiencyScore' ? normalizeEfficiencyPercent(value) : value))}%`,
                     bgcolor: color,
                     borderRadius: 99,
                   }}
@@ -81,7 +89,7 @@ function ProductivityBreakdown({ components, compact = false }) {
                   textAlign: 'right',
                 }}
               >
-                {Math.round(value)}%
+                {formatComponentPct(key, value)}
               </Typography>
             </Box>
           </Box>
@@ -98,8 +106,7 @@ export default function DeveloperProductivityDonutChart({
   score = 0,
   completionRate = 0,
   onTimeDelivery = 0,
-  teamParticipation = 0,
-  workloadBalance = 0,
+  efficiencyScore = 0,
   embedded = false,
   wide = false,
 }) {
@@ -112,15 +119,15 @@ export default function DeveloperProductivityDonutChart({
     () => ({
       completionRate: Math.min(100, Math.max(0, Math.round(Number(completionRate) || 0))),
       onTimeDelivery: Math.min(100, Math.max(0, Math.round(Number(onTimeDelivery) || 0))),
-      teamParticipation: Math.min(100, Math.max(0, Math.round(Number(teamParticipation) || 0))),
-      workloadBalance: Math.min(100, Math.max(0, Math.round(Number(workloadBalance) || 0))),
+      efficiencyScore: normalizeEfficiencyPercent(efficiencyScore),
     }),
-    [completionRate, onTimeDelivery, teamParticipation, workloadBalance],
+    [completionRate, onTimeDelivery, efficiencyScore],
   );
 
   const components = useMemo(
     () =>
       PRODUCTIVITY_COMPONENTS.map(({ key, label, weight, color }) => ({
+        key,
         label,
         weight,
         color,
@@ -171,7 +178,7 @@ export default function DeveloperProductivityDonutChart({
               Productivity score
             </Typography>
             <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block', color: 'text.secondary' }}>
-              Individual sprint performance gauge.
+              Individual delivery score (45% completion, 35% on-time, 20% efficiency).
             </Typography>
           </Box>
         </Box>
@@ -199,6 +206,7 @@ export default function DeveloperProductivityDonutChart({
           }}
         >
           <KpiDonutChart
+            key={`dev-productivity-${normalizedScore}-${completionRate}-${onTimeDelivery}-${efficiencyScore}`}
             pct={normalizedScore}
             displayValue={formatProductivityScoreDisplay(normalizedScore)}
             arcColor={arcColor}

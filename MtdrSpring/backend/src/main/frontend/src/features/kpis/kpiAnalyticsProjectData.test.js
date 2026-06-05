@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import {
   filterTasksForKpiSprints,
   pickProjectSprintsForKpi,
+  resolveOnTimeDeliveryPercent,
   taskSprintIdForKpi,
 } from './kpiAnalyticsProjectData';
 
@@ -29,4 +30,10 @@ test('filterTasksForKpiSprints keeps tasks in project sprints only', () => {
   const out = filterTasksForKpiSprints(tasks, sprints);
   expect(out).toHaveLength(1);
   expect(taskSprintIdForKpi(out[0])).toBe(10);
+});
+
+test('resolveOnTimeDeliveryPercent reads enriched sprint KPIs', () => {
+  expect(resolveOnTimeDeliveryPercent({ kpis: { onTimeDelivery: 100 } })).toBe(100);
+  expect(resolveOnTimeDeliveryPercent({ kpis: { onTimeDelivery: 47.6 } })).toBe(48);
+  expect(resolveOnTimeDeliveryPercent(null)).toBe(0);
 });

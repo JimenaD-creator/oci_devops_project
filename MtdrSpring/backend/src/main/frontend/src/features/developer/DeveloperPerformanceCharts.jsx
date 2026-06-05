@@ -275,6 +275,19 @@ const PRODUCTIVITY_COMPARE_TOOLTIP_PROPS = {
   isAnimationActive: false,
 };
 
+const PRODUCTIVITY_LINE_PROPS = { isAnimationActive: false, connectNulls: false };
+
+function productivityChartDataKey(data = []) {
+  return data
+    .map((row) =>
+      Object.keys(row)
+        .filter((k) => k.startsWith('score_') || k === 'productivityScore')
+        .map((k) => `${k}:${row[k]}`)
+        .join(','),
+    )
+    .join('|');
+}
+
 /** Developer line legend — rendered below the chart so it does not overlap the Sprint axis label. */
 function ProductivityCompareLegend({ series = [], isDark = false, compact = false }) {
   if (!series.length) return null;
@@ -385,7 +398,11 @@ export function ProductivityScoreCompareChartEmbed({
     >
       <Box sx={{ ...chartAreaSx, position: 'relative', zIndex: 1, overflow: 'visible' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 28, right: 12, left: 68, bottom: 48 }}>
+          <LineChart
+            key={productivityChartDataKey(data)}
+            data={data}
+            margin={{ top: 28, right: 12, left: 68, bottom: 48 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="name"
@@ -436,7 +453,7 @@ export function ProductivityScoreCompareChartEmbed({
                   stroke={stroke.color}
                   strokeWidth={stroke.width}
                   strokeOpacity={stroke.opacity}
-                  connectNulls={false}
+                  {...PRODUCTIVITY_LINE_PROPS}
                   dot={(dotProps) => {
                     const val = dotProps.payload?.[s.dataKey];
                     if (!Number.isFinite(Number(val))) return null;
@@ -502,6 +519,7 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
         <Box sx={{ width: '100%', height: CHART_H }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
+              key={productivityChartDataKey(data)}
               data={data}
               margin={{ top: 28, right: 16, left: 72, bottom: isCompare ? 58 : 52 }}
             >
@@ -557,7 +575,7 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
                         stroke={stroke.color}
                         strokeWidth={stroke.width}
                         strokeOpacity={stroke.opacity}
-                        connectNulls={false}
+                        {...PRODUCTIVITY_LINE_PROPS}
                         dot={(dotProps) => {
                           const val = dotProps.payload?.[s.dataKey];
                           if (!Number.isFinite(Number(val))) return null;
@@ -588,6 +606,7 @@ export function ProductivityScoreTrendChart({ data = [], series = null, compareM
                     dataKey="productivityScore"
                     stroke={SCORE_LINE}
                     strokeWidth={3}
+                    {...PRODUCTIVITY_LINE_PROPS}
                     dot={<ColoredDot />}
                     activeDot={{ r: 7, fill: SCORE_LINE, stroke: SCORE_LINE }}
                   >
