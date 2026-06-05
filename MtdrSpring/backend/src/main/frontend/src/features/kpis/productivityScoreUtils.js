@@ -35,6 +35,43 @@ export function normalizeWorkloadBalancePercent(rawWb) {
   return Math.min(100, Math.max(0, Math.round(wb)));
 }
 
+/**
+ * Per-developer workload balance (0–100) for individual productivity score.
+ * Measures assignment parity vs teammates (not logged hours vs the busiest person).
+ * Developers who finish all assigned work are not over-penalized for a lighter assignment load.
+ *
+ * @param {{ assigned?: number, completed?: number, hours?: number }} dev
+ * @param {Array<{ assigned?: number, completed?: number, hours?: number }>} teamDevs
+ */
+export function computeIndividualWorkloadBalance(dev, teamDevs = []) {
+  const assigned = Math.max(0, Number(dev?.assigned) || 0);
+  const completed = Math.max(0, Number(dev?.completed) || 0);
+  const hours = Math.max(0, Number(dev?.hours) || 0);
+
+  const active = (teamDevs || []).filter(
+    (d) => Math.max(0, Number(d?.assigned) || 0) > 0 || Math.max(0, Number(d?.hours) || 0) > 0,
+  );
+  if (assigned === 0 && hours === 0) return 0;
+  if (active.length <= 1) return 100;
+
+  const counts = active.map((d) => Math.max(0, Number(d?.assigned) || 0));
+  const avg = counts.reduce((sum, n) => sum + n, 0) / active.length;
+  const max = Math.max(...counts);
+  const min = Math.min(...counts);
+  const spread = Math.max(max - min, 1);
+
+  const distance = Math.abs(assigned - avg);
+  let balance = Math.round(100 * (1 - distance / spread));
+  balance = Math.min(100, Math.max(0, balance));
+
+  const pending = Math.max(0, assigned - completed);
+  if (assigned > 0 && pending === 0) {
+    balance = Math.max(balance, 85);
+  }
+
+  return balance;
+}
+
 /** Efficiency score on KPI cards: 0–100% (estimated ÷ logged hours, capped at 100). */
 export function normalizeEfficiencyPercent(v) {
   const n = Number(v);

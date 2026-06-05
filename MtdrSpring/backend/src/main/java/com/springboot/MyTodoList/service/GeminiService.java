@@ -57,9 +57,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class GeminiService {
 
-    private static final long ENRICH_RESPONSE_CACHE_MS = 45_000;
+    private static final long ENRICH_RESPONSE_CACHE_MS = 180_000;
+    private static final long INSIGHTS_GET_RESPONSE_CACHE_MS = 120_000;
+    private static final long LIVE_APPLY_CACHE_MS = 45_000;
     private final ConcurrentHashMap<String, CachedEnrichedInsights> enrichResponseCache =
         new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedEnrichedInsights> liveApplyCache =
+        new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedInsightsGetResponse> insightsGetResponseCache =
+        new ConcurrentHashMap<>();
+
+    private static final class EnrichRequestScope {
+        final Map<Long, Map<String, Object>> liveKpisBySprintId = new HashMap<>();
+        final Map<Long, String> teamWorkloadJsonBySprintId = new HashMap<>();
+    }
+
+    private static final ThreadLocal<EnrichRequestScope> ENRICH_SCOPE = new ThreadLocal<>();
 
     private static final class CachedEnrichedInsights {
         final JsonNode node;
@@ -67,6 +80,16 @@ public class GeminiService {
 
         CachedEnrichedInsights(JsonNode node, long expiresAtMs) {
             this.node = node;
+            this.expiresAtMs = expiresAtMs;
+        }
+    }
+
+    private static final class CachedInsightsGetResponse {
+        final Map<String, Object> payload;
+        final long expiresAtMs;
+
+        CachedInsightsGetResponse(Map<String, Object> payload, long expiresAtMs) {
+            this.payload = payload;
             this.expiresAtMs = expiresAtMs;
         }
     }
@@ -237,6 +260,7 @@ public class GeminiService {
             insight.setAcknowledged(false);
             insight.setErrorMessage(null); // clear any previous error
             insightRepository.save(insight);
+            invalidateInsightsGetResponseCache(sprintId);
 
             System.out.println("[GeminiService] Insights saved for sprint " + sprintId);
             return CompletableFuture.completedFuture(insight);
@@ -569,9 +593,60 @@ public class GeminiService {
             insight.setAcknowledged(false);
             insight.setErrorMessage(sanitizeError(errorMessage));
             insightRepository.save(insight);
+            invalidateInsightsGetResponseCache(sprintId);
         } catch (Exception e) {
             System.err.println("[GeminiService] saveErrorInsight failed: " + e.getMessage());
         }
+    }
+
+    /** Cached GET /api/insights/sprint/{id} payload — avoids re-running enrich on every tab open. */
+    public Optional<Map<String, Object>> getCachedInsightsGetResponse(SprintInsight insight) {
+        if (insight == null || insight.getSprintId() == null) {
+            return Optional.empty();
+        }
+        String key = insightsGetResponseCacheKey(insight);
+        CachedInsightsGetResponse hit = insightsGetResponseCache.get(key);
+        long now = System.currentTimeMillis();
+        if (hit != null && hit.expiresAtMs > now) {
+            return Optional.of(hit.payload);
+        }
+        return Optional.empty();
+    }
+
+    public void putCachedInsightsGetResponse(SprintInsight insight, Map<String, Object> payload) {
+        if (insight == null || payload == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        insightsGetResponseCache.put(
+            insightsGetResponseCacheKey(insight),
+            new CachedInsightsGetResponse(payload, now + INSIGHTS_GET_RESPONSE_CACHE_MS));
+        if (insightsGetResponseCache.size() > 120) {
+            insightsGetResponseCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
+        }
+    }
+
+    public void invalidateInsightsGetResponseCache(Long sprintId) {
+        if (sprintId == null) {
+            return;
+        }
+        String prefix = sprintId + "|";
+        long now = System.currentTimeMillis();
+        insightsGetResponseCache.keySet().removeIf(k -> k.startsWith(prefix));
+        enrichResponseCache.keySet().removeIf(k -> k.startsWith(String.valueOf(sprintId)));
+        liveApplyCache.keySet().removeIf(k -> k.startsWith(prefix));
+    }
+
+    private static String insightsGetResponseCacheKey(SprintInsight insight) {
+        return insight.getSprintId()
+            + "|"
+            + (insight.getGeneratedAt() != null ? insight.getGeneratedAt().toString() : "")
+            + "|"
+            + insight.isAcknowledged()
+            + "|"
+            + (insight.getErrorMessage() != null ? insight.getErrorMessage() : "")
+            + "|"
+            + Objects.hashCode(insight.getInsightsJson());
     }
 
     /**
@@ -617,6 +692,10 @@ public class GeminiService {
      * who have no assignment rows yet (common when the UI shows members but assignments are not synced).
      */
     private String buildTeamWorkloadJson(Long sprintId) {
+        EnrichRequestScope scope = ENRICH_SCOPE.get();
+        if (scope != null && scope.teamWorkloadJsonBySprintId.containsKey(sprintId)) {
+            return scope.teamWorkloadJsonBySprintId.get(sprintId);
+        }
         try {
             List<UserTask> raw = userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
             if (raw == null) {
@@ -793,6 +872,9 @@ public class GeminiService {
             if (byUser.isEmpty()) {
                 System.err.println("[GeminiService] buildTeamWorkloadJson: no USER_TASK and no USER_SPRINT roster for sprint "
                     + sprintId);
+                if (scope != null) {
+                    scope.teamWorkloadJsonBySprintId.put(sprintId, "[]");
+                }
                 return "[]";
             }
 
@@ -815,9 +897,16 @@ public class GeminiService {
                 row.put("fromProjectTeamOnly", a.fromProjectTeamOnly);
                 out.add(row);
             }
-            return mapper.writeValueAsString(out);
+            String json = mapper.writeValueAsString(out);
+            if (scope != null) {
+                scope.teamWorkloadJsonBySprintId.put(sprintId, json);
+            }
+            return json;
         } catch (Exception e) {
             System.err.println("[GeminiService] buildTeamWorkloadJson: " + e.getMessage());
+            if (scope != null) {
+                scope.teamWorkloadJsonBySprintId.put(sprintId, "[]");
+            }
             return "[]";
         }
     }
@@ -1106,7 +1195,7 @@ public class GeminiService {
             "  For workload_redistribution, also evaluate worked-hour imbalance: if someone with urgent/open tasks has clearly higher logged hours than peers, recommend moving 1-2 suitable tasks to a teammate with lower logged hours and little/no open work.\n" +
             "- executiveSummary: all four fields non-empty strings in English (use KPIs, history, task status counts, and timeline phase; if data is thin, still give concise coaching text — for in_progress, mention remaining time and current pace).\n" +
             "- sprintChangeSummary: always use \"\" (empty string). Sprint-over-sprint facts belong in the UI comparison table; narrative belongs in executiveSummary and alerts.\n" +
-            "- When hasPriorSprints=true: executiveSummary.trends must be 1 short direct sentence (max 2 if essential), under ~28 words, comparing to the immediately previous sprint by label. No semicolon KPI lists. Write deltas with the % symbol (e.g. \"improved by 21% compared to the previous sprint\"), never the words \"percentage points\". When in_progress with open tasks, say the lower score is because work is not Done yet—not that the team underperformed vs a closed sprint.\n" +
+            "- When hasPriorSprints=true: executiveSummary.trends must be 1 short direct sentence (max 2 if essential), under ~28 words, comparing to the immediately previous sprint by label. No semicolon KPI lists. For productivity score, state the absolute change in points (e.g. \"decreased by 15 points compared to the previous sprint\") — subtract previous productivityScore from current; do NOT use relative percent change (if score fell from 63 to 48, write 15 points, not 24%). When in_progress with open tasks, say the lower score is because work is not Done yet—not that the team underperformed vs a closed sprint.\n" +
             "- executiveSummary.overview MUST start with exactly one sentence of the form: \"Task status in this sprint: <n> To do, <n> In progress, <n> In review, <n> Done.\" using the integers from \"Canonical status totals\" above (no estimates). If the unknown count is greater than 0, append: \" <n> task(s) use other or unknown statuses.\" Then continue with narrative after that sentence.\n" +
             "- Blocked assignments: when that list is non-empty, you MUST reflect it in alerts; default severity to 'warning' (delivery risk) rather than 'info' unless the situation is truly negligible. Use actionableRecommendations (at least one category blockers when material), developerInsights for each affected assignee, predictions.risks, and executiveSummary where relevant. The assignee named there is the developer who flagged their own assignment as blocked.\n" +
             "- developerInsights: one object per developer in the team workload list (including fromSprintRosterOnly=true); compare assignedTaskRows and workedHoursSum to team averages; for roster-only rows, note they are on the sprint roster but have no tracked assignment rows yet. If that list is empty, set developerInsights to [].\n" +
@@ -1124,7 +1213,8 @@ public class GeminiService {
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
             "- workloadRecommendations: only if workloadBalance < 70 or planned assignment counts/hours are materially uneven; else []. When generated, base from/to on assignedTaskRows and assignedHoursSum (for not_started, prefer planned load over workedHoursSum). For in_progress sprints, also use workedHoursSum and open urgent work. Avoid assigning additional tasks to the most-loaded developer when a teammate has lower planned or logged load.\n" +
             "  Never set 'to' / destination to a developer who appears in the blocked-assignments list above — they already have blocked work and cannot take more tasks until unblocked. Never move tasks onto someone who already logged the most hours this sprint when another eligible teammate has lower hours.\n" +
-            "- productivityPrediction.predictedScore: integer 0-100; trend: 'up', 'down', or 'stable'; reasoning in English.\n" +
+            "- productivityPrediction.predictedScore: integer 0-100 forecast for the NEXT sprint productivity score; reasoning in English.\n" +
+            "- productivityPrediction.trend: MUST compare predictedScore to Current Sprint productivityScore only — 'up' if predicted is higher, 'down' if lower, 'stable' only when equal. Do NOT set trend based only on comparison to the previous sprint.\n" +
             "- kpiManagerGuide: required for managers. intro: one clear English sentence summarizing how the sprint KPIs read together. " +
             "byMetric must include exactly these five string keys: completionRate, onTimeDelivery, efficiencyScore, workloadBalance, productivityScore — " +
             "each 1-2 sentences interpreting the current percentages from \"Current Sprint\" above (reference approximate values); explain practical implications for delivery and team load, not textbook definitions alone. " +
@@ -1257,6 +1347,7 @@ public class GeminiService {
      * (snake_case keys, empty developerInsights / recommendations, sparse executiveSummary).
      */
     public JsonNode enrichInsightsForResponse(JsonNode insights, Long sprintId) {
+        ENRICH_SCOPE.set(new EnrichRequestScope());
         try {
             if (insights == null || !insights.isObject()) {
                 return insights;
@@ -1280,6 +1371,8 @@ public class GeminiService {
         } catch (Exception e) {
             System.err.println("[GeminiService] enrichInsightsForResponse: " + e.getMessage());
             return insights;
+        } finally {
+            ENRICH_SCOPE.remove();
         }
     }
 
@@ -1287,6 +1380,12 @@ public class GeminiService {
     private JsonNode applyLiveDeveloperNarratives(JsonNode enriched, Long sprintId) {
         if (enriched == null || !enriched.isObject() || sprintId == null) {
             return enriched;
+        }
+        String liveKey = sprintId + "|" + enriched.hashCode();
+        long now = System.currentTimeMillis();
+        CachedEnrichedInsights liveHit = liveApplyCache.get(liveKey);
+        if (liveHit != null && liveHit.expiresAtMs > now) {
+            return liveHit.node;
         }
         ObjectNode copy = ((ObjectNode) enriched).deepCopy();
         try {
@@ -1303,6 +1402,10 @@ public class GeminiService {
         ensureWorkloadGuidanceFromAssignments(copy, sprintId, sprint);
         applyOverloadGuardrails(copy, sprintId);
         finalizeDeveloperInsightNarratives(copy);
+        liveApplyCache.put(liveKey, new CachedEnrichedInsights(copy, now + LIVE_APPLY_CACHE_MS));
+        if (liveApplyCache.size() > 80) {
+            liveApplyCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
+        }
         return copy;
     }
 
@@ -4510,9 +4613,20 @@ public class GeminiService {
         if (sprint == null || sprint.getId() == null) {
             return Map.of();
         }
+        EnrichRequestScope scope = ENRICH_SCOPE.get();
+        if (scope != null) {
+            Map<String, Object> cached = scope.liveKpisBySprintId.get(sprint.getId());
+            if (cached != null) {
+                return cached;
+            }
+        }
         List<Task> tasks = taskRepository.findByAssignedSprintId(sprint.getId());
         List<UserTask> assignments = userTaskRepository.findBySprintIdWithUserAndTask(sprint.getId());
-        return SprintLiveKpiUtil.computeLiveKpis(sprint, tasks, assignments);
+        Map<String, Object> live = SprintLiveKpiUtil.computeLiveKpis(sprint, tasks, assignments);
+        if (scope != null) {
+            scope.liveKpisBySprintId.put(sprint.getId(), live);
+        }
+        return live;
     }
 
     private void syncLiveKpisToSprintEntity(Long sprintId) {
@@ -4791,6 +4905,7 @@ public class GeminiService {
                     dEs,
                     dWb,
                     changeCtx);
+                trends = GeminiInsightKpiAlignUtil.alignProductivityTrendDeltaInProse(trends, dPs);
                 es.put("trends", trends);
             }
         }
@@ -4839,17 +4954,21 @@ public class GeminiService {
         }
         ObjectNode pred = (ObjectNode) predNode;
         int livePs = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
-        int liveCr = GeminiInsightKpiAlignUtil.intMetric(live, "completionRate");
-        int liveOtd = GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery");
+        int predicted = livePs;
         if (pred.has("predictedScore") && pred.get("predictedScore").isNumber()) {
-            int stored = pred.get("predictedScore").asInt();
-            boolean looksLikeSingleKpiNotProductivity =
-                (Math.abs(stored - liveOtd) <= 3 && Math.abs(stored - livePs) > 5)
-                    || (Math.abs(stored - liveCr) <= 3 && Math.abs(stored - livePs) > 5);
-            if (looksLikeSingleKpiNotProductivity || Math.abs(stored - livePs) > 15) {
-                pred.put("predictedScore", livePs);
-            }
+            predicted = Math.max(0, Math.min(100, pred.get("predictedScore").asInt()));
         }
+        pred.put("predictedScore", predicted);
+        int deltaVsCurrent = predicted - livePs;
+        String trend;
+        if (deltaVsCurrent > 0) {
+            trend = "up";
+        } else if (deltaVsCurrent < 0) {
+            trend = "down";
+        } else {
+            trend = "stable";
+        }
+        pred.put("trend", trend);
         if (pred.path("reasoning").isTextual()) {
             pred.put(
                 "reasoning",

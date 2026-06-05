@@ -6,7 +6,33 @@ import {
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
   softenProductivityGuideForSprintPhase,
+  computeIndividualWorkloadBalance,
 } from './productivityScoreUtils';
+
+describe('computeIndividualWorkloadBalance', () => {
+  it('rewards developers who cleared all assignments despite lighter load vs peers', () => {
+    const team = [
+      { name: 'A', assigned: 10, completed: 8, hours: 40 },
+      { name: 'B', assigned: 4, completed: 4, hours: 12 },
+      { name: 'C', assigned: 6, completed: 5, hours: 28 },
+    ];
+    expect(computeIndividualWorkloadBalance(team[1], team)).toBe(85);
+  });
+
+  it('scores 100 when assignment count matches team average', () => {
+    const team = [
+      { assigned: 5, completed: 5, hours: 20 },
+      { assigned: 5, completed: 4, hours: 30 },
+      { assigned: 5, completed: 3, hours: 10 },
+    ];
+    expect(computeIndividualWorkloadBalance(team[0], team)).toBe(100);
+  });
+
+  it('returns 0 for developers with no sprint activity', () => {
+    const team = [{ assigned: 3, completed: 2, hours: 8 }];
+    expect(computeIndividualWorkloadBalance({ assigned: 0, completed: 0, hours: 0 }, team)).toBe(0);
+  });
+});
 
 describe('productivityScoreUtils (KPI Analytics)', () => {
   it('buildProductivityKpiAnalyticsGuideLine is a short fallback (value + what it measures)', () => {

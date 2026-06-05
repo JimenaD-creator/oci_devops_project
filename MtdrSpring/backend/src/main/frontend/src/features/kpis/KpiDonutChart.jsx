@@ -45,7 +45,7 @@ export default function KpiDonutChart({
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+        <PieChart key={`kpi-donut-${p}`}>
           <Pie
             data={data}
             cx="50%"
@@ -56,6 +56,7 @@ export default function KpiDonutChart({
             endAngle={-270}
             dataKey="value"
             stroke="none"
+            isAnimationActive={false}
           >
             <Cell fill={arcColor} />
             <Cell fill={restFill} />

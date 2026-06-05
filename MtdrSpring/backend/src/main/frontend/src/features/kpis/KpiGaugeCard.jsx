@@ -250,7 +250,12 @@ export default function KpiGaugeCard({ def, selectedSprints, compareMode, ordere
           mt: 0.5,
         }}
       >
-        <KpiDonutChart pct={chartPct} displayValue={main} displaySuffix={suffix} />
+        <KpiDonutChart
+          key={`${def.key}-${chartPct}`}
+          pct={chartPct}
+          displayValue={main}
+          displaySuffix={suffix}
+        />
 
         <Box
           sx={{

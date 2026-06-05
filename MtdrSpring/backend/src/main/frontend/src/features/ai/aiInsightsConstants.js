@@ -151,6 +151,27 @@ export function clampTrendsPercentLikeValues(text) {
  * Align "productivity score" phrases in Trends to the selected sprint's real score.
  * Example: "score of 100" -> "score of 97" when actual score is 97.
  */
+/**
+ * Rewrites productivity sprint-over-sprint deltas to absolute score points (matches KPI Analytics).
+ * Gemini often writes relative % (e.g. 24%) when the score fell 15 points (63% → 48%).
+ */
+export function alignProductivityTrendDelta(text, deltaProductivityPoints) {
+  if (text == null || !Number.isFinite(Number(deltaProductivityPoints))) return text;
+  const delta = Math.round(Number(deltaProductivityPoints));
+  if (delta === 0) return text;
+  const source = String(text);
+  const pattern =
+    /(productivity(?:\s+score)?\s+(?:has\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\s+by\s+)\d+(?:\.\d+)?\s*%/i;
+  if (!pattern.test(source)) return source;
+  const absPoints = Math.abs(delta);
+  const verb = delta > 0 ? 'increased' : 'decreased';
+  const pointsLabel = absPoints === 1 ? ' point' : ' points';
+  return source.replace(
+    pattern,
+    `Productivity ${verb} by ${absPoints}${pointsLabel}`,
+  );
+}
+
 export function alignTrendsProductivityScore(text, actualScore) {
   if (text == null || actualScore == null) return text;
   const display = formatProductivityScoreDisplay(actualScore);
@@ -511,6 +532,83 @@ export function normalizeWorkloadBalanceGuideText(text, workloadBalancePct) {
     'This KPI measures how evenly tasks are distributed, not how fast each person completes them — ' +
     'use completion rate or developer insights if execution pace differs between teammates.'
   );
+}
+
+/** Any integer-point gap on a 0–100 score is meaningful for forecast vs current. */
+const FORECAST_TREND_EPSILON = 0;
+
+/** Trend for next-sprint forecast vs the selected sprint's live productivity score. */
+export function productivityForecastTrendFromDelta(deltaPoints) {
+  const d = Number(deltaPoints);
+  if (!Number.isFinite(d)) return 'stable';
+  if (d > FORECAST_TREND_EPSILON) return 'up';
+  if (d < -FORECAST_TREND_EPSILON) return 'down';
+  return 'stable';
+}
+
+/**
+ * Normalizes next-sprint productivity forecast display.
+ * Trend is always vs current sprint productivity — not vs the previous sprint.
+ */
+export function resolveProductivityPredictionDisplay(
+  prediction,
+  currentSprintMetrics = null,
+) {
+  const rawScore = Number(prediction?.predictedScore);
+  const currentPs = Number(currentSprintMetrics?.productivityScore);
+  const liveOtd = Number(currentSprintMetrics?.onTimeDelivery);
+  const liveCr = Number(currentSprintMetrics?.completionRate);
+
+  let predictedScore = rawScore;
+  if (
+    Number.isFinite(rawScore) &&
+    Number.isFinite(currentPs) &&
+    ((Math.abs(rawScore - liveOtd) <= 3 && Math.abs(rawScore - currentPs) > 5) ||
+      (Math.abs(rawScore - liveCr) <= 3 && Math.abs(rawScore - currentPs) > 5))
+  ) {
+    // Gemini stored a single KPI as predicted productivity — keep score but do not swap in current PS.
+    predictedScore = rawScore;
+  }
+
+  const clampedScore = Number.isFinite(predictedScore)
+    ? Math.max(0, Math.min(100, Math.round(predictedScore)))
+    : 0;
+  const currentProductivityScore = Number.isFinite(currentPs)
+    ? Math.max(0, Math.min(100, Math.round(currentPs)))
+    : null;
+  const deltaVsCurrent =
+    currentProductivityScore != null ? clampedScore - currentProductivityScore : null;
+  const trend =
+    deltaVsCurrent != null
+      ? productivityForecastTrendFromDelta(deltaVsCurrent)
+      : prediction?.trend === 'up' || prediction?.trend === 'down'
+        ? prediction.trend
+        : 'stable';
+
+  return {
+    predictedScore: clampedScore,
+    trend,
+    deltaVsCurrent,
+    currentProductivityScore,
+  };
+}
+
+export function formatProductivityForecastDeltaLine(resolved) {
+  if (
+    !resolved ||
+    resolved.currentProductivityScore == null ||
+    resolved.deltaVsCurrent == null
+  ) {
+    return null;
+  }
+  const abs = Math.abs(resolved.deltaVsCurrent);
+  if (resolved.deltaVsCurrent > FORECAST_TREND_EPSILON) {
+    return `+${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
+  }
+  if (resolved.deltaVsCurrent < -FORECAST_TREND_EPSILON) {
+    return `−${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
+  }
+  return `About the same as current sprint (${resolved.currentProductivityScore}%)`;
 }
 
 /** Shown when a sprint insight section has no AI content yet */

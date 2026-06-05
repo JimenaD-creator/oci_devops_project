@@ -96,7 +96,14 @@ public class InsightsController {
             // No row at all — generation was never triggered (or hasn't started yet)
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(buildResponsePayload(opt.get()));
+        SprintInsight insight = opt.get();
+        Optional<Map<String, Object>> cached = geminiService.getCachedInsightsGetResponse(insight);
+        if (cached.isPresent()) {
+            return ResponseEntity.ok(cached.get());
+        }
+        Map<String, Object> payload = buildResponsePayload(insight);
+        geminiService.putCachedInsightsGetResponse(insight, payload);
+        return ResponseEntity.ok(payload);
     }
 
     @GetMapping("/project/{projectId}")
@@ -156,6 +163,7 @@ public class InsightsController {
         SprintInsight insight = opt.get();
         insight.setAcknowledged(true);
         insightRepository.save(insight);
+        geminiService.invalidateInsightsGetResponseCache(sprintId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("acknowledged", true);

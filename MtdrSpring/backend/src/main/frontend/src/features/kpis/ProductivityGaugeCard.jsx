@@ -109,6 +109,7 @@ export default function ProductivityGaugeCard({ selectedSprints, compareMode }) 
         }}
       >
         <KpiDonutChart
+          key={`productivity-gauge-${pct}`}
           pct={pct}
           displayValue={display}
           displaySuffix="/ 100"

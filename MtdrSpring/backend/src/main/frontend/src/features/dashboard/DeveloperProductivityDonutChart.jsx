@@ -209,6 +209,7 @@ export default function DeveloperProductivityDonutChart({
           }}
         >
           <KpiDonutChart
+            key={`dev-productivity-${normalizedScore}-${completionRate}-${onTimeDelivery}-${efficiencyScore}-${workloadBalance}`}
             pct={normalizedScore}
             displayValue={formatProductivityScoreDisplay(normalizedScore)}
             arcColor={arcColor}
