@@ -405,7 +405,7 @@ function CompareHoursTooltip({ active, payload, sprintDefs }) {
   );
 }
 
-function TeamProductivityTrendTooltip({ active, payload }) {
+function TeamProductivityTrendTooltip({ active, payload, showWorkloadBalance = true }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -440,7 +440,8 @@ function TeamProductivityTrendTooltip({ active, payload }) {
       </Typography>
       <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', lineHeight: 1.45 }}>
         Completion {row.completionRate}% · On-time {row.onTimeDelivery}% · Efficiency{' '}
-        {row.efficiencyScore}% · Workload balance {row.workloadBalance}%
+        {row.efficiencyScore}%
+        {showWorkloadBalance ? ` · Workload balance ${row.workloadBalance}%` : ''}
       </Typography>
       {row.totalTasks > 0 ? (
         <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem', mt: 0.5, lineHeight: 1.4 }}>
@@ -1391,7 +1392,6 @@ export default function DashboardDeveloperCharts({
       completionRate: row.completionRate ?? 0,
       onTimeDelivery: row.onTime ?? 0,
       efficiencyScore: row.efficiencyScore ?? row.participation ?? 0,
-      workloadBalance: row.workload ?? 0,
       totalCompleted: row.completed ?? 0,
       totalTasks: row.assigned ?? 0,
     }));
@@ -2157,7 +2157,12 @@ export default function DashboardDeveloperCharts({
               />
               <Tooltip
                 {...RECHARTS_BAR_TOOLTIP_PROPS}
-                content={(props) => <TeamProductivityTrendTooltip {...props} />}
+                content={(props) => (
+                  <TeamProductivityTrendTooltip
+                    {...props}
+                    showWorkloadBalance={!singleDeveloperFocus}
+                  />
+                )}
               />
               <Line
                 type="monotone"

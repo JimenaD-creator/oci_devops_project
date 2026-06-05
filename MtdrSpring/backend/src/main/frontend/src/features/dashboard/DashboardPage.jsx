@@ -1530,12 +1530,11 @@ export default function DashboardPage({
               }}
             >
               <DeveloperProductivityDonutChart
-                key={`dev-prod-${selectedDeveloperProductivity?.score ?? 0}-${selectedDeveloperProductivity?.completionRate ?? 0}-${selectedDeveloperProductivity?.onTimeDelivery ?? 0}-${selectedDeveloperProductivity?.efficiencyScore ?? 0}-${selectedDeveloperProductivity?.workloadBalance ?? 0}`}
+                key={`dev-prod-${selectedDeveloperProductivity?.score ?? 0}-${selectedDeveloperProductivity?.completionRate ?? 0}-${selectedDeveloperProductivity?.onTimeDelivery ?? 0}-${selectedDeveloperProductivity?.efficiencyScore ?? 0}`}
                 score={selectedDeveloperProductivity?.score ?? 0}
                 completionRate={selectedDeveloperProductivity?.completionRate ?? 0}
                 onTimeDelivery={selectedDeveloperProductivity?.onTimeDelivery ?? 0}
                 efficiencyScore={selectedDeveloperProductivity?.efficiencyScore ?? 0}
-                workloadBalance={selectedDeveloperProductivity?.workloadBalance ?? 0}
                 embedded
                 wide
               />

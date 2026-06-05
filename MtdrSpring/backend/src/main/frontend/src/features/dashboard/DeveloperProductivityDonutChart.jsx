@@ -12,10 +12,9 @@ import { completionRateProgressColor } from './constants/dashboardConstants';
 import { CHART_DESC_SX } from './dashboardTypography';
 
 const PRODUCTIVITY_COMPONENTS = [
-  { key: 'completionRate', label: 'Completion rate', weight: 'x0.4', color: '#1565C0' },
-  { key: 'onTimeDelivery', label: 'On-time delivery', weight: 'x0.3', color: '#1D9E75' },
+  { key: 'completionRate', label: 'Completion rate', weight: 'x0.45', color: '#1565C0' },
+  { key: 'onTimeDelivery', label: 'On-time delivery', weight: 'x0.35', color: '#1D9E75' },
   { key: 'efficiencyScore', label: 'Efficiency score', weight: 'x0.2', color: '#8E24AA' },
-  { key: 'workloadBalance', label: 'Workload balance', weight: 'x0.1', color: '#FB8C00' },
 ];
 
 function formatComponentPct(key, value) {
@@ -30,7 +29,7 @@ function ProductivityBreakdown({ components, compact = false }) {
   return (
     <Grid container spacing={compact ? 0.75 : 1.5} sx={{ width: '100%' }}>
       {components.map(({ key, label, value, weight, color }) => (
-        <Grid item xs={6} key={label}>
+        <Grid item xs={12} sm={4} key={label}>
           <Box
             sx={{
               bgcolor: isDark ? '#16181C' : '#F8F9FA',
@@ -108,7 +107,6 @@ export default function DeveloperProductivityDonutChart({
   completionRate = 0,
   onTimeDelivery = 0,
   efficiencyScore = 0,
-  workloadBalance = 0,
   embedded = false,
   wide = false,
 }) {
@@ -122,9 +120,8 @@ export default function DeveloperProductivityDonutChart({
       completionRate: Math.min(100, Math.max(0, Math.round(Number(completionRate) || 0))),
       onTimeDelivery: Math.min(100, Math.max(0, Math.round(Number(onTimeDelivery) || 0))),
       efficiencyScore: normalizeEfficiencyPercent(efficiencyScore),
-      workloadBalance: Math.min(100, Math.max(0, Math.round(Number(workloadBalance) || 0))),
     }),
-    [completionRate, onTimeDelivery, efficiencyScore, workloadBalance],
+    [completionRate, onTimeDelivery, efficiencyScore],
   );
 
   const components = useMemo(
@@ -181,7 +178,7 @@ export default function DeveloperProductivityDonutChart({
               Productivity score
             </Typography>
             <Typography sx={{ ...CHART_DESC_SX, mt: 0.35, display: 'block', color: 'text.secondary' }}>
-              Individual sprint performance gauge.
+              Individual delivery score (45% completion, 35% on-time, 20% efficiency).
             </Typography>
           </Box>
         </Box>
@@ -209,7 +206,7 @@ export default function DeveloperProductivityDonutChart({
           }}
         >
           <KpiDonutChart
-            key={`dev-productivity-${normalizedScore}-${completionRate}-${onTimeDelivery}-${efficiencyScore}-${workloadBalance}`}
+            key={`dev-productivity-${normalizedScore}-${completionRate}-${onTimeDelivery}-${efficiencyScore}`}
             pct={normalizedScore}
             displayValue={formatProductivityScoreDisplay(normalizedScore)}
             arcColor={arcColor}

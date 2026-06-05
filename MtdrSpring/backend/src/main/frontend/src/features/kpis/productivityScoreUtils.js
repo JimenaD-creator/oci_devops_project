@@ -1,7 +1,21 @@
 /**
- * Single source of truth for Productivity Score (matches KPI Analytics card).
- * Formula: completion×0.4 + on-time×0.3 + efficiency×0.2 + workload×0.1
+ * Productivity score formulas:
+ * - Team / sprint (KPI Analytics): completion×0.4 + on-time×0.3 + efficiency×0.2 + workload×0.1
+ * - Individual developer: completion×0.45 + on-time×0.35 + efficiency×0.2 (workload shown separately)
  */
+
+export const TEAM_PRODUCTIVITY_WEIGHTS = {
+  completionRate: 0.4,
+  onTimeDelivery: 0.3,
+  efficiencyScore: 0.2,
+  workloadBalance: 0.1,
+};
+
+export const INDIVIDUAL_PRODUCTIVITY_WEIGHTS = {
+  completionRate: 0.45,
+  onTimeDelivery: 0.35,
+  efficiencyScore: 0.2,
+};
 
 const MS_PER_DAY = 86400000;
 /** First N calendar days of a sprint: avoid "weak/mixed" performance labels. */
@@ -36,7 +50,7 @@ export function normalizeWorkloadBalancePercent(rawWb) {
 }
 
 /**
- * Per-developer workload balance (0–100) for individual productivity score.
+ * Per-developer workload balance (0–100) for tables and charts — not part of individual productivity score.
  * Measures assignment parity vs teammates (not logged hours vs the busiest person).
  * Developers who finish all assigned work are not over-penalized for a lighter assignment load.
  *
@@ -99,7 +113,34 @@ export function computeProductivityScore({
       : teamParticipation;
   const esForWeight = normalizeEfficiencyPercent(esRaw);
   const wb = normalizeWorkloadBalancePercent(workloadBalance);
-  const score = Math.round(cr * 0.4 + otd * 0.3 + esForWeight * 0.2 + wb * 0.1);
+  const w = TEAM_PRODUCTIVITY_WEIGHTS;
+  const score = Math.round(
+    cr * w.completionRate +
+      otd * w.onTimeDelivery +
+      esForWeight * w.efficiencyScore +
+      wb * w.workloadBalance,
+  );
+  return Math.min(100, Math.max(0, score));
+}
+
+/** Individual developer productivity — delivery quality only (no workload term). */
+export function computeIndividualProductivityScore({
+  completionRate = 0,
+  onTimeDelivery = 0,
+  efficiencyScore = 0,
+  teamParticipation,
+} = {}) {
+  const cr = normalizeKpiComponentPercent(completionRate);
+  const otd = normalizeKpiComponentPercent(onTimeDelivery);
+  const esRaw =
+    efficiencyScore != null && efficiencyScore !== ''
+      ? efficiencyScore
+      : teamParticipation;
+  const esForWeight = normalizeEfficiencyPercent(esRaw);
+  const w = INDIVIDUAL_PRODUCTIVITY_WEIGHTS;
+  const score = Math.round(
+    cr * w.completionRate + otd * w.onTimeDelivery + esForWeight * w.efficiencyScore,
+  );
   return Math.min(100, Math.max(0, score));
 }
 
@@ -198,13 +239,11 @@ export function productivityScoreFromDeveloperMetrics({
   const completionRate = a > 0 ? Math.round((100 * c) / a) : 0;
   const onTimeDelivery = typeof onTime === 'number' ? onTime : 0;
   const efficiencyScore = efficiencyScoreFromDeveloperHours(h, estimate);
-  const workloadBalance = Math.min(100, Math.max(0, Math.round(Number(workload) || 0)));
 
-  return computeProductivityScore({
+  return computeIndividualProductivityScore({
     completionRate,
     onTimeDelivery,
     efficiencyScore,
-    workloadBalance,
   });
 }
 

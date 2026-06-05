@@ -22,7 +22,6 @@ const initialData = [
     hours: 32.5,
     onTime: 70,
     efficiencyScore: 100,
-    workload: 80,
   },
   {
     name: 'Developer 2',
@@ -32,7 +31,6 @@ const initialData = [
     hours: 45.0,
     onTime: 85,
     efficiencyScore: 90,
-    workload: 100,
   },
   {
     name: 'Developer 3',
@@ -42,7 +40,6 @@ const initialData = [
     hours: 20.0,
     onTime: 60,
     efficiencyScore: 80,
-    workload: 60,
   },
   {
     name: 'Developer 4',
@@ -52,7 +49,6 @@ const initialData = [
     hours: 31.0,
     onTime: 75,
     efficiencyScore: 95,
-    workload: 70,
   },
 ];
 
@@ -69,19 +65,6 @@ function Badge({ val, green, yellow }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   return <span className={`badge-base ${getBadgeClass(val, green, yellow, isDark)}`}>{val}%</span>;
-}
-
-function WorkloadBar({ val }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-  return (
-    <div className="workload-container">
-      <div className="workload-track">
-        <div className="workload-fill" style={{ width: `${val}%` }} />
-      </div>
-      <span className="workload-text">{val}%</span>
-    </div>
-  );
 }
 
 // ── Avatar con foto o iniciales ──────────────────────────────────────────────
@@ -190,10 +173,6 @@ const getSharedDeveloperTableCSS = (isDark) => `
   .badge-tier-high-dark { color: #A5D6A7; background: #1A4A2A; border-color: #2E7D32; }
   .badge-tier-mid-dark  { color: #FFCC80; background: #4A2A1A; border-color: #E65100; }
   .badge-tier-low-dark  { color: #CE93D8; background: #2A1A3D; border-color: #7B1FA2; }
-  .workload-container { display: flex; align-items: center; gap: 8px; }
-  .workload-track { width: 96px; height: 8px; background: ${isDark ? '#2A2C32' : '#F0F0F0'}; border-radius: 9999px; overflow: hidden; }
-  .workload-fill  { height: 100%; background: #607D8B; border-radius: 9999px; }
-  .workload-text  { font-size: 0.8125rem; font-weight: 600; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; }
   .summary-row    { background: ${isDark ? '#16181C' : '#F7F7F7'}; border-top: 2px solid ${isDark ? '#2A2C32' : '#ECECEC'}; }
   .summary-cell   { font-size: 0.8125rem; font-weight: 700; color: ${isDark ? '#F0F0F0' : '#1A1A1A'}; }
   .text-center    { text-align: center; }
@@ -208,8 +187,6 @@ const getSprintMetricsDashboardTextCSS = (isDark) => `
   .dev-productivity-dashboard td                   { font-size: 0.875rem; padding: 10px 12px; }
   .dev-productivity-dashboard .dev-name-text       { font-size: 0.875rem; }
   .dev-productivity-dashboard .badge-base          { font-size: 0.75rem; padding: 2px 7px; }
-  .dev-productivity-dashboard .workload-text       { font-size: 0.8125rem; }
-  .dev-productivity-dashboard .workload-track      { width: 88px; height: 7px; }
   .dev-productivity-dashboard .summary-cell        { font-size: 0.875rem; }
   .dev-productivity-dashboard .search-wrapper input.search-input[type="text"] {
     font-size: 0.8125rem; padding: 7px 10px 7px 32px;
@@ -250,7 +227,6 @@ const fullColumns = [
     sortable: true,
     hint: EFFICIENCY_COLUMN_HINT,
   },
-  { key: 'workload', label: 'Workload Balance', sortable: false },
 ];
 
 function normalizeDeveloperName(name) {
@@ -302,7 +278,6 @@ function SprintMetricsTable({
         row[`${sp.id}_efficiencyScore`] = d
           ? efficiencyScoreFromDeveloperHours(spHours, spEstimate)
           : null;
-        row[`${sp.id}_workload`] = d && typeof d.workload === 'number' ? d.workload : 0;
       });
       if (!profilePicture) {
         profilePicture = resolveProfilePictureFromRoster(projectDevelopers, {
@@ -377,12 +352,6 @@ function SprintMetricsTable({
     return `${Number.isInteger(n) ? n : n.toFixed(1)}h`;
   };
 
-  const workloadAvgForSprint = (spId) => {
-    const nums = sorted.map((r) => r[`${spId}_workload`]).filter((v) => typeof v === 'number');
-    if (!nums.length) return null;
-    return Math.round(nums.reduce((acc, x) => acc + x, 0) / nums.length);
-  };
-
   const onTimeAvgForSprint = (spId) => {
     const nums = sorted.map((r) => r[`${spId}_onTime`]).filter((v) => typeof v === 'number');
     if (!nums.length) return null;
@@ -408,8 +377,6 @@ function SprintMetricsTable({
     ) : (
       <span className="cell-muted">—</span>
     );
-  const renderWorkloadCell = (v) =>
-    typeof v === 'number' ? <WorkloadBar val={v} /> : <span className="cell-muted">—</span>;
 
   const sortIcon = (key) =>
     sort.key === key ? (
@@ -466,7 +433,7 @@ function SprintMetricsTable({
                     {selectedSprints.map((sp, si) => (
                       <th
                         key={sp.id}
-                        colSpan={6}
+                        colSpan={5}
                         className={`th-sprint-compare-group${si > 0 ? ' th-sprint-compare-group-bordered' : ''}`}
                       >
                         {sp.shortLabel}
@@ -524,11 +491,6 @@ function SprintMetricsTable({
                             {EFFICIENCY_COLUMN_LABEL} {sortIcon(`${sp.id}_efficiencyScore`)}
                           </div>
                         </th>,
-                        <th key={`${sp.id}-w`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Workload Balance
-                          </div>
-                        </th>,
                       ];
                     })}
                   </tr>
@@ -573,11 +535,6 @@ function SprintMetricsTable({
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {EFFICIENCY_COLUMN_LABEL} {sortIcon(`${sp.id}_efficiencyScore`)}
-                              </div>
-                            </th>
-                            <th>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                Workload Balance
                               </div>
                             </th>
                           </>
@@ -648,9 +605,6 @@ function SprintMetricsTable({
                             <td key={`${r.name}-${sp.id}-part`} className="text-center">
                               {renderEfficiencyCell(r[`${sp.id}_efficiencyScore`])}
                             </td>,
-                            <td key={`${r.name}-${sp.id}-w`}>
-                              {renderWorkloadCell(r[`${sp.id}_workload`])}
-                            </td>,
                           ];
                         })
                       : (() => {
@@ -670,7 +624,6 @@ function SprintMetricsTable({
                                   <td className="text-center">
                                     {renderEfficiencyCell(r[`${sp.id}_efficiencyScore`])}
                                   </td>
-                                  <td>{renderWorkloadCell(r[`${sp.id}_workload`])}</td>
                                 </>
                               ) : null}
                             </>
@@ -685,7 +638,6 @@ function SprintMetricsTable({
                 {compareMode
                   ? selectedSprints.flatMap((sp, si) => {
                       const bc = si > 0 ? ' td-sprint-compare-first' : '';
-                      const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
                       const effAvg = efficiencyAvgForSprint(sp.id);
                       return [
@@ -712,18 +664,10 @@ function SprintMetricsTable({
                             <span className="cell-muted">—</span>
                           )}
                         </td>,
-                        <td key={`avg-${sp.id}-w`} className="summary-cell">
-                          {wAvg != null ? (
-                            <WorkloadBar val={wAvg} />
-                          ) : (
-                            <span className="cell-muted">—</span>
-                          )}
-                        </td>,
                       ];
                     })
                   : (() => {
                       const sp = selectedSprints[0];
-                      const wAvg = workloadAvgForSprint(sp.id);
                       const otAvg = onTimeAvgForSprint(sp.id);
                       const effAvg = efficiencyAvgForSprint(sp.id);
                       return (
@@ -745,13 +689,6 @@ function SprintMetricsTable({
                           <td className="summary-cell text-center">
                             {effAvg != null ? (
                               <span className="summary-cell">{effAvg}%</span>
-                            ) : (
-                              <span className="cell-muted">—</span>
-                            )}
-                          </td>
-                          <td className="summary-cell">
-                            {wAvg != null ? (
-                              <WorkloadBar val={wAvg} />
                             ) : (
                               <span className="cell-muted">—</span>
                             )}
@@ -891,9 +828,6 @@ function FullAnalyticsTable() {
                     <td className="text-center">
                       <Badge val={r.efficiencyScore} green={90} yellow={70} />
                     </td>
-                    <td>
-                      <WorkloadBar val={r.workload} />
-                    </td>
                   </tr>
                 );
               })}
@@ -911,9 +845,6 @@ function FullAnalyticsTable() {
                 </td>
                 <td className="text-center">
                   <span className="summary-cell">{avg('efficiencyScore')}%</span>
-                </td>
-                <td>
-                  <WorkloadBar val={parseFloat(avg('workload'))} />
                 </td>
               </tr>
             </tbody>
