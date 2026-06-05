@@ -1,5 +1,6 @@
 import { getApiBase } from '../../utils/apiBase';
 import { apiFetch } from '../../utils/auth';
+import { getCachedDevelopersSnapshot } from './dashboardSprintData';
 
 const DEVELOPERS_CACHE_TTL = 120000; // 2 minutes — aligned with dashboard bundle cache
 
@@ -57,6 +58,18 @@ export async function fetchProjectDevelopers(projectId, options = {}) {
   const now = Date.now();
   if (isDevelopersCacheValid(pid, now, forceFresh)) {
     return cachedDevelopers.developers;
+  }
+
+  if (!forceFresh) {
+    const bundleSnap = getCachedDevelopersSnapshot(pid);
+    if (bundleSnap?.developers) {
+      cachedDevelopers = {
+        projectId: pid,
+        developers: bundleSnap.developers,
+        timestamp: bundleSnap.timestamp || now,
+      };
+      return bundleSnap.developers;
+    }
   }
 
   const response = await apiFetch(`${getApiBase()}/api/projects/${pid}/developers`);

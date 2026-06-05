@@ -15,7 +15,6 @@ import {
   applyOptimisticTaskDeleted,
   applyOptimisticTaskCreated,
 } from '../features/dashboard/dashboardSprintData';
-import { fetchProjectDevelopers } from '../features/dashboard/projectApi';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
 import { markTasksSyncCaughtUp, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
 
@@ -84,10 +83,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       setError(null);
       let succeeded = false;
       try {
-        const [data] = await Promise.all([
-          fetchDashboardSprints(pid, { forceFresh }),
-          fetchProjectDevelopers(pid, { forceFresh }).catch(() => []),
-        ]);
+        const data = await fetchDashboardSprints(pid, { forceFresh });
         setSprints(Array.isArray(data) ? data : []);
         const freshSnap = getCachedBundleSnapshot(pid);
         const updatedAt = freshSnap?.timestamp ?? Date.now();
@@ -128,7 +124,12 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     const snap = getCachedBundleSnapshot(pid);
     if (snap) {
       applySnapshot(snap);
-      load({ silent: true, forceFresh: false }).catch(() => {});
+      const looksEmpty =
+        (!Array.isArray(snap.enrichedSprints) || snap.enrichedSprints.length === 0) &&
+        (snap.taskCount ?? 0) === 0;
+      if (looksEmpty) {
+        load({ silent: false, forceFresh: true }).catch(() => {});
+      }
       return;
     }
     load({ silent: false, forceFresh: false });

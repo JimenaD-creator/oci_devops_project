@@ -77,13 +77,13 @@ class TaskControllerTest {
 
     @Test
     void getAllTasks_withProjectId_filtersByProject() throws Exception {
-        when(taskRepository.findByProjectId(2L)).thenReturn(Collections.emptyList());
+        when(taskRepository.findByProjectIdWithSprint(2L)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/tasks").param("projectId", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
 
-        verify(taskRepository).findByProjectId(2L);
+        verify(taskRepository).findByProjectIdWithSprint(2L);
     }
 
     @Test

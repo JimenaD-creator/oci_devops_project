@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.dto.DashboardTaskDto;
 import com.springboot.MyTodoList.dto.TaskCreatePayload;
 import com.springboot.MyTodoList.dto.TaskNewAssigneesPayload;
 import com.springboot.MyTodoList.model.Task;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -53,11 +55,14 @@ public class TaskController {
      * Get tasks, optionally filtered by project (via sprint).
      */
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks(@RequestParam(required = false) Long projectId) {
-        List<Task> tasks = projectId != null
-                ? taskRepository.findByProjectId(projectId)
-                : taskRepository.findAll();
-        return ResponseEntity.ok(tasks);
+    public ResponseEntity<?> getAllTasks(@RequestParam(required = false) Long projectId) {
+        if (projectId != null) {
+            List<DashboardTaskDto> tasks = taskRepository.findByProjectIdWithSprint(projectId).stream()
+                    .map(DashboardTaskDto::from)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(tasks);
+        }
+        return ResponseEntity.ok(taskRepository.findAll());
     }
     
     /**

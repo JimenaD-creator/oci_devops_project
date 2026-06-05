@@ -1,17 +1,14 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.dto.DashboardBundleResponse;
+import com.springboot.MyTodoList.dto.TeamRosterDto;
 import com.springboot.MyTodoList.model.Project;
-import com.springboot.MyTodoList.model.TeamMember;
-import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.ProjectRepository;
-import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.service.DashboardBundleService;
 import com.springboot.MyTodoList.service.ProjectAccessAuthorization;
 import com.springboot.MyTodoList.service.ProjectLookupService;
-import com.springboot.MyTodoList.util.UserRoleUtil;
-import java.util.LinkedHashMap;
+import com.springboot.MyTodoList.service.ProjectTeamRosterService;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +22,16 @@ public class ProjectController {
     private ProjectRepository projectRepository;
 
     @Autowired
-    private TeamMembersRepository teamMembersRepository;
-
-    @Autowired
     private ProjectLookupService projectLookupService;
 
     @Autowired
     private ProjectAccessAuthorization projectAccessAuthorization;
+
+    @Autowired
+    private ProjectTeamRosterService projectTeamRosterService;
+
+    @Autowired
+    private DashboardBundleService dashboardBundleService;
 
     @GetMapping("/all")
     public List<Project> getAllProjects() {
@@ -86,33 +86,26 @@ public class ProjectController {
         return ResponseEntity.ok(projectLookupService.findAllProjectsForDeveloper(userId));
     }
 
-    @GetMapping("/{projectId}/developers")
-    public ResponseEntity<List<User>> getProjectDevelopers(@PathVariable Long projectId) {
-        Optional<Project> projectOpt = projectRepository.findById(projectId);
-        if (projectOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Project project = projectOpt.get();
-        Long teamId = project.getAssignedTeam() != null ? project.getAssignedTeam().getId() : null;
-        if (teamId == null) {
-            return ResponseEntity.ok(List.of());
-        }
-
-        List<TeamMember> members = teamMembersRepository.findByTeam_Id(teamId);
-        Map<Integer, User> byId = new LinkedHashMap<>();
-        for (TeamMember tm : members) {
-            User user = tm.getUser();
-            if (user != null && UserRoleUtil.isDeveloperUser(user)) {
-                byId.put(user.getId().intValue(), user);
-            }
-        }
-        User manager = project.getAssignedTeam().getManager();
-        if (manager != null && UserRoleUtil.isDeveloperUser(manager)) {
-            byId.put(manager.getId().intValue(), manager);
-        }
-
-        return ResponseEntity.ok(List.copyOf(byId.values()));
+    /**
+     * Single optimized payload for dashboard / tasks / sprints initial load.
+     */
+    /**
+     * Dashboard bundle — same access model as {@code /api/sprints?projectId=} (any authenticated user).
+     * Do not gate on {@code userMayAccessProject}; that returned 403 in prod for valid managers.
+     */
+    @GetMapping("/{projectId}/dashboard-bundle")
+    public ResponseEntity<DashboardBundleResponse> getDashboardBundle(@PathVariable Long projectId) {
+        return dashboardBundleService
+                .loadBundle(projectId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{projectId}/developers")
+    public ResponseEntity<List<TeamRosterDto>> getProjectDevelopers(@PathVariable Long projectId) {
+        return projectTeamRosterService
+                .findProject(projectId)
+                .map(project -> ResponseEntity.ok(projectTeamRosterService.listDevelopersForProject(project)))
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

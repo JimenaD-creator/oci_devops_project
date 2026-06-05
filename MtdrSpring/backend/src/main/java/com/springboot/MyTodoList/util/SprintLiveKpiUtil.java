@@ -7,10 +7,8 @@ import com.springboot.MyTodoList.model.UserTask;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Live sprint KPIs aligned with {@code dashboardSprintData.deriveKpisFromLiveData} and KPI Analytics.

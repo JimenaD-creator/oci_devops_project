@@ -34,6 +34,7 @@ let cachedData = {
   sprints: null,
   tasks: null,
   userTasks: null,
+  developers: null,
   enrichedSprints: null,
   timestamp: 0,
   projectId: null,
@@ -579,6 +580,124 @@ function enrichSprintsWithUserTasks(sprints, tasks, userTasks) {
 
 const fetchJsonNoCache = (url) => apiFetch(url);
 
+function applyRosterProfilePictures(enrichedSprints, developers) {
+  if (!Array.isArray(enrichedSprints) || !Array.isArray(developers)) return;
+  const picByUserId = new Map();
+  const picByName = new Map();
+  developers.forEach((d) => {
+    if (!d?.profilePicture) return;
+    if (d.id != null) picByUserId.set(Number(d.id), d.profilePicture);
+    if (d.name) picByName.set(normalizeDeveloperName(d.name), d.profilePicture);
+  });
+  enrichedSprints.forEach((sp) => {
+    (sp.developers || []).forEach((dev) => {
+      if (dev.profilePicture) return;
+      if (dev.userId != null) {
+        const pic = picByUserId.get(Number(dev.userId));
+        if (pic) dev.profilePicture = pic;
+      }
+      if (!dev.profilePicture && dev.name) {
+        const pic = picByName.get(normalizeDeveloperName(dev.name));
+        if (pic) dev.profilePicture = pic;
+      }
+    });
+  });
+}
+
+async function fetchLegacyDashboardPayload(projectId) {
+  const base = getApiBase();
+  const sprintsUrl = `${base}/api/sprints?projectId=${encodeURIComponent(projectId)}`;
+  const tasksUrl = `${base}/api/tasks?projectId=${encodeURIComponent(projectId)}`;
+  const userTasksUrl = `${base}/api/user-tasks?projectId=${encodeURIComponent(projectId)}`;
+  const developersUrl = `${base}/api/projects/${encodeURIComponent(projectId)}/developers`;
+
+  const [sprintsRes, tasksRes, userTasksRes, developersRes] = await Promise.all([
+    fetchJsonNoCache(sprintsUrl),
+    fetchJsonNoCache(tasksUrl),
+    fetchJsonNoCache(userTasksUrl),
+    fetchJsonNoCache(developersUrl).catch(() => ({ ok: false })),
+  ]);
+
+  const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find((s) => s >= 400);
+  if (status) {
+    const err = new Error(`Failed to load data (HTTP ${status})`);
+    err.httpStatus = status;
+    if (isUnauthorizedHttpStatus(status)) {
+      err.code = 'UNAUTHORIZED';
+      err.userMessage = getSessionExpiredMessage();
+    }
+    throw err;
+  }
+
+  const developers = developersRes?.ok ? await developersRes.json() : [];
+  return {
+    sprints: await sprintsRes.json(),
+    tasks: await tasksRes.json(),
+    userTasks: await userTasksRes.json(),
+    developers: Array.isArray(developers) ? developers : [],
+  };
+}
+
+async function fetchProjectDashboardBundle(projectId) {
+  const base = getApiBase();
+  const url = `${base}/api/projects/${encodeURIComponent(projectId)}/dashboard-bundle`;
+  const res = await fetchJsonNoCache(url);
+  if (res.ok) {
+    return res.json();
+  }
+  if (isUnauthorizedHttpStatus(res.status)) {
+    const err = new Error(`Failed to load dashboard bundle (HTTP ${res.status})`);
+    err.httpStatus = res.status;
+    err.code = 'UNAUTHORIZED';
+    err.userMessage = getSessionExpiredMessage();
+    throw err;
+  }
+  // Prod may be on an older backend (404) or bundle auth/data issues — fall back to legacy APIs.
+  if (res.status === 403 || res.status === 404 || res.status >= 500) {
+    console.warn(
+      `Dashboard bundle unavailable (HTTP ${res.status}); falling back to legacy project APIs.`,
+    );
+    return fetchLegacyDashboardPayload(projectId);
+  }
+  const err = new Error(`Failed to load dashboard bundle (HTTP ${res.status})`);
+  err.httpStatus = res.status;
+  throw err;
+}
+
+function storeBundleInCache(pid, bundle, now) {
+  const apiSprints = Array.isArray(bundle?.sprints) ? bundle.sprints : [];
+  const apiTasks = Array.isArray(bundle?.tasks) ? bundle.tasks : [];
+  const apiUserTasks = Array.isArray(bundle?.userTasks) ? bundle.userTasks : [];
+  const apiDevelopers = Array.isArray(bundle?.developers) ? bundle.developers : [];
+
+  cachedData = {
+    sprints: apiSprints,
+    tasks: apiTasks,
+    userTasks: apiUserTasks,
+    developers: apiDevelopers,
+    enrichedSprints: null,
+    timestamp: now,
+    projectId: pid,
+  };
+
+  const sortedSprints = [...apiSprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
+  let enriched;
+  try {
+    enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
+  } catch (e) {
+    console.error(
+      'enrichSprintsWithUserTasks failed, using sprints without user-task rollups:',
+      e,
+    );
+    enriched = mapped;
+  }
+  applyRosterProfilePictures(enriched, apiDevelopers);
+  assignSprintAccentColors(enriched);
+  cachedData.enrichedSprints = enriched;
+  return enriched;
+}
+
 function isCacheValidForProject(pid, now, forceFresh) {
   return (
     !forceFresh &&
@@ -601,8 +720,25 @@ export function getCachedBundleSnapshot(projectId) {
     sprints: cachedData.sprints,
     tasks: cachedData.tasks,
     userTasks: cachedData.userTasks,
+    developers: cachedData.developers,
     enrichedSprints: cachedData.enrichedSprints,
     taskCount: Array.isArray(cachedData.tasks) ? cachedData.tasks.length : 0,
+    timestamp: cachedData.timestamp,
+  };
+}
+
+/** Developers from the last dashboard bundle (one profile picture per person). */
+export function getCachedDevelopersSnapshot(projectId) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  if (!pid || !isCacheValidForProject(pid, Date.now(), false)) {
+    return null;
+  }
+  if (!Array.isArray(cachedData.developers)) {
+    return null;
+  }
+  return {
+    developers: cachedData.developers,
     timestamp: cachedData.timestamp,
   };
 }
@@ -664,64 +800,11 @@ export async function fetchDashboardSprints(projectId, options = {}) {
   }
 
   try {
-    console.log('Fetching fresh dashboard data');
-    const base = getApiBase();
-    const sprintsUrl = `${base}/api/sprints?projectId=${encodeURIComponent(pid)}`;
-    const tasksUrl = `${base}/api/tasks?projectId=${encodeURIComponent(pid)}`;
-    const userTasksUrl = `${base}/api/user-tasks?projectId=${encodeURIComponent(pid)}`;
-
-    const [sprintsRes, tasksRes, userTasksRes] = await Promise.all([
-      fetchJsonNoCache(sprintsUrl),
-      fetchJsonNoCache(tasksUrl),
-      fetchJsonNoCache(userTasksUrl),
-    ]);
-
-    if (!sprintsRes.ok || !tasksRes.ok || !userTasksRes.ok) {
-      const status = [sprintsRes.status, tasksRes.status, userTasksRes.status].find(
-        (s) => s >= 400,
-      );
-      const err = new Error(`Failed to load data (HTTP ${status ?? 'error'})`);
-      err.httpStatus = status;
-      if (isUnauthorizedHttpStatus(status)) {
-        err.code = 'UNAUTHORIZED';
-        err.userMessage = getSessionExpiredMessage();
-      }
-      throw err;
-    }
-
-    const apiSprints = await sprintsRes.json();
-    const apiTasks = await tasksRes.json();
-    const apiUserTasks = await userTasksRes.json();
-
-    cachedData = {
-      sprints: apiSprints,
-      tasks: apiTasks,
-      userTasks: apiUserTasks,
-      enrichedSprints: null,
-      timestamp: now,
-      projectId: pid,
-    };
-    const sortedSprints = [...apiSprints].sort((a, b) => Number(a.id) - Number(b.id));
-    const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
-    let enriched;
-    try {
-      enriched = enrichSprintsWithUserTasks(mapped, apiTasks, apiUserTasks);
-    } catch (e) {
-      console.error(
-        'enrichSprintsWithUserTasks failed, using sprints without user-task rollups:',
-        e,
-      );
-      enriched = mapped;
-    }
-    assignSprintAccentColors(enriched);
-    cachedData.enrichedSprints = enriched;
-    return enriched;
+    const bundle = await fetchProjectDashboardBundle(pid);
+    return storeBundleInCache(pid, bundle, now);
   } catch (error) {
     console.error('Dashboard data load failed:', error);
-    if (error?.code === 'UNAUTHORIZED' || isUnauthorizedHttpStatus(error?.httpStatus)) {
-      throw error;
-    }
-    return [];
+    throw error;
   }
 }
 
@@ -805,6 +888,7 @@ export function invalidateDashboardCache() {
     sprints: null,
     tasks: null,
     userTasks: null,
+    developers: null,
     enrichedSprints: null,
     timestamp: 0,
     projectId: null,
