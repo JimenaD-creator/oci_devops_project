@@ -1,0 +1,31 @@
+<testsuites id="" name="" tests="3" failures="0" skipped="0" errors="0" time="27.490337">
+<testsuite name="04-tasks.spec.ts" timestamp="2026-06-06T19:07:48.774Z" hostname="chromium" tests="3" failures="0" skipped="0" time="26.052" errors="0">
+<testcase name="Suite 4: Tasks › creates three tasks with full information @smoke" classname="04-tasks.spec.ts" time="14.138">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-cre-6792f-with-full-information-smoke-chromium\test-finished-1.png]]
+
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-cre-6792f-with-full-information-smoke-chromium\video.webm]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Suite 4: Tasks › edits the title of three existing tasks" classname="04-tasks.spec.ts" time="8.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-edi-a6c63-tle-of-three-existing-tasks-chromium\test-finished-1.png]]
+
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-edi-a6c63-tle-of-three-existing-tasks-chromium\video.webm]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Suite 4: Tasks › changes Kanban ticket status: Done, In Review, In Progress" classname="04-tasks.spec.ts" time="3.91">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-cha-08725--Done-In-Review-In-Progress-chromium\test-finished-1.png]]
+
+[[ATTACHMENT|test-results\04-tasks-Suite-4-Tasks-cha-08725--Done-In-Review-In-Progress-chromium\video.webm]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

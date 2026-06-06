@@ -1,0 +1,240 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\playwright.config.ts",
+    "rootDir": "C:/Users/HP/Documents/TEC DE MONTERREY/SOFTWARE DEVELOPMENT/CHALLENGE/oci_devops_project/tests/suites",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/HP/Documents/TEC DE MONTERREY/SOFTWARE DEVELOPMENT/CHALLENGE/oci_devops_project/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/HP/Documents/TEC DE MONTERREY/SOFTWARE DEVELOPMENT/CHALLENGE/oci_devops_project/tests/suites",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "junit.xml"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "04-tasks.spec.ts",
+      "file": "04-tasks.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Suite 4: Tasks",
+          "file": "04-tasks.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates three tasks with full information @smoke",
+              "ok": true,
+              "tags": [
+                "tasks",
+                "smoke",
+                "smoke",
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 14138,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T19:07:49.574Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-cre-6792f-with-full-information-smoke-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-cre-6792f-with-full-information-smoke-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bb1950c9234bbc0ed293-50b86a0d4d64880b129b",
+              "file": "04-tasks.spec.ts",
+              "line": 27,
+              "column": 7
+            },
+            {
+              "title": "edits the title of three existing tasks",
+              "ok": true,
+              "tags": [
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8004,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T19:08:03.878Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-edi-a6c63-tle-of-three-existing-tasks-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-edi-a6c63-tle-of-three-existing-tasks-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bb1950c9234bbc0ed293-29331a57a2c6f797884e",
+              "file": "04-tasks.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "changes Kanban ticket status: Done, In Review, In Progress",
+              "ok": true,
+              "tags": [
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3910,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T19:08:11.901Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-cha-08725--Done-In-Review-In-Progress-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-tasks-Suite-4-Tasks-cha-08725--Done-In-Review-In-Progress-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bb1950c9234bbc0ed293-87606792e1c662f63423",
+              "file": "04-tasks.spec.ts",
+              "line": 54,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-06-06T19:07:48.498Z",
+    "duration": 27490.337,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

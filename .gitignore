@@ -65,3 +65,11 @@ docker-compose.*.yml
 
 # Structurizr Lite local index
 architecture/.structurizr/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
