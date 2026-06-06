@@ -312,10 +312,12 @@ export default function DeveloperRadarCards({
   developerName = null,
   developerUserId = null,
   layout = 'grid',
+  enabled = true,
 }) {
   const [devs, setDevs] = React.useState([]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (sprintId == null || sprintId === '' || !Number.isFinite(Number(sprintId))) return;
     fetch(`${API_BASE}/api/insights/sprint/${sprintId}/developer-radar`, {
       cache: 'no-store',
@@ -324,7 +326,7 @@ export default function DeveloperRadarCards({
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setDevs(Array.isArray(data) ? data : []))
       .catch(() => setDevs([]));
-  }, [sprintId]);
+  }, [sprintId, enabled]);
 
   const visibleDevs = React.useMemo(() => {
     const list = devs.filter((d) => d && String(d.developerName ?? '').trim());

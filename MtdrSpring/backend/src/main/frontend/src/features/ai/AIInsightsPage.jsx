@@ -19,7 +19,7 @@ import {
   formatSprintLabel,
 } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
-import { pageEase, getErrorMessage } from './aiInsightsConstants';
+import { pageEase, getErrorMessage, isProcessingInsight } from './aiInsightsConstants';
 import {
   productivityScoreFromSprintKpis,
   normalizeWorkloadBalancePercent,
@@ -141,7 +141,13 @@ export default function AIInsightsPage({ projectId }) {
     ({ sprintId: sid, loading, notFound, data, fetchFailed }) => {
       if (sid == null || Number(sid) !== Number(selectedSprintId)) return;
       setInsightsLoading(Boolean(loading));
-      if (loading) return;
+      if (loading || isProcessingInsight(data)) {
+        setInsightsLoading(true);
+        if (isProcessingInsight(data)) {
+          setInsightsError(null);
+        }
+        return;
+      }
       if (notFound || !data) {
         setRawDeveloperInsightRows([]);
         setInsightsGeneratedAt(null);
@@ -443,7 +449,15 @@ export default function AIInsightsPage({ projectId }) {
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Developer radar
             </Typography>
-            <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} />
+            {insightsLoading || !insightsGeneratedAt ? (
+              <Typography sx={{ fontSize: '0.9rem', color: 'text.secondary', fontStyle: 'italic' }}>
+                {insightsLoading
+                  ? 'Radar charts load after sprint insights finish generating.'
+                  : 'Generate sprint insights above to load developer radar charts.'}
+              </Typography>
+            ) : (
+              <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} enabled />
+            )}
           </Paper>
         </>
       )}

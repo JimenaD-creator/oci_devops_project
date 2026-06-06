@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.springboot.MyTodoList.dto.DashboardBundleResponse;
@@ -64,7 +65,7 @@ class DashboardBundleServiceTest {
         when(sprintRepository.findByAssignedProjectId(3L)).thenReturn(List.of(sprint));
         when(taskRepository.findByProjectIdWithSprint(3L)).thenReturn(List.of(task));
         when(userTaskRepository.findByProjectIdWithUserAndTask(3L)).thenReturn(List.of(ut));
-        when(projectTeamRosterService.listDevelopersForProject(project)).thenReturn(List.of());
+        when(projectTeamRosterService.listDevelopersForProject(eq(project), eq(false))).thenReturn(List.of());
 
         Optional<DashboardBundleResponse> result = dashboardBundleService.loadBundle(3L);
 

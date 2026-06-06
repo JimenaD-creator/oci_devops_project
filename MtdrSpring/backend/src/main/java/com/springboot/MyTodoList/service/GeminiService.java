@@ -24,6 +24,8 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -56,6 +58,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GeminiService {
+
+    public static final String INSIGHT_STATUS_PROCESSING = "PROCESSING";
+
+    private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
     private static final long ENRICH_RESPONSE_CACHE_MS = 180_000;
     private static final long INSIGHTS_GET_RESPONSE_CACHE_MS = 120_000;
@@ -207,10 +213,36 @@ public class GeminiService {
         return buildDeveloperVariationFallback(sprintSnapshots);
     }
 
-    @Async
+    /**
+     * Marks a sprint as generating before the async job starts so GET polling sees {@code status: processing}
+     * immediately and logs confirm the request was accepted.
+     */
+    public void markInsightGenerationStarted(Long sprintId) {
+        log.info("AI insight generation queued for sprint {}", sprintId);
+        Long projectId = sprintRepository.findById(sprintId)
+            .map(s -> s.getAssignedProject() != null ? s.getAssignedProject().getId() : null)
+            .orElse(null);
+        SprintInsight insight = insightRepository.findBySprintId(sprintId)
+            .orElse(new SprintInsight());
+        insight.setSprintId(sprintId);
+        if (projectId != null) {
+            insight.setProjectId(projectId);
+        } else if (insight.getProjectId() == null) {
+            insight.setProjectId(-1L);
+        }
+        insight.setInsightsJson(null);
+        insight.setErrorMessage(INSIGHT_STATUS_PROCESSING);
+        insight.setGeneratedAt(LocalDateTime.now());
+        insight.setAcknowledged(false);
+        insightRepository.save(insight);
+        invalidateInsightsGetResponseCache(sprintId);
+    }
+
+    @Async("geminiInsightsExecutor")
     public CompletableFuture<SprintInsight> generateInsightsForSprint(Long sprintId) {
-        System.out.println("[GeminiService] API key present: "
-            + (geminiApiConfiguration.isConfigured() ? "YES" : "NO/EMPTY"));
+        long startedAtMs = System.currentTimeMillis();
+        log.info("AI insight generation started for sprint {} (thread={})",
+            sprintId, Thread.currentThread().getName());
         if (!geminiApiConfiguration.isConfigured()) {
             saveErrorInsight(sprintId, null, GeminiApiConfiguration.ERROR_CODE);
             return CompletableFuture.failedFuture(
@@ -233,6 +265,7 @@ public class GeminiService {
             }
 
             // Same live KPI formula as dashboard / KPI Analytics (not SQL snapshot that can diverge).
+            log.info("Sprint {}: syncing live KPIs before Gemini prompt", sprintId);
             syncLiveKpisToSprintEntity(sprintId);
             sprint = sprintRepository.findById(sprintId).orElse(sprint);
 
@@ -240,9 +273,10 @@ public class GeminiService {
                 .findByAssignedProjectIdOrderByStartDateAsc(projectId);
 
             String prompt = buildPrompt(sprint, historicalSprints, sprintId);
-            System.out.println("[GeminiService] Prompt length: " + prompt.length());
-            System.out.println("[GeminiService] Prompt preview: " + prompt.substring(0, Math.min(200, prompt.length())));
+            log.info("Sprint {}: Gemini prompt ready ({} chars)", sprintId, prompt.length());
             String rawJson = callGemini(prompt);
+            log.info("Sprint {}: Gemini response received ({} ms elapsed)",
+                sprintId, System.currentTimeMillis() - startedAtMs);
             String insightsJson = extractJsonFromGeminiResponse(rawJson);
             JsonNode rawTree = mapper.readTree(insightsJson);
             if (rawTree.isObject()) {
@@ -262,16 +296,19 @@ public class GeminiService {
             insightRepository.save(insight);
             invalidateInsightsGetResponseCache(sprintId);
 
-            System.out.println("[GeminiService] Insights saved for sprint " + sprintId);
+            log.info("Sprint {}: insights saved ({} ms total)",
+                sprintId, System.currentTimeMillis() - startedAtMs);
             return CompletableFuture.completedFuture(insight);
 
         } catch (Exception e) {
-            System.err.println("[GeminiService] Error generating insights: " + e.getMessage());
+            log.error("Sprint {}: insight generation failed after {} ms — {}",
+                sprintId, System.currentTimeMillis() - startedAtMs, e.getMessage(), e);
             // Persist the error so the frontend stops polling immediately
             try {
                 saveErrorInsight(sprintId, null, e.getMessage());
             } catch (Exception saveEx) {
-                System.err.println("[GeminiService] Could not save error insight: " + saveEx.getMessage());
+                log.error("Sprint {}: could not persist error insight — {}",
+                    sprintId, saveEx.getMessage(), saveEx);
             }
             return CompletableFuture.failedFuture(e);
         }
@@ -1224,6 +1261,7 @@ public class GeminiService {
             "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, efficiencyScore, and workloadBalance — "
             + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
             + "When phase is in_progress, add one brief line only if needed: the score updates as work is marked Done and is not a final grade while the sprint is open. "
+            + "When Sprint timeline.phase is ended: use past tense and describe final sprint outcomes only — NEVER say the score will update, keep updating, or change during the sprint; do NOT mention live snapshot, tasks still in progress, or pending work; you MAY close with one short sentence that this reflects final delivery for the completed sprint window. "
             + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
             + "(no baseline, expected, underperforming, sprint not started, early snapshot, little work completed yet, or similar excuses). "
             + "You MAY add one short sentence that the score will update as the sprint runs and tasks or hours change. "
@@ -3574,30 +3612,84 @@ public class GeminiService {
     }
 
     private static final Pattern PRODUCTIVITY_EVOLUTION_NOTE_ALREADY = Pattern.compile(
-        "(?i)\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
-            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|task\\s+(?:progress|updates?)|"
+        "(?i)\\b(?:will\\s+update|will\\s+change|will\\s+keep\\s+updating|keeps?\\s+updating|continues?\\s+to\\s+update|"
+            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|during\\s+the\\s+sprint|tasks?\\s+progress|task\\s+(?:progress|updates?)|"
             + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins|still\\s+open|"
             + "sprint\\s+(?:is\\s+)?(?:still\\s+)?open|pending\\s+task|live\\s+snapshot|"
             + "not\\s+yet\\s+done|not\\s+a\\s+final|active\\s+tasks?|marked\\s+done|"
-            + "updates?\\s+as\\s+more)\\b");
+            + "updates?\\s+as\\s+more|change\\s+during)\\b");
 
     private static String productivityEvolutionNote(Sprint sprint) {
         String phase = resolveSprintPhase(sprint);
+        if ("ended".equals(phase)) {
+            return "";
+        }
         if ("not_started".equals(phase)) {
             return "It will update once the sprint begins and tasks move through statuses, "
                 + "assignments, and logged hours feed the four KPIs.";
         }
         if ("in_progress".equals(phase)) {
+            if (isSprintEarlyForProductivityGuide(sprint)) {
+                return "It will keep updating as tasks progress and completion, on-time delivery, "
+                    + "participation, and workload balance change during the sprint.";
+            }
             return "It updates as more work is marked Done—not a final grade while the sprint is open.";
-        }
-        if (isSprintEarlyForProductivityGuide(sprint)) {
-            return "It will keep updating as tasks progress and completion, on-time delivery, "
-                + "participation, and workload balance change during the sprint.";
         }
         return "";
     }
 
+    private static final String PRODUCTIVITY_ENDED_SPRINT_CLOSING =
+        "This reflects final delivery for the completed sprint window.";
+
+    private static final Pattern ENDED_SPRINT_CLOSING_ALREADY = Pattern.compile(
+        "(?i)\\b(?:final delivery|completed sprint(?: window)?|sprint has ended|full sprint window|final sprint outcomes?)\\b");
+
+    /** Appends a past-tense closing line once the sprint calendar has ended. */
+    private static String appendProductivityEndedSprintClosing(String text, Sprint sprint) {
+        if (!"ended".equals(resolveSprintPhase(sprint))) {
+            return text;
+        }
+        if (text == null || text.isBlank()) {
+            return text == null ? "" : text.trim();
+        }
+        String raw = text.trim();
+        if (ENDED_SPRINT_CLOSING_ALREADY.matcher(raw).find()) {
+            return raw;
+        }
+        return raw + " " + PRODUCTIVITY_ENDED_SPRINT_CLOSING;
+    }
+
+    /** Drops forward-looking evolution sentences once the sprint calendar has ended. */
+    private static String stripProductivityEvolutionNotesForEndedSprint(String text, Sprint sprint) {
+        if (text == null || text.isBlank() || !"ended".equals(resolveSprintPhase(sprint))) {
+            return text;
+        }
+        String[] parts = text.split("(?<=[.!?])\\s+");
+        if (parts.length <= 1) {
+            return PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(text).find() ? "" : text.trim();
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String part : parts) {
+            String s = part.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            if (!PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(s).find()) {
+                if (kept.length() > 0) {
+                    kept.append(' ');
+                }
+                kept.append(s);
+            }
+        }
+        String out = kept.toString().trim();
+        return out.isEmpty() ? text.trim() : out;
+    }
+
     private static String appendProductivityEvolutionNote(String text, Sprint sprint) {
+        if ("ended".equals(resolveSprintPhase(sprint))) {
+            return stripProductivityEvolutionNotesForEndedSprint(
+                text == null ? "" : text, sprint);
+        }
         if (text == null || text.isBlank()) {
             return productivityEvolutionNote(sprint);
         }
@@ -3626,13 +3718,16 @@ public class GeminiService {
     private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
         int clamped = Math.min(100, Math.max(0, scorePct));
         if (existing == null || existing.isBlank()) {
-            return polishProductivityGuideProse(appendProductivityEvolutionNote(
-                String.format(
-                    Locale.ROOT,
-                    "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
-                        + "team participation, and workload balance into one indicator for overall sprint performance.",
-                    clamped),
-                sprint));
+            String fallback = String.format(
+                Locale.ROOT,
+                "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
+                    + "team participation, and workload balance into one indicator for overall sprint performance.",
+                clamped);
+            if ("ended".equals(resolveSprintPhase(sprint))) {
+                return polishProductivityGuideProse(
+                    appendProductivityEndedSprintClosing(fallback, sprint));
+            }
+            return polishProductivityGuideProse(appendProductivityEvolutionNote(fallback, sprint));
         }
         String out = stripProductivityGuideInstructionEcho(existing);
         out = stripProductivityLowScoreExcuses(out, sprint);
@@ -3640,7 +3735,13 @@ public class GeminiService {
             out = softenProductivityGuidePerformanceLabels(out);
         }
         out = replaceProductivityScoreMentionsInProse(out, clamped);
-        return polishProductivityGuideProse(appendProductivityEvolutionNote(out, sprint));
+        if ("ended".equals(resolveSprintPhase(sprint))) {
+            out = stripProductivityEvolutionNotesForEndedSprint(out, sprint);
+            out = appendProductivityEndedSprintClosing(out, sprint);
+        } else {
+            out = appendProductivityEvolutionNote(out, sprint);
+        }
+        return polishProductivityGuideProse(out);
     }
 
     private static final class AssignmentLoadSnap {

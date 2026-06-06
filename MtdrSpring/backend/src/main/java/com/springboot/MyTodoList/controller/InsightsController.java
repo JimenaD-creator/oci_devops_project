@@ -6,6 +6,8 @@ import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.service.GeminiService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +30,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/insights")
 public class InsightsController {
+
+    private static final Logger log = LoggerFactory.getLogger(InsightsController.class);
 
     @Autowired
     private GeminiService geminiService;
@@ -55,13 +59,16 @@ public class InsightsController {
             return ResponseEntity.unprocessableEntity().body(response);
         }
         try {
+            log.info("POST /api/insights/sprint/{}/generate accepted", sprintId);
+            geminiService.markInsightGenerationStarted(sprintId);
+
             CompletableFuture<SprintInsight> future =
                 geminiService.generateInsightsForSprint(sprintId);
 
             future.whenComplete((result, ex) -> {
                 if (ex != null) {
-                    System.err.println("[InsightsController] Async generation failed for sprint "
-                        + sprintId + ": " + ex.getMessage());
+                    log.error("Async insight generation failed for sprint {}: {}",
+                        sprintId, ex.getMessage(), ex);
                 }
             });
 
@@ -188,6 +195,9 @@ public class InsightsController {
         if (insight.getErrorMessage() != null) {
             payload.put("error", insight.getErrorMessage());
             payload.put("insights", null);
+            if (GeminiService.INSIGHT_STATUS_PROCESSING.equals(insight.getErrorMessage())) {
+                payload.put("status", "processing");
+            }
             return payload;
         }
 

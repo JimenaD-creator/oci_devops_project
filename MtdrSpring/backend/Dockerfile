@@ -11,4 +11,4 @@ COPY --from=build /app/target/MyTodoList-0.0.1-SNAPSHOT.jar MyTodoList.jar
 RUN chown -R app:app /tmp/
 USER 1000
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "MyTodoList.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "MyTodoList.jar"]

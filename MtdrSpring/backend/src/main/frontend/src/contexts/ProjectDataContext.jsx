@@ -142,6 +142,12 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       const snap = getCachedBundleSnapshot(pid);
       if (snap && !options.forceFresh) {
         applySnapshot(snap);
+        const hasData =
+          (Array.isArray(snap.enrichedSprints) && snap.enrichedSprints.length > 0) ||
+          (snap.taskCount ?? 0) > 0;
+        if (hasData) {
+          return Promise.resolve();
+        }
         return load({ silent: true, forceFresh: false });
       }
       return load({ silent: Boolean(options.silent), forceFresh: Boolean(options.forceFresh) });

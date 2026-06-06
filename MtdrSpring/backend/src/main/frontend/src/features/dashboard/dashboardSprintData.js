@@ -41,6 +41,93 @@ let cachedData = {
 };
 /** In-memory TTL for sprints + tasks + user-tasks bundle (shared across all pages). */
 const CACHE_TTL = 120000; // 2 minutes
+const SESSION_CACHE_PREFIX = 'dashboardBundle:v1:';
+
+function sessionCacheKey(pid) {
+  return `${SESSION_CACHE_PREFIX}${pid}`;
+}
+
+function readSessionBundleCache(pid) {
+  try {
+    const raw = sessionStorage.getItem(sessionCacheKey(pid));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || String(parsed.projectId) !== String(pid)) return null;
+    if (!parsed.timestamp || Date.now() - parsed.timestamp >= CACHE_TTL) return null;
+    if (!Array.isArray(parsed.sprints) || !Array.isArray(parsed.tasks) || !Array.isArray(parsed.userTasks)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionBundleCache(pid) {
+  try {
+    const developers = Array.isArray(cachedData.developers)
+      ? cachedData.developers.map((d) => {
+          const { profilePicture: _omit, ...rest } = d || {};
+          return rest;
+        })
+      : [];
+    sessionStorage.setItem(
+      sessionCacheKey(pid),
+      JSON.stringify({
+        projectId: pid,
+        timestamp: cachedData.timestamp,
+        sprints: cachedData.sprints,
+        tasks: cachedData.tasks,
+        userTasks: cachedData.userTasks,
+        developers,
+        enrichedSprints: cachedData.enrichedSprints,
+      }),
+    );
+  } catch (e) {
+    try {
+      sessionStorage.setItem(
+        sessionCacheKey(pid),
+        JSON.stringify({
+          projectId: pid,
+          timestamp: cachedData.timestamp,
+          sprints: cachedData.sprints,
+          tasks: cachedData.tasks,
+          userTasks: cachedData.userTasks,
+          developers: [],
+          enrichedSprints: null,
+        }),
+      );
+    } catch {
+      /* sessionStorage full — in-memory cache still works for this tab */
+    }
+  }
+}
+
+function clearSessionBundleCache(pid) {
+  try {
+    if (pid) sessionStorage.removeItem(sessionCacheKey(pid));
+  } catch {
+    /* ignore */
+  }
+}
+
+function hydrateMemoryCacheFromSession(pid) {
+  const sessionSnap = readSessionBundleCache(pid);
+  if (!sessionSnap) return false;
+  cachedData = {
+    sprints: sessionSnap.sprints,
+    tasks: sessionSnap.tasks,
+    userTasks: sessionSnap.userTasks,
+    developers: sessionSnap.developers ?? null,
+    enrichedSprints: sessionSnap.enrichedSprints ?? null,
+    timestamp: sessionSnap.timestamp,
+    projectId: pid,
+  };
+  if (!Array.isArray(cachedData.enrichedSprints) || cachedData.enrichedSprints.length === 0) {
+    rebuildEnrichedSprintsFromCache();
+  }
+  return isCacheValidForProject(pid, Date.now(), false);
+}
 
 /**
  * Mutates each sprint: accentColor from palette by order among all sprints (sorted by id).
@@ -695,6 +782,7 @@ function storeBundleInCache(pid, bundle, now) {
   applyRosterProfilePictures(enriched, apiDevelopers);
   assignSprintAccentColors(enriched);
   cachedData.enrichedSprints = enriched;
+  writeSessionBundleCache(pid);
   return enriched;
 }
 
@@ -713,7 +801,13 @@ function isCacheValidForProject(pid, now, forceFresh) {
 export function getCachedBundleSnapshot(projectId) {
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
-  if (!pid || !isCacheValidForProject(pid, Date.now(), false)) {
+  if (!pid) {
+    return null;
+  }
+  if (!isCacheValidForProject(pid, Date.now(), false)) {
+    hydrateMemoryCacheFromSession(pid);
+  }
+  if (!isCacheValidForProject(pid, Date.now(), false)) {
     return null;
   }
   return {
@@ -786,6 +880,9 @@ export async function fetchDashboardSprints(projectId, options = {}) {
   }
 
   const now = Date.now();
+  if (!forceFresh && !isCacheValidForProject(pid, now, false)) {
+    hydrateMemoryCacheFromSession(pid);
+  }
 
   if (isCacheValidForProject(pid, now, forceFresh)) {
     if (Array.isArray(cachedData.enrichedSprints)) {
@@ -884,6 +981,7 @@ export function applyOptimisticTaskCreated(projectId, task, userTasks = []) {
 
 // Export function to manually invalidate cache when data changes
 export function invalidateDashboardCache() {
+  const prevPid = cachedData.projectId;
   cachedData = {
     sprints: null,
     tasks: null,
@@ -893,6 +991,7 @@ export function invalidateDashboardCache() {
     timestamp: 0,
     projectId: null,
   };
+  if (prevPid) clearSessionBundleCache(prevPid);
   if (process.env.NODE_ENV !== 'test') {
     console.log('Dashboard cache invalidated');
   }

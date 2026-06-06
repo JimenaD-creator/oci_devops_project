@@ -32,6 +32,10 @@ public class ProjectTeamRosterService {
     }
 
     public List<TeamRosterDto> listDevelopersForProject(Project project) {
+        return listDevelopersForProject(project, true);
+    }
+
+    public List<TeamRosterDto> listDevelopersForProject(Project project, boolean includeProfilePictures) {
         if (project == null) {
             return List.of();
         }
@@ -55,7 +59,7 @@ public class ProjectTeamRosterService {
 
         List<TeamRosterDto> roster = new ArrayList<>(byId.size());
         for (User user : byId.values()) {
-            roster.add(TeamRosterDto.fromUser(user));
+            roster.add(TeamRosterDto.fromUser(user, includeProfilePictures));
         }
         return roster;
     }

@@ -13,6 +13,7 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ public class DashboardBundleService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "projects", key = "'dashboard-bundle:' + #projectId")
     public Optional<DashboardBundleResponse> loadBundle(Long projectId) {
         if (projectId == null) {
             return Optional.empty();
@@ -52,7 +54,7 @@ public class DashboardBundleService {
             bundle.setTasks(tasks.stream().map(DashboardTaskDto::from).collect(Collectors.toList()));
             bundle.setUserTasks(
                     userTasks.stream().map(DashboardUserTaskDto::from).collect(Collectors.toList()));
-            bundle.setDevelopers(projectTeamRosterService.listDevelopersForProject(project));
+            bundle.setDevelopers(projectTeamRosterService.listDevelopersForProject(project, false));
             return bundle;
         });
     }

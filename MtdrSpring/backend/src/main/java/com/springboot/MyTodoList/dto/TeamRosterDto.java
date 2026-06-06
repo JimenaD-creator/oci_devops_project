@@ -14,6 +14,11 @@ public class TeamRosterDto {
     public TeamRosterDto() {}
 
     public static TeamRosterDto fromUser(User user) {
+        return fromUser(user, true);
+    }
+
+    /** {@code includeProfilePicture=false} keeps dashboard bundle JSON small (no base64 CLOBs). */
+    public static TeamRosterDto fromUser(User user, boolean includeProfilePicture) {
         if (user == null) {
             return null;
         }
@@ -23,7 +28,9 @@ public class TeamRosterDto {
         dto.email = user.getEmail();
         dto.phoneNumber = user.getPhoneNumber();
         dto.type = user.getType();
-        dto.profilePicture = user.getProfilePicture();
+        if (includeProfilePicture) {
+            dto.profilePicture = user.getProfilePicture();
+        }
         return dto;
     }
 

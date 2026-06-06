@@ -33,6 +33,17 @@ export function isApiKeyInsightError(code) {
   return String(code ?? '').trim() === 'API_KEY_MISSING';
 }
 
+export const INSIGHT_STATUS_PROCESSING = 'PROCESSING';
+
+/** True while the server is generating insights (async job in flight). */
+export function isProcessingInsight(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  return (
+    payload.status === 'processing' ||
+    String(payload.error ?? '').trim() === INSIGHT_STATUS_PROCESSING
+  );
+}
+
 /** Sprint id 0 is valid — do not use `if (!sprintId)` (0 is falsy in JS). */
 export function isValidSprintId(sprintId) {
   return sprintId != null && sprintId !== '' && Number.isFinite(Number(sprintId));

@@ -27,6 +27,7 @@ import {
   API_BASE,
   getErrorMessage,
   isApiKeyInsightError,
+  isProcessingInsight,
   isValidSprintId,
   AI_INSIGHTS_EMPTY,
 } from './aiInsightsConstants';
@@ -70,6 +71,8 @@ export default function InsightCard({
   const [error, setError] = useState(null);
   const [errorCode, setErrorCode] = useState(null);
   const [pollCount, setPollCount] = useState(0);
+  const [pollElapsedSec, setPollElapsedSec] = useState(0);
+  const pollStartMsRef = useRef(null);
   const [lastGeneratedAtMs, setLastGeneratedAtMs] = useState(null);
   const lastGeneratedAtMsRef = useRef(null);
   const cancelPollRef = useRef(false);
@@ -98,16 +101,25 @@ export default function InsightCard({
     return Number.isFinite(ms) ? ms : null;
   };
 
+  const pollDelayMs = useCallback((attempt, elapsedMs) => {
+    if (attempt === 0) return 400;
+    if (elapsedMs < 30_000) return 800;
+    return 3000;
+  }, []);
+
   // Iterative loop — NOT recursive. Each iteration awaits before the next,
   // so the attempt counter increments correctly and the loop terminates at MAX_ATTEMPTS.
   const pollForResults = useCallback(
     async (minGeneratedAtMs = null) => {
       // Gemini can take up to ~60s per attempt (with server-side retries on 503).
-      const MAX_ATTEMPTS = 50;
-      const INTERVAL_MS = 3000;
+      const MAX_ATTEMPTS = 60;
+      pollStartMsRef.current = Date.now();
+      setPollElapsedSec(0);
       for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
-        await new Promise((r) => setTimeout(r, INTERVAL_MS));
+        const elapsedMs = Date.now() - (pollStartMsRef.current ?? Date.now());
+        await new Promise((r) => setTimeout(r, pollDelayMs(attempt, elapsedMs)));
         if (cancelPollRef.current) return;
+        setPollElapsedSec(Math.floor((Date.now() - (pollStartMsRef.current ?? Date.now())) / 1000));
         try {
           const { notFound, data } = await fetchSprintInsights(sprintId, {
             retries: 1,
@@ -116,6 +128,11 @@ export default function InsightCard({
           });
           if (cancelPollRef.current) return;
           if (!notFound && data) {
+            if (isProcessingInsight(data)) {
+              setPollCount(attempt + 1);
+              publishInsightsFetch({ loading: true, notFound: false, data });
+              continue;
+            }
             if (data.error) {
               // While regenerating, DB may still hold the previous failure until async save finishes.
               if (minGeneratedAtMs != null) {
@@ -168,7 +185,7 @@ export default function InsightCard({
         setStatus('error');
       }
     },
-    [sprintId, notifyPersistedInsightsChange, publishInsightsFetch],
+    [sprintId, notifyPersistedInsightsChange, publishInsightsFetch, pollDelayMs],
   );
 
   const startGeneration = useCallback(async () => {
@@ -180,6 +197,8 @@ export default function InsightCard({
     setErrorCode(null);
     setInsights(null);
     setPollCount(0);
+    setPollElapsedSec(0);
+    publishInsightsFetch({ loading: true, notFound: false, data: null });
     try {
       const res = await fetch(`${API_BASE}/api/insights/sprint/${sprintId}/generate`, {
         method: 'POST',
@@ -191,6 +210,7 @@ export default function InsightCard({
         setErrorCode(code);
         setError(getErrorMessage(code));
         setStatus('error');
+        publishInsightsFetch({ loading: false, notFound: false, data: null, fetchFailed: true });
         return;
       }
       cancelPollRef.current = false;
@@ -200,8 +220,9 @@ export default function InsightCard({
       setErrorCode(null);
       setError('Could not start AI analysis. Check server connection.');
       setStatus('error');
+      publishInsightsFetch({ loading: false, notFound: false, data: null, fetchFailed: true });
     }
-  }, [sprintId, pollForResults]);
+  }, [sprintId, pollForResults, publishInsightsFetch]);
 
   const loadExisting = useCallback(async () => {
     if (!isValidSprintId(sprintId)) return { action: 'none' };
@@ -236,6 +257,12 @@ export default function InsightCard({
       const generatedMs = parseGeneratedAtMs(data.generatedAt);
       lastGeneratedAtMsRef.current = generatedMs;
       setLastGeneratedAtMs(generatedMs);
+      if (isProcessingInsight(data)) {
+        setStatus('polling');
+        cancelPollRef.current = false;
+        pollForResults(lastGeneratedAtMsRef.current);
+        return { action: 'none' };
+      }
       if (data.error) {
         if (isApiKeyInsightError(data.error)) {
           try {
@@ -280,7 +307,7 @@ export default function InsightCard({
       setStatus((prev) => (prev === 'generating' || prev === 'polling' ? prev : 'idle'));
       return { action: 'autoGenerate' };
     }
-  }, [sprintId, notifyPersistedInsightsChange, publishInsightsFetch]);
+  }, [sprintId, notifyPersistedInsightsChange, publishInsightsFetch, pollForResults]);
 
   const maybeAutoGenerateAfterLoad = useCallback(
     async (loadAction) => {
@@ -618,7 +645,7 @@ export default function InsightCard({
           <Typography sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, color: 'text.secondary' }}>
             {status === 'generating'
               ? 'Sending to Gemini…'
-              : `Waiting for response${pollCount > 0 ? ` (~${pollCount * 3}s elapsed)` : ''}…`}
+              : `Waiting for Gemini${pollElapsedSec > 0 ? ` (~${pollElapsedSec}s)` : ''}…`}
           </Typography>
         </Box>
       )}
