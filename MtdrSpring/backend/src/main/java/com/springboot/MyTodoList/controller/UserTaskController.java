@@ -8,6 +8,7 @@ import com.springboot.MyTodoList.model.UserTaskId;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.ProjectBundleCacheEvictor;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.UserTaskService;
 import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
@@ -52,6 +53,9 @@ public class UserTaskController {
 
     @Autowired
     private ProjectTaskEventPublisher projectTaskEventPublisher;
+
+    @Autowired
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
 
     @GetMapping("/my-blockers")
     public ResponseEntity<List<Map<String, Object>>> getMyBlockers(
@@ -182,6 +186,7 @@ public class UserTaskController {
 
             UserTask saved = userTaskRepository.save(userTask);
             taskAssignmentSyncService.syncTaskStatusFromAssignments(taskId);
+            taskRepository.findProjectIdByTaskId(taskId).ifPresent(projectBundleCacheEvictor::evictDashboardBundle);
             projectTaskEventPublisher.taskUpdated(taskId, userId, "rest");
 
             return ResponseEntity.ok(saved);

@@ -273,6 +273,28 @@ class TaskControllerTest {
     }
 
     @Test
+    void bulkDeleteTasks_validIds_returnsOkWithCounts() throws Exception {
+        when(taskService.deleteTasksByIds(List.of(1L, 2L, 3L))).thenReturn(3);
+
+        mockMvc.perform(post("/api/tasks/bulk-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[1,2,3]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedCount").value(3))
+                .andExpect(jsonPath("$.requestedCount").value(3));
+
+        verify(taskService).deleteTasksByIds(List.of(1L, 2L, 3L));
+    }
+
+    @Test
+    void bulkDeleteTasks_emptyIds_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/tasks/bulk-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void notifyNewAssignees_whenTaskMissing_returnsNotFound() throws Exception {
         when(taskRepository.existsById(50L)).thenReturn(false);
 

@@ -32,6 +32,9 @@ class TaskAssignmentSyncServiceTest {
     @Mock
     private KpiService kpiService;
 
+    @Mock
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
+
     @InjectMocks
     private TaskAssignmentSyncService syncService;
 
