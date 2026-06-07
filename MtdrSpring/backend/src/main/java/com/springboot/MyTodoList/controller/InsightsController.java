@@ -105,11 +105,14 @@ public class InsightsController {
         }
         SprintInsight insight = opt.get();
         Optional<Map<String, Object>> cached = geminiService.getCachedInsightsGetResponse(insight);
+        Map<String, Object> payload;
         if (cached.isPresent()) {
-            return ResponseEntity.ok(cached.get());
+            payload = new HashMap<>(cached.get());
+        } else {
+            payload = buildResponsePayload(insight);
+            geminiService.putCachedInsightsGetResponse(insight, payload);
         }
-        Map<String, Object> payload = buildResponsePayload(insight);
-        geminiService.putCachedInsightsGetResponse(insight, payload);
+        geminiService.attachInsightsFreshnessMetadata(payload, sprintId);
         return ResponseEntity.ok(payload);
     }
 

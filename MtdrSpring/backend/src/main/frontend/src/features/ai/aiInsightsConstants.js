@@ -214,6 +214,24 @@ export function alignTrendsProductivityScore(text, actualScore) {
   return source;
 }
 
+/** "Productivity remained stable at 100 points" → live KPI score (e.g. 99 points). */
+export function alignProductivityStableLevelInProse(text, actualScore) {
+  if (text == null || actualScore == null) return text;
+  const score = Math.min(100, Math.max(0, Math.round(Number(actualScore))));
+  if (!Number.isFinite(score)) return text;
+  const displayPct = formatProductivityScoreDisplay(score);
+  return String(text).replace(
+    /(productivity\s+(?:remained|stays|stayed|is|was)\s+(?:stable\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*(?:percentage\s+)?points?)?/gi,
+    (_, prefix, _num, suffix) => {
+      if (suffix && /points?/i.test(suffix)) {
+        const unit = score === 1 ? ' point' : ' points';
+        return `${prefix}${score}${unit}`;
+      }
+      return `${prefix}${displayPct}`;
+    },
+  );
+}
+
 /**
  * Align all productivity-score mentions in AI prose to the KPI card value (integer %, e.g. 78%).
  */
@@ -223,6 +241,7 @@ export function alignProductivityScoreProse(text, actualScore) {
   if (!display) return text;
   let out = alignKpiMetricsInText(String(text), { productivityScore: actualScore });
   out = alignTrendsProductivityScore(out, actualScore);
+  out = alignProductivityStableLevelInProse(out, actualScore);
   const productivityPatterns = [
     /(productivity\s*score[^0-9]{0,48}?)(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
     /(overall\s+productivity[^0-9]{0,40}?)(-?\d+(?:\.\d+)?)\s*%?/gi,
@@ -557,15 +576,23 @@ export function normalizeWorkloadBalanceGuideText(text, workloadBalancePct) {
   );
 }
 
-/** Any integer-point gap on a 0–100 score is meaningful for forecast vs current. */
-const FORECAST_TREND_EPSILON = 0;
+/** Point band within which a forecast is treated as flat vs current sprint score. */
+export function forecastStabilityBand(currentProductivityScore) {
+  const current = Number(currentProductivityScore);
+  if (!Number.isFinite(current)) return 0;
+  if (current >= 98) return 2;
+  if (current >= 90) return 1;
+  return 0;
+}
 
 /** Trend for next-sprint forecast vs the selected sprint's live productivity score. */
-export function productivityForecastTrendFromDelta(deltaPoints) {
+export function productivityForecastTrendFromDelta(deltaPoints, currentProductivityScore = null) {
   const d = Number(deltaPoints);
   if (!Number.isFinite(d)) return 'stable';
-  if (d > FORECAST_TREND_EPSILON) return 'up';
-  if (d < -FORECAST_TREND_EPSILON) return 'down';
+  const band = forecastStabilityBand(currentProductivityScore);
+  if (Math.abs(d) <= band) return 'stable';
+  if (d > 0) return 'up';
+  if (d < 0) return 'down';
   return 'stable';
 }
 
@@ -593,20 +620,29 @@ export function resolveProductivityPredictionDisplay(
     predictedScore = rawScore;
   }
 
-  const clampedScore = Number.isFinite(predictedScore)
+  let clampedScore = Number.isFinite(predictedScore)
     ? Math.max(0, Math.min(100, Math.round(predictedScore)))
     : 0;
   const currentProductivityScore = Number.isFinite(currentPs)
     ? Math.max(0, Math.min(100, Math.round(currentPs)))
     : null;
-  const deltaVsCurrent =
+  let deltaVsCurrent =
     currentProductivityScore != null ? clampedScore - currentProductivityScore : null;
-  const trend =
+  let trend =
     deltaVsCurrent != null
-      ? productivityForecastTrendFromDelta(deltaVsCurrent)
+      ? productivityForecastTrendFromDelta(deltaVsCurrent, currentProductivityScore)
       : prediction?.trend === 'up' || prediction?.trend === 'down'
         ? prediction.trend
         : 'stable';
+  if (
+    trend === 'stable' &&
+    currentProductivityScore != null &&
+    deltaVsCurrent != null &&
+    deltaVsCurrent !== 0
+  ) {
+    deltaVsCurrent = 0;
+    clampedScore = currentProductivityScore;
+  }
 
   return {
     predictedScore: clampedScore,
@@ -625,10 +661,10 @@ export function formatProductivityForecastDeltaLine(resolved) {
     return null;
   }
   const abs = Math.abs(resolved.deltaVsCurrent);
-  if (resolved.deltaVsCurrent > FORECAST_TREND_EPSILON) {
+  if (resolved.deltaVsCurrent > 0) {
     return `+${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
   }
-  if (resolved.deltaVsCurrent < -FORECAST_TREND_EPSILON) {
+  if (resolved.deltaVsCurrent < 0) {
     return `−${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
   }
   return `About the same as current sprint (${resolved.currentProductivityScore}%)`;

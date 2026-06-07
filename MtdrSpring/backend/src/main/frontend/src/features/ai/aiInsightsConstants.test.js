@@ -10,6 +10,7 @@ import {
   resolveProductivityPredictionDisplay,
   formatProductivityForecastDeltaLine,
   alignProductivityTrendDelta,
+  alignProductivityScoreProse,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -70,6 +71,19 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(resolved.deltaVsCurrent).toBe(-2);
     expect(formatProductivityForecastDeltaLine(resolved)).toBe(
       '−2 points vs current sprint (87%)',
+    );
+  });
+
+  it('resolveProductivityPredictionDisplay treats a 1-point drop at 100 as stable (99 vs 100)', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 99, trend: 'down' },
+      { productivityScore: 100 },
+    );
+    expect(resolved.trend).toBe('stable');
+    expect(resolved.predictedScore).toBe(100);
+    expect(resolved.deltaVsCurrent).toBe(0);
+    expect(formatProductivityForecastDeltaLine(resolved)).toBe(
+      'About the same as current sprint (100%)',
     );
   });
 
@@ -166,5 +180,14 @@ describe('aiInsightsConstants KPI alignment', () => {
     const out = alignProductivityTrendDelta(text, -13);
     expect(out).toContain('decreased by 13 points');
     expect(out).not.toContain('18 points');
+  });
+
+  it('alignProductivityScoreProse fixes stable-at-level when Gemini rounds up (99 vs 100 points)', () => {
+    const text =
+      'Productivity remained stable at 100 points compared to the previous sprint.';
+    const out = alignProductivityScoreProse(text, 99);
+    expect(out).toBe(
+      'Productivity remained stable at 99 points compared to the previous sprint.',
+    );
   });
 });

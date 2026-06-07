@@ -1,5 +1,7 @@
 package com.springboot.MyTodoList.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -514,6 +516,48 @@ class GeminiInsightKpiAlignUtilTest {
         assertTrue(out.contains("decreased by 15 points"));
         assertFalse(out.contains("24%"));
         assertTrue(out.contains("work is still in progress"));
+    }
+
+    @Test
+    void productivityForecastTrend_treatsOnePointDropAtPerfectScoreAsStable() {
+        assertEquals("stable", GeminiInsightKpiAlignUtil.productivityForecastTrend(100, 99));
+        assertEquals("down", GeminiInsightKpiAlignUtil.productivityForecastTrend(100, 97));
+    }
+
+    @Test
+    void resolveForecastPredictedScore_snapsToLiveWhenWithinStabilityBand() {
+        assertEquals(100, GeminiInsightKpiAlignUtil.resolveForecastPredictedScore(100, 99));
+        assertEquals(97, GeminiInsightKpiAlignUtil.resolveForecastPredictedScore(100, 97));
+    }
+
+    @Test
+    void alignProductivityStableLevelInProse_replacesRoundedGeminiScoreWithLive() {
+        String gemini =
+            "Productivity remained stable at 100 points compared to the previous sprint.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityStableLevelInProse(gemini, 99);
+        assertEquals(
+            "Productivity remained stable at 99 points compared to the previous sprint.",
+            out);
+    }
+
+    @Test
+    void detectGenerationKpiDrift_flagsProductivityChange() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode snapshot = mapper.readTree(
+            "{\"kpis\":{\"completionRate\":100,\"onTimeDelivery\":100,\"efficiencyScore\":80,"
+                + "\"workloadBalance\":70,\"productivityScore\":99},"
+                + "\"taskStatusBreakdown\":{\"total\":10,\"done\":10,\"toDo\":0,\"inProgress\":0,\"inReview\":0}}");
+        Map<String, Object> live = Map.of(
+            "completionRate", 100,
+            "onTimeDelivery", 100,
+            "efficiencyScore", 80,
+            "workloadBalance", 70,
+            "productivityScore", 97);
+        JsonNode liveBreakdown = mapper.readTree(
+            "{\"total\":10,\"done\":10,\"toDo\":0,\"inProgress\":0,\"inReview\":0}");
+        List<String> changed =
+            GeminiInsightKpiAlignUtil.detectGenerationKpiDrift(snapshot, live, liveBreakdown);
+        assertTrue(changed.contains("productivityScore"));
     }
 
     @Test

@@ -29,6 +29,7 @@ import { DeveloperInsightsTable } from './InsightCardParts';
 import DeveloperRadarCards from './DeveloperRadarCards';
 import { fetchProjectDevelopers } from '../dashboard/projectApi';
 import { fetchSprintInsights } from './insightsApi';
+import { taskBreakdownFromSprint } from './insightsFreshness';
 import { mergeDeveloperInsightRows } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
@@ -180,10 +181,18 @@ export default function AIInsightsPage({ projectId }) {
         completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
         onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
         teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
+        efficiencyScore: normalizeKpiPercent(
+          selectedSprint.kpis?.efficiencyScore ?? selectedSprint.kpis?.teamParticipation,
+        ),
         workloadBalance: normalizeWorkloadBalancePercent(selectedSprint.kpis?.workloadBalance),
         productivityScore: resolveSprintProductivityScore(selectedSprint.kpis),
       }
     : null;
+
+  const liveTaskStatusBreakdown = useMemo(
+    () => taskBreakdownFromSprint(selectedSprint),
+    [selectedSprint],
+  );
 
   /** Sprints sorted chronologically for "next sprint" comparisons. */
   const sortedSprints = useMemo(() => {
@@ -369,6 +378,7 @@ export default function AIInsightsPage({ projectId }) {
             nextSprintActualScore={resolveSprintProductivityScore(nextSprintForSelected?.kpis)}
             currentSprintActualScore={resolveSprintProductivityScore(selectedSprint?.kpis)}
             currentSprintMetrics={currentSprintKpiMetrics}
+            liveTaskStatusBreakdown={liveTaskStatusBreakdown}
             productivityDeltaPoints={productivityDeltaPoints}
             refreshToken={0}
             autoGenerateOnMissing={false}

@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -111,6 +112,110 @@ public final class GeminiInsightKpiAlignUtil {
         return text != null && !text.isBlank() && ON_TIME_DECLINE_CLAIM.matcher(text).find();
     }
 
+    /** Point band within which next-sprint forecast is treated as flat vs current productivity. */
+    public static int forecastStabilityBand(int currentProductivityScore) {
+        if (currentProductivityScore >= 98) {
+            return 2;
+        }
+        if (currentProductivityScore >= 90) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /** Trend for productivityPrediction vs live sprint score (not vs previous sprint). */
+    public static String productivityForecastTrend(int liveProductivityScore, int predictedScore) {
+        int delta = predictedScore - liveProductivityScore;
+        int band = forecastStabilityBand(liveProductivityScore);
+        if (Math.abs(delta) <= band) {
+            return "stable";
+        }
+        if (delta > 0) {
+            return "up";
+        }
+        if (delta < 0) {
+            return "down";
+        }
+        return "stable";
+    }
+
+    /** When forecast is within stability band, show live score so UI matches "about the same". */
+    public static int resolveForecastPredictedScore(int liveProductivityScore, int rawPredicted) {
+        int predicted = Math.max(0, Math.min(100, rawPredicted));
+        if ("stable".equals(productivityForecastTrend(liveProductivityScore, predicted))
+            && predicted != liveProductivityScore) {
+            return liveProductivityScore;
+        }
+        return predicted;
+    }
+
+    private static final List<String> GENERATION_KPI_SNAPSHOT_KEYS = List.of(
+        "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore");
+
+    private static final List<String> GENERATION_TASK_BREAKDOWN_KEYS = List.of(
+        "total", "done", "toDo", "inProgress", "inReview");
+
+    /**
+     * Compares persisted {@code generationKpiSnapshot} (stored at Generate) with live sprint KPIs / task counts.
+     */
+    public static List<String> detectGenerationKpiDrift(JsonNode snapshotNode, Map<String, Object> liveKpis, JsonNode liveBreakdown) {
+        if (snapshotNode == null || !snapshotNode.isObject() || liveKpis == null) {
+            return List.of();
+        }
+        JsonNode snapKpis = snapshotNode.get("kpis");
+        if (snapKpis == null || !snapKpis.isObject()) {
+            return List.of();
+        }
+        List<String> changed = new ArrayList<>();
+        for (String key : GENERATION_KPI_SNAPSHOT_KEYS) {
+            int expected = snapKpis.path(key).asInt(-1);
+            int actual = intMetric(liveKpis, key);
+            if (expected >= 0 && expected != actual) {
+                changed.add(key);
+            }
+        }
+        JsonNode snapBreakdown = snapshotNode.get("taskStatusBreakdown");
+        if (snapBreakdown != null && snapBreakdown.isObject() && liveBreakdown != null && liveBreakdown.isObject()) {
+            for (String key : GENERATION_TASK_BREAKDOWN_KEYS) {
+                if (!snapBreakdown.has(key) || !liveBreakdown.has(key)) {
+                    continue;
+                }
+                int expected = snapBreakdown.path(key).asInt(-1);
+                int actual = liveBreakdown.path(key).asInt(-1);
+                if (expected >= 0 && actual >= 0 && expected != actual) {
+                    changed.add("taskStatusBreakdown." + key);
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * "Productivity remained stable at 100 points" → live KPI score (e.g. 99 points).
+     */
+    public static String alignProductivityStableLevelInProse(String text, int productivityScore) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        Pattern pattern = Pattern.compile(
+            "(?i)(productivity\\s+(?:remained|stays|stayed|is|was)\\s+(?:stable\\s+)?at\\s+)(-?\\d+(?:\\.\\d+)?)(\\s*(?:percentage\\s+)?points?)?");
+        Matcher matcher = pattern.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String suffix = matcher.group(3);
+            String replacement;
+            if (suffix != null && suffix.toLowerCase(Locale.ROOT).contains("point")) {
+                String unit = productivityScore == 1 ? " point" : " points";
+                replacement = matcher.group(1) + productivityScore + unit;
+            } else {
+                replacement = matcher.group(1) + productivityScore + "%";
+            }
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
     /**
      * Replaces percentage literals in prose with live KPI values when the text mentions that metric.
      */
@@ -125,6 +230,7 @@ public final class GeminiInsightKpiAlignUtil {
         int otd = intMetric(live, "onTimeDelivery");
         out = alignLooseAtPhrases(out, otd);
         out = alignLooseAtPhrases(out, intMetric(live, "productivityScore"));
+        out = alignProductivityStableLevelInProse(out, intMetric(live, "productivityScore"));
         out = fixHavingIsAtGrammar(out);
         out = reconcileOnTimeDeliveryConcernProse(out, otd);
         out = fixProductivityPercentMisattributedToOnTime(out, live);
