@@ -466,32 +466,33 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   const currentSprint = getSelectedSprint();
   const shouldShowEmptyKpiView = kpiDataReady && !loading && sprints.length === 0;
   const selectedSprintRows = sprints.filter((s) => s.id === selectedSprintId);
-  const assignedTotalInSprint = kpis.totalTasks;
-  const completedTotalInSprint = kpis.completedTasks;
-  const selectedSprintIdForTotals = currentSprint?.id;
-  
-  const uniqueTeamTotalsBySprintId = useMemo(() => {
-    if (selectedSprintIdForTotals == null) return undefined;
-    return {
-      [selectedSprintIdForTotals]: {
-        assigned: kpis.totalTasks,
-        completed: kpis.completedTasks,
-      },
-    };
-  }, [selectedSprintIdForTotals, kpis.totalTasks, kpis.completedTasks]);
-  
+
+  const teamHoursTotals = useMemo(() => {
+    const devs = currentSprint?.developers || [];
+    return devs.reduce(
+      (acc, d) => ({
+        estimated: acc.estimated + (Number(d.assignedHoursEstimate) || 0),
+        worked: acc.worked + (Number(d.hours) || 0),
+      }),
+      { estimated: 0, worked: 0 },
+    );
+  }, [currentSprint]);
+
   const developerCountForChartLayout = Array.isArray(currentSprint?.developers)
     ? currentSprint.developers.length
     : 0;
   const chartDataDensity = Math.max(
-    assignedTotalInSprint,
-    completedTotalInSprint,
+    teamHoursTotals.worked,
+    teamHoursTotals.estimated,
     developerCountForChartLayout,
   );
   const adaptiveAssignedChartHeight = Math.min(
     360,
     Math.max(220, 200 + Math.round(chartDataDensity * 2)),
   );
+  const teamHoursChartHeight = isDesktopLayout
+    ? Math.min(168, Math.max(140, 124 + selectedSprintRows.length * 20))
+    : adaptiveAssignedChartHeight;
   const adaptiveAssignedChartWidth = Math.min(
     640,
     Math.max(430, 430 + Math.round(chartDataDensity * 1.5)),
@@ -770,14 +771,25 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       >
         <Grid container spacing={2} sx={{ alignItems: 'stretch', mb: 2 }}>
           <Grid item xs={12} lg={6} sx={{ display: 'flex', minWidth: 0 }}>
-            <Box sx={{ width: '100%', minWidth: 0 }}>
+            <Box
+              sx={{
+                width: '100%',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                flex: isDesktopLayout ? 1 : undefined,
+              }}
+            >
               <DeveloperWorkloadCharts
                 selectedSprints={selectedSprintRows}
+                primaryChart="teamHours"
                 showHoursChart={false}
-                uniqueTeamTotalsBySprintId={uniqueTeamTotalsBySprintId}
-                assignedCompletedHeight={adaptiveAssignedChartHeight}
-                assignedCompletedMaxWidth={adaptiveAssignedChartWidth}
+                assignedCompletedHeight={teamHoursChartHeight}
+                assignedCompletedMaxWidth={
+                  isDesktopLayout ? undefined : adaptiveAssignedChartWidth
+                }
                 suppressOuterMargin={isDesktopLayout}
+                fillColumnHeight={isDesktopLayout}
               />
             </Box>
           </Grid>

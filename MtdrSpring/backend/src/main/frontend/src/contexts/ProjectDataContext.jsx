@@ -12,8 +12,10 @@ import {
   fetchProjectBundleRaw,
   getCachedBundleSnapshot,
   invalidateDashboardCache,
+  isFullPageReload,
   applyOptimisticTaskDeleted,
   applyOptimisticTaskCreated,
+  applyOptimisticTaskUpdated,
 } from '../features/dashboard/dashboardSprintData';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
 import { markTasksSyncCaughtUp, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
@@ -39,7 +41,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
   const [taskCount, setTaskCount] = useState(() =>
     Array.isArray(initialSnap?.tasks) ? initialSnap.tasks.length : (initialSnap?.taskCount ?? 0),
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(pid) && !initialSnap);
   const [refreshing, setRefreshing] = useState(false);
   const [dataUpdatedAt, setDataUpdatedAt] = useState(() => initialSnap?.timestamp ?? 0);
   const [error, setError] = useState(null);
@@ -87,9 +89,10 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
         setSprints(Array.isArray(data) ? data : []);
         const freshSnap = getCachedBundleSnapshot(pid);
         const updatedAt = freshSnap?.timestamp ?? Date.now();
-        if (freshSnap) {
-          setTaskCount(freshSnap.taskCount ?? 0);
-        }
+        setTaskCount(
+          freshSnap?.taskCount ??
+            (Array.isArray(freshSnap?.tasks) ? freshSnap.tasks.length : 0),
+        );
         setDataUpdatedAt(updatedAt);
         succeeded = true;
       } catch (e) {
@@ -132,7 +135,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       }
       return;
     }
-    load({ silent: false, forceFresh: false });
+    load({ silent: false, forceFresh: isFullPageReload() });
   }, [loadEnabled, pid, load, applySnapshot]);
 
   const ensureLoaded = useCallback(
@@ -243,9 +246,18 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
         } else {
           setTaskCount((count) => count + 1);
         }
+      } else if (detail.type === 'task-updated' && detail.task?.id != null) {
+        const snap = applyOptimisticTaskUpdated(pid, detail.task, detail.meta);
+        if (snap) {
+          applySnapshot(snap);
+          appliedOptimistic = true;
+        }
       }
 
-      invalidateDashboardCache();
+      const keepOptimisticCache = detail.type === 'task-updated' && appliedOptimistic;
+      if (!keepOptimisticCache) {
+        invalidateDashboardCache();
+      }
       setLoadEnabled(true);
       invalidateAndRefresh({
         silent: true,

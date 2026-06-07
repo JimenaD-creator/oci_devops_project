@@ -5,6 +5,8 @@ import {
   isoToDateInputValue,
   isDateInputOnOrBefore,
   mapTaskToKanban,
+  deriveDeveloperKanbanStatus,
+  patchUserTasksAfterTaskSave,
   shouldPromptWorkedHoursForAssigneeDone,
   shouldPromptWorkedHoursOnKanbanDone,
 } from './taskUtils';
@@ -86,6 +88,41 @@ test('shouldPromptWorkedHoursOnKanbanDone is false when assignment already compl
       assignees: [{ user: { id: 7 }, status: 'COMPLETED', workedHours: 2 }],
     }),
   ).toBe(false);
+});
+
+test('deriveDeveloperKanbanStatus shows Done when TASK is Done even if assignment row is stale', () => {
+  expect(
+    deriveDeveloperKanbanStatus('DONE', [{ user: { id: 7 }, status: 'IN_PROGRESS' }]),
+  ).toBe('DONE');
+});
+
+test('deriveDeveloperKanbanStatus shows Done when developer assignment is COMPLETED', () => {
+  expect(
+    deriveDeveloperKanbanStatus('IN_PROGRESS', [{ user: { id: 7 }, status: 'COMPLETED' }]),
+  ).toBe('DONE');
+});
+
+test('patchUserTasksAfterTaskSave preserves worked hours when completing assignment', () => {
+  const prev = [
+    { user: { id: 7 }, task: { id: 10 }, status: 'IN_PROGRESS', workedHours: 0 },
+    { user: { id: 8 }, task: { id: 10 }, status: 'IN_PROGRESS', workedHours: 0 },
+  ];
+  const next = patchUserTasksAfterTaskSave(
+    prev,
+    { id: 10, status: 'DONE' },
+    {
+      syncAssignmentStatuses: true,
+      assignmentStatus: 'COMPLETED',
+      userId: 7,
+      workedHours: 4.5,
+    },
+  );
+  const mine = next.find((ut) => ut.user.id === 7);
+  const other = next.find((ut) => ut.user.id === 8);
+  expect(mine.status).toBe('COMPLETED');
+  expect(mine.workedHours).toBe(4.5);
+  expect(other.status).toBe('IN_PROGRESS');
+  expect(other.workedHours).toBe(0);
 });
 
 test('shouldPromptWorkedHoursForAssigneeDone only for current developer', () => {

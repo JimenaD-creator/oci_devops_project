@@ -91,7 +91,7 @@ export default function DashboardTopMetrics({
 
   const help = multiSprint
     ? {
-        hours: 'Combined logged hours in the selection',
+        hours: 'Hours',
         avgTasks: 'Total tasks divided by developers on the project team',
         avgHours: 'Total hours divided by developers on the project team',
       }

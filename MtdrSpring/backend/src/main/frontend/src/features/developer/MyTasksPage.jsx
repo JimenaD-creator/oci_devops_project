@@ -172,7 +172,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'my-tasks-page') return;
       if (event?.detail?.source === 'sse') return;
-      loadData({ silent: true }).catch((err) => {
+      loadData({ silent: true, forceFresh: true }).catch((err) => {
         console.error('MyTasksPage sync refresh failed:', err);
       });
     };
@@ -233,8 +233,12 @@ export default function MyTasksPage({ projectId, currentUser }) {
   }, [userTasks, mySprintTasks]);
 
   const tableRows = useMemo(
-    () => buildSprintTaskTableRows(mySprintTasks, sprintUserTasksForTable, projectDevelopers),
-    [mySprintTasks, sprintUserTasksForTable, projectDevelopers],
+    () =>
+      buildSprintTaskTableRows(mySprintTasks, sprintUserTasksForTable, projectDevelopers, {
+        assignmentFilter: (assignments) =>
+          assignments.filter((ut) => resolveUserTaskUserId(ut) === currentUserId),
+      }),
+    [mySprintTasks, sprintUserTasksForTable, projectDevelopers, currentUserId],
   );
 
   const mySprintStats = useMemo(() => {
@@ -488,7 +492,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
               meta,
               source: 'my-tasks-page',
             });
-            await loadData({ silent: true });
+            await loadData({ silent: true, forceFresh: true });
           } catch (e) {
             console.error('Failed to refresh my tasks after save:', e);
           }

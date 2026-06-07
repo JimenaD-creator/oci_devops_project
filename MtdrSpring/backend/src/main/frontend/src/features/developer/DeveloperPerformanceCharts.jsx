@@ -138,7 +138,9 @@ function ProductivityScoreTooltip({ active, payload }) {
       <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mt: 0.5, lineHeight: 1.45 }}>
         Completion {row.completionRate}%
         {typeof row.onTime === 'number' ? ` · On-time ${row.onTime}%` : ''}
-        {typeof row.participation === 'number' ? ` · Participation ${row.participation}%` : ''}
+        {typeof (row.efficiencyScore ?? row.participation) === 'number'
+          ? ` · Efficiency score ${row.efficiencyScore ?? row.participation}%`
+          : ''}
         {typeof row.workload === 'number' ? ` · Workload ${row.workload}%` : ''}
       </Typography>
       <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mt: 0.25 }}>
@@ -202,10 +204,9 @@ function ProductivityCompareTooltip({ active, payload, label, series = [] }) {
             <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', lineHeight: 1.4 }}>
               Completion {e.meta.completionRate}%
               {typeof e.meta.onTime === 'number' ? ` · On-time ${e.meta.onTime}%` : ''}
-              {typeof e.meta.participation === 'number'
-                ? ` · Participation ${e.meta.participation}%`
+              {typeof (e.meta.efficiencyScore ?? e.meta.participation) === 'number'
+                ? ` · Efficiency score ${e.meta.efficiencyScore ?? e.meta.participation}%`
                 : ''}
-              {typeof e.meta.workload === 'number' ? ` · Workload ${e.meta.workload}%` : ''}
             </Typography>
           ) : null}
           {e.meta ? (

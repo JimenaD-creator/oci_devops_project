@@ -43,6 +43,20 @@ let cachedData = {
 const CACHE_TTL = 120000; // 2 minutes
 const SESSION_CACHE_PREFIX = 'dashboardBundle:v1:';
 
+/** True after F5 / browser reload — sessionStorage may still hold stale bundle data. */
+export function isFullPageReload() {
+  try {
+    const nav = performance.getEntriesByType?.('navigation')?.[0];
+    return nav?.type === 'reload';
+  } catch {
+    return false;
+  }
+}
+
+function shouldBypassClientCache(options = {}) {
+  return Boolean(options?.forceFresh) || isFullPageReload();
+}
+
 function sessionCacheKey(pid) {
   return `${SESSION_CACHE_PREFIX}${pid}`;
 }
@@ -112,6 +126,7 @@ function clearSessionBundleCache(pid) {
 }
 
 function hydrateMemoryCacheFromSession(pid) {
+  if (isFullPageReload()) return false;
   const sessionSnap = readSessionBundleCache(pid);
   if (!sessionSnap) return false;
   cachedData = {
@@ -841,7 +856,7 @@ export function getCachedDevelopersSnapshot(projectId) {
  * Returns raw API arrays (sprints, tasks, userTasks) using the same cache as fetchDashboardSprints.
  */
 export async function fetchProjectBundleRaw(projectId, options = {}) {
-  const forceFresh = Boolean(options?.forceFresh);
+  const forceFresh = shouldBypassClientCache(options);
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
   if (!pid) {
@@ -872,7 +887,7 @@ export async function fetchCachedProjectTasks(projectId, options = {}) {
 }
 
 export async function fetchDashboardSprints(projectId, options = {}) {
-  const forceFresh = Boolean(options?.forceFresh);
+  const forceFresh = shouldBypassClientCache(options);
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
   if (!pid) {
@@ -975,6 +990,55 @@ export function applyOptimisticTaskCreated(projectId, task, userTasks = []) {
   }
   cachedData.userTasks = mergedUserTasks;
   cachedData.timestamp = Date.now();
+  rebuildEnrichedSprintsFromCache();
+  return getCachedBundleSnapshot(pid);
+}
+
+/** Instant Kanban/dashboard update after a local task save (status, hours, assignee sync). */
+export function applyOptimisticTaskUpdated(projectId, task, meta = {}) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  const tid = Number(task?.id);
+  if (!pid || !Number.isFinite(tid)) return null;
+
+  if (cachedData.projectId !== pid) {
+    if (!Array.isArray(cachedData.tasks) && !Array.isArray(cachedData.userTasks)) {
+      return null;
+    }
+    cachedData.projectId = pid;
+  }
+
+  cachedData.tasks = (cachedData.tasks || []).map((t) =>
+    Number(t?.id) === tid ? { ...t, ...task } : t,
+  );
+  if (!cachedData.tasks.some((t) => Number(t?.id) === tid) && task) {
+    cachedData.tasks = [task, ...cachedData.tasks];
+  }
+
+  if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+    const targetUserId =
+      meta.userId != null && Number.isFinite(Number(meta.userId)) ? Number(meta.userId) : null;
+    const hours =
+      meta.workedHours != null && Number.isFinite(Number(meta.workedHours))
+        ? Number(meta.workedHours)
+        : null;
+    cachedData.userTasks = (cachedData.userTasks || []).map((ut) => {
+      const utTid = resolveUserTaskTaskId(ut);
+      if (Number(utTid) !== tid) return ut;
+      const uid = resolveUserTaskUserId(ut);
+      if (targetUserId != null && uid !== targetUserId) return ut;
+      const next = { ...ut, status: meta.assignmentStatus };
+      if (hours != null) {
+        next.workedHours = hours;
+        next.worked_hours = hours;
+        next.hours = hours;
+      }
+      return next;
+    });
+  }
+
+  cachedData.timestamp = Date.now();
+  writeSessionBundleCache(pid);
   rebuildEnrichedSprintsFromCache();
   return getCachedBundleSnapshot(pid);
 }

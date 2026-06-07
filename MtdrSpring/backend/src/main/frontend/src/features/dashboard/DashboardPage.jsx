@@ -480,7 +480,7 @@ export default function DashboardPage({
     );
   }
 
-  if (sharedLoading && sharedSprints.length === 0) {
+  if ((sharedLoading || sharedRefreshing) && sharedSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 
@@ -494,7 +494,11 @@ export default function DashboardPage({
     : null;
 
   const shouldShowEmptyDashboardView =
-    !loadErrorMessage && (allSprints.length === 0 || sharedTaskCount === 0);
+    !loadErrorMessage &&
+    !sharedLoading &&
+    !sharedRefreshing &&
+    allSprints.length === 0 &&
+    sharedTaskCount === 0;
 
   if (loadErrorMessage) {
     return (

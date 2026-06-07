@@ -43,7 +43,9 @@ import {
   shouldPromptWorkedHoursOnKanbanDone,
   taskEntityId,
   userTaskRowTaskId,
+  deriveDeveloperKanbanStatus,
 } from './utils/taskUtils';
+import { applyOptimisticTaskUpdated, isFullPageReload } from '../dashboard/dashboardSprintData';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
 import {
@@ -170,7 +172,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   );
 
   useEffect(() => {
-    loadData();
+    loadData({ forceRefresh: isFullPageReload() });
   }, [loadData]);
 
   useProjectBundleSync(
@@ -385,7 +387,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       }
     };
 
-    const commitServerUpdate = (updated, meta) => {
+    const commitServerUpdate = async (updated, meta) => {
       if (updated?.id != null) {
         setRawTasks((prev) => mergeUpdatedTask(prev, updated));
         if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
@@ -395,6 +397,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         }
       }
       if (!updated?.id) return;
+      applyOptimisticTaskUpdated(String(effectiveProjectId), updated, meta);
       notifyTasksMutated({
         source: 'tasks-page',
         type: 'task-updated',
@@ -402,6 +405,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         task: updated,
         meta,
       });
+      await loadData({ silent: true, forceRefresh: true });
     };
 
     const putTask = async () => {
@@ -454,7 +458,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           rollbackOptimistic();
           return;
         }
-        commitServerUpdate(updated, undefined);
+        await commitServerUpdate(updated, undefined);
         return;
       }
 
@@ -475,7 +479,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           rollbackOptimistic();
           return;
         }
-        commitServerUpdate(updated, {
+        await commitServerUpdate(updated, {
           syncAssignmentStatuses: true,
           assignmentStatus: 'COMPLETED',
         });
@@ -487,7 +491,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         rollbackOptimistic();
         return;
       }
-      commitServerUpdate(updated, {
+      await commitServerUpdate(updated, {
         syncAssignmentStatuses: true,
         assignmentStatus: ns,
       });
@@ -534,7 +538,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const refreshSharedAfterTaskMutation = useCallback(async () => {
     try {
       await invalidateAndRefresh({ silent: true, confirmOnly: true });
-      await loadData({ silent: true });
+      await loadData({ silent: true, forceRefresh: true });
     } catch (e) {
       console.error('Failed to refresh shared project data after task change:', e);
     }
@@ -619,16 +623,26 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       }
       patchUserTaskAfterCompletion(taskId, uid, workedHours);
       const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
+      const completionMeta = {
+        syncAssignmentStatuses: true,
+        assignmentStatus: 'COMPLETED',
+        userId: uid,
+        ...(workedHours != null && Number.isFinite(Number(workedHours))
+          ? { workedHours: Number(workedHours) }
+          : {}),
+      };
+      const updatedTask = taskRow ? { ...taskRow, status: 'DONE' } : { id: taskId, status: 'DONE' };
+      applyOptimisticTaskUpdated(String(effectiveProjectId), updatedTask, completionMeta);
       notifyTasksMutated({
         source: 'tasks-page',
         type: 'task-updated',
         taskId,
-        task: taskRow ?? { id: taskId },
-        meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+        task: taskRow ?? { id: taskId, status: 'DONE' },
+        meta: completionMeta,
       });
-      await loadData({ silent: true });
+      await loadData({ silent: true, forceRefresh: true });
     },
-    [rawTasks, loadData, patchUserTaskAfterCompletion],
+    [rawTasks, loadData, patchUserTaskAfterCompletion, effectiveProjectId],
   );
 
   const handleConfirmWorkedHours = useCallback(
@@ -704,25 +718,32 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         }
         const updated = await res.json();
         if (updated?.id != null) {
+          const completionMeta = {
+            syncAssignmentStatuses: true,
+            assignmentStatus: 'COMPLETED',
+            userId: uid,
+            ...(workedHours != null && Number.isFinite(Number(workedHours))
+              ? { workedHours: Number(workedHours) }
+              : {}),
+          };
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));
           setUserTasks((prev) =>
             patchUserTasksAfterTaskSave(
               prev,
               updated,
-              {
-                syncAssignmentStatuses: true,
-                assignmentStatus: 'COMPLETED',
-              },
+              completionMeta,
               projectDevelopersRef.current,
             ),
           );
+          applyOptimisticTaskUpdated(String(effectiveProjectId), updated, completionMeta);
           notifyTasksMutated({
             source: 'tasks-page',
             type: 'task-updated',
             taskId: updated.id,
             task: updated,
-            meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+            meta: completionMeta,
           });
+          await loadData({ silent: true, forceRefresh: true });
         }
       } catch (e) {
         console.error('Error saving worked hours:', e);
@@ -733,7 +754,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         setLoadError('Could not save worked hours. Please try again.');
       }
     },
-    [pendingDone, rawTasks, userTasks, finishAssigneeCompletion],
+    [pendingDone, rawTasks, userTasks, finishAssigneeCompletion, effectiveProjectId],
   );
 
   const markAssigneeDone = async (taskId, ut) => {
@@ -839,9 +860,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       tasksForKanban.map((task) => {
         const tid = Number(task.id);
         const assignmentRows = assignmentsByTaskId.get(tid) ?? [];
-        return mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [], assignmentRows);
+        const statusOverride = developerMode
+          ? deriveDeveloperKanbanStatus(task.status, assignmentRows)
+          : undefined;
+        return mapTaskToKanban(
+          task,
+          developersByTaskId.get(String(task.id)) ?? [],
+          assignmentRows,
+          { statusOverride },
+        );
       }),
-    [tasksForKanban, developersByTaskId, assignmentsByTaskId],
+    [tasksForKanban, developersByTaskId, assignmentsByTaskId, developerMode],
   );
 
   const filteredItems = useMemo(() => {
