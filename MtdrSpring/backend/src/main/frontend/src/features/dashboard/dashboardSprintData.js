@@ -12,6 +12,7 @@ import {
 } from '../../utils/teamRosterUtils';
 import { getApiBase } from '../../utils/apiBase';
 import { apiFetch, getSessionExpiredMessage, isUnauthorizedHttpStatus } from '../../utils/auth';
+import { developerAvatarColors } from '../../utils/developerColors';
 
 /** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
@@ -1514,7 +1515,62 @@ export function buildCompareDeveloperChartsModel(
   const hoursRows = [...baseRows].sort((a, b) => sumHours(b) - sumHours(a));
   const comboRows = [...baseRows].sort((a, b) => sumComboTasks(b) - sumComboTasks(a));
 
-  return { sprintDefs, workloadRows, hoursRows, comboRows };
+  let developerDefs = names.map((fullName) => ({
+    fullName,
+    shortName: shortDevName(fullName),
+    accentColor: developerAvatarColors(fullName).color,
+  }));
+  developerDefs.sort((a, b) => {
+    const rowA = baseRows.find((r) => r.name === a.fullName);
+    const rowB = baseRows.find((r) => r.name === b.fullName);
+    const diff = sumWorkload(rowB) - sumWorkload(rowA);
+    return diff !== 0 ? diff : String(a.fullName).localeCompare(String(b.fullName));
+  });
+  developerDefs = developerDefs.map((dev, idx) => ({ ...dev, id: idx }));
+
+  const sprintWorkloadRows = sprints.map((sp, idx) => {
+    const row = {
+      sprintId: Number(sp.id),
+      shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
+      accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
+      name: sp.shortLabel ?? `Sprint ${idx}`,
+    };
+    developerDefs.forEach((dev) => {
+      const devData = (sp.developers || []).find((d) => d.name === dev.fullName);
+      const assigned = Number(devData?.assigned) || 0;
+      const completedRaw = Number(devData?.completed) || 0;
+      const completed = Math.min(completedRaw, assigned);
+      const open = Math.max(0, assigned - completed);
+      row[`wc_${dev.id}`] = completed;
+      row[`wo_${dev.id}`] = open;
+    });
+    return row;
+  });
+
+  const sprintHoursRows = sprints.map((sp, idx) => {
+    const row = {
+      sprintId: Number(sp.id),
+      shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
+      accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
+      name: sp.shortLabel ?? `Sprint ${idx}`,
+    };
+    developerDefs.forEach((dev) => {
+      const devData = (sp.developers || []).find((d) => d.name === dev.fullName);
+      row[`hw_${dev.id}`] = Number(devData?.hours) || 0;
+      row[`ha_${dev.id}`] = Number(devData?.assignedHoursEstimate) || 0;
+    });
+    return row;
+  });
+
+  return {
+    sprintDefs,
+    developerDefs,
+    workloadRows,
+    hoursRows,
+    comboRows,
+    sprintWorkloadRows,
+    sprintHoursRows,
+  };
 }
 
 export const DEVELOPER_DISPLAY_NAME = {};
