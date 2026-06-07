@@ -166,21 +166,33 @@ export function clampTrendsPercentLikeValues(text) {
  * Rewrites productivity sprint-over-sprint deltas to absolute score points (matches KPI Analytics).
  * Gemini often writes relative % (e.g. 24%) when the score fell 15 points (63% → 48%).
  */
+const PRODUCTIVITY_TREND_DELTA_VERB =
+  '(?:decreased|increased|improved|declined|dropped|rose|fell)';
+
 export function alignProductivityTrendDelta(text, deltaProductivityPoints) {
   if (text == null || !Number.isFinite(Number(deltaProductivityPoints))) return text;
   const delta = Math.round(Number(deltaProductivityPoints));
   if (delta === 0) return text;
   const source = String(text);
-  const pattern =
-    /(productivity(?:\s+score)?\s+(?:has\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\s+by\s+)\d+(?:\.\d+)?\s*%/i;
-  if (!pattern.test(source)) return source;
   const absPoints = Math.abs(delta);
   const verb = delta > 0 ? 'increased' : 'decreased';
   const pointsLabel = absPoints === 1 ? ' point' : ' points';
-  return source.replace(
-    pattern,
-    `Productivity ${verb} by ${absPoints}${pointsLabel}`,
+  const replacement = `Productivity ${verb} by ${absPoints}${pointsLabel}`;
+  const percentPattern = new RegExp(
+    `(productivity(?:\\s+score)?\\s+(?:has\\s+)?${PRODUCTIVITY_TREND_DELTA_VERB}\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*%`,
+    'i',
   );
+  const pointsPattern = new RegExp(
+    `(productivity(?:\\s+score)?\\s+(?:has\\s+)?${PRODUCTIVITY_TREND_DELTA_VERB}\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*(?:percentage\\s+)?points?`,
+    'i',
+  );
+  if (percentPattern.test(source)) {
+    return source.replace(percentPattern, replacement);
+  }
+  if (pointsPattern.test(source)) {
+    return source.replace(pointsPattern, replacement);
+  }
+  return source;
 }
 
 export function alignTrendsProductivityScore(text, actualScore) {

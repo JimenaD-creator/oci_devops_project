@@ -159,4 +159,12 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).not.toContain('24%');
     expect(out).toContain('work is still in progress');
   });
+
+  it('alignProductivityTrendDelta replaces wrong point delta with live score points', () => {
+    const text =
+      'Productivity decreased by 18 points compared to the previous sprint.';
+    const out = alignProductivityTrendDelta(text, -13);
+    expect(out).toContain('decreased by 13 points');
+    expect(out).not.toContain('18 points');
+  });
 });

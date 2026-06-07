@@ -162,6 +162,16 @@ export function productivityScoreFromSprintKpis(kpis) {
   });
 }
 
+/** Same source of truth as KPI Analytics card (stored score when present). */
+export function resolveSprintProductivityScore(kpis) {
+  if (!kpis || typeof kpis !== 'object') return 0;
+  const stored = Number(kpis.productivityScore);
+  if (Number.isFinite(stored)) {
+    return Math.min(100, Math.max(0, stored <= 1 ? Math.round(stored * 100) : Math.round(stored)));
+  }
+  return productivityScoreFromSprintKpis(kpis);
+}
+
 /**
  * Canonical manager-guide line for Efficiency Score (matches KPI Analytics card).
  */

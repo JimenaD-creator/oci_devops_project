@@ -21,7 +21,7 @@ import {
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
 import { pageEase, getErrorMessage, isProcessingInsight } from './aiInsightsConstants';
 import {
-  productivityScoreFromSprintKpis,
+  resolveSprintProductivityScore,
   normalizeWorkloadBalancePercent,
 } from '../kpis/productivityScoreUtils';
 import InsightCard from './InsightCard';
@@ -181,7 +181,7 @@ export default function AIInsightsPage({ projectId }) {
         onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
         teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
         workloadBalance: normalizeWorkloadBalancePercent(selectedSprint.kpis?.workloadBalance),
-        productivityScore: productivityScoreFromSprintKpis(selectedSprint.kpis),
+        productivityScore: resolveSprintProductivityScore(selectedSprint.kpis),
       }
     : null;
 
@@ -215,10 +215,10 @@ export default function AIInsightsPage({ projectId }) {
     if (selectedSprintId == null || sortedSprints.length < 2) return null;
     const idx = sortedSprints.findIndex((s) => Number(s.id) === Number(selectedSprintId));
     if (idx <= 0) return null;
-    const current = productivityScoreFromSprintKpis(sortedSprints[idx]?.kpis);
-    const previous = productivityScoreFromSprintKpis(sortedSprints[idx - 1]?.kpis);
+    const current = resolveSprintProductivityScore(sortedSprints[idx]?.kpis);
+    const previous = resolveSprintProductivityScore(sortedSprints[idx - 1]?.kpis);
     if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
-    return Math.round(current) - Math.round(previous);
+    return current - previous;
   }, [selectedSprintId, sortedSprints]);
 
   if (loading && sprints.length === 0) return <PageLoadingSpinner />;
@@ -366,8 +366,8 @@ export default function AIInsightsPage({ projectId }) {
             showPredictionsSection={showPredictionsSection}
             showNextSprintForecast={showNextSprintForecast}
             nextSprintLabel={nextSprintForSelected ? getSprintLabel(nextSprintForSelected.id) : null}
-            nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
-            currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
+            nextSprintActualScore={resolveSprintProductivityScore(nextSprintForSelected?.kpis)}
+            currentSprintActualScore={resolveSprintProductivityScore(selectedSprint?.kpis)}
             currentSprintMetrics={currentSprintKpiMetrics}
             productivityDeltaPoints={productivityDeltaPoints}
             refreshToken={0}

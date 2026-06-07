@@ -55,9 +55,13 @@ public final class GeminiInsightKpiAlignUtil {
         "(?i)\\b(?:not done yet|not finished|sprint is still|still open|still running|"
             + "still in progress|work is still|open tasks?|unfinished|score is lower because|score may rise)\\b");
 
-    /** Gemini often writes relative % change (e.g. 24%) instead of absolute score points (e.g. 15). */
+    /** Gemini often writes relative % (e.g. 24%) instead of absolute score points (e.g. 15). */
     private static final Pattern PRODUCTIVITY_TREND_DELTA_PERCENT = Pattern.compile(
         "(?i)(productivity(?:\\s+score)?\\s+(?:has\\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*%");
+
+    /** Gemini may also write wrong absolute points (e.g. 18 points when live delta is 13). */
+    private static final Pattern PRODUCTIVITY_TREND_DELTA_POINTS = Pattern.compile(
+        "(?i)(productivity(?:\\s+score)?\\s+(?:has\\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*(?:percentage\\s+)?points?");
 
     /** Trends are UI-facing coaching lines — keep them brief and direct. */
     private static final int EXECUTIVE_TRENDS_MAX_CHARS = 180;
@@ -451,14 +455,17 @@ public final class GeminiInsightKpiAlignUtil {
         if (text == null || text.isBlank() || deltaProductivityPoints == 0) {
             return text;
         }
-        if (!PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).find()) {
-            return text;
-        }
         int absPoints = Math.abs(deltaProductivityPoints);
         String pointsLabel = absPoints == 1 ? " point" : " points";
         String verb = deltaProductivityPoints > 0 ? "increased" : "decreased";
-        return PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).replaceAll(
-            "Productivity " + verb + " by " + absPoints + pointsLabel);
+        String replacement = "Productivity " + verb + " by " + absPoints + pointsLabel;
+        if (PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).find()) {
+            return PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).replaceAll(replacement);
+        }
+        if (PRODUCTIVITY_TREND_DELTA_POINTS.matcher(text).find()) {
+            return PRODUCTIVITY_TREND_DELTA_POINTS.matcher(text).replaceAll(replacement);
+        }
+        return text;
     }
 
     /** Repairs prose broken when legacy summaries had % stripped (e.g. "from to completion"). */
