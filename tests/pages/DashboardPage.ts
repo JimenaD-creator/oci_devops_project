@@ -10,6 +10,14 @@ export class DashboardPage {
   readonly developerFilter: Locator;
   readonly goToTasksButton: Locator;
 
+  /** Reuse manager storageState — skip login form. */
+  static async open(page: Page): Promise<DashboardPage> {
+    await page.goto('/');
+    const dashboard = new DashboardPage(page);
+    await dashboard.expectLoaded();
+    return dashboard;
+  }
+
   constructor(page: Page) {
     this.page = page;
     this.navDashboard = page.getByRole('button', { name: UI.dashboard, exact: true });
@@ -22,6 +30,9 @@ export class DashboardPage {
 
   async expectLoaded(): Promise<void> {
     await this.expectDashboardVisible();
+    await expect(this.page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible({
+      timeout: TIMEOUTS.settle,
+    });
   }
 
   async openAiInsights(): Promise<void> {
@@ -48,5 +59,15 @@ export class DashboardPage {
 
   async expectDashboardVisible(): Promise<void> {
     await expect(this.navDashboard).toBeVisible({ timeout: TIMEOUTS.login });
+  }
+
+  async expectScorecardsAndAveragesVisible(): Promise<void> {
+    await expect(this.page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible();
+    await expect(this.page.getByText('Tasks Completed').first()).toBeVisible();
+    await expect(this.page.getByText('Total hours worked').first()).toBeVisible();
+    await expect(this.page.getByText('Average tasks per developer').first()).toBeVisible();
+    await expect(this.page.getByText('Average hours per developer').first()).toBeVisible();
+    await expect(this.page.getByText('Completion Rate').first()).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Project status', exact: true })).toBeVisible();
   }
 }

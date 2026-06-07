@@ -13,7 +13,8 @@ export class KpiAnalyticsPage {
   }
 
   async expectLoaded(): Promise<void> {
-    await expect(this.productivityScore.first()).toBeVisible({ timeout: TIMEOUTS.navigation });
+    await expect(this.productivityScore.first()).toBeVisible({ timeout: TIMEOUTS.settle });
+    await expect(this.completionRate.first()).toBeAttached({ timeout: TIMEOUTS.settle });
   }
 
   async expectCompletionRateVisible(): Promise<void> {

@@ -44,16 +44,26 @@ export class LoginPage {
 
   async clearSession(): Promise<void> {
     await this.page.context().clearCookies();
-    await this.goto();
+    await this.page.goto(ROUTES.login, { waitUntil: 'domcontentloaded' });
     await this.page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();
     });
+    await this.page.reload({ waitUntil: 'domcontentloaded' });
+    await this.signInButton.waitFor({ state: 'visible', timeout: TIMEOUTS.navigation });
   }
 
   async fillCredentials(user: User): Promise<void> {
     await this.usernameField.fill(user.username);
     await this.passwordField.fill(user.password);
+  }
+
+  /** Types credentials slowly so each keystroke is visible in test videos. */
+  async typeCredentials(user: User, delayMs = 150): Promise<void> {
+    await this.usernameField.click();
+    await this.usernameField.pressSequentially(user.username, { delay: delayMs });
+    await this.passwordField.click();
+    await this.passwordField.pressSequentially(user.password, { delay: delayMs });
   }
 
   async submit(): Promise<void> {

@@ -1,65 +1,93 @@
-/** Suite 1 — Authentication (hooks, locators, snapshots, tags, test.slow/skip/fail, parameterized, soft/negative assertions) */
+/** Suite 1 — Authentication */
 import { test, expect } from '@playwright/test';
-import { ROUTES, TAGS, USERS } from '../constants';
-import { LoginPage } from '../pages';
+import { API_ENDPOINTS, ROUTES, TAGS, USERS } from '../constants';
+import { captureAndAttachScreenshot, captureStableScreenshot, DashboardPage, KpiAnalyticsPage, LoginPage } from '../pages';
 
 test.describe('Suite 1: Authentication', { tag: TAGS.auth }, () => {
-  // Lifecycle hook — runs once before the suite
   test.beforeAll(() => {
     expect(ROUTES.login).toContain('163.192.142.68');
   });
-  // Lifecycle hook — runs before each test
+
   test.beforeEach(async ({ page }) => {
     await new LoginPage(page).clearSession();
   });
-  // Lifecycle hook — screenshot after each test (see also screenshot: 'on' in playwright.config.ts)
+
   test.afterEach(async ({ page }, testInfo) => {
-    await page.screenshot({ path: testInfo.outputPath('auth.png'), fullPage: true });
+    await captureStableScreenshot(page, testInfo, 'auth.png');
   });
-  // Lifecycle hook — runs once after the suite
+
   test.afterAll(() => {
     expect(USERS.MANAGER.username.length).toBeGreaterThan(0);
   });
-  // Tags (@smoke, @auth) — filter with: npx playwright test --grep @smoke
+
   test(
-    'invalid login then valid login @smoke',
+    'shows invalid credentials error @smoke',
     { tag: [TAGS.smoke, TAGS.auth] },
-    async ({ page, browserName }) => {
-      // test.slow — triples the test timeout for this flow
+    async ({ page, browserName }, testInfo) => {
       test.slow();
-      // test.skip — skips when condition is true (non-Chromium browsers)
       test.skip(browserName === 'firefox', 'Auth smoke runs on Chromium only');
+
       const login = new LoginPage(page);
-      // Page object + 7 locator strategies (getByRole, getByTestId, getByText, getByLabel, getByPlaceholder on login)
       await login.expectLoginLocatorsVisible();
-      // Visual snapshot — compared against tests/suites/01-auth.spec.ts-snapshots/
-      await expect(page).toHaveScreenshot('login-form.png', { maxDiffPixelRatio: 0.08 });
-      // Negative assertion (non-retrying) — plain expect, not await expect()
+      await expect(page).toHaveScreenshot('login-form.png', { maxDiffPixelRatio: 0.08, animations: 'disabled' });
+      await captureAndAttachScreenshot(page, testInfo, 'login-form-evidence.png');
       expect(page.url()).toBe(ROUTES.login);
-      // Parameterized test data — loop over credential cases inside the E2E flow
-      const loginCases = [
-        { user: USERS.INVALID_USER, shouldFail: true },
-        { user: USERS.MANAGER, shouldFail: false },
-      ];
-      for (const loginCase of loginCases) {
-        if (loginCase.shouldFail) {
-          await login.login(loginCase.user);
-          await login.expectInvalidCredentialsError();
-          // Soft assertions — continue on failure and report all at the end
-          await expect.soft(login.usernameField).toBeEditable();
-          await expect.soft(login.signInButton).toBeEnabled();
-          // test.fail — marks expected failure when condition is true (false = test continues normally)
-          test.fail(false, 'Password policy UI is not exposed on the login form yet');
-        } else {
-          await login.usernameField.fill(loginCase.user.username);
-          await login.passwordField.fill(loginCase.user.password);
-          await login.signInButton.click();
-          // Auto-waiting assertion — Playwright retries until visible or timeout
-          await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({
-            timeout: 45_000,
-          });
-        }
-      }
+
+      await test.step('Enter invalid credentials and submit', async () => {
+        await login.typeCredentials(USERS.INVALID_USER);
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.url().includes(API_ENDPOINTS.LOGIN) && response.status() === 401,
+          ),
+          login.submit(),
+        ]);
+      });
+
+      await test.step('Invalid credentials error is shown', async () => {
+        await expect(login.errorAlert).toBeVisible({ timeout: 15_000 });
+        await login.expectInvalidCredentialsError();
+        await captureAndAttachScreenshot(page, testInfo, 'invalid-login-error.png');
+        await expect.soft(login.usernameField).toBeEditable();
+        await expect.soft(login.signInButton).toBeEnabled();
+        test.fail(false, 'Password policy UI is not exposed on the login form yet');
+      });
+    },
+  );
+
+  test(
+    'valid manager login reaches dashboard @smoke',
+    { tag: [TAGS.smoke, TAGS.auth] },
+    async ({ page, browserName }, testInfo) => {
+      test.slow();
+      test.skip(browserName === 'firefox', 'Auth smoke runs on Chromium only');
+
+      const login = new LoginPage(page);
+      const dashboard = new DashboardPage(page);
+      const kpi = new KpiAnalyticsPage(page);
+
+      await test.step('Enter valid manager credentials and submit', async () => {
+        await login.expectLoginLocatorsVisible();
+        await login.typeCredentials(USERS.MANAGER);
+        await Promise.all([
+          page.waitForResponse(
+            (response) => response.url().includes(API_ENDPOINTS.LOGIN) && response.ok(),
+          ),
+          login.submit(),
+        ]);
+      });
+
+      await test.step('Manager dashboard loaded after login', async () => {
+        await dashboard.expectDashboardVisible();
+        await expect(page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Project status', exact: true })).toBeVisible();
+        await captureAndAttachScreenshot(page, testInfo, 'dashboard-after-login.png');
+        await kpi.openFromDashboard(dashboard);
+        await kpi.expectCompletionRateVisible();
+        await expect(page.getByText('Productivity Score').first()).toBeVisible();
+        await dashboard.navDashboard.click();
+        await expect(page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible();
+      });
     },
   );
 });

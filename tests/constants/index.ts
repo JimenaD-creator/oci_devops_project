@@ -4,12 +4,17 @@ import { Task, User } from '../types';
 
 export const BASE_URL = 'http://163.192.142.68';
 
+export const AUTH_STORAGE = {
+  manager: 'playwright/.auth/manager.json',
+  developer: 'playwright/.auth/developer.json',
+} as const;
+
 export const ROUTES = {
   login: `${BASE_URL}/login`,
   home: `${BASE_URL}/`,
 } as const;
 
-// Test users (hardcoded credentials)
+// Test users
 
 export const USERS: Record<string, User> = {
   MANAGER: {
@@ -29,6 +34,9 @@ export const USERS: Record<string, User> = {
   },
 };
 
+/** Developer display name in task assignee dropdown (matches USERS.DEVELOPER login). */
+export const DEVELOPER_ASSIGNEE = /Jimena/i;
+
 //  Sample tasks for create / edit
 export const TASK_STATUSES = {
   TODO: { value: 'TODO', label: 'To Do' },
@@ -38,7 +46,7 @@ export const TASK_STATUSES = {
   PENDING: { value: 'PENDING', label: 'Pending' },
 } as const;
 
-/** API classification values (see NewTaskDialog TYPE_OPTIONS). */
+/** API classification values */
 export const TASK_CLASSIFICATIONS = {
   FEATURE: { value: 'FEATURE', label: 'Feature' },
   BUG: { value: 'BUG', label: 'Bug' },
@@ -46,7 +54,7 @@ export const TASK_CLASSIFICATIONS = {
   USER_STORY: { value: 'USER_STORY', label: 'User Story' },
 } as const;
 
-/** API priority values (see NewTaskDialog PRIORITY_OPTIONS). */
+/** API priority values  */
 export const TASK_PRIORITIES = {
   LOW: { value: 'LOW', label: 'Low' },
   MEDIUM: { value: 'MEDIUM', label: 'Medium' },
@@ -59,7 +67,7 @@ export const DEFAULT_TASK_DATES = {
   dueDate: '2026-12-31',
 } as const;
 
-/** Sample tasks — status/priority/classification match backend + UI enums. */
+/** Sample tasks */
 export const TEST_TASKS: Task[] = [
   {
     title: 'Implement Login Feature',
@@ -90,6 +98,17 @@ export const TEST_TASKS: Task[] = [
   },
 ];
 
+/** Task created by manager in Suite 3 — completed by developer in Suite 4 Kanban test. */
+export const DEVELOPER_KANBAN_TASK: Task = {
+  title: 'Change status to Done in Kanban Board',
+  description: 'Change status to Done in Kanban Board',
+  status: 'TODO',
+  priority: 'MEDIUM',
+  classification: 'TASK',
+  startDate: DEFAULT_TASK_DATES.startDate,
+  dueDate: DEFAULT_TASK_DATES.dueDate,
+};
+
 // Selectors
 
 export const SELECTORS = {
@@ -101,7 +120,7 @@ export const SELECTORS = {
     brandHeading: 'h1:has-text("ORACLE")',
     subtitle: 'text=Sign in to access the dashboard',
     rememberMeCheckbox: 'input.login-checkbox',
-    /** Used with page.getByTestId() — matches id via playwright testIdAttribute config */
+    /** Used with page.getByTestId() */
     testIdEmail: 'login-email',
     testIdPassword: 'login-password',
     /** Used with page.getByTitle() — kanban cards and task table rows */
@@ -223,6 +242,10 @@ export const TIMEOUTS = {
   expect: 20_000,
   login: 45_000,
   dialog: 20_000,
+  /** Wait for spinners / network before screenshots and end-of-test video frame. */
+  settle: 30_000,
+  /** Brief hold so recordings capture the final UI after async content loads. */
+  visualHold: 2_000,
 } as const;
 
 // Mock / HAR paths (for API mocking tests)

@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { KANBAN_COLUMNS, SELECTORS, TIMEOUTS } from '../constants';
+import { KANBAN_COLUMNS, SELECTORS, TASK_STATUSES, TIMEOUTS } from '../constants';
 import type { KanbanColumn } from '../types';
 import { DashboardPage } from './DashboardPage';
 
@@ -26,40 +26,39 @@ export class KanbanPage {
     await expect(this.board).toBeVisible({ timeout: TIMEOUTS.navigation });
   }
 
-  columnBody(columnClass: string): Locator {
-    return this.page.locator(columnClass).locator(SELECTORS.kanban.columnBody);
-  }
-
-  firstCardInColumn(columnClass: string): Locator {
-    return this.page.locator(`${columnClass} ${SELECTORS.kanban.taskCard}`).first();
-  }
-
-  async dragFirstCard(fromColumnClass: string, toColumn: KanbanColumn): Promise<void> {
-    const card = this.firstCardInColumn(fromColumnClass);
-    const target = this.page
+  columnBodyFor(column: KanbanColumn): Locator {
+    return this.page
       .locator('.kanban-column')
       .filter({
-        has: this.page.locator(SELECTORS.kanban.columnHeader, { hasText: toColumn }),
+        has: this.page.locator(SELECTORS.kanban.columnHeader, { hasText: column }),
       })
       .locator(SELECTORS.kanban.columnBody);
-    await card.dragTo(target);
   }
 
-  async moveTodoToDone(): Promise<void> {
-    if (await this.firstCardInColumn(SELECTORS.kanban.columnTodo).count()) {
-      await this.dragFirstCard(SELECTORS.kanban.columnTodo, KANBAN_COLUMNS.DONE);
-    }
+  taskCardByTitle(title: string): Locator {
+    return this.board.locator(SELECTORS.kanban.taskCard).filter({ hasText: title });
   }
 
-  async moveInProgressToInReview(): Promise<void> {
-    if (await this.firstCardInColumn(SELECTORS.kanban.columnInProgress).count()) {
-      await this.dragFirstCard(SELECTORS.kanban.columnInProgress, KANBAN_COLUMNS.IN_REVIEW);
-    }
+  taskCardById(taskId: number): Locator {
+    return this.board.locator(SELECTORS.kanban.taskCard).filter({ hasText: `#${taskId}` });
   }
 
-  async moveInReviewToInProgress(): Promise<void> {
-    if (await this.firstCardInColumn(SELECTORS.kanban.columnInReview).count()) {
-      await this.dragFirstCard(SELECTORS.kanban.columnInReview, KANBAN_COLUMNS.IN_PROGRESS);
-    }
+  async dragTaskToDone(title: string, taskId?: number): Promise<void> {
+    const card = taskId != null ? this.taskCardById(taskId) : this.taskCardByTitle(title).first();
+    await expect(card).toBeVisible({ timeout: TIMEOUTS.navigation });
+    await card.locator('.kanban-task-status-pill').click();
+    await this.page.getByRole('menuitem', { name: TASK_STATUSES.DONE.label, exact: true }).click();
+  }
+
+  async expectTaskInDoneColumn(title: string, taskId?: number): Promise<void> {
+    const card =
+      taskId != null
+        ? this.page.locator(`${SELECTORS.kanban.columnDone} ${SELECTORS.kanban.taskCard}`).filter({
+            hasText: `#${taskId}`,
+          })
+        : this.page.locator(`${SELECTORS.kanban.columnDone} ${SELECTORS.kanban.taskCard}`).filter({
+            hasText: title,
+          });
+    await expect(card).toBeVisible({ timeout: TIMEOUTS.expect });
   }
 }
