@@ -169,12 +169,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4583,
+                  "duration": 5185,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-06-08T05:44:32.558Z",
+                  "startTime": "2026-06-08T17:27:49.749Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -192,6 +192,236 @@
           "file": "tests/setup/manager.auth.setup.ts",
           "line": 6,
           "column": 6
+        }
+      ]
+    },
+    {
+      "title": "tests\\suites\\02-manager.spec.ts",
+      "file": "tests/suites/02-manager.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Suite 2: Manager",
+          "file": "tests/suites/02-manager.spec.ts",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "views dashboard and opens KPI Analytics @smoke",
+              "ok": true,
+              "tags": [
+                "manager",
+                "smoke",
+                "smoke",
+                "manager"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4544,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:58.448Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-4109f-d-opens-KPI-Analytics-smoke-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b663833bd2617a2efa18-0f8995fd16452b7e82a8",
+              "file": "tests/suites/02-manager.spec.ts",
+              "line": 12,
+              "column": 7
+            },
+            {
+              "title": "filters dashboard analytics by developer",
+              "ok": true,
+              "tags": [
+                "manager"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5789,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:29:03.104Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-6abbd-oard-analytics-by-developer-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b663833bd2617a2efa18-6aeec46e624b5437b050",
+              "file": "tests/suites/02-manager.spec.ts",
+              "line": 28,
+              "column": 7
+            },
+            {
+              "title": "views dashboard scorecards and completion metrics",
+              "ok": true,
+              "tags": [
+                "manager"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3783,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:29:08.907Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-475c9-ards-and-completion-metrics-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b663833bd2617a2efa18-8fcfd37463c757f8a7a9",
+              "file": "tests/suites/02-manager.spec.ts",
+              "line": 34,
+              "column": 7
+            },
+            {
+              "title": "explores AI Insights",
+              "ok": true,
+              "tags": [
+                "manager"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4170,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:29:12.706Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-explores-AI-Insights-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b663833bd2617a2efa18-2df750a2f43a0f6eed4b",
+              "file": "tests/suites/02-manager.spec.ts",
+              "line": 38,
+              "column": 7
+            },
+            {
+              "title": "opens Tasks and Kanban board",
+              "ok": true,
+              "tags": [
+                "manager"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5219,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:29:16.895Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-opens-Tasks-and-Kanban-board-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b663833bd2617a2efa18-81f636c8af87210968ee",
+              "file": "tests/suites/02-manager.spec.ts",
+              "line": 45,
+              "column": 7
+            }
+          ]
         }
       ]
     },
@@ -226,15 +456,15 @@
                   "projectName": "manager",
                   "results": [
                     {
-                      "workerIndex": 1,
+                      "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 48023,
+                      "duration": 42885,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-08T05:44:38.951Z",
+                      "startTime": "2026-06-08T17:29:22.133Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -252,6 +482,798 @@
               "file": "tests/suites/03-tasks.spec.ts",
               "line": 22,
               "column": 7
+            },
+            {
+              "title": "creates task assigned to developer for Kanban",
+              "ok": true,
+              "tags": [
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 15101,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:30:05.033Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\03-tasks-Suite-3-Tasks-cre-da6ea-ned-to-developer-for-Kanban-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "466493c6dd44679c8150-94bc50461ca93f4de136",
+              "file": "tests/suites/03-tasks.spec.ts",
+              "line": 38,
+              "column": 7
+            },
+            {
+              "title": "manager filters completed tasks by Done status",
+              "ok": true,
+              "tags": [
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6751,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:30:20.150Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\03-tasks-Suite-3-Tasks-man-55fca-pleted-tasks-by-Done-status-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "466493c6dd44679c8150-e298c0847bb63f74b67e",
+              "file": "tests/suites/03-tasks.spec.ts",
+              "line": 55,
+              "column": 7
+            },
+            {
+              "title": "manager deletes a task",
+              "ok": true,
+              "tags": [
+                "tasks"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "manager",
+                  "projectName": "manager",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 16056,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:30:26.915Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\03-tasks-Suite-3-Tasks-manager-deletes-a-task-manager\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "466493c6dd44679c8150-a444db99ae227d8f0bb7",
+              "file": "tests/suites/03-tasks.spec.ts",
+              "line": 70,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "tests\\setup\\developer.auth.setup.ts",
+      "file": "tests/setup/developer.auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticate as developer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup-developer",
+              "projectName": "setup-developer",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3660,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-08T17:27:56.992Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\developer.auth.setup.ts-authenticate-as-developer-setup-developer\\video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7969fb3c72fbbfbdb021-8d66cd89509f12cd3e95",
+          "file": "tests/setup/developer.auth.setup.ts",
+          "line": 6,
+          "column": 6
+        }
+      ]
+    },
+    {
+      "title": "tests\\suites\\01-auth.spec.ts",
+      "file": "tests/suites/01-auth.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Suite 1: Authentication",
+          "file": "tests/suites/01-auth.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "login — invalid credentials shows error @smoke",
+              "ok": true,
+              "tags": [
+                "auth",
+                "smoke",
+                "smoke",
+                "auth"
+              ],
+              "tests": [
+                {
+                  "timeout": 360000,
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\tests\\suites\\01-auth.spec.ts",
+                        "line": 38,
+                        "column": 14
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "auth",
+                  "projectName": "auth",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13784,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Enter invalid credentials and submit",
+                          "duration": 5862
+                        },
+                        {
+                          "title": "Invalid credentials error is shown",
+                          "duration": 2098
+                        }
+                      ],
+                      "startTime": "2026-06-08T17:28:01.355Z",
+                      "annotations": [
+                        {
+                          "type": "slow",
+                          "location": {
+                            "file": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\tests\\suites\\01-auth.spec.ts",
+                            "line": 38,
+                            "column": 14
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "login-form-evidence.png",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\01-auth-Suite-1-Authentica-003e8-edentials-shows-error-smoke-auth\\attachments\\login-form-evidence-png-42f7e3cb92986fc5037227d4d1cf000e870454ad.png"
+                        },
+                        {
+                          "name": "invalid-login-error.png",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\01-auth-Suite-1-Authentica-003e8-edentials-shows-error-smoke-auth\\attachments\\invalid-login-error-png-356e9d048eb148679857d5d6f696290c2a1ffcdd.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\01-auth-Suite-1-Authentica-003e8-edentials-shows-error-smoke-auth\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "791b3c4e0869e77b2651-673be0ad8b34b5e0d129",
+              "file": "tests/suites/01-auth.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "login — valid manager reaches dashboard @smoke",
+              "ok": true,
+              "tags": [
+                "auth",
+                "smoke",
+                "smoke",
+                "auth"
+              ],
+              "tests": [
+                {
+                  "timeout": 360000,
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\tests\\suites\\01-auth.spec.ts",
+                        "line": 38,
+                        "column": 14
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "auth",
+                  "projectName": "auth",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13471,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Enter valid manager credentials and submit",
+                          "duration": 5151
+                        },
+                        {
+                          "title": "Manager dashboard loaded after login",
+                          "duration": 5121
+                        }
+                      ],
+                      "startTime": "2026-06-08T17:28:15.264Z",
+                      "annotations": [
+                        {
+                          "type": "slow",
+                          "location": {
+                            "file": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\tests\\suites\\01-auth.spec.ts",
+                            "line": 38,
+                            "column": 14
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "dashboard-after-login.png",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\01-auth-Suite-1-Authentica-73dc8-ger-reaches-dashboard-smoke-auth\\attachments\\dashboard-after-login-png-ae8819df8d39210c78243fdeecd00f9bcf3eefae.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\01-auth-Suite-1-Authentica-73dc8-ger-reaches-dashboard-smoke-auth\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "791b3c4e0869e77b2651-228e7cbbb7c2d8ac9a52",
+              "file": "tests/suites/01-auth.spec.ts",
+              "line": 34,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "tests\\suites\\05-mock-api.spec.ts",
+      "file": "tests/suites/05-mock-api.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Suite 5: Mock API",
+          "file": "tests/suites/05-mock-api.spec.ts",
+          "line": 13,
+          "column": 6,
+          "specs": [
+            {
+              "title": "rejects invalid login via page.route @mock",
+              "ok": true,
+              "tags": [
+                "mock",
+                "mock"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mock-api",
+                  "projectName": "mock-api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5568,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:29.459Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-A-916db-d-login-via-page-route-mock-mock-api\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dd6fbe5ae98c6e92f21e-dddf5708b2571215d8cb",
+              "file": "tests/suites/05-mock-api.spec.ts",
+              "line": 18,
+              "column": 7
+            },
+            {
+              "title": "rejects invalid login via mock helper @mock",
+              "ok": true,
+              "tags": [
+                "mock",
+                "mock"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mock-api",
+                  "projectName": "mock-api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5321,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:35.226Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-A-212cf--login-via-mock-helper-mock-mock-api\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dd6fbe5ae98c6e92f21e-f2427175cb986f37c37d",
+              "file": "tests/suites/05-mock-api.spec.ts",
+              "line": 35,
+              "column": 7
+            },
+            {
+              "title": "logs in with mocks @mock",
+              "ok": true,
+              "tags": [
+                "mock",
+                "mock"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mock-api",
+                  "projectName": "mock-api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6022,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:40.559Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-API-logs-in-with-mocks-mock-mock-api\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dd6fbe5ae98c6e92f21e-16d09316fda5504aa8f3",
+              "file": "tests/suites/05-mock-api.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "replays failed login from HAR @mock",
+              "ok": true,
+              "tags": [
+                "mock",
+                "mock"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mock-api",
+                  "projectName": "mock-api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5144,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:46.594Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-A-bc1f7--failed-login-from-HAR-mock-mock-api\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dd6fbe5ae98c6e92f21e-509cbaefe9e49f57bb9e",
+              "file": "tests/suites/05-mock-api.spec.ts",
+              "line": 49,
+              "column": 7
+            },
+            {
+              "title": "logs in with full manager session from HAR @mock",
+              "ok": true,
+              "tags": [
+                "mock",
+                "mock"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mock-api",
+                  "projectName": "mock-api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6084,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:28:51.756Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-A-5bb88-nager-session-from-HAR-mock-mock-api\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dd6fbe5ae98c6e92f21e-c212a4f9990764d47b8b",
+              "file": "tests/suites/05-mock-api.spec.ts",
+              "line": 57,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "tests\\suites\\04-developer.spec.ts",
+      "file": "tests/suites/04-developer.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Suite 4: Developer",
+          "file": "tests/suites/04-developer.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "verifies assigned task metrics @smoke",
+              "ok": true,
+              "tags": [
+                "developer",
+                "smoke",
+                "smoke",
+                "developer"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "developer",
+                  "projectName": "developer",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4584,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:30:43.671Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Devel-8c7c3-assigned-task-metrics-smoke-developer\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3ba4723bb053a66e15af-4ff33e4dfbb58fc9caef",
+              "file": "tests/suites/04-developer.spec.ts",
+              "line": 16,
+              "column": 7
+            },
+            {
+              "title": "shows table rows when tasks are assigned",
+              "ok": true,
+              "tags": [
+                "developer"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "developer",
+                  "projectName": "developer",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4360,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:30:48.383Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Devel-4ce66-ows-when-tasks-are-assigned-developer\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3ba4723bb053a66e15af-89aeb09c1471d0397751",
+              "file": "tests/suites/04-developer.spec.ts",
+              "line": 27,
+              "column": 7
+            },
+            {
+              "title": "marks a task as completed in Kanban",
+              "ok": true,
+              "tags": [
+                "developer"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "developer",
+                  "projectName": "developer",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 18644,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Developer completes task in Kanban with hours worked",
+                          "duration": 9508
+                        },
+                        {
+                          "title": "My Tasks table shows Done status",
+                          "duration": 6296
+                        }
+                      ],
+                      "startTime": "2026-06-08T17:30:52.765Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "kanban-task-in-done.png",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Devel-8e611-task-as-completed-in-Kanban-developer\\attachments\\kanban-task-in-done-png-9961483ed23711fdcf6858ff9b2f95d7854ebcbd.png"
+                        },
+                        {
+                          "name": "my-tasks-status-done.png",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Devel-8e611-task-as-completed-in-Kanban-developer\\attachments\\my-tasks-status-done-png-905d882833730658fd2a60ea20055370496c9f3d.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Devel-8e611-task-as-completed-in-Kanban-developer\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3ba4723bb053a66e15af-625925cb1e9e68e0b777",
+              "file": "tests/suites/04-developer.spec.ts",
+              "line": 34,
+              "column": 7
+            },
+            {
+              "title": "opens My Performance",
+              "ok": true,
+              "tags": [
+                "developer"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "developer",
+                  "projectName": "developer",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 15677,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-08T17:31:11.420Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\04-developer-Suite-4-Developer-opens-My-Performance-developer\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3ba4723bb053a66e15af-11d4c85d27a94b1301e5",
+              "file": "tests/suites/04-developer.spec.ts",
+              "line": 57,
+              "column": 7
             }
           ]
         }
@@ -260,9 +1282,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-06-08T05:44:31.447Z",
-    "duration": 55899.534999999996,
-    "expected": 2,
+    "startTime": "2026-06-08T17:27:48.485Z",
+    "duration": 218703.867,
+    "expected": 22,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
