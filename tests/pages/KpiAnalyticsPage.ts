@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { SELECTORS, TIMEOUTS, UI } from '../constants';
+import { SELECTORS, TIMEOUTS } from '../constants';
+import type { DashboardPage } from './DashboardPage';
 
 export class KpiAnalyticsPage {
   readonly page: Page;
@@ -12,17 +13,12 @@ export class KpiAnalyticsPage {
     this.completionRate = page.locator(SELECTORS.dashboard.completionRate);
   }
 
-  async expectLoaded(): Promise<void> {
+  async openFromDashboard(dashboard: DashboardPage): Promise<void> {
+    await dashboard.openKpiAnalytics();
     await expect(this.productivityScore.first()).toBeVisible({ timeout: TIMEOUTS.settle });
-    await expect(this.completionRate.first()).toBeAttached({ timeout: TIMEOUTS.settle });
   }
 
   async expectCompletionRateVisible(): Promise<void> {
     await expect(this.completionRate.first()).toBeAttached();
-  }
-
-  async openFromDashboard(dashboard: { openKpiAnalytics: () => Promise<void> }): Promise<void> {
-    await dashboard.openKpiAnalytics();
-    await this.expectLoaded();
   }
 }

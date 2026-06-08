@@ -1,5 +1,5 @@
 /**
- * Domain interfaces and types for Playwright E2E tests.
+ * Domain interfaces and types
  */
 
 // Authentication

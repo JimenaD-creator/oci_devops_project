@@ -14,24 +14,21 @@ import { DashboardPage } from './DashboardPage';
 export class TasksPage {
   readonly page: Page;
   readonly newTaskButton: Locator;
-  readonly tasksTable: Locator;
   readonly taskRows: Locator;
   readonly taskDialog: Locator;
 
-  /** Reuse manager storageState and open Tasks from the dashboard. */
+  constructor(page: Page) {
+    this.page = page;
+    this.newTaskButton = page.getByRole('button', { name: UI.newTask });
+    this.taskRows = page.locator('table').getByRole('row').filter({ has: page.getByRole('cell') });
+    this.taskDialog = page.locator(SELECTORS.tasks.taskDialog);
+  }
+
   static async openAsManager(page: Page): Promise<TasksPage> {
     const dashboard = await DashboardPage.open(page);
     const tasks = new TasksPage(page);
     await tasks.openFromDashboard(dashboard);
     return tasks;
-  }
-
-  constructor(page: Page) {
-    this.page = page;
-    this.newTaskButton = page.getByRole('button', { name: UI.newTask });
-    this.tasksTable = page.locator('table');
-    this.taskRows = this.tasksTable.getByRole('row').filter({ has: page.getByRole('cell') });
-    this.taskDialog = page.locator(SELECTORS.tasks.taskDialog);
   }
 
   async openFromDashboard(dashboard: DashboardPage): Promise<void> {
@@ -41,34 +38,27 @@ export class TasksPage {
       await expect(tasksNav).toBeVisible({ timeout: TIMEOUTS.navigation });
     }
     await tasksNav.click();
-    await this.expectLoaded();
-  }
-
-  async expectLoaded(): Promise<void> {
     await expect(this.newTaskButton).toBeVisible({ timeout: TIMEOUTS.navigation });
   }
 
-  async openNewTaskDialog(): Promise<void> {
-    await this.newTaskButton.click();
-    await this.taskDialog.waitFor({ state: 'visible', timeout: TIMEOUTS.dialog });
-  }
-
-  async fillNewTaskForm(
+  async createTask(
     task: Task,
     options?: { assignee?: string | RegExp; sprint?: string | RegExp },
-  ): Promise<void> {
+  ): Promise<{ id: number; title: string }> {
+    await this.newTaskButton.click();
+    await this.taskDialog.waitFor({ state: 'visible', timeout: TIMEOUTS.dialog });
+
     const dialog = this.taskDialog;
     await dialog.getByRole('textbox', { name: /Task title/i }).fill(task.title);
 
-    const descriptionEditor = dialog.getByRole('textbox', { name: /^Description/i });
-    await descriptionEditor.click();
-    await descriptionEditor.fill(task.description);
-    await descriptionEditor.blur();
+    const description = dialog.getByRole('textbox', { name: /^Description/i });
+    await description.click();
+    await description.fill(task.description);
+    await description.blur();
 
     const typeLabel =
       TASK_CLASSIFICATIONS[task.classification]?.label ?? TASK_CLASSIFICATIONS.FEATURE.label;
     const priorityLabel = TASK_PRIORITIES[task.priority]?.label ?? TASK_PRIORITIES.MEDIUM.label;
-
     await dialog.getByRole('button', { name: typeLabel }).first().click();
     await dialog.getByRole('button', { name: priorityLabel }).first().click();
 
@@ -93,85 +83,54 @@ export class TasksPage {
       }
     }
 
-    const startDate = task.startDate ?? DEFAULT_TASK_DATES.startDate;
-    const dueDate = task.dueDate ?? DEFAULT_TASK_DATES.dueDate;
-    await dialog.getByLabel(/Start date/i).fill(startDate);
-    await dialog.getByLabel(/Due date/i).fill(dueDate);
-  }
+    await dialog.getByLabel(/Start date/i).fill(task.startDate ?? DEFAULT_TASK_DATES.startDate);
+    await dialog.getByLabel(/Due date/i).fill(task.dueDate ?? DEFAULT_TASK_DATES.dueDate);
 
-  async submitNewTask(): Promise<{ id: number; title: string }> {
-    const createButton = this.taskDialog.getByRole('button', { name: UI.createTask });
+    const createButton = dialog.getByRole('button', { name: UI.createTask });
     await expect(createButton).toBeEnabled({ timeout: TIMEOUTS.dialog });
     const response = await Promise.all([
       this.page.waitForResponse(
-        (response) =>
-          response.url().includes('/api/tasks') &&
-          response.request().method() === 'POST' &&
-          response.ok(),
+        (r) => r.url().includes('/api/tasks') && r.request().method() === 'POST' && r.ok(),
       ),
       createButton.click(),
     ]).then(([res]) => res);
+
     const created = (await response.json()) as { id: number; title: string };
     await this.taskDialog.waitFor({ state: 'hidden', timeout: TIMEOUTS.dialog });
     return created;
   }
 
-  async createTask(
-    task: Task,
-    options?: { assignee?: string | RegExp; sprint?: string | RegExp },
-  ): Promise<{ id: number; title: string }> {
-    await this.openNewTaskDialog();
-    await this.fillNewTaskForm(task, options);
-    return this.submitNewTask();
-  }
-
-  taskRowByTitle(title: string): Locator {
-    return this.taskRows.filter({ hasText: title });
+  taskRow(title: string): Locator {
+    return this.taskRows.filter({ hasText: title }).last();
   }
 
   async expectTaskVisible(title: string): Promise<void> {
-    const row = this.taskRowByTitle(title).last();
+    const row = this.taskRow(title);
     await row.scrollIntoViewIfNeeded();
     await expect(row).toBeVisible({ timeout: TIMEOUTS.expect });
   }
 
   async expectTaskStatus(title: string, status: string): Promise<void> {
-    const row = this.taskRowByTitle(title).last();
+    const row = this.taskRow(title);
     await row.scrollIntoViewIfNeeded();
     await expect(row.getByText(status, { exact: true })).toBeVisible({ timeout: TIMEOUTS.expect });
   }
 
   async editTaskTitle(currentTitle: string, newTitle: string): Promise<void> {
-    const row = this.taskRowByTitle(currentTitle).last();
+    const row = this.taskRow(currentTitle);
     await row.scrollIntoViewIfNeeded();
-    await expect(row).toBeVisible({ timeout: TIMEOUTS.expect });
     await row.click();
     await this.taskDialog.waitFor({ state: 'visible', timeout: TIMEOUTS.dialog });
     await this.page.getByRole('button', { name: 'Edit' }).click();
     await this.page.getByLabel(/Task title/i).fill(newTitle);
     await Promise.all([
       this.page.waitForResponse(
-        (response) =>
-          /\/api\/tasks\/\d+/.test(response.url()) &&
-          response.request().method() === 'PUT' &&
-          response.ok(),
+        (r) => /\/api\/tasks\/\d+/.test(r.url()) && r.request().method() === 'PUT' && r.ok(),
       ),
       this.page.getByRole('button', { name: 'Save changes' }).click(),
     ]);
     await this.taskDialog.waitFor({ state: 'hidden', timeout: TIMEOUTS.dialog });
     await this.expectTaskVisible(newTitle);
-  }
-
-  completedTaskRows(): Locator {
-    return this.taskRows.filter({
-      has: this.page.getByText(TASK_STATUSES.DONE.label, { exact: true }),
-    });
-  }
-
-  async expectCompletedTasksVisible(minCount = 1): Promise<void> {
-    const doneRows = this.completedTaskRows();
-    await expect(doneRows.first()).toBeVisible({ timeout: TIMEOUTS.expect });
-    expect(await doneRows.count()).toBeGreaterThanOrEqual(minCount);
   }
 
   async filterByStatus(statusLabel: string): Promise<void> {
@@ -187,22 +146,25 @@ export class TasksPage {
     }
   }
 
-  async editTaskTitleAtRow(rowIndex: number, newTitle: string): Promise<void> {
-    const row = this.taskRows.nth(rowIndex);
-    await expect(row).toBeVisible({ timeout: TIMEOUTS.navigation });
+  async deleteTask(title: string): Promise<void> {
+    const row = this.taskRow(title);
+    await row.scrollIntoViewIfNeeded();
     await row.click();
-    await this.taskDialog.waitFor({ state: 'visible' });
-    await this.page.getByRole('button', { name: 'Edit' }).click();
-    await this.page.getByLabel(/Task title/i).fill(newTitle);
+    await this.taskDialog.waitFor({ state: 'visible', timeout: TIMEOUTS.dialog });
+
+    this.page.once('dialog', (dialog) => dialog.accept());
     await Promise.all([
       this.page.waitForResponse(
-        (response) =>
-          /\/api\/tasks\/\d+/.test(response.url()) &&
-          response.request().method() === 'PUT' &&
-          response.ok(),
+        (r) => /\/api\/tasks\/\d+/.test(r.url()) && r.request().method() === 'DELETE' && r.ok(),
       ),
-      this.page.getByRole('button', { name: 'Save changes' }).click(),
+      this.taskDialog.getByRole('button', { name: 'Delete' }).click(),
     ]);
     await this.taskDialog.waitFor({ state: 'hidden', timeout: TIMEOUTS.dialog });
+  }
+
+  async expectTaskNotVisible(title: string): Promise<void> {
+    await expect(this.taskRows.filter({ hasText: title })).toHaveCount(0, {
+      timeout: TIMEOUTS.expect,
+    });
   }
 }

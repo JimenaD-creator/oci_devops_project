@@ -356,7 +356,7 @@ export async function mockManagerSessionFromHar(page: Page): Promise<void> {
   await mockTaskById(page);
 }
 
-/** Records live API traffic into a HAR file (use once, then commit the generated file). */
+/** Records live API traffic into a HAR file */
 export async function recordHar(page: Page, harFile: string, url = '**/api/**'): Promise<void> {
   await page.routeFromHAR(resolveHarPath(harFile), {
     url,
@@ -376,7 +376,7 @@ export async function mockUnhandledApi(page: Page): Promise<void> {
   });
 }
 
-/** Registers all mocks needed for a mocked manager session (no real API). */
+/** Registers all mocks needed for a mocked manager session */
 export async function mockAllForManager(page: Page): Promise<void> {
   await mockUnhandledApi(page);
   await mockLoginSuccess(page, MOCK_MANAGER_LOGIN);
@@ -390,7 +390,7 @@ export async function mockAllForManager(page: Page): Promise<void> {
   await mockUserTasks(page);
 }
 
-/** Registers all mocks needed for a mocked developer session (no real API). */
+/** Registers all mocks needed for a mocked developer session */
 export async function mockAllForDeveloper(page: Page): Promise<void> {
   await mockUnhandledApi(page);
   await mockLoginSuccess(page, MOCK_DEVELOPER_LOGIN);

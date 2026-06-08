@@ -1,25 +1,16 @@
-/** Suite 3 — Task lifecycle (runs before Suite 4 Developer) */
+/** Suite 3 — Task lifecycle  */
 import { test, expect } from '@playwright/test';
 import {
   DEVELOPER_ASSIGNEE,
   DEVELOPER_KANBAN_TASK,
+  DELETE_TASK,
   TAGS,
   TASK_STATUSES,
   TEST_TASKS,
-  TIMEOUTS,
 } from '../constants';
-import { captureStableScreenshot, LoginPage, TasksPage } from '../pages';
+import { captureStableScreenshot } from '../helpers/screenshots';
+import { LoginPage, TasksPage } from '../pages';
 import { saveKanbanTaskRef } from '../helpers/kanbanTaskStore';
-import type { Task } from '../types';
-
-const runId = Date.now();
-
-function tasksForRun(): Task[] {
-  return TEST_TASKS.map((task, index) => ({
-    ...task,
-    title: `${task.title} ${runId}-${index + 1}`,
-  }));
-}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -35,11 +26,11 @@ test.describe('Suite 3: Tasks', { tag: TAGS.tasks }, () => {
       await TasksPage.openAsManager(page);
       const tasksPage = new TasksPage(page);
       const login = new LoginPage(page);
-      for (const task of tasksForRun()) {
+      for (const task of TEST_TASKS) {
         await tasksPage.createTask(task);
         await tasksPage.expectTaskVisible(task.title);
         await expect(login.taskRowByTitle.first()).toBeAttached();
-        await tasksPage.editTaskTitle(task.title, `E2E Edited ${task.title}`);
+        await tasksPage.editTaskTitle(task.title, `Updated: ${task.title}`);
       }
     },
   );
@@ -74,5 +65,14 @@ test.describe('Suite 3: Tasks', { tag: TAGS.tasks }, () => {
         has: page.getByText(TASK_STATUSES.TODO.label, { exact: true }),
       }),
     ).toHaveCount(0);
+  });
+
+  test('manager deletes a task', async ({ page }) => {
+    await TasksPage.openAsManager(page);
+    const tasksPage = new TasksPage(page);
+    await tasksPage.createTask(DELETE_TASK);
+    await tasksPage.expectTaskVisible(DELETE_TASK.title);
+    await tasksPage.deleteTask(DELETE_TASK.title);
+    await tasksPage.expectTaskNotVisible(DELETE_TASK.title);
   });
 });

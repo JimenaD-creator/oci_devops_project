@@ -1,7 +1,8 @@
 /** Suite 2 — Manager */
 import { test, expect } from '@playwright/test';
 import { TAGS, TIMEOUTS, UI } from '../constants';
-import { captureStableScreenshot, DashboardPage, KanbanPage, KpiAnalyticsPage, LoginPage, TasksPage } from '../pages';
+import { captureStableScreenshot } from '../helpers/screenshots';
+import { DashboardPage, KanbanPage, KpiAnalyticsPage, LoginPage, TasksPage } from '../pages';
 
 test.describe('Suite 2: Manager', { tag: TAGS.manager }, () => {
   test.afterEach(async ({ page }, testInfo) => {
@@ -19,7 +20,7 @@ test.describe('Suite 2: Manager', { tag: TAGS.manager }, () => {
       await dashboard.expectDashboardVisible();
       await kpi.openFromDashboard(dashboard);
       await kpi.expectCompletionRateVisible();
-      await expect(new LoginPage(page).developerAvatarByAlt('Demo Developer')).toHaveCount(0);
+      await expect(new LoginPage(page).developerAvatar('Demo Developer')).toHaveCount(0);
       await page.clock.fastForward('02:00:00');
       expect(Date.now()).toBeGreaterThan(new Date('2026-06-05T11:00:00Z').getTime());
     },
@@ -32,7 +33,7 @@ test.describe('Suite 2: Manager', { tag: TAGS.manager }, () => {
   });
   test('views dashboard scorecards and completion metrics', async ({ page }) => {
     await DashboardPage.open(page);
-    await new DashboardPage(page).expectScorecardsAndAveragesVisible();
+    await new DashboardPage(page).expectScorecardsVisible();
   });
   test('explores AI Insights', async ({ page }) => {
     await DashboardPage.open(page);
