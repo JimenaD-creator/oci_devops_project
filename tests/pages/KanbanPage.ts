@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { KANBAN_COLUMNS, SELECTORS, TASK_STATUSES, TIMEOUTS } from '../constants';
-import type { KanbanColumn } from '../types';
-import { DashboardPage } from './DashboardPage';
+import { SELECTORS, TASK_STATUSES, TIMEOUTS } from '../constants';
+import type { DashboardPage } from './DashboardPage';
 
 export class KanbanPage {
   readonly page: Page;
@@ -19,46 +18,27 @@ export class KanbanPage {
       await expect(kanbanNav).toBeVisible({ timeout: TIMEOUTS.navigation });
     }
     await kanbanNav.click();
-    await this.expectLoaded();
-  }
-
-  async expectLoaded(): Promise<void> {
     await expect(this.board).toBeVisible({ timeout: TIMEOUTS.navigation });
   }
 
-  columnBodyFor(column: KanbanColumn): Locator {
-    return this.page
-      .locator('.kanban-column')
-      .filter({
-        has: this.page.locator(SELECTORS.kanban.columnHeader, { hasText: column }),
-      })
-      .locator(SELECTORS.kanban.columnBody);
+  taskCard(title: string, taskId?: number): Locator {
+    const cards = this.board.locator(SELECTORS.kanban.taskCard);
+    if (taskId != null) {
+      return cards.filter({ hasText: `#${taskId}` });
+    }
+    return cards.filter({ hasText: title }).first();
   }
 
-  taskCardByTitle(title: string): Locator {
-    return this.board.locator(SELECTORS.kanban.taskCard).filter({ hasText: title });
-  }
-
-  taskCardById(taskId: number): Locator {
-    return this.board.locator(SELECTORS.kanban.taskCard).filter({ hasText: `#${taskId}` });
-  }
-
-  async dragTaskToDone(title: string, taskId?: number): Promise<void> {
-    const card = taskId != null ? this.taskCardById(taskId) : this.taskCardByTitle(title).first();
+  async moveTaskToDone(title: string, taskId?: number): Promise<void> {
+    const card = this.taskCard(title, taskId);
     await expect(card).toBeVisible({ timeout: TIMEOUTS.navigation });
     await card.locator('.kanban-task-status-pill').click();
     await this.page.getByRole('menuitem', { name: TASK_STATUSES.DONE.label, exact: true }).click();
   }
 
   async expectTaskInDoneColumn(title: string, taskId?: number): Promise<void> {
-    const card =
-      taskId != null
-        ? this.page.locator(`${SELECTORS.kanban.columnDone} ${SELECTORS.kanban.taskCard}`).filter({
-            hasText: `#${taskId}`,
-          })
-        : this.page.locator(`${SELECTORS.kanban.columnDone} ${SELECTORS.kanban.taskCard}`).filter({
-            hasText: title,
-          });
+    const doneCards = this.page.locator(`${SELECTORS.kanban.columnDone} ${SELECTORS.kanban.taskCard}`);
+    const card = taskId != null ? doneCards.filter({ hasText: `#${taskId}` }) : doneCards.filter({ hasText: title });
     await expect(card).toBeVisible({ timeout: TIMEOUTS.expect });
   }
 }

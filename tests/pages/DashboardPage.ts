@@ -8,15 +8,6 @@ export class DashboardPage {
   readonly navKpiAnalytics: Locator;
   readonly navSprints: Locator;
   readonly developerFilter: Locator;
-  readonly goToTasksButton: Locator;
-
-  /** Reuse manager storageState — skip login form. */
-  static async open(page: Page): Promise<DashboardPage> {
-    await page.goto('/');
-    const dashboard = new DashboardPage(page);
-    await dashboard.expectLoaded();
-    return dashboard;
-  }
 
   constructor(page: Page) {
     this.page = page;
@@ -25,14 +16,24 @@ export class DashboardPage {
     this.navKpiAnalytics = page.getByRole('button', { name: UI.kpiAnalytics, exact: true });
     this.navSprints = page.getByRole('button', { name: 'Sprints', exact: true });
     this.developerFilter = page.locator(SELECTORS.dashboard.developerFilter);
-    this.goToTasksButton = page.locator(SELECTORS.dashboard.goToTasksButton);
+  }
+
+  static async open(page: Page): Promise<DashboardPage> {
+    await page.goto('/');
+    const dashboard = new DashboardPage(page);
+    await dashboard.expectLoaded();
+    return dashboard;
   }
 
   async expectLoaded(): Promise<void> {
-    await this.expectDashboardVisible();
+    await expect(this.navDashboard).toBeVisible({ timeout: TIMEOUTS.login });
     await expect(this.page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible({
       timeout: TIMEOUTS.settle,
     });
+  }
+
+  async expectDashboardVisible(): Promise<void> {
+    await expect(this.navDashboard).toBeVisible({ timeout: TIMEOUTS.login });
   }
 
   async openAiInsights(): Promise<void> {
@@ -57,11 +58,7 @@ export class DashboardPage {
     }
   }
 
-  async expectDashboardVisible(): Promise<void> {
-    await expect(this.navDashboard).toBeVisible({ timeout: TIMEOUTS.login });
-  }
-
-  async expectScorecardsAndAveragesVisible(): Promise<void> {
+  async expectScorecardsVisible(): Promise<void> {
     await expect(this.page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible();
     await expect(this.page.getByText('Tasks Completed').first()).toBeVisible();
     await expect(this.page.getByText('Total hours worked').first()).toBeVisible();

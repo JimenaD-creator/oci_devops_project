@@ -3,13 +3,8 @@ import { test, expect } from '@playwright/test';
 import { TAGS, UI } from '../constants';
 import { installFreshDashboardBundleRoute } from '../helpers/freshDashboardBundle';
 import { readKanbanTaskRef } from '../helpers/kanbanTaskStore';
-import {
-  captureAndAttachScreenshot,
-  captureStableScreenshot,
-  KanbanPage,
-  MyTasksPage,
-  waitForPageSettled,
-} from '../pages';
+import { captureAndAttachScreenshot, captureStableScreenshot, waitForPageSettled } from '../helpers/screenshots';
+import { KanbanPage, MyTasksPage } from '../pages';
 
 test.describe.configure({ mode: 'serial' });
 

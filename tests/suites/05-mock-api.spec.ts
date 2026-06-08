@@ -1,7 +1,8 @@
 /** Suite 5 — API mocking within login flows (page.route, mock helpers, HAR replay) */
 import { test, expect } from '@playwright/test';
 import { TAGS, USERS } from '../constants';
-import { captureStableScreenshot, DashboardPage, LoginPage } from '../pages';
+import { captureStableScreenshot } from '../helpers/screenshots';
+import { DashboardPage, LoginPage } from '../pages';
 import {
   mockAllForManager,
   mockLoginFailedFromHar,
@@ -17,7 +18,6 @@ test.describe('Suite 5: Mock API', { tag: TAGS.mock }, () => {
   test('rejects invalid login via page.route @mock', async ({ page }) => {
     await new LoginPage(page).clearSession();
     let intercepted = false;
-    // Mock API — inline page.route() intercepts POST /api/auth/login without hitting the real server
     await page.route('**/api/auth/login', async (route) => {
       intercepted = true;
       await route.fulfill({
@@ -34,15 +34,13 @@ test.describe('Suite 5: Mock API', { tag: TAGS.mock }, () => {
   });
   test('rejects invalid login via mock helper @mock', async ({ page }) => {
     await new LoginPage(page).clearSession();
-    // Mock API — reusable handler from tests/mocks/apiMocks.ts
     await mockLoginUnauthorized(page);
     const login = new LoginPage(page);
     await login.loginWith(USERS.MANAGER);
     await login.expectInvalidCredentialsError();
   });
-  test('logs in with programmatic mocks @mock', async ({ page }) => {
+  test('logs in with mocks @mock', async ({ page }) => {
     await new LoginPage(page).clearSession();
-    // Mock API — full manager session via page.route handlers (no real API)
     await mockAllForManager(page);
     const login = new LoginPage(page);
     await login.loginWith(USERS.MANAGER);
@@ -58,7 +56,6 @@ test.describe('Suite 5: Mock API', { tag: TAGS.mock }, () => {
   });
   test('logs in with full manager session from HAR @mock', async ({ page }) => {
     await new LoginPage(page).clearSession();
-    // HAR mocking — replays manager-session.har (login + dashboard API chain)
     await mockManagerSessionFromHar(page);
     const login = new LoginPage(page);
     await login.loginWith(USERS.MANAGER);

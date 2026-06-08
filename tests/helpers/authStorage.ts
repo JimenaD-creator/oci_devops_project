@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-/** App stores JWT in sessionStorage by default — copy to localStorage so storageState survives new contexts. */
+/** App stores JWT in sessionStorage by default */
 export async function persistAuthTokenForStorage(page: Page): Promise<void> {
   await page.evaluate(() => {
     const token =

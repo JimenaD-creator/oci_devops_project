@@ -1,4 +1,4 @@
-import { Task, User } from '../types';
+import { LoginTestCase, Task, User } from '../types';
 
 //  Platform URLs
 
@@ -34,7 +34,27 @@ export const USERS: Record<string, User> = {
   },
 };
 
-/** Developer display name in task assignee dropdown (matches USERS.DEVELOPER login). */
+/** Parameterized login scenarios for Suite 1 (Authentication). */
+export const LOGIN_TEST_CASES: LoginTestCase[] = [
+  {
+    name: 'invalid credentials',
+    user: {
+      identifier: USERS.INVALID_USER.username,
+      password: USERS.INVALID_USER.password,
+    },
+    shouldFail: true,
+  },
+  {
+    name: 'valid manager',
+    user: {
+      identifier: USERS.MANAGER.username,
+      password: USERS.MANAGER.password,
+    },
+    shouldFail: false,
+  },
+];
+
+/** Developer display name in task assignee dropdown */
 export const DEVELOPER_ASSIGNEE = /Jimena/i;
 
 //  Sample tasks for create / edit
@@ -109,6 +129,17 @@ export const DEVELOPER_KANBAN_TASK: Task = {
   dueDate: DEFAULT_TASK_DATES.dueDate,
 };
 
+/** Throwaway task for the delete test*/
+export const DELETE_TASK: Task = {
+  title: 'Remove after review',
+  description: 'Temporary task created only to verify delete',
+  status: 'TODO',
+  priority: 'LOW',
+  classification: 'TASK',
+  startDate: DEFAULT_TASK_DATES.startDate,
+  dueDate: DEFAULT_TASK_DATES.dueDate,
+};
+
 // Selectors
 
 export const SELECTORS = {
@@ -120,10 +151,8 @@ export const SELECTORS = {
     brandHeading: 'h1:has-text("ORACLE")',
     subtitle: 'text=Sign in to access the dashboard',
     rememberMeCheckbox: 'input.login-checkbox',
-    /** Used with page.getByTestId() */
     testIdEmail: 'login-email',
     testIdPassword: 'login-password',
-    /** Used with page.getByTitle() — kanban cards and task table rows */
     titleViewTaskDetails: 'Click to view details',
   },
   dashboard: {
@@ -194,7 +223,7 @@ export const API_ENDPOINTS = {
   USERS: '/api/users',
 } as const;
 
-// Tags for filtering: npx playwright test --grep @smoke
+// Tags for filtering
 
 export const TAGS = {
   smoke: '@smoke',
@@ -209,7 +238,6 @@ export const TAGS = {
 
 export const UI = {
   signIn: 'Sign in',
-  /** Backend returns "Invalid credentials." — UI may append "Please try again." */
   invalidCredentials: 'Invalid credentials',
   dashboard: 'Dashboard',
   kpiAnalytics: 'KPI Analytics',
@@ -242,9 +270,7 @@ export const TIMEOUTS = {
   expect: 20_000,
   login: 45_000,
   dialog: 20_000,
-  /** Wait for spinners / network before screenshots and end-of-test video frame. */
   settle: 30_000,
-  /** Brief hold so recordings capture the final UI after async content loads. */
   visualHold: 2_000,
 } as const;
 

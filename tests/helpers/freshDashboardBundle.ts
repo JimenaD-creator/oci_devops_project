@@ -15,11 +15,6 @@ async function fetchJson(
   return response.json();
 }
 
-/**
- * The deployed server caches GET /api/projects/:id/dashboard-bundle (@Cacheable).
- * Newly created tasks appear in /api/tasks but not in the stale bundle, so developer
- * Kanban never shows them. Rebuild the bundle from live task endpoints in tests.
- */
 export async function installFreshDashboardBundleRoute(page: Page): Promise<void> {
   await page.route('**/api/projects/*/dashboard-bundle', async (route: Route) => {
     if (page.isClosed()) {
