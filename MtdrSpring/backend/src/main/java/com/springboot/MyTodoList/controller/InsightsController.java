@@ -170,6 +170,7 @@ public class InsightsController {
             response.put("minSimilarity", threshold);
             response.put("indexedSprints", indexed);
             response.put("insightsAvailable", withInsights);
+            response.put("vectorSearchBackend", embeddingService.getInsightVectorSearchBackend().name());
             response.put("matches", matches);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -197,6 +198,7 @@ public class InsightsController {
             response.put("status", "ok");
             response.put("projectId", projectId);
             response.put("embeddedCount", embedded);
+            response.put("vectorSearchBackend", embeddingService.getInsightVectorSearchBackend().name());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("status", "failed");
