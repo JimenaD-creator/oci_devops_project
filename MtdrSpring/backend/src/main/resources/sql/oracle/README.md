@@ -5,11 +5,15 @@
 ## Steps (production)
 
 1. Run `00_check_vector_support.sql` — probe must succeed.
-2. Run `01_task_embeddings_vector_migration.sql` — adds `EMBEDDING_VEC` + IVF index.
-3. Set `VECTOR_SEARCH_MODE=auto` (default) or `oracle` in `.env` / OKE secrets.
-4. Rebuild and restart the backend (Docker or OKE).
-5. Re-index each sprint: `POST /api/embeddings/sprint/{sprintId}/index`
-6. Verify: `GET /api/embeddings/sprint/{id}` → `"vectorSearchBackend": "ORACLE"`
+2. Run `01_task_embeddings_vector_migration.sql` — task vectors + IVF index.
+3. Run `02_sprint_insight_embeddings_vector_migration.sql` — insight vectors + IVF index.
+4. Set `VECTOR_SEARCH_MODE=auto` (default) or `oracle` in `.env` / OKE secrets.
+5. Rebuild and restart the backend (Docker or OKE).
+6. Re-index tasks per sprint: `POST /api/embeddings/sprint/{sprintId}/index`
+7. Backfill insight embeddings: `POST /api/insights/project/{projectId}/embeddings/backfill`
+8. Verify:
+   - `GET /api/embeddings/sprint/{id}` → `"vectorSearchBackend": "ORACLE"`
+   - `GET /api/insights/sprint/{id}/similar` → `"vectorSearchBackend": "ORACLE"`
 
 ## Rollback
 

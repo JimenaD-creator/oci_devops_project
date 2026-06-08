@@ -11,8 +11,9 @@ import com.springboot.MyTodoList.model.TaskEmbedding;
 import com.springboot.MyTodoList.repository.SprintInsightEmbeddingRepository;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
+import com.springboot.MyTodoList.service.vector.SprintInsightEmbeddingVectorStore;
 import com.springboot.MyTodoList.service.vector.TaskEmbeddingVectorStore;
-import com.springboot.MyTodoList.service.vector.VectorCosineSimilarity;
+import com.springboot.MyTodoList.service.vector.ScoredSprintInsightEmbedding;
 import com.springboot.MyTodoList.service.vector.VectorSearchBackend;
 import com.springboot.MyTodoList.util.InsightEmbeddingTextBuilder;
 import org.slf4j.Logger;
@@ -28,7 +29,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -63,6 +63,9 @@ public class EmbeddingService {
 
     @Autowired
     private TaskEmbeddingVectorStore vectorStore;
+
+    @Autowired
+    private SprintInsightEmbeddingVectorStore insightVectorStore;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -105,12 +108,20 @@ public class EmbeddingService {
         return vectorStore.getActiveBackend();
     }
 
+    public VectorSearchBackend getInsightVectorSearchBackend() {
+        return insightVectorStore.getActiveBackend();
+    }
+
     public boolean hasStoredVector(TaskEmbedding row) {
         return vectorStore.hasStoredVector(row);
     }
 
+    public boolean hasStoredInsightVector(SprintInsightEmbedding row) {
+        return insightVectorStore.hasStoredVector(row);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
-    // SPRINT INSIGHT EMBEDDINGS (application-mode cosine on JSON CLOB)
+    // SPRINT INSIGHT EMBEDDINGS (Oracle VECTOR or application cosine on JSON CLOB)
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional
@@ -132,10 +143,10 @@ public class EmbeddingService {
             row.setSprintId(insight.getSprintId());
             row.setProjectId(insight.getProjectId());
             row.setTextChunk(chunk);
-            row.setEmbedding(mapper.writeValueAsString(vector));
             row.setCreatedAt(LocalDateTime.now());
-            insightEmbeddingRepository.save(row);
-            log.info("Embedded sprint insight for sprint {}", insight.getSprintId());
+            insightVectorStore.save(row, vector, mapper.writeValueAsString(vector));
+            log.info("Embedded sprint insight for sprint {} (backend={})",
+                insight.getSprintId(), insightVectorStore.getActiveBackend());
         } catch (Exception e) {
             log.warn("Failed to embed sprint insight for sprint {}: {}", insight.getSprintId(), e.getMessage());
         }
@@ -150,36 +161,24 @@ public class EmbeddingService {
             return List.of();
         }
 
-        List<SprintInsightEmbedding> peers = insightEmbeddingRepository.findByProjectId(source.getProjectId());
-        List<ScoredInsight> scored = new ArrayList<>();
-        for (SprintInsightEmbedding peer : peers) {
-            if (peer.getSprintId().equals(sprintId)) {
-                continue;
-            }
-            double[] peerVector = parseVectorJson(peer.getEmbedding());
-            if (peerVector == null) {
-                continue;
-            }
-            double similarity = VectorCosineSimilarity.cosineSimilarity(sourceVector, peerVector);
-            scored.add(new ScoredInsight(peer, similarity));
-        }
+        List<ScoredSprintInsightEmbedding> scored = insightVectorStore.rankSimilarInProject(
+            sourceVector, source.getProjectId(), sprintId, Math.max(topK * 4, 20));
 
-        scored.sort(Comparator.comparingDouble(ScoredInsight::similarity).reversed());
-        List<ScoredInsight> filtered = scored.stream()
-            .filter(s -> s.similarity() >= threshold)
+        List<ScoredSprintInsightEmbedding> filtered = scored.stream()
+            .filter(s -> s.getSimilarity() >= threshold)
             .limit(topK)
             .collect(Collectors.toList());
 
         if (filtered.isEmpty()) {
             filtered = scored.stream()
-                .filter(s -> s.similarity() >= INSIGHT_SIMILARITY_FLOOR)
+                .filter(s -> s.getSimilarity() >= INSIGHT_SIMILARITY_FLOOR)
                 .limit(topK)
                 .collect(Collectors.toList());
         }
 
         List<SimilarSprintInsightMatch> matches = new ArrayList<>();
-        for (ScoredInsight item : filtered) {
-            matches.add(toInsightMatch(item.embedding(), item.similarity()));
+        for (ScoredSprintInsightEmbedding item : filtered) {
+            matches.add(toInsightMatch(item.getEmbedding(), item.getSimilarity()));
         }
         return matches;
     }
@@ -187,20 +186,7 @@ public class EmbeddingService {
     public List<SprintInsightEmbedding> findRelevantSprintInsights(String query, Long projectId, int topK)
             throws Exception {
         double[] queryVector = generateEmbedding(query);
-        List<SprintInsightEmbedding> rows = insightEmbeddingRepository.findByProjectId(projectId);
-        return rows.stream()
-            .map(row -> {
-                double[] stored = parseVectorJson(row.getEmbedding());
-                if (stored == null) {
-                    return null;
-                }
-                return Map.entry(row, VectorCosineSimilarity.cosineSimilarity(queryVector, stored));
-            })
-            .filter(java.util.Objects::nonNull)
-            .sorted(Comparator.comparingDouble((Map.Entry<SprintInsightEmbedding, Double> e) -> e.getValue()).reversed())
-            .limit(Math.max(1, topK))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
+        return insightVectorStore.findRelevantInProject(queryVector, projectId, topK);
     }
 
     @Transactional
@@ -355,23 +341,5 @@ public class EmbeddingService {
             return 1;
         }
         return 0;
-    }
-
-    private static final class ScoredInsight {
-        private final SprintInsightEmbedding embedding;
-        private final double similarity;
-
-        private ScoredInsight(SprintInsightEmbedding embedding, double similarity) {
-            this.embedding = embedding;
-            this.similarity = similarity;
-        }
-
-        private SprintInsightEmbedding embedding() {
-            return embedding;
-        }
-
-        private double similarity() {
-            return similarity;
-        }
     }
 }

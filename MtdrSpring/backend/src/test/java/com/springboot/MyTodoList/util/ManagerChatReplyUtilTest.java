@@ -47,6 +47,17 @@ class ManagerChatReplyUtilTest {
     }
 
     @Test
+    void alignProductivityVsPreviousInProse_fixesParentheticalFromSprint() {
+        String input =
+            "However, the current sprint shows a productivity score of 83% "
+                + "(a decrease of 83% from Sprint 3).";
+        String out = ManagerChatReplyUtil.alignProductivityVsPreviousInProse(input, -13, 83, "Sprint 3");
+        org.junit.jupiter.api.Assertions.assertTrue(out.contains("decrease of 13 points"));
+        org.junit.jupiter.api.Assertions.assertFalse(out.contains("decrease of 83%"));
+        org.junit.jupiter.api.Assertions.assertTrue(out.contains("from Sprint 3"));
+    }
+
+    @Test
     void polishManagerChatReply_fixesExactUserReport() {
         String input =
             "For Sprint 5, here are the key insights and alerts:\n"

@@ -27,6 +27,9 @@ public class SprintInsightEmbedding {
     @Column(name = "EMBEDDING", columnDefinition = "CLOB")
     private String embedding;
 
+    /** Native VECTOR column populated via JDBC when Oracle AI Vector Search is enabled. */
+    // EMBEDDING_VEC VECTOR(768, FLOAT64) — not mapped by JPA; see SprintInsightEmbeddingVectorStore.
+
     @Column(name = "CREATED_AT", nullable = false)
     private LocalDateTime createdAt;
 

@@ -20,6 +20,7 @@ public class VectorSearchProperties {
     private String legacyJsonColumn = "EMBEDDING";
     private int dimensions = 768;
     private String vectorIndexName = "TASK_EMBEDDINGS_VEC_IDX";
+    private String insightVectorIndexName = "SPRINT_INSIGHT_EMBEDDINGS_VEC_IDX";
     private int indexTargetAccuracy = 95;
 
     public Mode getMode() {
@@ -90,6 +91,16 @@ public class VectorSearchProperties {
         }
     }
 
+    public String getInsightVectorIndexName() {
+        return insightVectorIndexName;
+    }
+
+    public void setInsightVectorIndexName(String insightVectorIndexName) {
+        if (insightVectorIndexName != null && !insightVectorIndexName.isBlank()) {
+            this.insightVectorIndexName = insightVectorIndexName.trim();
+        }
+    }
+
     public int getIndexTargetAccuracy() {
         return indexTargetAccuracy;
     }
@@ -102,5 +113,9 @@ public class VectorSearchProperties {
 
     public String qualifiedEmbeddingsTable() {
         return schema + ".TASK_EMBEDDINGS";
+    }
+
+    public String qualifiedInsightEmbeddingsTable() {
+        return schema + ".SPRINT_INSIGHT_EMBEDDINGS";
     }
 }
