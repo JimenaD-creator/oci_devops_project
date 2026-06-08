@@ -426,7 +426,6 @@ export function alignSingleMetricBlock(text, metricKey, actual) {
       ? formatEfficiencyScoreDisplay(actual)
       : formatKpiMetricValue(actual);
   if (metricKey === 'efficiencyScore') {
-    out = applyKpiMetricPatterns(out, 'teamParticipation', actual);
     out = out.replace(
       /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
       `efficiency score is ${display}`,
@@ -464,7 +463,7 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   let aligned = alignKpiMetricsInText(text, metrics);
   const actual = metrics[metricKey];
   if (metricKey === 'efficiencyScore' && actual != null) {
-    aligned = applyKpiMetricPatterns(aligned, 'teamParticipation', actual);
+    aligned = applyKpiMetricPatterns(aligned, 'efficiencyScore', actual);
   }
   if (actual == null) return aligned;
   let out = alignAlertLoosePercents(aligned, actual);

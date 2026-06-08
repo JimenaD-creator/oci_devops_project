@@ -1,3 +1,8 @@
+import {
+  normalizeEfficiencyPercent,
+  resolveSprintProductivityScore,
+} from '../kpis/productivityScoreUtils';
+
 /** KPI keys stored in generationKpiSnapshot.kpis (matches backend live KPI map). */
 export const INSIGHTS_KPI_SNAPSHOT_KEYS = [
   'completionRate',
@@ -33,9 +38,11 @@ export function normalizeLiveMetricsForSnapshotCompare(metrics = {}) {
   return {
     completionRate: roundKpi(metrics.completionRate),
     onTimeDelivery: roundKpi(metrics.onTimeDelivery),
-    efficiencyScore: roundKpi(metrics.efficiencyScore ?? metrics.teamParticipation),
+    efficiencyScore: roundKpi(
+      normalizeEfficiencyPercent(metrics.efficiencyScore ?? metrics.teamParticipation),
+    ),
     workloadBalance: roundKpi(metrics.workloadBalance),
-    productivityScore: roundKpi(metrics.productivityScore),
+    productivityScore: roundKpi(resolveSprintProductivityScore(metrics)),
   };
 }
 

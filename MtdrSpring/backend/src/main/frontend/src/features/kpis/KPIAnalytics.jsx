@@ -20,7 +20,13 @@ import { resolveOnTimeDeliveryPercent } from './kpiAnalyticsProjectData';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import KpiManagerGuidePanel from './KpiManagerGuidePanel';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import {
+  buildSprintNumberMap,
+  formatSprintLabel,
+  getSprintDisplayIndex,
+  pickDefaultSelectedSprint,
+  sortSprintsByStartDate,
+} from '../sprints/utils/sprintUtils';
 import { fetchSprintInsights } from '../ai/insightsApi';
 import { getErrorMessage } from '../ai/aiInsightsConstants';
 import {
@@ -279,7 +285,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     getRawBundle,
   } = useProjectData();
   const [tasks, setTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
   const [managerGuide, setManagerGuide] = useState(null);
   const [managerGuideLoading, setManagerGuideLoading] = useState(true);
@@ -295,22 +301,27 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     [contextSprints, projectKey, dataUpdatedAt],
   );
 
-  // Crear mapa de números de sprint secuenciales
-  const getSprintNumber = useCallback((sprintId) => {
-    const sortedSprints = [...sprints].sort((a, b) => a.id - b.id);
-    const index = sortedSprints.findIndex(s => s.id === sprintId);
-    return index >= 0 ? index + 1 : sprintId; // +1 para que Sprint 0 sea Sprint 1
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
-  // Una sola definición de getSprintLabel
-  const getSprintLabel = useCallback((sprintId) => {
-    if (sprintId == null) return '';
-    const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
-    if (sprint?.shortLabel) return sprint.shortLabel;
-    if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-    const sprintNum = getSprintNumber(sprintId);
-    return `Sprint ${sprintNum}`;
-  }, [sprints, getSprintNumber]);
+  const getSprintNumber = useCallback(
+    (sprintId) => getSprintDisplayIndex(sprintNumberMap, sprintId),
+    [sprintNumberMap],
+  );
+
+  const getSprintLabel = useCallback(
+    (sprintId) => {
+      if (sprintId == null) return '';
+      const sequential = formatSprintLabel(sprintNumberMap, sprintId);
+      if (sequential) return sequential;
+      const sprint = sprints.find((s) => Number(s.id) === Number(sprintId));
+      if (sprint?.shortLabel) return sprint.shortLabel;
+      if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
+      return '';
+    },
+    [sprints, sprintNumberMap],
+  );
+
+  const loading = contextLoading || !kpiDataReady;
 
   // Efecto para cargar manager guide
   useEffect(() => {
@@ -359,7 +370,11 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     };
   }, [selectedSprintId, loading, kpiDataReady]);
 
-  const loading = contextLoading || tasksLoading;
+  useEffect(() => {
+    setKpiDataReady(false);
+    setTasks([]);
+    managerGuideBySprintRef.current.clear();
+  }, [projectKey]);
 
   useEffect(() => {
     ensureLoaded({ silent: true }).catch(() => {});
@@ -386,8 +401,18 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
       return undefined;
     }
 
+    if (contextLoading) {
+      return undefined;
+    }
+
+    if (sprints.length === 0) {
+      setTasks([]);
+      setTasksLoading(false);
+      setKpiDataReady(true);
+      return undefined;
+    }
+
     setTasksLoading(true);
-    setKpiDataReady(false);
 
     (async () => {
       try {
@@ -410,7 +435,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
     return () => {
       cancelled = true;
     };
-  }, [dataUpdatedAt, sprints, projectKey, getRawBundle]);
+  }, [dataUpdatedAt, sprints, projectKey, getRawBundle, contextLoading]);
 
   const getSelectedSprint = () => sprints.find((s) => s.id === selectedSprintId);
 
@@ -575,7 +600,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
   }
 
   // Ordenar sprints para el select
-  const sortedSprintsForSelect = [...sprints].sort((a, b) => a.id - b.id);
+  const sortedSprintsForSelect = sortSprintsByStartDate(sprints);
 
   return (
     <Box

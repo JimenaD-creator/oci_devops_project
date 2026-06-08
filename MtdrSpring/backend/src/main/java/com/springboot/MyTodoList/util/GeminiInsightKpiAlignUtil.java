@@ -80,7 +80,7 @@ public final class GeminiInsightKpiAlignUtil {
     private static final int ON_TIME_STRONG_PERCENT = 70;
 
     private static final String[] LIVE_METRIC_KEYS = {
-        "completionRate", "onTimeDelivery", "teamParticipation", "workloadBalance", "productivityScore"
+        "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore"
     };
 
     private GeminiInsightKpiAlignUtil() {}
@@ -90,6 +90,9 @@ public final class GeminiInsightKpiAlignUtil {
             return 0;
         }
         Object v = live.get(key);
+        if (v == null && "efficiencyScore".equals(key)) {
+            v = live.get("teamParticipation");
+        }
         if (v instanceof Number) {
             return Math.min(100, Math.max(0, ((Number) v).intValue()));
         }
@@ -329,10 +332,13 @@ public final class GeminiInsightKpiAlignUtil {
                 }
                 return alignOnTimePhrasesInProse(text, actualPercent);
             case "teamParticipation":
-                if (!lower.contains("participation") && !lower.contains("engagement")) {
+            case "efficiencyScore":
+                if (!lower.contains("efficiency")
+                        && !lower.contains("participation")
+                        && !lower.contains("engagement")) {
                     return text;
                 }
-                return applyTightMetricPatterns(text, display, TEAM_PARTICIPATION_PATTERNS);
+                return applyTightMetricPatterns(text, display, EFFICIENCY_SCORE_PATTERNS);
             case "workloadBalance":
                 if (!lower.contains("workload") && !lower.contains("balance")) {
                     return text;
@@ -358,7 +364,9 @@ public final class GeminiInsightKpiAlignUtil {
         Pattern.compile("(?i)(on[- ]?time\\s*delivery\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
     };
 
-    private static final Pattern[] TEAM_PARTICIPATION_PATTERNS = {
+    private static final Pattern[] EFFICIENCY_SCORE_PATTERNS = {
+        Pattern.compile("(?i)(efficiency\\s*score(?:\\s+is\\s+(?:currently\\s+)?|\\s*(?:of|is|was|at)\\s*))(-?\\d+(?:\\.\\d+)?)\\s*%?"),
+        Pattern.compile("(?i)(efficiency\\s*score\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
         Pattern.compile("(?i)(team\\s*participation(?:\\s+is\\s+(?:currently\\s+)?|\\s*(?:of|is|was|at)\\s*))(-?\\d+(?:\\.\\d+)?)\\s*%?"),
         Pattern.compile("(?i)(team\\s*participation\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
     };
@@ -615,7 +623,7 @@ public final class GeminiInsightKpiAlignUtil {
             return text;
         }
         int cr = intMetric(live, "completionRate");
-        int tp = intMetric(live, "teamParticipation");
+        int es = intMetric(live, "efficiencyScore");
         int wb = intMetric(live, "workloadBalance");
         String out = text;
         out = out.replaceAll("(?i)remained stable at\\s*,", "remained stable at " + cr + "%,");
@@ -624,12 +632,12 @@ public final class GeminiInsightKpiAlignUtil {
             "(?i)(completion(?:\\s+rate)?s?)\\s+remained stable at\\s*,",
             "$1 remained stable at " + cr + "%,");
         out = out.replaceAll(
-            "(?i)(team participation|participation)\\s+stayed at\\s*,",
-            "$1 stayed at " + tp + "%,");
+            "(?i)(efficiency\\s+score|team participation|participation)\\s+stayed at\\s*,",
+            "efficiency score stayed at " + es + "%,");
         out = out.replaceAll(
-            "(?i)(team participation|participation)\\s+stayed at\\s*\\.",
-            "$1 stayed at " + tp + "%.");
-        out = out.replaceAll("(?i)\\bstayed at\\s*\\.", "stayed at " + tp + "%.");
+            "(?i)(efficiency\\s+score|team participation|participation)\\s+stayed at\\s*\\.",
+            "efficiency score stayed at " + es + "%.");
+        out = out.replaceAll("(?i)\\bstayed at\\s*\\.", "stayed at " + es + "%.");
         out = out.replaceAll(
             "(?i)(workload balance)\\s+(?:saw[^.]*?at|stayed at|remained at)\\s*,",
             "$1 remained at " + wb + "%,");
@@ -637,7 +645,7 @@ public final class GeminiInsightKpiAlignUtil {
             out = DANGLING_AT_COMMA.matcher(out).replaceFirst("at " + cr + "%,");
         }
         if (DANGLING_AT_PERIOD.matcher(out).find()) {
-            out = DANGLING_AT_PERIOD.matcher(out).replaceFirst("at " + tp + "%.");
+            out = DANGLING_AT_PERIOD.matcher(out).replaceFirst("at " + es + "%.");
         }
         return out;
     }

@@ -2,8 +2,11 @@ package com.springboot.MyTodoList.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
+import com.springboot.MyTodoList.dto.SimilarSprintInsightMatch;
 import com.springboot.MyTodoList.model.*;
 import com.springboot.MyTodoList.repository.*;
+import com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil;
+import com.springboot.MyTodoList.util.ManagerChatInsightContextUtil;
 import com.springboot.MyTodoList.util.ManagerChatReplyUtil;
 import com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil;
 import com.springboot.MyTodoList.util.SprintLiveKpiUtil;
@@ -31,6 +34,7 @@ public class ManagerChatService {
     @Autowired private TaskRepository taskRepository;
     @Autowired private UserTaskRepository userTaskRepository;
     @Autowired private UserSprintRepository userSprintRepository;
+    @Autowired private SprintInsightRepository sprintInsightRepository;
     @Autowired private EmbeddingService embeddingService;
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -61,20 +65,61 @@ public class ManagerChatService {
         }
 
         try {
-            String contextJson = buildProjectContext(req.getProjectId(), req.getSprintId());
-            String scope = req.getSprintId() != null
-                ? "sprint_" + req.getSprintId()
+            Long effectiveSprintId = req.getSprintId();
+            if (effectiveSprintId == null && mentionsThisSprint(req.getMessage())) {
+                List<Sprint> ordered =
+                    sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(req.getProjectId());
+                effectiveSprintId = resolveFocalSprintId(ordered);
+            }
+
+            String contextJson = buildProjectContext(req.getProjectId(), effectiveSprintId);
+            String scope = effectiveSprintId != null
+                ? "sprint_" + effectiveSprintId
                 : "all_sprints";
-            Long targetSprintId = resolveTargetSprintId(req);
-            Integer sprintProductivityScore = targetSprintId != null
-                ? getRoundedProductivityScoreForSprint(targetSprintId)
+            boolean sprintScopeInferred = req.getSprintId() == null && effectiveSprintId != null;
+            Long targetSprintId = effectiveSprintId != null ? effectiveSprintId : resolveTargetSprintId(req);
+            Map<String, Integer> liveKpis = targetSprintId != null
+                ? getLiveKpiSnapshotForSprint(targetSprintId)
                 : null;
 
-            String ragContext = buildRagContext(req.getMessage(), req.getSprintId());
-            String systemPrompt = buildSystemPrompt(contextJson, ragContext, scope);
+            Long focalSprintId = effectiveSprintId != null ? effectiveSprintId : targetSprintId;
+            if (focalSprintId == null && mentionsSimilarPatterns(req.getMessage())) {
+                List<Sprint> ordered =
+                    sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(req.getProjectId());
+                focalSprintId = resolveFocalSprintId(ordered);
+            }
+            String ragContext = buildRagContext(
+                req.getMessage(), req.getProjectId(), effectiveSprintId, focalSprintId);
+            String scopeLabel = resolveSprintLabel(req.getProjectId(), effectiveSprintId);
+            String systemPrompt = buildSystemPrompt(
+                contextJson, ragContext, scope, scopeLabel, sprintScopeInferred);
             String reply = callGemini(systemPrompt, req.getMessage(), req.getHistory());
-            reply = ManagerChatReplyUtil.clampPercentagesToRange(reply);
-            reply = ManagerChatReplyUtil.alignProductivityScoreMentions(reply, sprintProductivityScore);
+            int productivityDelta = 0;
+            String previousLabel = null;
+            if (effectiveSprintId != null) {
+                productivityDelta =
+                    productivityDeltaVsPreviousSprint(req.getProjectId(), effectiveSprintId);
+                Map<Long, String> sprintLabels = buildSprintLabelMap(req.getProjectId());
+                Map<String, Object> vsPrevious =
+                    buildProductivityVsPreviousSprint(req.getProjectId(), effectiveSprintId, sprintLabels);
+                if (vsPrevious != null) {
+                    Object prev = vsPrevious.get("previousSprintLabel");
+                    if (prev != null && !String.valueOf(prev).isBlank()) {
+                        previousLabel = String.valueOf(prev);
+                    }
+                }
+            }
+            List<String> validLabels = effectiveSprintId != null
+                ? new ArrayList<>(buildSprintLabelMap(req.getProjectId()).values())
+                : List.of();
+            reply = ManagerChatReplyUtil.polishManagerChatReply(
+                reply,
+                liveKpis,
+                productivityDelta,
+                scopeLabel,
+                previousLabel,
+                validLabels,
+                effectiveSprintId);
             return ManagerChatResponse.of(reply, scope);
 
         } catch (Exception e) {
@@ -88,22 +133,226 @@ public class ManagerChatService {
     // RAG CONTEXT
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String buildRagContext(String query, Long sprintId) {
+    private String buildRagContext(String query, Long projectId, Long sprintId, Long focalSprintId) {
+        StringBuilder sb = new StringBuilder();
         try {
-            List<TaskEmbedding> relevant = embeddingService.findRelevantTasks(query, sprintId, 8);
-            if (relevant.isEmpty()) {
-                return "No indexed tasks found — using full project data below.";
+            List<TaskEmbedding> relevantTasks = embeddingService.findRelevantTasks(query, sprintId, 8);
+            if (relevantTasks.isEmpty()) {
+                sb.append("No indexed tasks found — using full project data below.\n");
+            } else {
+                sb.append("Top relevant tasks retrieved by semantic search:\n");
+                for (TaskEmbedding te : relevantTasks) {
+                    sb.append("- ").append(te.getTextoChunk()).append("\n");
+                }
             }
+        } catch (Exception e) {
+            System.err.println("[ManagerChatService] buildRagContext tasks error: " + e.getMessage());
+            sb.append("Task vector search unavailable.\n");
+        }
+
+        if (projectId != null && sprintId == null) {
+            try {
+                List<SprintInsightEmbedding> relevantInsights =
+                    embeddingService.findRelevantSprintInsights(query, projectId, 4);
+                if (!relevantInsights.isEmpty()) {
+                    Map<Long, String> labels = buildSprintLabelMap(projectId);
+                    sb.append("\nTop relevant sprint AI insights (semantic search):\n");
+                    for (SprintInsightEmbedding ie : relevantInsights) {
+                        String label = labels.getOrDefault(ie.getSprintId(), "Sprint");
+                        sb.append("- ").append(label).append(": ")
+                            .append(ie.getTextChunk()).append("\n");
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[ManagerChatService] buildRagContext insights error: " + e.getMessage());
+            }
+        }
+
+        if (projectId != null && focalSprintId != null
+                && (mentionsSimilarPatterns(query) || sprintId != null)) {
+            String similar = buildSimilarSprintPatternsContext(projectId, focalSprintId);
+            if (!similar.isBlank()) {
+                if (sb.length() > 0) {
+                    sb.append("\n\n");
+                }
+                sb.append(similar);
+            }
+        }
+
+        return sb.toString().trim();
+    }
+
+    private String buildSimilarSprintPatternsContext(Long projectId, Long focalSprintId) {
+        try {
+            List<SimilarSprintInsightMatch> matches = embeddingService.findSimilarSprintInsights(
+                focalSprintId, 5, EmbeddingService.DEFAULT_INSIGHT_SIMILARITY_THRESHOLD);
+            if (matches.isEmpty()) {
+                return "Similar sprint patterns: no close matches found for this sprint yet "
+                    + "(generate AI insights on at least one other sprint in the project).";
+            }
+            Map<Long, String> labels = buildSprintLabelMap(projectId);
+            String focalLabel = labels.getOrDefault(focalSprintId, "the selected sprint");
             StringBuilder sb = new StringBuilder();
-            sb.append("Top relevant tasks retrieved by semantic search:\n");
-            for (TaskEmbedding te : relevant) {
-                sb.append("- ").append(te.getTextoChunk()).append("\n");
+            sb.append("Similar sprint patterns (same project, compared to ").append(focalLabel).append("):\n");
+            for (SimilarSprintInsightMatch match : matches) {
+                String label = labels.getOrDefault(match.getSprintId(), "a prior sprint");
+                int matchPct = (int) Math.round(match.getSimilarity() * 100);
+                sb.append("- ").append(label).append(" (~").append(matchPct).append("% pattern match)");
+                if (match.getTopAlertSeverity() != null && !match.getTopAlertSeverity().isBlank()) {
+                    sb.append(", top alert: ").append(match.getTopAlertSeverity());
+                }
+                if (match.getSnippet() != null && !match.getSnippet().isBlank()) {
+                    sb.append(" — ").append(match.getSnippet());
+                }
+                sb.append("\n");
             }
+            sb.append(
+                "Use this list when the manager asks about recurring problems, past precedents, "
+                    + "or sprints with similar delivery/workload issues. Refer to sprints by label, not database id.");
             return sb.toString();
         } catch (Exception e) {
-            System.err.println("[ManagerChatService] buildRagContext error: " + e.getMessage());
-            return "Vector search unavailable — using full project data below.";
+            System.err.println("[ManagerChatService] buildSimilarSprintPatternsContext: " + e.getMessage());
+            return "";
         }
+    }
+
+    private List<Sprint> orderedProjectSprints(Long projectId) {
+        if (projectId == null) {
+            return List.of();
+        }
+        return sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+    }
+
+    private Map<Long, Integer> buildSprintNumberMap(Long projectId) {
+        Map<Long, Integer> numbers = new LinkedHashMap<>();
+        int index = 0;
+        for (Sprint sprint : orderedProjectSprints(projectId)) {
+            if (sprint.getId() == null) {
+                continue;
+            }
+            numbers.put(sprint.getId(), index);
+            index++;
+        }
+        return numbers;
+    }
+
+    private Map<Long, String> buildSprintLabelMap(Long projectId) {
+        Map<Long, String> labels = new LinkedHashMap<>();
+        for (Map.Entry<Long, Integer> entry : buildSprintNumberMap(projectId).entrySet()) {
+            labels.put(entry.getKey(), "Sprint " + entry.getValue());
+        }
+        return labels;
+    }
+
+    private String resolveSprintLabel(Long projectId, Long sprintId) {
+        if (projectId == null || sprintId == null) {
+            return null;
+        }
+        return buildSprintLabelMap(projectId).get(sprintId);
+    }
+
+    private Map<String, Object> computeLiveKpisMapForSprint(Long sprintId) {
+        if (sprintId == null) {
+            return Map.of();
+        }
+        return sprintRepository.findById(sprintId)
+            .map(s -> {
+                List<Task> sprintTasks = taskRepository.findByAssignedSprintId(sprintId);
+                List<UserTask> sprintUserTasks =
+                    userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
+                return SprintLiveKpiUtil.computeLiveKpis(s, sprintTasks, sprintUserTasks);
+            })
+            .orElse(Map.of());
+    }
+
+    private int productivityDeltaVsPreviousSprint(Long projectId, Long sprintId) {
+        List<Sprint> ordered = orderedProjectSprints(projectId);
+        int idx = indexOfSprintId(ordered, sprintId);
+        if (idx <= 0) {
+            return 0;
+        }
+        Long previousId = ordered.get(idx - 1).getId();
+        if (previousId == null) {
+            return 0;
+        }
+        int currentScore = GeminiInsightKpiAlignUtil.intMetric(
+            computeLiveKpisMapForSprint(sprintId), "productivityScore");
+        int previousScore = GeminiInsightKpiAlignUtil.intMetric(
+            computeLiveKpisMapForSprint(previousId), "productivityScore");
+        return currentScore - previousScore;
+    }
+
+    private Map<String, Object> buildProductivityVsPreviousSprint(
+            Long projectId, Long sprintId, Map<Long, String> sprintLabels) {
+        List<Sprint> ordered = orderedProjectSprints(projectId);
+        int idx = indexOfSprintId(ordered, sprintId);
+        if (idx <= 0) {
+            return null;
+        }
+        Long previousId = ordered.get(idx - 1).getId();
+        if (previousId == null) {
+            return null;
+        }
+        int currentScore = GeminiInsightKpiAlignUtil.intMetric(
+            computeLiveKpisMapForSprint(sprintId), "productivityScore");
+        int previousScore = GeminiInsightKpiAlignUtil.intMetric(
+            computeLiveKpisMapForSprint(previousId), "productivityScore");
+        int delta = currentScore - previousScore;
+        Map<String, Object> comparison = new LinkedHashMap<>();
+        comparison.put("previousSprintLabel", sprintLabels.getOrDefault(previousId, "the previous sprint"));
+        comparison.put("currentProductivityScore", currentScore);
+        comparison.put("previousProductivityScore", previousScore);
+        comparison.put("signedDeltaPoints", delta);
+        comparison.put("deltaPoints", Math.abs(delta));
+        comparison.put("direction", delta >= 0 ? "increased" : "decreased");
+        return comparison;
+    }
+
+    private String resolvePreviousSprintLabel(Long projectId, Long sprintId, Map<Long, String> sprintLabels) {
+        List<Sprint> ordered = orderedProjectSprints(projectId);
+        int idx = indexOfSprintId(ordered, sprintId);
+        if (idx <= 0) {
+            return null;
+        }
+        Long previousId = ordered.get(idx - 1).getId();
+        return previousId == null ? null : sprintLabels.get(previousId);
+    }
+
+    private int indexOfSprintId(List<Sprint> ordered, Long sprintId) {
+        if (ordered == null || sprintId == null) {
+            return -1;
+        }
+        for (int i = 0; i < ordered.size(); i++) {
+            Sprint sprint = ordered.get(i);
+            if (sprint.getId() != null && sprint.getId().equals(sprintId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean mentionsSimilarPatterns(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("similar")
+                || lower.contains("parecid")
+                || lower.contains("pattern")
+                || lower.contains("patron")
+                || lower.contains("patrón")
+                || lower.contains("recurring")
+                || lower.contains("repeat")
+                || lower.contains("precedent")
+                || lower.contains("before")
+                || lower.contains("past sprint")
+                || lower.contains("previous sprint")
+                || lower.contains("sprint anterior")
+                || lower.contains("otro sprint")
+                || lower.contains("hemos visto")
+                || lower.contains("have we seen")
+                || lower.contains("same problem")
+                || lower.contains("mismo problema");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -112,19 +361,32 @@ public class ManagerChatService {
 
     private String buildProjectContext(Long projectId, Long sprintId) throws Exception {
         List<Sprint> sprints;
+        Map<Long, SprintInsight> insightBySprintId = new HashMap<>();
+        Map<Long, Integer> sprintNumbers = buildSprintNumberMap(projectId);
+        Map<Long, String> sprintLabels = buildSprintLabelMap(projectId);
         if (sprintId != null) {
             sprints = sprintRepository.findById(sprintId)
                 .map(List::of)
                 .orElse(List.of());
+            sprintInsightRepository.findBySprintId(sprintId)
+                .ifPresent(insight -> insightBySprintId.put(sprintId, insight));
         } else {
-            sprints = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+            sprints = orderedProjectSprints(projectId);
+            for (SprintInsight insight : sprintInsightRepository.findByProjectIdOrderByGeneratedAtDesc(projectId)) {
+                if (insight.getSprintId() != null) {
+                    insightBySprintId.putIfAbsent(insight.getSprintId(), insight);
+                }
+            }
         }
 
         List<Map<String, Object>> sprintData = new ArrayList<>();
         List<Map<String, Object>> allDevRows = new ArrayList<>();
         for (Sprint s : sprints) {
+            int sprintNumber = sprintNumbers.getOrDefault(s.getId(), 0);
+            String sprintLabel = sprintLabels.getOrDefault(s.getId(), "Sprint " + sprintNumber);
             Map<String, Object> sd = new LinkedHashMap<>();
-            sd.put("sprintId", s.getId());
+            sd.put("sprintNumber", sprintNumber);
+            sd.put("sprintLabel", sprintLabel);
             sd.put("startDate", s.getStartDate() != null ? s.getStartDate().toString() : null);
             sd.put("dueDate", s.getDueDate() != null ? s.getDueDate().toString() : null);
             sd.put("goal", s.getGoal());
@@ -135,7 +397,7 @@ public class ManagerChatService {
             sd.put("kpis", liveKpis);
             sd.put("completionRate", liveKpis.get("completionRate"));
             sd.put("onTimeDelivery", liveKpis.get("onTimeDelivery"));
-            sd.put("teamParticipation", liveKpis.get("teamParticipation"));
+            sd.put("efficiencyScore", liveKpis.get("efficiencyScore"));
             sd.put("workloadBalance", liveKpis.get("workloadBalance"));
             sd.put("productivityScore", liveKpis.get("productivityScore"));
             sd.put("totalTasks", liveKpis.get("totalTasks"));
@@ -150,20 +412,51 @@ public class ManagerChatService {
             sd.put("developers", devSummary);
             allDevRows.addAll(devSummary);
 
-            sd.put("blockedAssignments", buildBlockedAssignmentsForSprint(s.getId()));
+            sd.put("blockedTasks", buildBlockedAssignmentsForSprint(s.getId()));
+
+            SprintInsight sprintInsight = insightBySprintId.get(s.getId());
+            Map<String, Object> sprintAnalysis =
+                ManagerChatInsightContextUtil.compactInsightForChat(sprintInsight, mapper);
+            String previousLabelForSprint = resolvePreviousSprintLabel(projectId, s.getId(), sprintLabels);
+            List<String> allValidLabels = new ArrayList<>(sprintLabels.values());
+            ManagerChatInsightContextUtil.sanitizeSprintLabelsInInsightMap(
+                sprintAnalysis, sprintLabel, s.getId(), previousLabelForSprint, allValidLabels);
+            sd.put("sprintAnalysis", sprintAnalysis);
 
             sprintData.add(sd);
         }
 
         Map<String, Object> context = new LinkedHashMap<>();
-        context.put("projectId", projectId);
         context.put("asOf", LocalDateTime.now().toString());
+        context.put("totalSprintsInProject", sprintLabels.size());
+        context.put("validSprintLabels", new ArrayList<>(sprintLabels.values()));
         context.put("sprintCount", sprintData.size());
         context.put("sprints", sprintData);
+        if (sprintId != null) {
+            context.put("managerScope", "single_sprint");
+            String answerLabel = sprintLabels.getOrDefault(sprintId, "the selected sprint");
+            context.put("answerAboutSprintLabel", answerLabel);
+            context.put("activeSprintLabel", answerLabel);
+            Integer seqNum = sprintNumbers.get(sprintId);
+            if (seqNum != null) {
+                context.put("sequentialSprintNumber", seqNum);
+            }
+            Map<String, Object> vsPrevious = buildProductivityVsPreviousSprint(projectId, sprintId, sprintLabels);
+            if (vsPrevious != null) {
+                context.put("productivityVsPreviousSprint", vsPrevious);
+            }
+        }
         if (sprintId == null && sprintData.size() > 1) {
             context.put(
-                    "developersAggregatedAllSprints",
+                    "developersAllSprints",
                     SprintDeveloperMetricsUtil.mergeDeveloperRowsByUserId(allDevRows));
+            context.put(
+                    "developerPerformanceHistory",
+                    ManagerChatInsightContextUtil.buildDeveloperPerformanceHistory(sprintData));
+        } else if (sprintData.size() == 1) {
+            context.put(
+                    "developerPerformanceHistory",
+                    ManagerChatInsightContextUtil.buildDeveloperPerformanceHistory(sprintData));
         }
 
         return mapper.writeValueAsString(context);
@@ -280,40 +573,69 @@ public class ManagerChatService {
     // PROMPT BUILDING
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String buildSystemPrompt(String contextJson, String ragContext, String scope) {
-        String scopeDesc = scope.startsWith("sprint_")
-            ? "Sprint " + scope.replace("sprint_", "")
-            : "all sprints in the project";
+    private String buildSystemPrompt(
+            String contextJson, String ragContext, String scope, String scopeLabel, boolean sprintScopeInferred) {
+        String scopeDesc;
+        if (scope.startsWith("sprint_") && scopeLabel != null && !scopeLabel.isBlank()) {
+            scopeDesc = sprintScopeInferred
+                ? scopeLabel + " only (inferred as the current/active sprint from \"this sprint\" in the question)"
+                : scopeLabel + " only (manager selected this sprint in the chat dropdown)";
+        } else if (scope.startsWith("sprint_")) {
+            scopeDesc = "the selected sprint only";
+        } else {
+            scopeDesc = "all sprints in the project";
+        }
 
         return "You are a helpful project management assistant for a software development team. "
             + "You have access to real-time project data and answer questions from the project manager.\n\n"
             + "## Your behavior\n"
             + "- Answer concisely and directly. Use plain English.\n"
             + "- When the manager asks for counts, lists, or comparisons, use the exact numbers from the data.\n"
-            + "- If asked for productivity score, report the exact `productivityScore` value from sprint data (do not infer a different number).\n"
+            + "- For KPI questions (completion rate, on-time delivery, team participation, workload balance, "
+            + "productivity score), always use each sprint's live kpis object — these match KPI Analytics and the "
+            + "dashboard. Never use stale numbers from sprintAnalysis (AI notes may be outdated). "
+            + "Never mention discrepancies between sprintAnalysis and live KPIs — state only the live KPI value.\n"
+            + "- When managerScope is single_sprint or answerAboutSprintLabel is present, \"this sprint\" and "
+            + "\"current sprint\" mean answerAboutSprintLabel / activeSprintLabel only — do not answer about other sprints unless asked "
+            + "to compare.\n"
+            + "- CRITICAL: sequentialSprintNumber and answerAboutSprintLabel are the ONLY valid sprint name for the current answer "
+            + "(e.g. the label in answerAboutSprintLabel). validSprintLabels lists all sprints in this project. Never write \"Sprint N\" where N is not in "
+            + "validSprintLabels. Never use internal row ids as sprint numbers.\n"
+            + "- Only use sprint labels listed in validSprintLabels. This project has totalSprintsInProject sprints; "
+            + "never invent a sprint number that is not in validSprintLabels.\n"
+            + "- When the manager says Sprint N, use the sprint whose sprintNumber is N (not any internal id).\n"
+            + "- Always refer to sprints by sprintLabel (e.g. Sprint 3), never by internal database ids.\n"
             + "- If a question cannot be answered from the data provided, say so clearly.\n"
             + "- For developer-specific questions, refer to them by name.\n"
-            + "- In each sprint's `developers` array, `completed` is the count of unique tasks where that developer's "
+            + "- In each sprint's developers array, completed is the count of unique tasks where that developer's "
             + "assignment is finished (same as the dashboard Completed Tasks chart). "
-            + "`pending` = assigned minus completed. Do not use TASK.status Done for per-developer completed counts "
-            + "on shared tasks.\n"
-            + "- For hours worked per developer, use `developers[].workedHours` only (sum of USER_TASK.WORKED_HOURS, "
-            + "same as the dashboard Hours Worked chart, one decimal). When scope is all sprints, use "
-            + "`developersAggregatedAllSprints` if present. Do not infer hours from `tasks` or TASK.assignedHours.\n"
-            + "- `assignedHoursEstimate` is planned task hours per developer (lighter bar on the hours chart).\n"
-            + "- For KPI questions (completion rate, on-time delivery, team participation, workload balance, "
-            + "productivity score), use each sprint's `kpis` object — these are live values matching KPI Analytics "
-            + "and the dashboard (not stale DB snapshots). Report integers as shown (0–100).\n"
-            + "- Productivity score formula: completion×0.4 + on-time×0.3 + participation×0.2 + workload×0.1.\n"
+            + "pending = assigned minus completed.\n"
+            + "- For hours worked per developer, use developers[].workedHours only. When scope is all sprints, use "
+            + "developersAllSprints if present.\n"
+            + "- Productivity score formula: completion×0.4 + on-time×0.3 + efficiency×0.2 + workload×0.1.\n"
+            + "- When productivityVsPreviousSprint is present, use its deltaPoints and direction for "
+            + "comparisons vs the previous sprint — this is current live score minus previous live score "
+            + "(absolute points, not relative %). Never copy stale numbers from sprintAnalysis.trends.\n"
             + "- Use bullet points or short tables when listing multiple items.\n"
             + "- Never make up data. If a value is null or missing, say it's not recorded.\n"
-            + "- Each sprint may include \"blockedAssignments\": who flagged an assignment as blocked, task id/title, and reason. "
-            + "Use it when asked about blockers, who is stuck, or delivery risk. In your replies, never name database tables or columns.\n"
+            + "- Each sprint may include blockedTasks (who is stuck and why). Use for blocker and delivery-risk questions.\n"
+            + "- Each sprint may include sprintAnalysis (AI-generated notes): summary, alerts, recommendations, "
+            + "developerNotes. Use for trends, coaching, and recommendations. If sprintAnalysis.available is false, "
+            + "say AI insights were not generated yet for that sprint.\n"
+            + "- developerPerformanceHistory merges developer notes with live metrics across sprints — use for "
+            + "how a developer performed over time.\n"
+            + "- When asked how to improve team productivity, combine live KPIs, sprintAnalysis recommendations and "
+            + "alerts, blockedTasks, and developerPerformanceHistory. Ground advice in this data.\n"
+            + "- The vector-search section may include \"Similar sprint patterns\" — use it when the manager asks "
+            + "about recurring issues, precedents, or sprints that resembled the current one. Explain what was "
+            + "similar (alerts, workload, delivery risk) and what the team could learn, in plain language.\n"
+            + "- Write for a manager: plain language only. Never mention JSON field names, database columns, "
+            + "camelCase identifiers, or backtick-wrapped technical terms in your reply.\n"
             + "- Keep responses under 300 words unless more detail is specifically requested.\n"
             + "- Respond in the same language the manager uses (Spanish or English).\n\n"
             + "- Any percentage you mention must stay between 0% and 100%.\n\n"
             + "## Current data scope: " + scopeDesc + "\n\n"
-            + "## Most relevant tasks (vector search)\n"
+            + "## Most relevant tasks and sprint insights (vector search)\n"
             + ragContext + "\n\n"
             + "## Full project data (JSON)\n"
             + contextJson;
@@ -473,9 +795,9 @@ public class ManagerChatService {
         return raw;
     }
 
-    private Integer getRoundedProductivityScoreForSprint(Long sprintId) {
+    private Map<String, Integer> getLiveKpiSnapshotForSprint(Long sprintId) {
         if (sprintId == null) {
-            return null;
+            return Map.of();
         }
         return sprintRepository.findById(sprintId)
             .map(s -> {
@@ -484,24 +806,111 @@ public class ManagerChatService {
                         userTaskRepository.findBySprintIdWithUserAndTask(sprintId);
                 Map<String, Object> kpis =
                         SprintLiveKpiUtil.computeLiveKpis(s, sprintTasks, sprintUserTasks);
-                Object score = kpis.get("productivityScore");
-                return score instanceof Number ? ((Number) score).intValue() : null;
+                Map<String, Integer> out = new LinkedHashMap<>();
+                putRoundedKpi(out, "productivityScore", kpis.get("productivityScore"));
+                putRoundedKpi(out, "completionRate", kpis.get("completionRate"));
+                putRoundedKpi(out, "onTimeDelivery", kpis.get("onTimeDelivery"));
+                putRoundedKpi(out, "workloadBalance", kpis.get("workloadBalance"));
+                return out;
             })
-            .orElse(null);
+            .orElse(Map.of());
+    }
+
+    private void putRoundedKpi(Map<String, Integer> target, String key, Object value) {
+        if (value instanceof Number) {
+            target.put(key, ((Number) value).intValue());
+        }
     }
 
     private Long resolveTargetSprintId(ManagerChatRequest req) {
-        if (req == null) return null;
-        if (req.getSprintId() != null) return req.getSprintId();
-        String msg = req.getMessage();
-        if (msg == null || msg.isBlank()) return null;
-        Matcher m = SPRINT_ID_IN_TEXT.matcher(msg);
-        if (!m.find()) return null;
-        try {
-            return Long.parseLong(m.group(1));
-        } catch (NumberFormatException ex) {
+        if (req == null || req.getProjectId() == null) {
             return null;
         }
+        if (req.getSprintId() != null) {
+            return req.getSprintId();
+        }
+
+        List<Sprint> projectSprints =
+                sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(req.getProjectId());
+        Long fromLabel = resolveSprintNumberFromMessage(req.getMessage(), projectSprints);
+        if (fromLabel != null) {
+            return fromLabel;
+        }
+        if (mentionsFocalSprint(req.getMessage())) {
+            return resolveFocalSprintId(projectSprints);
+        }
+        return null;
+    }
+
+    private Long resolveSprintNumberFromMessage(String message, List<Sprint> orderedSprints) {
+        if (message == null || message.isBlank() || orderedSprints == null || orderedSprints.isEmpty()) {
+            return null;
+        }
+        Matcher m = SPRINT_ID_IN_TEXT.matcher(message);
+        if (!m.find()) {
+            return null;
+        }
+        try {
+            int n = Integer.parseInt(m.group(1));
+            if (n >= 1 && n <= orderedSprints.size()) {
+                return orderedSprints.get(n - 1).getId();
+            }
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private boolean mentionsThisSprint(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("current sprint")
+                || lower.contains("this sprint")
+                || lower.contains("sprint actual")
+                || lower.contains("este sprint");
+    }
+
+    private boolean mentionsFocalSprint(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        if (mentionsThisSprint(message)) {
+            return true;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("productivity")
+                || lower.contains("productividad")
+                || lower.contains("improve")
+                || lower.contains("mejorar")
+                || lower.contains("recommend")
+                || lower.contains("recomiend");
+    }
+
+    private Long resolveFocalSprintId(List<Sprint> orderedSprints) {
+        if (orderedSprints == null || orderedSprints.isEmpty()) {
+            return null;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        Long activeId = null;
+        LocalDateTime activeStart = null;
+        for (Sprint sprint : orderedSprints) {
+            if (sprint.getStartDate() == null || sprint.getDueDate() == null) {
+                continue;
+            }
+            if (!now.isBefore(sprint.getStartDate()) && !now.isAfter(sprint.getDueDate())) {
+                if (activeStart == null || sprint.getStartDate().isAfter(activeStart)) {
+                    activeStart = sprint.getStartDate();
+                    activeId = sprint.getId();
+                }
+            }
+        }
+        if (activeId != null) {
+            return activeId;
+        }
+        Sprint last = orderedSprints.get(orderedSprints.size() - 1);
+        return last.getId();
     }
 
     private String sanitizeErrorCode(String msg) {

@@ -149,6 +149,9 @@ public class GeminiService {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private EmbeddingService embeddingService;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(60))
@@ -299,6 +302,7 @@ public class GeminiService {
             insight.setErrorMessage(null); // clear any previous error
             insightRepository.save(insight);
             invalidateInsightsGetResponseCache(sprintId);
+            embeddingService.embedSprintInsight(insight);
 
             log.info("Sprint {}: insights saved ({} ms total)",
                 sprintId, System.currentTimeMillis() - startedAtMs);
@@ -4905,17 +4909,18 @@ public class GeminiService {
     }
 
     /**
-     * Same labels as frontend {@code buildSprintNumberMap}: sprints sorted by DB id → Sprint 0, Sprint 1, …
+     * Same labels as frontend {@code buildSprintNumberMap}: per-project 0-based index by startDate.
      */
     private Map<Long, Integer> buildSprintDisplayIndexMap(Long projectId) {
         Map<Long, Integer> map = new HashMap<>();
         if (projectId == null) {
             return map;
         }
-        List<Sprint> sprints = sprintRepository.findByAssignedProjectId(projectId);
-        sprints.sort(Comparator.comparing(Sprint::getId));
+        List<Sprint> sprints = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
         for (int i = 0; i < sprints.size(); i++) {
-            map.put(sprints.get(i).getId(), i);
+            if (sprints.get(i).getId() != null) {
+                map.put(sprints.get(i).getId(), i);
+            }
         }
         return map;
     }

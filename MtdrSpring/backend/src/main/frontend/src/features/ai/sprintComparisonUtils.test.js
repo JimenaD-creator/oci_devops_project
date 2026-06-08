@@ -16,7 +16,7 @@ describe('sprintComparisonUtils', () => {
     kpis: {
       completionRate: 50,
       onTimeDelivery: 80,
-      teamParticipation: 60,
+      efficiencyScore: 60,
       workloadBalance: 70,
       ...kpis,
     },

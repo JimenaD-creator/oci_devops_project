@@ -35,10 +35,10 @@ class SprintLiveKpiUtilTest {
 
         assertEquals(50, kpis.get("completionRate"));
         assertEquals(100, kpis.get("onTimeDelivery"));
-        assertEquals(38, kpis.get("teamParticipation"));
+        assertEquals(100, kpis.get("efficiencyScore"));
         assertEquals(85, kpis.get("workloadBalance"));
         assertEquals(6.0, kpis.get("totalWorkedHours"));
-        assertEquals(66, kpis.get("productivityScore"));
+        assertEquals(79, kpis.get("productivityScore"));
     }
 
     private static Task task(long id, String status, long assignedHours) {

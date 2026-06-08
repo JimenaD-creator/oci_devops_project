@@ -29,7 +29,7 @@ import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { pickDefaultSelectedSprint, buildSprintNumberMap } from '../sprints/utils/sprintUtils';
 import {
   resolveActiveProjectId,
   sprintProjectIdFromJson,
@@ -97,9 +97,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [pendingDone, setPendingDone] = useState(null);
 
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
-    const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
-    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
-    return index >= 0 ? index : sprintId;
+    const map = buildSprintNumberMap(sprintsList);
+    const n = map.get(Number(sprintId));
+    return n !== undefined ? n : sprintId;
   }, []);
 
   const getSprintLabel = useCallback(
@@ -1010,11 +1010,8 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                 disabled={!sprints.length}
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
-                  const sprintNum = getSprintNumber(
-                    Number(value),
-                    sprintsForActiveProject.length ? sprintsForActiveProject : sprints,
-                  );
-                  return `Sprint ${sprintNum}`;
+                  const pool = sprintsForActiveProject.length ? sprintsForActiveProject : sprints;
+                  return getSprintLabel(Number(value), pool);
                 }}
                 MenuProps={{
                   PaperProps: {

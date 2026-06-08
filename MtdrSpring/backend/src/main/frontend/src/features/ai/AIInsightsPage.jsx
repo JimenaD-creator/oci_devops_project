@@ -180,7 +180,6 @@ export default function AIInsightsPage({ projectId }) {
     ? {
         completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
         onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
-        teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
         efficiencyScore: normalizeKpiPercent(
           selectedSprint.kpis?.efficiencyScore ?? selectedSprint.kpis?.teamParticipation,
         ),

@@ -56,7 +56,7 @@ export function NewSprintDialog({ open, onClose, onCreated, projectId }) {
           dueDate: new Date(dueDate).toISOString(),
           completionRate: 0,
           onTimeDelivery: 0,
-          teamParticipation: 0,
+          efficiencyScore: 0,
           workloadBalance: 0,
           goal: goal.trim() || null,
         }),

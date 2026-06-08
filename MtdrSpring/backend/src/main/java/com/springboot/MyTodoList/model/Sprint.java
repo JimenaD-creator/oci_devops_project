@@ -28,7 +28,7 @@ public class Sprint {
     @Column(name = "ON_TIME_DELIVERY")
     private BigDecimal onTimeDelivery;
     
-    @Column(name = "TEAM_PARTICIPATION") // misma columna en DB, sin migración
+    @Column(name = "EFFICIENCY_SCORE")
     private BigDecimal efficiencyScore;
     
     @Column(name = "WORKLOAD_BALANCE")

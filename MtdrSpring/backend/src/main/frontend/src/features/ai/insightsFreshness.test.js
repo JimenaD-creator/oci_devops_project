@@ -45,7 +45,7 @@ describe('insightsFreshness', () => {
     const live = normalizeLiveMetricsForSnapshotCompare({
       completionRate: 90,
       onTimeDelivery: 100,
-      teamParticipation: 75,
+      efficiencyScore: 75,
       workloadBalance: 68,
       productivityScore: 99,
     });

@@ -48,7 +48,7 @@ import {
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { pickDefaultSelectedSprint, buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import {
   fetchProjectById,
@@ -221,15 +221,19 @@ export default function DashboardPage({
     [allSprints],
   );
 
+  const sprintLabelMap = useMemo(
+    () => buildSprintNumberMap(allSprints),
+    [allSprints],
+  );
+
   const getSprintFilterLabel = useCallback(
     (sprintId) => {
       const sprint = allSprints.find((s) => Number(s.id) === Number(sprintId));
       if (sprint?.shortLabel) return sprint.shortLabel;
       if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-      const index = sortedSprintsForFilter.findIndex((s) => Number(s.id) === Number(sprintId));
-      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+      return formatSprintLabel(sprintLabelMap, sprintId) || `Sprint ${sprintId}`;
     },
-    [allSprints, sortedSprintsForFilter],
+    [allSprints, sprintLabelMap],
   );
 
   const selectedSprints = useMemo(() => {

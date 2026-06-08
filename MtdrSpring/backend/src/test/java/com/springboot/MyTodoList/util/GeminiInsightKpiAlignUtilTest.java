@@ -73,7 +73,7 @@ class GeminiInsightKpiAlignUtilTest {
 
     @Test
     void polishSprintChangeSummary_fixesDuplicateTeamAndDanglingAt() {
-        Map<String, Object> live = Map.of("completionRate", 72, "teamParticipation", 65, "workloadBalance", 88);
+        Map<String, Object> live = Map.of("completionRate", 72, "efficiencyScore", 65, "workloadBalance", 88);
         String in =
             "Sprint 4 is still in progress; compared with Sprint 3, the team, the team moved completion. "
                 + "Completion rates remained stable at, and team participation stayed at.";
@@ -88,7 +88,7 @@ class GeminiInsightKpiAlignUtilTest {
         Map<String, Object> live = Map.of(
             "completionRate", 70,
             "onTimeDelivery", 82,
-            "teamParticipation", 60,
+            "efficiencyScore", 60,
             "workloadBalance", 75,
             "productivityScore", 78);
         String in =
@@ -114,7 +114,7 @@ class GeminiInsightKpiAlignUtilTest {
             Map.of(
                 "completionRate", 70,
                 "onTimeDelivery", 80,
-                "teamParticipation", 55,
+                "efficiencyScore", 55,
                 "workloadBalance", 78,
                 "productivityScore", 68));
         assertFalse(out.isBlank());
@@ -478,7 +478,7 @@ class GeminiInsightKpiAlignUtilTest {
             "productivityScore", 97,
             "onTimeDelivery", 71,
             "completionRate", 80,
-            "teamParticipation", 60,
+            "efficiencyScore", 60,
             "workloadBalance", 75);
         String in =
             "Productivity increased by 6 points compared to the previous sprint, "

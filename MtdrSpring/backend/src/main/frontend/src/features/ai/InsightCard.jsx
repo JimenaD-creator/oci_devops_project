@@ -43,8 +43,6 @@ import {
   PredictionsBlock,
   BlockedAssignmentsSnapshot,
 } from './InsightCardParts';
-import InsightsFreshnessBanner from './InsightsFreshnessBanner';
-import { detectInsightsKpiDrift, INSIGHTS_KPI_LABELS } from './insightsFreshness';
 
 export default function InsightCard({
   sprintId,
@@ -445,23 +443,6 @@ export default function InsightCard({
     [insights, sprintDevelopers],
   );
 
-  const insightsKpiDrift = useMemo(() => {
-    if (status !== 'loaded' || !insights?.generationKpiSnapshot) {
-      return { changed: false, labels: [] };
-    }
-    const drift = detectInsightsKpiDrift(
-      insights.generationKpiSnapshot,
-      currentSprintMetrics,
-      liveTaskStatusBreakdown,
-    );
-    return {
-      changed: drift.changed,
-      labels: drift.labels?.length
-        ? drift.labels
-        : drift.metrics.map((key) => INSIGHTS_KPI_LABELS[key] || key),
-    };
-  }, [status, insights, currentSprintMetrics, liveTaskStatusBreakdown]);
-
   const hasExtendedPredictions =
     insights?.predictions &&
     (insights.predictions.productivityOutlook ||
@@ -672,16 +653,6 @@ export default function InsightCard({
       {/* Loaded */}
       {status === 'loaded' && insights && (
         <Collapse in={expanded}>
-          <InsightsFreshnessBanner
-            generatedAt={
-              lastGeneratedAtMs != null ? new Date(lastGeneratedAtMs).toISOString() : null
-            }
-            status={status}
-            kpiValuesChanged={insightsKpiDrift.changed}
-            changedMetricLabels={insightsKpiDrift.labels}
-            onRegenerate={handleGenerate}
-            regenerating={status === 'generating' || status === 'polling'}
-          />
           {/* Snapshot counters */}
           <Box
             sx={{
