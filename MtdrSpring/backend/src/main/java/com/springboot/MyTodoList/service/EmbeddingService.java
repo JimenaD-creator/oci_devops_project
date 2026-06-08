@@ -2,17 +2,21 @@ package com.springboot.MyTodoList.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.springboot.MyTodoList.dto.SimilarSprintInsightMatch;
-import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
+import com.springboot.MyTodoList.dto.SimilarSprintInsightMatch;
 import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.model.SprintInsightEmbedding;
+import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.TaskEmbedding;
 import com.springboot.MyTodoList.repository.SprintInsightEmbeddingRepository;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
 import com.springboot.MyTodoList.service.vector.TaskEmbeddingVectorStore;
+import com.springboot.MyTodoList.service.vector.VectorCosineSimilarity;
 import com.springboot.MyTodoList.service.vector.VectorSearchBackend;
+import com.springboot.MyTodoList.util.InsightEmbeddingTextBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +27,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class EmbeddingService {
@@ -36,14 +46,20 @@ public class EmbeddingService {
     /** When nothing passes the default threshold, still show strong relative matches above this floor. */
     private static final double INSIGHT_SIMILARITY_FLOOR = 0.42;
 
-    @Autowired
-    private GeminiApiConfiguration geminiApiConfiguration;
-
     private static final String EMBEDDING_URL =
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
 
     @Autowired
+    private GeminiApiConfiguration geminiApiConfiguration;
+
+    @Autowired
     private TaskEmbeddingRepository embeddingRepository;
+
+    @Autowired
+    private SprintInsightEmbeddingRepository insightEmbeddingRepository;
+
+    @Autowired
+    private SprintInsightRepository insightRepository;
 
     @Autowired
     private TaskEmbeddingVectorStore vectorStore;
@@ -54,7 +70,7 @@ public class EmbeddingService {
         .build();
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GENERAR Y GUARDAR EMBEDDING DE UNA TAREA
+    // TASK EMBEDDINGS (RAG)
     // ─────────────────────────────────────────────────────────────────────────
 
     public void embedTask(Task task, Long sprintId) throws Exception {
@@ -72,20 +88,13 @@ public class EmbeddingService {
         String embeddingJson = mapper.writeValueAsString(vector);
         vectorStore.save(te, vector, embeddingJson);
 
-        System.out.println("[EmbeddingService] Embedded task " + task.getId() + ": " + texto);
+        log.debug("Embedded task {} for sprint {}", task.getId(), sprintId);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BUSCAR TAREAS RELEVANTES PARA UNA PREGUNTA (RAG)
-    // ─────────────────────────────────────────────────────────────────────────
 
     public List<TaskEmbedding> findRelevantTasks(String query, Long sprintId, int topK) throws Exception {
         return findRelevantTasks(query, sprintId, null, topK);
     }
 
-    /**
-     * Hybrid semantic search: vector similarity plus optional relational {@code taskStatus} filter.
-     */
     public List<TaskEmbedding> findRelevantTasks(
             String query, Long sprintId, String taskStatus, int topK) throws Exception {
         double[] queryVector = generateEmbedding(query);
@@ -101,16 +110,134 @@ public class EmbeddingService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // LLAMADA A GEMINI EMBEDDING API
+    // SPRINT INSIGHT EMBEDDINGS (application-mode cosine on JSON CLOB)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public void embedSprintInsight(SprintInsight insight) {
+        if (insight == null || insight.getInsightsJson() == null || insight.getInsightsJson().isBlank()) {
+            return;
+        }
+        try {
+            JsonNode root = mapper.readTree(insight.getInsightsJson());
+            String chunk = InsightEmbeddingTextBuilder.buildFromInsightsJson(root);
+            if (chunk.isBlank()) {
+                log.warn("Skipping insight embedding for sprint {} — empty chunk", insight.getSprintId());
+                return;
+            }
+            double[] vector = generateEmbedding(chunk);
+            insightEmbeddingRepository.deleteBySprintId(insight.getSprintId());
+
+            SprintInsightEmbedding row = new SprintInsightEmbedding();
+            row.setSprintId(insight.getSprintId());
+            row.setProjectId(insight.getProjectId());
+            row.setTextChunk(chunk);
+            row.setEmbedding(mapper.writeValueAsString(vector));
+            row.setCreatedAt(LocalDateTime.now());
+            insightEmbeddingRepository.save(row);
+            log.info("Embedded sprint insight for sprint {}", insight.getSprintId());
+        } catch (Exception e) {
+            log.warn("Failed to embed sprint insight for sprint {}: {}", insight.getSprintId(), e.getMessage());
+        }
+    }
+
+    public List<SimilarSprintInsightMatch> findSimilarSprintInsights(
+            Long sprintId, int topK, double threshold) throws Exception {
+        SprintInsightEmbedding source = insightEmbeddingRepository.findBySprintId(sprintId)
+            .orElseThrow(() -> new IllegalArgumentException("No embedding indexed for sprint " + sprintId));
+        double[] sourceVector = parseVectorJson(source.getEmbedding());
+        if (sourceVector == null) {
+            return List.of();
+        }
+
+        List<SprintInsightEmbedding> peers = insightEmbeddingRepository.findByProjectId(source.getProjectId());
+        List<ScoredInsight> scored = new ArrayList<>();
+        for (SprintInsightEmbedding peer : peers) {
+            if (peer.getSprintId().equals(sprintId)) {
+                continue;
+            }
+            double[] peerVector = parseVectorJson(peer.getEmbedding());
+            if (peerVector == null) {
+                continue;
+            }
+            double similarity = VectorCosineSimilarity.cosineSimilarity(sourceVector, peerVector);
+            scored.add(new ScoredInsight(peer, similarity));
+        }
+
+        scored.sort(Comparator.comparingDouble(ScoredInsight::similarity).reversed());
+        List<ScoredInsight> filtered = scored.stream()
+            .filter(s -> s.similarity() >= threshold)
+            .limit(topK)
+            .collect(Collectors.toList());
+
+        if (filtered.isEmpty()) {
+            filtered = scored.stream()
+                .filter(s -> s.similarity() >= INSIGHT_SIMILARITY_FLOOR)
+                .limit(topK)
+                .collect(Collectors.toList());
+        }
+
+        List<SimilarSprintInsightMatch> matches = new ArrayList<>();
+        for (ScoredInsight item : filtered) {
+            matches.add(toInsightMatch(item.embedding(), item.similarity()));
+        }
+        return matches;
+    }
+
+    public List<SprintInsightEmbedding> findRelevantSprintInsights(String query, Long projectId, int topK)
+            throws Exception {
+        double[] queryVector = generateEmbedding(query);
+        List<SprintInsightEmbedding> rows = insightEmbeddingRepository.findByProjectId(projectId);
+        return rows.stream()
+            .map(row -> {
+                double[] stored = parseVectorJson(row.getEmbedding());
+                if (stored == null) {
+                    return null;
+                }
+                return Map.entry(row, VectorCosineSimilarity.cosineSimilarity(queryVector, stored));
+            })
+            .filter(java.util.Objects::nonNull)
+            .sorted(Comparator.comparingDouble((Map.Entry<SprintInsightEmbedding, Double> e) -> e.getValue()).reversed())
+            .limit(Math.max(1, topK))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public int backfillProjectInsightEmbeddings(Long projectId) throws Exception {
+        List<SprintInsight> insights = insightRepository.findByProjectIdOrderByGeneratedAtDesc(projectId);
+        int embedded = 0;
+        for (SprintInsight insight : insights) {
+            if (insight.getInsightsJson() == null || insight.getInsightsJson().isBlank()) {
+                continue;
+            }
+            embedSprintInsight(insight);
+            embedded++;
+        }
+        return embedded;
+    }
+
+    public int countIndexedInsightsForProject(Long projectId) {
+        return insightEmbeddingRepository.findByProjectId(projectId).size();
+    }
+
+    public int countInsightsWithJsonForProject(Long projectId) {
+        return (int) insightRepository.findByProjectIdOrderByGeneratedAtDesc(projectId).stream()
+            .filter(i -> i.getInsightsJson() != null && !i.getInsightsJson().isBlank())
+            .count();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GEMINI EMBEDDING API
     // ─────────────────────────────────────────────────────────────────────────
 
     private double[] generateEmbedding(String texto) throws Exception {
         geminiApiConfiguration.requireConfigured();
 
-        String body = mapper.writeValueAsString(java.util.Map.of(
+        String body = mapper.writeValueAsString(Map.of(
             "model", "models/gemini-embedding-001",
-            "content", java.util.Map.of(
-                "parts", java.util.List.of(java.util.Map.of("text", texto))
+            "content", Map.of(
+                "parts", List.of(Map.of("text", texto))
             )
         ));
 
@@ -153,5 +280,98 @@ public class EmbeddingService {
         if (task.getClassification() != null) sb.append("Type: ").append(task.getClassification()).append(". ");
         if (task.getDueDate() != null)        sb.append("Due: ").append(task.getDueDate().toLocalDate()).append(". ");
         return sb.toString().trim();
+    }
+
+    private double[] parseVectorJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode values = mapper.readTree(json);
+            if (!values.isArray()) {
+                return null;
+            }
+            double[] vector = new double[values.size()];
+            for (int i = 0; i < values.size(); i++) {
+                vector[i] = values.get(i).asDouble();
+            }
+            return vector;
+        } catch (Exception e) {
+            log.warn("Could not parse insight embedding JSON: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private SimilarSprintInsightMatch toInsightMatch(SprintInsightEmbedding row, double similarity) {
+        String snippet = row.getTextChunk();
+        String topAlertSeverity = null;
+        LocalDateTime generatedAt = null;
+        Optional<SprintInsight> insight = insightRepository.findBySprintId(row.getSprintId());
+        if (insight.isPresent()) {
+            generatedAt = insight.get().getGeneratedAt();
+            try {
+                JsonNode root = mapper.readTree(insight.get().getInsightsJson());
+                snippet = InsightEmbeddingTextBuilder.buildDisplaySnippet(root);
+                topAlertSeverity = extractTopAlertSeverity(root);
+            } catch (Exception e) {
+                log.debug("Could not parse insight JSON for sprint {}: {}", row.getSprintId(), e.getMessage());
+            }
+        }
+        return new SimilarSprintInsightMatch(
+            row.getSprintId(),
+            row.getProjectId(),
+            similarity,
+            snippet,
+            topAlertSeverity,
+            generatedAt);
+    }
+
+    private String extractTopAlertSeverity(JsonNode root) {
+        JsonNode alerts = root.get("alerts");
+        if (alerts == null || !alerts.isArray()) {
+            return null;
+        }
+        int bestRank = -1;
+        String best = null;
+        for (JsonNode alert : alerts) {
+            String severity = alert.path("severity").asText("info").toLowerCase(Locale.ROOT);
+            int rank = alertSeverityRank(severity);
+            if (rank > bestRank) {
+                bestRank = rank;
+                best = severity;
+            }
+        }
+        return best;
+    }
+
+    private int alertSeverityRank(String severity) {
+        if ("critical".equals(severity)) {
+            return 3;
+        }
+        if ("warning".equals(severity)) {
+            return 2;
+        }
+        if ("info".equals(severity)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static final class ScoredInsight {
+        private final SprintInsightEmbedding embedding;
+        private final double similarity;
+
+        private ScoredInsight(SprintInsightEmbedding embedding, double similarity) {
+            this.embedding = embedding;
+            this.similarity = similarity;
+        }
+
+        private SprintInsightEmbedding embedding() {
+            return embedding;
+        }
+
+        private double similarity() {
+            return similarity;
+        }
     }
 }

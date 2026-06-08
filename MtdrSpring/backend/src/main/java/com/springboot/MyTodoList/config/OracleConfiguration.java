@@ -26,6 +26,12 @@ public class OracleConfiguration {
 
     @Bean
     public DataSource dataSource() throws SQLException {
+        String tnsAdmin = env.getProperty("TNS_ADMIN");
+        if (tnsAdmin != null && !tnsAdmin.isBlank()) {
+            System.setProperty("oracle.net.tns_admin", tnsAdmin.trim());
+            logger.info("Oracle TNS_ADMIN={}", tnsAdmin.trim());
+        }
+
         PoolDataSource pds = PoolDataSourceFactory.getPoolDataSource();
         pds.setConnectionFactoryClassName("oracle.jdbc.pool.OracleDataSource");
         pds.setURL(dbSettings.getUrl());
