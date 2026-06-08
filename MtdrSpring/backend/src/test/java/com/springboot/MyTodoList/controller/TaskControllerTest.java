@@ -21,6 +21,7 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.ProjectBundleCacheEvictor;
 import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
@@ -61,6 +62,9 @@ class TaskControllerTest {
 
     @MockBean
     private ProjectTaskEventPublisher projectTaskEventPublisher;
+
+    @MockBean
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
 
     @Test
     void getAllTasks_withoutProjectId_returnsAll() throws Exception {

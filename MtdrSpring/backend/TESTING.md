@@ -49,11 +49,13 @@ On PowerShell, always quote `-D` and `-P` arguments.
 
 ## OCI pipeline
 
-Add a build step:
+The build pipeline (`build_spec.yaml` at repo root) runs unit tests **before** the Docker image build. If any test fails, the pipeline stops and nothing is pushed to the registry:
 
 ```bash
 cd MtdrSpring/backend && mvn -B test -Dspring.profiles.active=test
 ```
+
+The image build step still uses `-DskipTests` in `build.sh` / `Dockerfile` because tests already ran in the prior step.
 
 ## Layout
 
