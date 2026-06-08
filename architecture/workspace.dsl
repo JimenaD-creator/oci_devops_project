@@ -27,7 +27,7 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
 
                 kpiEngine = component "KPI engine" "Computes and stores sprint KPI fields from aggregates." "Spring Service"
                 geminiService = component "Gemini Service" "Builds sprint insight prompts, calls Gemini, and stores generated narratives." "Spring Service"
-                semanticRetrieval = component "Semantic retrieval" "Embeds text and finds similar stored tasks." "Spring Service"
+                semanticRetrieval = component "Semantic retrieval" "Embeds text via Gemini; stores VECTOR(768) in TASK_EMBEDDINGS; searches with VECTOR_DISTANCE (Oracle) or in-app cosine (fallback)." "Spring Service"
                 chatOrchestration = component "Chat orchestration" "Builds retrieval context and calls the LLM for manager chat." "Spring Service"
 
                 dataRepo = component "Data Repository" "Persists domain data, such as projects, tasks, and sprint KPI snapshots." "Spring Data JPA / JDBC"
