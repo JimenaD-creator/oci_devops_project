@@ -182,19 +182,50 @@ public final class ManagerChatReplyUtil {
             int signedDeltaPoints,
             int currentScore,
             String previousSprintLabel) {
-        if (text == null || text.isBlank() || signedDeltaPoints == 0) {
+        if (text == null || text.isBlank()) {
             return text;
         }
         String prev = previousSprintLabel == null || previousSprintLabel.isBlank()
             ? "the previous sprint"
             : previousSprintLabel;
+
+        if (signedDeltaPoints == 0) {
+            return stripSpuriousProductivityDeltaWhenFlat(text, currentScore);
+        }
+
         int abs = Math.abs(signedDeltaPoints);
         String pointsWord = abs == 1 ? "point" : "points";
         String verb = signedDeltaPoints > 0 ? "increase" : "decrease";
+        String article = signedDeltaPoints > 0 ? "an" : "a";
+
+        String out = text;
+
+        Pattern parentheticalDeltaPercent = Pattern.compile(
+            "(?i)\\(\\s*(a\\s+)?(decrease|increase|decreased|increased|drop|rise|dropped|rose|fell|improved|declined)"
+                + "\\s+of\\s+\\d+(?:\\.\\d+)?\\s*%(\\s*(?:from|compared\\s+to)\\s+[^)]+)?\\)");
+        Matcher paren = parentheticalDeltaPercent.matcher(out);
+        if (paren.find()) {
+            String suffix = paren.group(3) != null ? paren.group(3).trim() : " compared to " + prev;
+            if (!suffix.toLowerCase(Locale.ROOT).contains("compared")
+                    && !suffix.toLowerCase(Locale.ROOT).contains("from")) {
+                suffix = " compared to " + prev;
+            }
+            String fixed = String.format(
+                Locale.ROOT,
+                "(%s %s of %d %s%s)",
+                article,
+                verb,
+                abs,
+                pointsWord,
+                suffix);
+            out = paren.replaceFirst(Matcher.quoteReplacement(fixed));
+        }
 
         Pattern deltaPercent = Pattern.compile(
-            "(?i)(which is (?:a )?(?:decrease|increase|decreased|increased|drop|rise|dropped|rose|fell|improved|declined)\\s+of\\s+)\\d+(?:\\.\\d+)?\\s*%");
-        String out = deltaPercent.matcher(text).replaceAll("$1" + abs + " " + pointsWord);
+            "(?i)((?:which is )?(?:\\(?\\s*)?(?:a\\s+)?"
+                + "(?:decrease|increase|decreased|increased|drop|rise|dropped|rose|fell|improved|declined)"
+                + "\\s+of\\s+)\\d+(?:\\.\\d+)?\\s*%");
+        out = deltaPercent.matcher(out).replaceAll("$1" + abs + " " + pointsWord);
 
         Pattern productivityBullet = Pattern.compile(
             "(?i)([•\\-*]?\\s*Productivity:?\\s*)The productivity score is \\d+(?:\\.\\d+)?%?,? which is (?:a )?"
@@ -204,8 +235,9 @@ public final class ManagerChatReplyUtil {
         if (bullet.find()) {
             String fixed = String.format(
                 Locale.ROOT,
-                "The productivity score is %d%%, which is a %s of %d %s compared to %s",
+                "The productivity score is %d%%, which is %s %s of %d %s compared to %s",
                 currentScore,
+                article,
                 verb,
                 abs,
                 pointsWord,
@@ -214,6 +246,17 @@ public final class ManagerChatReplyUtil {
         }
 
         return out;
+    }
+
+    /** When delta is 0, remove parentheticals that claim a large % drop/increase (model copied the score). */
+    private static String stripSpuriousProductivityDeltaWhenFlat(String text, int currentScore) {
+        if (text == null || text.isBlank() || currentScore <= 0) {
+            return text;
+        }
+        Pattern parentheticalDeltaPercent = Pattern.compile(
+            "(?i)\\s*\\(\\s*(?:a\\s+)?(?:decrease|increase|decreased|increased|drop|rise|dropped|rose|fell|improved|declined)"
+                + "\\s+of\\s+" + currentScore + "(?:\\.0)?\\s*%\\s*(?:from|compared\\s+to)\\s+[^)]+\\)");
+        return parentheticalDeltaPercent.matcher(text).replaceAll("");
     }
 
     /** Single post-processing pass for manager chat replies. */
