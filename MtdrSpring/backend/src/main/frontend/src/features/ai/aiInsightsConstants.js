@@ -94,7 +94,17 @@ export const KPI_LABELS = {
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
   blockers: 'Blockers',
+  sprintComparison: 'Sprint comparison',
 };
+
+/** Backend-injected alert comparing logged hours vs completions vs the previous sprint. */
+export const HOURS_VS_PREVIOUS_ALERT_SOURCE = 'hoursVsPreviousSprint';
+
+export function isHoursVsPreviousSprintAlert(alert) {
+  if (!alert || typeof alert !== 'object') return false;
+  if (alert.alertSource === HOURS_VS_PREVIOUS_ALERT_SOURCE) return true;
+  return alert.kpi === 'sprintComparison';
+}
 
 /** Only these `kpi` fields on alerts are 0–100% — others (e.g. blockers) must not show a % suffix. */
 export const KPI_ALERT_PERCENT_KEYS = new Set([

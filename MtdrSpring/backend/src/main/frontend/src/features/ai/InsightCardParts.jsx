@@ -39,6 +39,7 @@ import {
   alignProductivityTrendDelta,
   resolveProductivityPredictionDisplay,
   formatProductivityForecastDeltaLine,
+  isHoursVsPreviousSprintAlert,
 } from './aiInsightsConstants';
 
 const getSeverity = (severityKey, isDark) => {
@@ -74,13 +75,18 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
   const cfg = getSeverity(alert.severity, isDark);
   const { Icon } = cfg;
   const kpiKey = typeof alert.kpi === 'string' ? alert.kpi : '';
+  const isSprintComparisonAlert = isHoursVsPreviousSprintAlert(alert);
   const normalizedKpiMetric =
-    currentSprintMetrics && currentSprintMetrics[kpiKey] != null
+    !isSprintComparisonAlert && currentSprintMetrics && currentSprintMetrics[kpiKey] != null
       ? clampKpiPercentForDisplay(currentSprintMetrics[kpiKey])
       : null;
-  const effectiveAlertValue = normalizedKpiMetric != null ? normalizedKpiMetric : alert.value;
+  const effectiveAlertValue = isSprintComparisonAlert
+    ? null
+    : normalizedKpiMetric != null
+      ? normalizedKpiMetric
+      : alert.value;
   let messageText = alert.message;
-  if (currentSprintMetrics) {
+  if (currentSprintMetrics && !isSprintComparisonAlert) {
     messageText = alignKpiMetricsInText(messageText, currentSprintMetrics);
     if (kpiKey && currentSprintMetrics[kpiKey] != null) {
       messageText = alignKpiProseForMetric(messageText, kpiKey, currentSprintMetrics);
@@ -121,7 +127,7 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
               borderRadius: 1,
             }}
           />
-          {alert.kpi && (
+          {(alert.kpi || isSprintComparisonAlert) && (
             <Typography
               sx={{
                 fontSize: { xs: '0.85rem', md: '0.9rem' },
@@ -129,8 +135,10 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
                 fontWeight: 600,
               }}
             >
-              {KPI_LABELS[alert.kpi] ?? alert.kpi}
-              {effectiveAlertValue != null
+              {isSprintComparisonAlert
+                ? (KPI_LABELS.sprintComparison ?? 'Sprint comparison')
+                : (KPI_LABELS[alert.kpi] ?? alert.kpi)}
+              {!isSprintComparisonAlert && effectiveAlertValue != null
                 ? valueIsPercentKpi
                   ? ` — ${clampKpiPercentForDisplay(effectiveAlertValue)}%`
                   : ` — ${effectiveAlertValue}`

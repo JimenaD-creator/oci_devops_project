@@ -11,6 +11,7 @@ import {
   formatProductivityForecastDeltaLine,
   alignProductivityTrendDelta,
   alignProductivityScoreProse,
+  isHoursVsPreviousSprintAlert,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -189,5 +190,15 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toBe(
       'Productivity remained stable at 99 points compared to the previous sprint.',
     );
+  });
+
+  it('isHoursVsPreviousSprintAlert detects backend-injected sprint comparison alerts', () => {
+    expect(
+      isHoursVsPreviousSprintAlert({
+        alertSource: 'hoursVsPreviousSprint',
+        kpi: 'sprintComparison',
+      }),
+    ).toBe(true);
+    expect(isHoursVsPreviousSprintAlert({ kpi: 'efficiencyScore', value: 100 })).toBe(false);
   });
 });

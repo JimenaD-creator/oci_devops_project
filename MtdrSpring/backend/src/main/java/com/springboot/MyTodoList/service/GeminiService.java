@@ -16,6 +16,7 @@ import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil;
 import com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil;
+import com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil;
 import com.springboot.MyTodoList.util.SprintLiveKpiUtil;
 import com.springboot.MyTodoList.util.UserRoleUtil;
 import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
@@ -1559,6 +1560,7 @@ public class GeminiService {
             normalizeAlertSeverities(root);
             filterPrematureSprintKpiAlerts(root, sprintId);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            injectSprintHoursCompletionAlert(root, sprintId);
             enrichKpiManagerGuideIfEmpty(root, sprintId);
             normalizeKpiManagerGuidePercentSpacing(root);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
@@ -4446,6 +4448,54 @@ public class GeminiService {
             root.set("blockedAssignments", blocked);
         } else {
             root.set("blockedAssignments", mapper.createArrayNode());
+        }
+    }
+
+    /**
+     * Adds a deterministic alert when logged hours per completed task diverges materially from the
+     * immediately previous sprint (see {@link SprintHoursCompletionAlertUtil}).
+     */
+    private void injectSprintHoursCompletionAlert(ObjectNode root, Long sprintId) {
+        try {
+            Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+            if (sprint == null) {
+                return;
+            }
+            String phase = resolveSprintPhase(sprint);
+            if ("not_started".equals(phase)) {
+                return;
+            }
+            Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
+            Sprint previous = findImmediatePreviousSprint(sprint, projectId);
+            if (previous == null) {
+                return;
+            }
+            JsonNode alertsNode = root.get("alerts");
+            ArrayNode alerts;
+            if (alertsNode == null || !alertsNode.isArray()) {
+                alerts = mapper.createArrayNode();
+                root.set("alerts", alerts);
+            } else {
+                alerts = (ArrayNode) alertsNode;
+            }
+            if (SprintHoursCompletionAlertUtil.alertsAlreadyContainHoursVsPrevious(alerts)) {
+                return;
+            }
+            Map<String, Object> curLive = resolveLiveKpisForSprint(sprint);
+            Map<String, Object> prevLive = resolveLiveKpisForSprint(previous);
+            Map<Long, Integer> displayMap = buildSprintDisplayIndexMap(projectId);
+            String prevLabel = sprintDisplayLabel(displayMap, previous.getId());
+            boolean ended = "ended".equals(phase);
+            boolean early = isSprintEarlyForProductivityGuide(sprint);
+            SprintHoursCompletionAlertUtil.buildAlert(
+                    SprintHoursCompletionAlertUtil.DeliverySnapshot.fromLiveKpis(curLive),
+                    SprintHoursCompletionAlertUtil.DeliverySnapshot.fromLiveKpis(prevLive),
+                    prevLabel,
+                    ended,
+                    early
+            ).ifPresent(alertMap -> alerts.add(mapper.valueToTree(alertMap)));
+        } catch (Exception e) {
+            System.err.println("[GeminiService] injectSprintHoursCompletionAlert: " + e.getMessage());
         }
     }
 
