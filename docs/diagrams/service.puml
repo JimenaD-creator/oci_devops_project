@@ -1,0 +1,630 @@
+@startuml
+
+class com.springboot.MyTodoList.service.AdminService {
+	{field} -projectRepo : com.springboot.MyTodoList.repository.ProjectRepository
+	{field} -teamMemberRepo : com.springboot.MyTodoList.repository.TeamMemberRepository
+	{field} -teamRepo : com.springboot.MyTodoList.repository.TeamRepository
+	{field} -userRepo : com.springboot.MyTodoList.repository.UserRepository
+	{method} +addMemberToTeam ( userId : Long , teamId : Long , role : String ) : com.springboot.MyTodoList.model.TeamMember
+	{method} +createProject ( project : com.springboot.MyTodoList.model.Project ) : com.springboot.MyTodoList.model.Project
+	{method} +createTeam ( team : com.springboot.MyTodoList.model.Team ) : com.springboot.MyTodoList.model.Team
+}
+
+
+class com.springboot.MyTodoList.service.DashboardBundleService {
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +loadBundle ( projectId : Long ) : java.util.Optional
+}
+
+
+class com.springboot.MyTodoList.service.DeepSeekService {
+	{field} -httpClient : org.apache.hc.client5.http.impl.classic.CloseableHttpClient
+	{field} -httpPost : org.apache.hc.client5.http.classic.methods.HttpPost
+	{method} +generateText ( prompt : String ) : String
+}
+
+
+class com.springboot.MyTodoList.service.EmailService {
+	{field} -fromEmail : String
+	{field} -frontendUrl : String
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -mailSender : org.springframework.mail.javamail.JavaMailSender
+	{field} -telegramBotUsername : String
+	{method} -buildTaskAssignmentHtml ( safeName : String , safeAssigner : String , safeTitle : String , priority : String , sprintLabel : String , tasksUrl : String , telegramLineHtml : String ) : String
+	{method}  {static} -buildTaskAssignmentPlainText ( assigneeName : String , assignerName : String , taskTitle : String , priority : String , sprintLabel : String , portalUrl : String , telegramLine : String ) : String
+	{method} -buildTaskDueReminderHtml ( safeName : String , safeTitle : String , safeDue : String , priority : String , sprintLabel : String , safeManager : String , portalUrl : String , telegramSignInHtml : String , telegramBlockersHtml : String ) : String
+	{method}  {static} -buildTaskDueReminderPlainText ( assigneeName : String , taskTitle : String , dueLabel : String , priority : String , sprintLabel : String , managerContact : String , portalUrl : String , telegramSignInLine : String , telegramBlockersLine : String ) : String
+	{method}  {static} -buildTelegramBlockerInstructionHtml ( botHandle : String ) : String
+	{method}  {static} -buildTelegramBlockerInstructionPlain ( botHandle : String ) : String
+	{method}  {static} -buildTelegramInstructionHtml ( botHandle : String ) : String
+	{method}  {static} -buildTelegramInstructionPlain ( botHandle : String ) : String
+	{method}  {static} -escapeHtml ( raw : String ) : String
+	{method} +sendPasswordResetEmail ( toEmail : String , token : String ) : void
+	{method} +sendTaskAssignmentEmail ( toEmail : String , assigneeName : String , taskTitle : String , priority : String , sprintLabel : String , assignedByName : String ) : void
+	{method} +sendTaskDueReminderEmail ( toEmail : String , assigneeName : String , taskTitle : String , dueLabel : String , priority : String , sprintLabel : String , managerContact : String ) : void
+}
+
+
+class com.springboot.MyTodoList.service.EmbeddingService {
+	{field} {static} +DEFAULT_INSIGHT_SIMILARITY_THRESHOLD : double
+	{field} {static} -EMBEDDING_URL : String
+	{field} {static} -INSIGHT_SIMILARITY_FLOOR : double
+	{field} -embeddingRepository : com.springboot.MyTodoList.repository.TaskEmbeddingRepository
+	{field} -geminiApiConfiguration : com.springboot.MyTodoList.config.GeminiApiConfiguration
+	{field} -httpClient : java.net.http.HttpClient
+	{field} -insightEmbeddingRepository : com.springboot.MyTodoList.repository.SprintInsightEmbeddingRepository
+	{field} -insightRepository : com.springboot.MyTodoList.repository.SprintInsightRepository
+	{field} {static} -log : org.slf4j.Logger
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{method} -alertSeverityRank ( severity : String ) : int
+	{method} +backfillProjectInsightEmbeddings ( projectId : Long ) : int
+	{method} -buildTaskChunk ( task : com.springboot.MyTodoList.model.Task ) : String
+	{method} +countIndexedInsightsForProject ( projectId : Long ) : int
+	{method} +countInsightsWithJsonForProject ( projectId : Long ) : int
+	{method} +embedSprintInsight ( insight : com.springboot.MyTodoList.model.SprintInsight ) : void
+	{method} +embedTask ( task : com.springboot.MyTodoList.model.Task , sprintId : Long ) : void
+	{method} -extractTopAlertSeverity ( root : com.fasterxml.jackson.databind.JsonNode ) : String
+	{method} +findRelevantSprintInsights ( query : String , projectId : Long , topK : int ) : java.util.List
+	{method} +findRelevantTasks ( query : String , sprintId : Long , topK : int ) : java.util.List
+	{method} +findRelevantTasks ( query : String , sprintId : Long , taskStatus : String , topK : int ) : java.util.List
+	{method} +findSimilarSprintInsights ( sprintId : Long , topK : int , threshold : double ) : java.util.List
+	{method} -generateEmbedding ( texto : String ) : [D
+	{method} +getInsightVectorSearchBackend () : com.springboot.MyTodoList.service.vector.VectorSearchBackend
+	{method} +getVectorSearchBackend () : com.springboot.MyTodoList.service.vector.VectorSearchBackend
+	{method} +hasStoredInsightVector ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding ) : boolean
+	{method} +hasStoredVector ( row : com.springboot.MyTodoList.model.TaskEmbedding ) : boolean
+	{method} -parseVectorJson ( json : String ) : [D
+	{method} -toInsightMatch ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding , similarity : double ) : com.springboot.MyTodoList.dto.SimilarSprintInsightMatch
+}
+
+
+class com.springboot.MyTodoList.service.GeminiService {
+	{field} {static} -ALERT_BLOCKER_LEXEMES : java.util.regex.Pattern
+	{field} {static} -ALERT_WORKLOAD_UNEVEN_LEXEMES : java.util.regex.Pattern
+	{field} {static} -CANONICAL_TASK_STATUS_OVERVIEW_LEAD : java.util.regex.Pattern
+	{field} {static} -ENDED_SPRINT_CLOSING_ALREADY : java.util.regex.Pattern
+	{field} {static} -ENRICH_RESPONSE_CACHE_MS : long
+	{field} {static} -ENRICH_SCOPE : ThreadLocal
+	{field} {static} -EXECUTION_KPI_ALERT_KEYS : java.util.Set
+	{field} {static} -EXECUTIVE_SUMMARY_TEXT_FIELDS : java.util.List
+	{field} {static} -GEMINI_EXECUTIVE_SUMMARY_KEY : String
+	{field} {static} -GLUED_PERCENT_LETTER : java.util.regex.Pattern
+	{field} {static} -INSIGHTS_GET_RESPONSE_CACHE_MS : long
+	{field} {static} +INSIGHT_STATUS_PROCESSING : String
+	{field} {static} -LIVE_APPLY_CACHE_MS : long
+	{field} {static} -PREMATURE_EXECUTION_ALERT_PROSE : java.util.regex.Pattern
+	{field} {static} -PRETTIFY_SKIP_KEYS : java.util.Set
+	{field} {static} -PRODUCTIVITY_ENDED_SPRINT_CLOSING : String
+	{field} {static} -PRODUCTIVITY_EVOLUTION_NOTE_ALREADY : java.util.regex.Pattern
+	{field} {static} -PRODUCTIVITY_LOW_SCORE_EXCUSE_SENTENCE : java.util.regex.Pattern
+	{field} {static} -PRODUCTIVITY_NEGATIVE_LABEL : java.util.regex.Pattern
+	{field} {static} -PRODUCTIVITY_SCORE_IN_INTRO : java.util.regex.Pattern
+	{field} {static} -REDISTRIBUTION_GUIDANCE_SENTENCE : java.util.regex.Pattern
+	{field} -enrichResponseCache : java.util.concurrent.ConcurrentHashMap
+	{field} -geminiApiConfiguration : com.springboot.MyTodoList.config.GeminiApiConfiguration
+	{field} -httpClient : java.net.http.HttpClient
+	{field} -insightRepository : com.springboot.MyTodoList.repository.SprintInsightRepository
+	{field} -insightsGetResponseCache : java.util.concurrent.ConcurrentHashMap
+	{field} -liveApplyCache : java.util.concurrent.ConcurrentHashMap
+	{field} {static} -log : org.slf4j.Logger
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -teamMembersRepository : com.springboot.MyTodoList.repository.TeamMembersRepository
+	{field} -userSprintRepository : com.springboot.MyTodoList.repository.UserSprintRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} -addRecommendation ( recs : com.fasterxml.jackson.databind.node.ArrayNode , category : String , text : String ) : void
+	{method} -aggregatePerformanceStats ( myTasks : java.util.List ) : com.springboot.MyTodoList.service.GeminiService$PerformanceStats
+	{method}  {static} -aiNarrativeFactsStaleVsLive ( ai : String , pendingLive : int , completedLive : int , workedLive : double , live : String ) : boolean
+	{method} -alignAlertsWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map , chronoOtd : java.util.List ) : void
+	{method}  {static} -alignExecutiveSummaryProseFields ( es : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map , chronoOtd : java.util.List ) : void
+	{method} -alignExecutiveSummaryWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprint : com.springboot.MyTodoList.model.Sprint , live : java.util.Map , chronoOtd : java.util.List ) : void
+	{method} -alignKpiManagerGuideWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map ) : void
+	{method} -alignPersistedInsightsWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -alignProductivityPredictionWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map ) : void
+	{method}  {static} -appendBlockedNotesIfMissing ( sb : StringBuilder , blockedNotes : java.util.List , lowerAlready : String ) : void
+	{method}  {static} -appendProductivityEndedSprintClosing ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -appendProductivityEvolutionNote ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -applyLiveDeveloperNarratives ( enriched : com.fasterxml.jackson.databind.JsonNode , sprintId : Long ) : com.fasterxml.jackson.databind.JsonNode
+	{method} -applyOverloadGuardrails ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -asDouble ( v : Object ) : double
+	{method} -asInt ( v : Object ) : int
+	{method} +attachInsightsFreshnessMetadata ( payload : java.util.Map , sprintId : Long ) : void
+	{method} -attachRadarMetricsToPayload ( payload : java.util.Map , sprintId : Long , userId : Long ) : void
+	{method} -blockedAssignmentNotesByDeveloper ( blockedArr : com.fasterxml.jackson.databind.JsonNode ) : java.util.Map
+	{method} -blockedDeveloperNamesLower ( sprintId : Long ) : java.util.Set
+	{method}  {static} -blockedTargetNameInRedistributionText ( text : String , blocked : java.util.Set ) : String
+	{method} -blockerSuffixForDeveloper ( name : String , blocks : java.util.List ) : String
+	{method}  {static} -buildBalancedWorkloadGuideText ( wb : double ) : String
+	{method} -buildBlockedUserTaskReportsJson ( sprintId : Long ) : String
+	{method}  {static} -buildCanonicalTaskStatusOverviewLead ( canonical : java.util.Map ) : String
+	{method} -buildCanonicalVsAllPriorSprintsJson ( current : com.springboot.MyTodoList.model.Sprint , projectId : Long ) : String
+	{method} +buildDeveloperPerformanceSummaryResponse ( sprintId : Long , userId : Long ) : java.util.Map
+	{method} -buildDeveloperStatusLoad ( sprintId : Long ) : java.util.Map
+	{method} -buildDeveloperUrgencyLoad ( sprintId : Long ) : java.util.Map
+	{method} -buildDeveloperVariationFallback ( sprintSnapshots : java.util.List ) : com.fasterxml.jackson.databind.JsonNode
+	{method}  {static} -buildLiveDeveloperInsightNarrative ( row : com.fasterxml.jackson.databind.JsonNode , teamAvgWorkedHours : double ) : String
+	{method} -buildPrompt ( currentSprint : com.springboot.MyTodoList.model.Sprint , allSprints : java.util.List , sprintId : Long ) : String
+	{method} -buildSprintDisplayIndexMap ( projectId : Long ) : java.util.Map
+	{method} -buildSprintTimelineJson ( s : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -buildTaskStatusBreakdownNode ( counts : java.util.Map ) : com.fasterxml.jackson.databind.node.ObjectNode
+	{method} -buildTaskStatusCountsJson ( sprintId : Long ) : String
+	{method} -buildTeamWorkloadJson ( sprintId : Long ) : String
+	{method} -buildWebDeveloperPerformancePrompt ( name : String , stats : com.springboot.MyTodoList.service.GeminiService$PerformanceStats , sprintContext : String , sprintId : Long , userId : Long ) : String
+	{method} -buildWebFallbackPerformanceSummary ( name : String , stats : com.springboot.MyTodoList.service.GeminiService$PerformanceStats , sprintContext : String ) : String
+	{method} -callGemini ( prompt : String ) : String
+	{method} -camelCaseKeysDeep ( node : com.fasterxml.jackson.databind.JsonNode ) : com.fasterxml.jackson.databind.JsonNode
+	{method} -captureGeminiExecutiveSummaryIfNeeded ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -clampOverloadWhenBlockedWithoutTaskCountDisparity ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -clampOverloadWhenPeerHasSameAssignmentCount ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -clampOverloadWhenPendingLoadIsBalanced ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -clearWorkloadRedistribution ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method}  {static} -composeDeveloperInsightDisplay ( o : com.fasterxml.jackson.databind.node.ObjectNode , liveSummary : String , aiNarrative : String , blockedNotes : java.util.List ) : String
+	{method} -computeProductivityScore ( s : com.springboot.MyTodoList.model.Sprint ) : double
+	{method} -computeStatusSpread ( rows : java.util.List , statusKey : String , blockedDeveloperNamesLower : java.util.Set ) : com.springboot.MyTodoList.service.GeminiService$StatusSpread
+	{method} -countDevelopersWithAssignments ( sprintId : Long ) : int
+	{method}  {static} -describeWorkedHoursVsTeam ( worked : double , teamAvg : double ) : String
+	{method} -detectTrendHint ( allPriorChronological : java.util.List , current : com.springboot.MyTodoList.model.Sprint , projectId : Long ) : String
+	{method} -enforceOverloadFromWorkloadSnapshot ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -enrichActionableRecommendationsIfEmpty ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprint : com.springboot.MyTodoList.model.Sprint ) : void
+	{method} -enrichDeveloperInsightsIfEmpty ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -enrichExecutiveSummaryIfSparse ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} +enrichInsightsForResponse ( insights : com.fasterxml.jackson.databind.JsonNode , sprintId : Long ) : com.fasterxml.jackson.databind.JsonNode
+	{method} -enrichInsightsForResponseUncached ( insights : com.fasterxml.jackson.databind.JsonNode , sprintId : Long ) : com.fasterxml.jackson.databind.JsonNode
+	{method} -enrichKpiManagerGuideIfEmpty ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -enrichSprintChangeSummary ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprint : com.springboot.MyTodoList.model.Sprint , live : java.util.Map , chronoOtd : java.util.List ) : void
+	{method} -ensureArrayField ( root : com.fasterxml.jackson.databind.node.ObjectNode , field : String ) : com.fasterxml.jackson.databind.node.ArrayNode
+	{method} -ensureWorkloadGuidanceFromAssignments ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long , sprint : com.springboot.MyTodoList.model.Sprint ) : void
+	{method} -excludeBlockedDevelopersFromRedistribution ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method}  {static} -extractCompletedCountFromAiNarrative ( ai : String ) : Integer
+	{method}  {static} -extractHoursLoggedFromAiNarrative ( ai : String ) : Double
+	{method} -extractJsonFromGeminiResponse ( rawGeminiResponse : String ) : String
+	{method} -filterPrematureSprintKpiAlerts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -finalizeDeveloperInsightNarratives ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -finalizeExecutiveSummaryFromGemini ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -findAllPreviousSprintsChronological ( current : com.springboot.MyTodoList.model.Sprint , projectId : Long ) : java.util.List
+	{method}  {static} -findAssignmentLoadSnap ( snaps : java.util.List , developerName : String ) : com.springboot.MyTodoList.service.GeminiService$AssignmentLoadSnap
+	{method} -findImmediatePreviousSprint ( current : com.springboot.MyTodoList.model.Sprint , projectId : Long ) : com.springboot.MyTodoList.model.Sprint
+	{method} -findOrCreateDeveloperInsight ( dev : com.fasterxml.jackson.databind.node.ArrayNode , developerName : String ) : com.fasterxml.jackson.databind.node.ObjectNode
+	{method}  {static} -fixGluedPercentInProse ( text : String ) : String
+	{method} -formatSprintContextForSummary ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -formatStatusSpreadReason ( from : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad , to : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad , statusLabel : String , fromStageCount : int , toStageCount : int , tasksToMove : int ) : String
+	{method}  {static} -formatUrgencyLoadPriorityAndDueSummary ( sender : com.springboot.MyTodoList.service.GeminiService$DeveloperUrgencyLoad ) : String
+	{method}  {static} -formatUrgencyLoadPriorityDueShort ( sender : com.springboot.MyTodoList.service.GeminiService$DeveloperUrgencyLoad ) : String
+	{method}  {static} -geminiExecutiveSummaryHasContent ( geminiNode : com.fasterxml.jackson.databind.JsonNode ) : boolean
+	{method} +generateDeveloperPerformanceSummary ( prompt : String ) : String
+	{method} +generateDeveloperVariationInsights ( sprintSnapshots : java.util.List ) : com.fasterxml.jackson.databind.JsonNode
+	{method} +generateInsightsForSprint ( sprintId : Long ) : java.util.concurrent.CompletableFuture
+	{method} +getCachedInsightsGetResponse ( insight : com.springboot.MyTodoList.model.SprintInsight ) : java.util.Optional
+	{method} -getCanonicalTaskStatusCounts ( sprintId : Long ) : java.util.Map
+	{method} -getLiveOnTimeSeriesChronological ( projectId : Long , currentSprintId : Long ) : java.util.List
+	{method} -injectBlockedAssignmentsSnapshot ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -injectTaskStatusBreakdownAndOverviewLead ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method}  {static} -insightsGetResponseCacheKey ( insight : com.springboot.MyTodoList.model.SprintInsight ) : String
+	{method}  {static} -intMetric ( value : Object ) : int
+	{method} +invalidateInsightsGetResponseCache ( sprintId : Long ) : void
+	{method}  {static} -isBlockedDeveloper ( developerName : String , blockedDeveloperNamesLower : java.util.Set ) : boolean
+	{method}  {static} -isDeterministicExecutiveSummaryText ( text : String ) : boolean
+	{method} -isDueSoon ( t : com.springboot.MyTodoList.model.Task , now : java.time.LocalDateTime ) : boolean
+	{method}  {static} -isEssentiallyLiveOnlyInsight ( prior : String , live : String ) : boolean
+	{method} -isFirstSprintInProject ( sprintId : Long ) : boolean
+	{method} -isHighPriorityTask ( t : com.springboot.MyTodoList.model.Task ) : boolean
+	{method}  {static} -isLiveTemplateInsight ( text : String ) : boolean
+	{method}  {static} -isSprintEarlyForProductivityGuide ( sprint : com.springboot.MyTodoList.model.Sprint ) : boolean
+	{method} -isTaskDone ( t : com.springboot.MyTodoList.model.Task ) : boolean
+	{method} -isTaskFinishedLate ( t : com.springboot.MyTodoList.model.Task ) : boolean
+	{method} -isTaskFinishedOnTime ( t : com.springboot.MyTodoList.model.Task ) : boolean
+	{method}  {static} -isUserTaskAssignmentComplete ( ut : com.springboot.MyTodoList.model.UserTask ) : boolean
+	{method}  {static} -isValidWorkloadDeveloperName ( name : String ) : boolean
+	{method} -isValidWorkloadMoveRecommendation ( rec : com.fasterxml.jackson.databind.JsonNode ) : boolean
+	{method}  {static} -liveSnapshotRedundantWithAi ( live : String , aiText : String ) : boolean
+	{method}  {static} -liveValueForAlertKpi ( kpi : String , live : java.util.Map ) : int
+	{method} -mapDevelopersByName ( developersRaw : Object ) : java.util.Map
+	{method} +markInsightGenerationStarted ( sprintId : Long ) : void
+	{method} -normalizeActionableRecommendationCounts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -normalizeActionableRecommendationRows ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -normalizeAlertSeverities ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -normalizeDeveloperInsightRows ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -normalizeKpiManagerGuidePercentSpacing ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -normalizeKpiManagerGuideProductivityScore ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -normalizeKpiManagerGuideWorkloadBalance ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method}  {static} -normalizeProductivityScoreGuideText ( existing : String , scorePct : int , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -normalizeWorkflowStatus ( raw : String ) : String
+	{method}  {static} -openPending ( d : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad ) : int
+	{method}  {static} -pickRedistributionReceiver ( withWork : java.util.List , from : com.springboot.MyTodoList.service.GeminiService$AssignmentLoadSnap , blockedDeveloperNamesLower : java.util.Set ) : com.springboot.MyTodoList.service.GeminiService$AssignmentLoadSnap
+	{method}  {static} -polishProductivityGuideProse ( text : String ) : String
+	{method}  {static} -preserveAiNarrativeFromPriorInsight ( o : com.fasterxml.jackson.databind.node.ObjectNode , priorInsight : String , liveSummary : String ) : void
+	{method} -prettifyHumanProseInInsights ( node : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} ~prettifyWorkflowStatusTokens ( text : String ) : String
+	{method}  {static} -productivityEvolutionNote ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -pruneInvalidWorkloadRecommendations ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} +putCachedInsightsGetResponse ( insight : com.springboot.MyTodoList.model.SprintInsight , payload : java.util.Map ) : void
+	{method} -readBlockedReportsFromSnapshot ( snap : java.util.Map ) : java.util.List
+	{method} -refineWorkloadRedistributionRecommendations ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -removeContradictoryWorkloadBalanceAlerts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method}  {static} -renameFieldIfPresent ( obj : com.fasterxml.jackson.databind.node.ObjectNode , oldKey : String , newKey : String ) : void
+	{method}  {static} -replaceProductivityScoreMentionsInProse ( text : String , scorePct : int ) : String
+	{method} -resolveDeveloperDisplayName ( myTasks : java.util.List , userId : Long ) : String
+	{method} -resolveLiveKpisForSprint ( sprint : com.springboot.MyTodoList.model.Sprint ) : java.util.Map
+	{method}  {static} -resolveSprintPhase ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -rewriteRedistributionTargetInTextField ( o : com.fasterxml.jackson.databind.node.ObjectNode , field : String , oldTarget : String , newTarget : String ) : void
+	{method} -sanitizeError ( raw : String ) : String
+	{method} -saveErrorInsight ( sprintId : Long , projectId : Long , errorMessage : String ) : void
+	{method}  {static} -shouldAppendLiveSnapshot ( live : String , aiNarrative : String , composedAiText : String , blockedNotes : java.util.List , row : com.fasterxml.jackson.databind.node.ObjectNode ) : boolean
+	{method}  {static} -snakeToLowerCamel ( snake : String ) : String
+	{method}  {static} -softenProductivityGuidePerformanceLabels ( text : String ) : String
+	{method} -sprintDisplayLabel ( displayMap : java.util.Map , sprintId : Long ) : String
+	{method}  {static} -stampDeveloperAiNarrativesFromRaw ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -stampGenerationKpiSnapshot ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -statusKeyFromRecommendationText ( text : String ) : String
+	{method} -statusLabel ( statusKey : String ) : String
+	{method} -statusRow ( status : String , count : long , flowOrder : int ) : java.util.Map
+	{method} -statusValue ( d : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad , statusKey : String ) : int
+	{method}  {static} -stripCanonicalTaskStatusLead ( overview : String ) : String
+	{method}  {static} -stripProductivityEvolutionNotesForEndedSprint ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -stripProductivityGuideInstructionEcho ( text : String ) : String
+	{method}  {static} -stripProductivityLowScoreExcuses ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -stripRedistributionGuidanceFromNarrative ( text : String ) : String
+	{method} -suppressComparativeTrendsForFirstSprint ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -syncDeveloperInsightNarrativesFromLiveWorkload ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -syncLiveKpisToSprintEntity ( sprintId : Long ) : void
+	{method}  {static} -teamAvgWorkedForOverloadGuardrail ( wl : com.fasterxml.jackson.databind.JsonNode , workedHours : double ) : boolean
+	{method} -toPercent ( value : java.math.BigDecimal ) : double
+}
+
+
+class com.springboot.MyTodoList.service.JwtService {
+	{field} -expirationMinutes : long
+	{field} -jwtEncoder : org.springframework.security.oauth2.jwt.JwtEncoder
+	{method} +generateToken ( user : com.springboot.MyTodoList.model.User ) : String
+}
+
+
+class com.springboot.MyTodoList.service.KpiService {
+	{field} -kpiRepository : com.springboot.MyTodoList.repository.KpiRepository
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{method} +calculateAllSprintsKpis () : void
+	{method} +calculateAndSaveKpisForSprint ( sprintId : Long ) : void
+	{method} -extractBigDecimal ( map : java.util.Map , key : String ) : java.math.BigDecimal
+}
+
+
+class com.springboot.MyTodoList.service.ManagerChatService {
+	{field} {static} -GEMINI_MAX_RETRIES : int
+	{field} {static} -GEMINI_RETRY_BASE_MS : long
+	{field} {static} -SPRINT_ID_IN_TEXT : java.util.regex.Pattern
+	{field} -geminiApiConfiguration : com.springboot.MyTodoList.config.GeminiApiConfiguration
+	{field} -httpClient : java.net.http.HttpClient
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{field} -sprintInsightRepository : com.springboot.MyTodoList.repository.SprintInsightRepository
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userSprintRepository : com.springboot.MyTodoList.repository.UserSprintRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} -buildBlockedAssignmentsForSprint ( sprintId : Long ) : java.util.List
+	{method} -buildDevSummaryForSprint ( sprintId : Long , userTasks : java.util.List ) : java.util.List
+	{method} -buildGeminiTurn ( role : String , text : String ) : java.util.Map
+	{method} -buildProductivityVsPreviousSprint ( projectId : Long , sprintId : Long , sprintLabels : java.util.Map ) : java.util.Map
+	{method} -buildProjectContext ( projectId : Long , sprintId : Long ) : String
+	{method} -buildRagContext ( query : String , projectId : Long , sprintId : Long , focalSprintId : Long ) : String
+	{method} -buildSimilarSprintPatternsContext ( projectId : Long , focalSprintId : Long ) : String
+	{method} -buildSprintLabelMap ( projectId : Long ) : java.util.Map
+	{method} -buildSprintNumberMap ( projectId : Long ) : java.util.Map
+	{method} -buildSystemPrompt ( contextJson : String , ragContext : String , scope : String , scopeLabel : String , sprintScopeInferred : boolean ) : String
+	{method} -buildTasksForSprint ( userTasks : java.util.List , sprintTasks : java.util.List ) : java.util.List
+	{method} -callGemini ( systemPrompt : String , userMessage : String , history : java.util.List ) : String
+	{method} +chat ( req : com.springboot.MyTodoList.model.ManagerChatRequest ) : com.springboot.MyTodoList.model.ManagerChatResponse
+	{method} -computeLiveKpisMapForSprint ( sprintId : Long ) : java.util.Map
+	{method} -extractTextFromGeminiResponse ( raw : String ) : String
+	{method} -friendlyError ( code : String ) : String
+	{method} -getLiveKpiSnapshotForSprint ( sprintId : Long ) : java.util.Map
+	{method} -indexOfSprintId ( ordered : java.util.List , sprintId : Long ) : int
+	{method} -mentionsFocalSprint ( message : String ) : boolean
+	{method} -mentionsSimilarPatterns ( message : String ) : boolean
+	{method} -mentionsThisSprint ( message : String ) : boolean
+	{method} -normalizeStatus ( raw : String ) : String
+	{method} -orderedProjectSprints ( projectId : Long ) : java.util.List
+	{method} -productivityDeltaVsPreviousSprint ( projectId : Long , sprintId : Long ) : int
+	{method} -putRoundedKpi ( target : java.util.Map , key : String , value : Object ) : void
+	{method} -resolveFocalSprintId ( orderedSprints : java.util.List ) : Long
+	{method} -resolvePhase ( s : com.springboot.MyTodoList.model.Sprint , tasks : java.util.List , liveKpis : java.util.Map ) : String
+	{method} -resolvePreviousSprintLabel ( projectId : Long , sprintId : Long , sprintLabels : java.util.Map ) : String
+	{method} -resolveSprintLabel ( projectId : Long , sprintId : Long ) : String
+	{method} -resolveSprintNumberFromMessage ( message : String , orderedSprints : java.util.List ) : Long
+	{method} -resolveTargetSprintId ( req : com.springboot.MyTodoList.model.ManagerChatRequest ) : Long
+	{method} -sanitizeErrorCode ( msg : String ) : String
+	{method} -sleepBeforeRetry ( attempt : int ) : void
+}
+
+
+class com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService {
+	{field} -enabled : boolean
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -pendingByUserId : java.util.concurrent.ConcurrentHashMap
+	{method} +drainForUser ( userId : Long ) : java.util.List
+	{method} +enqueue ( userId : Long , taskId : Long , taskTitle : String , assignedByName : String , priority : String , sprintLabel : String ) : void
+	{method} +formatTelegramMessage ( notice : com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService$PendingAssignmentNotice ) : String
+	{method}  {static} -trimOrNull ( raw : String ) : String
+}
+
+
+class com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService$PendingAssignmentNotice {
+	{field} -assignedByName : String
+	{field} -priority : String
+	{field} -sprintLabel : String
+	{field} -taskId : Long
+	{field} -taskTitle : String
+}
+
+
+class com.springboot.MyTodoList.service.ProjectAccessAuthorization {
+	{method} +developerMayAccess ( userId : Long ) : boolean
+	{method} +managerMayAccess ( managerId : Long ) : boolean
+	{method} +userMayAccessProject ( projectId : Long ) : boolean
+}
+
+
+class com.springboot.MyTodoList.service.ProjectBundleCacheEvictor {
+	{method} +evictDashboardBundle ( projectId : Long ) : void
+}
+
+
+class com.springboot.MyTodoList.service.ProjectLookupService {
+	{field} -projectRepository : com.springboot.MyTodoList.repository.ProjectRepository
+	{method} +findAllProjectsForDeveloper ( userId : Long ) : java.util.List
+	{method} +findAllProjectsForManager ( managerId : Long ) : java.util.List
+	{method} +findPrimaryProjectForDeveloper ( userId : Long ) : java.util.Optional
+	{method} +findPrimaryProjectForManager ( managerId : Long ) : java.util.Optional
+}
+
+
+class com.springboot.MyTodoList.service.ProjectTeamRosterService {
+	{field} -projectRepository : com.springboot.MyTodoList.repository.ProjectRepository
+	{field} -teamMembersRepository : com.springboot.MyTodoList.repository.TeamMembersRepository
+	{method} +findProject ( projectId : Long ) : java.util.Optional
+	{method} +listDevelopersForProject ( project : com.springboot.MyTodoList.model.Project ) : java.util.List
+	{method} +listDevelopersForProject ( project : com.springboot.MyTodoList.model.Project , includeProfilePictures : boolean ) : java.util.List
+	{method} +listDevelopersForProjectId ( projectId : Long ) : java.util.List
+}
+
+
+class com.springboot.MyTodoList.service.SprintService {
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{method} +findAll () : java.util.List
+	{method} +findById ( id : Long ) : com.springboot.MyTodoList.model.Sprint
+	{method} +findByProjectIdOrderByStartDateAsc ( projectId : Long ) : java.util.List
+}
+
+
+class com.springboot.MyTodoList.service.TaskAssignmentNotificationService {
+	{field} -enabled : boolean
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{method}  {static} -distinctPositiveIds ( ids : java.util.List ) : java.util.Set
+	{method}  {static} -formatSprintLabel ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -isValidEmail ( email : String ) : boolean
+	{method} -notificationsActive () : boolean
+	{method} -notifyAssignees ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.Set , assignedBy : String ) : void
+	{method} +notifyAssigneesAsync ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.Set , assignedBy : String ) : void
+	{method} +notifyAssigneesOnTaskCreated ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.List ) : void
+	{method} +notifyNewAssigneesAsync ( taskId : Long , newAssigneeUserIds : java.util.Set , assignedBy : String ) : void
+	{method} +notifyNewAssigneesOnReassignment ( taskId : Long , newAssigneeUserIds : java.util.List ) : void
+	{method} -resolveAssignerDisplayName () : String
+}
+
+
+class com.springboot.MyTodoList.service.TaskAssignmentSyncService {
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} -evictDashboardBundleForTask ( taskId : Long ) : void
+	{method}  {static} -isAssigneeDone ( status : String ) : boolean
+	{method}  {static} -norm ( s : String ) : String
+	{method} +syncTaskStatusFromAssignments ( taskId : Long ) : com.springboot.MyTodoList.model.Task
+	{method} +triggerKpiRecalc ( sprintId : Long ) : void
+}
+
+
+class com.springboot.MyTodoList.service.TaskDueReminderService {
+	{field} {static} -DUE_FORMAT : java.time.format.DateTimeFormatter
+	{field} -enabled : boolean
+	{field} -hoursBeforeDue : int
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -sentReminderKeys : java.util.concurrent.ConcurrentHashMap
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method}  {static} -formatDueLabel ( due : java.time.LocalDateTime , now : java.time.LocalDateTime ) : String
+	{method}  {static} -formatSprintLabel ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} ~isAssignmentClosedForReminders ( ut : com.springboot.MyTodoList.model.UserTask ) : boolean
+	{method}  {static} -isValidEmail ( email : String ) : boolean
+	{method} +processDueReminders () : int
+	{method} -purgeOldSentKeys () : void
+	{method}  {static} -resolveManagerContact ( task : com.springboot.MyTodoList.model.Task ) : String
+	{method} +sendDueRemindersScheduled () : void
+	{method} -trySendReminder ( ut : com.springboot.MyTodoList.model.UserTask , now : java.time.LocalDateTime ) : boolean
+}
+
+
+class com.springboot.MyTodoList.service.TaskService {
+	{field} -projectTaskEventPublisher : com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher
+	{field} -taskEmbeddingRepository : com.springboot.MyTodoList.repository.TaskEmbeddingRepository
+	{field} -taskLogRepository : com.springboot.MyTodoList.repository.TaskLogRepository
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +createTask ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.List ) : com.springboot.MyTodoList.model.Task
+	{method} +deleteTaskById ( id : Long ) : void
+	{method} -deleteTaskByIdInternal ( id : Long , projectId : Long ) : void
+	{method} +deleteTasksByIds ( ids : java.util.List ) : int
+}
+
+
+class com.springboot.MyTodoList.service.TelegramUserMappingService {
+	{field} -chatIdToUserIdMap : java.util.Map
+	{field} {static} -logger : org.slf4j.Logger
+	{method} +getAllMappings () : java.util.Map
+	{method} +getUserIdByChatId ( chatId : Long ) : Integer
+	{method} +isUserRegistered ( chatId : Long ) : boolean
+	{method} +registerUser ( chatId : Long , userId : Integer ) : void
+	{method} +unregisterUser ( chatId : Long ) : void
+}
+
+
+class com.springboot.MyTodoList.service.ToDoItemService {
+	{field} -toDoItemRepository : com.springboot.MyTodoList.repository.ToDoItemRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +addToDoItem ( toDoItem : com.springboot.MyTodoList.model.ToDoItem ) : com.springboot.MyTodoList.model.ToDoItem
+	{method} +deleteToDoItem ( id : int ) : boolean
+	{method} +findAll () : java.util.List
+	{method} +findByAssignedSprint ( assignedSprint : Integer ) : java.util.List
+	{method} +getItemById ( id : int ) : org.springframework.http.ResponseEntity
+	{method} +getToDoItemById ( id : int ) : com.springboot.MyTodoList.model.ToDoItem
+	{method} -syncUserTasksWithTelegramTaskState ( taskIdInt : int , justMarkedDone : boolean , justReopened : boolean ) : void
+	{method} +updateTaskStatusOnly ( id : int , status : String ) : boolean
+	{method} +updateToDoItem ( id : int , td : com.springboot.MyTodoList.model.ToDoItem ) : com.springboot.MyTodoList.model.ToDoItem
+}
+
+
+class com.springboot.MyTodoList.service.UserService {
+	{field} -passwordEncoder : org.springframework.security.crypto.password.PasswordEncoder
+	{field} -teamMemberRepository : com.springboot.MyTodoList.repository.TeamMemberRepository
+	{field} -teamRepository : com.springboot.MyTodoList.repository.TeamRepository
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{method} +authenticateByIdentifierAndPassword ( identifier : String , password : String ) : java.util.Optional
+	{method} +deleteUser ( id : Long ) : void
+	{method} +getAllUserDetails () : java.util.List
+	{method} +getAllUsers () : java.util.List
+	{method} +getUserById ( id : Long ) : java.util.Optional
+	{method} +saveUser ( user : com.springboot.MyTodoList.model.User ) : com.springboot.MyTodoList.model.User
+	{method} +updateUser ( id : Long , userDetails : com.springboot.MyTodoList.model.User ) : com.springboot.MyTodoList.model.User
+	{method} +verifyCredentialsByPhoneOrEmailAndPassword ( phoneOrEmail : String , password : String ) : java.util.Optional
+	{method} +verifyUserCredentials ( userId : Long , phoneOrEmail : String , password : String ) : boolean
+}
+
+
+class com.springboot.MyTodoList.service.UserTaskService {
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -projectTaskEventPublisher : com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -toDoItemRepository : com.springboot.MyTodoList.repository.ToDoItemRepository
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +assignUserToTaskAsTodo ( userId : Long , taskId : long ) : void
+	{method}  {static} -assignmentStatusIsCompleted ( status : String ) : boolean
+	{method} +findByUserId ( userId : Long ) : java.util.List
+	{method} +findByUserIdAndSprintId ( userId : Long , sprintId : Long ) : java.util.List
+	{method} +findDistinctAssigneesBySprintId ( sprintId : Long ) : java.util.List
+	{method} +findSprintIdsWithAssignmentsForUser ( userId : Long ) : java.util.List
+	{method} +findTaskIdsForUserInSprint ( userId : Long , sprintId : Long ) : java.util.Set
+	{method} +findUserTasksForUserInSprint ( userId : Long , sprintId : Long ) : java.util.List
+	{method} +getAssignmentStatus ( userId : Long , taskId : Long ) : java.util.Optional
+	{method} +getWorkedHours ( userId : Long , taskId : Long ) : Double
+	{method} +isMyAssignmentCompleted ( userId : Long , taskId : Long ) : boolean
+	{method} +isUserAssignedToTask ( userId : Long , taskId : Long ) : boolean
+	{method} +listBlockedReportsForDeveloper ( userId : Long , projectId : Long ) : java.util.List
+	{method} +loadUserSprintTaskListIndex ( userId : Long , sprintId : Long ) : com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex
+	{method} +reopenMyAssignment ( telegramUserId : Long , taskId : Long ) : boolean
+	{method} -resolveAssigneeUserIdForWorkedHours ( telegramHintUserId : Long , taskId : Long ) : Long
+	{method} +resolveBlockedReport ( userId : Long , taskId : Long ) : com.springboot.MyTodoList.model.UserTask
+	{method} +saveBlockedReason ( userId : Long , taskId : Long , blockedReason : String ) : com.springboot.MyTodoList.model.UserTask
+	{method} +saveWorkedHours ( userId : Long , taskId : Long , workedHours : Double ) : com.springboot.MyTodoList.model.UserTask
+	{method} +updateAssignmentStatus ( userId : Long , taskId : Long , status : String ) : boolean
+}
+
+
+class com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex {
+	{field} +assignedTaskIds : java.util.Set
+	{field} +assignmentStatusByTaskId : java.util.Map
+	{field} +myCompletedAssignmentTaskIds : java.util.Set
+}
+
+
+class com.springboot.MyTodoList.service.vector.ScoredSprintInsightEmbedding {
+	{field} -embedding : com.springboot.MyTodoList.model.SprintInsightEmbedding
+	{field} -similarity : double
+}
+
+
+class com.springboot.MyTodoList.service.vector.SprintInsightEmbeddingVectorStore {
+	{field} {static} -INSIGHT_TABLE : String
+	{field} -embeddingRepository : com.springboot.MyTodoList.repository.SprintInsightEmbeddingRepository
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{field} -oracleVectorColumnPresent : boolean
+	{field} -properties : com.springboot.MyTodoList.config.VectorSearchProperties
+	{method} -chooseBackend ( columnPresent : boolean ) : com.springboot.MyTodoList.service.vector.VectorSearchBackend
+	{method} -detectOracleVectorColumn () : boolean
+	{method} -findRelevantApplication ( queryVector : [D , projectId : Long , topK : int ) : java.util.List
+	{method} +findRelevantInProject ( queryVector : [D , projectId : Long , topK : int ) : java.util.List
+	{method} -findRelevantOracle ( queryVector : [D , projectId : Long , topK : int ) : java.util.List
+	{method} +hasStoredVector ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding ) : boolean
+	{method} -loadEmbeddingsInOrder ( ids : java.util.List ) : java.util.List
+	{method} -parseEmbedding ( json : String ) : [D
+	{method} -rankSimilarApplication ( referenceVector : [D , projectId : Long , excludeSprintId : Long , fetchLimit : int ) : java.util.List
+	{method} +rankSimilarInProject ( referenceVector : [D , projectId : Long , excludeSprintId : Long , fetchLimit : int ) : java.util.List
+	{method} -rankSimilarOracle ( referenceVector : [D , projectId : Long , excludeSprintId : Long , fetchLimit : int ) : java.util.List
+	{method} ~resolveBackend () : void
+	{method} +save ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding , vector : [D , embeddingJson : String ) : void
+	{method} -toScoredRows ( rows : java.util.List ) : java.util.List
+	{method} -writeOracleVector ( rowId : Long , vector : [D ) : void
+}
+
+
+class com.springboot.MyTodoList.service.vector.TaskEmbeddingVectorStore {
+	{field} -embeddingRepository : com.springboot.MyTodoList.repository.TaskEmbeddingRepository
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{field} -oracleVectorColumnPresent : boolean
+	{field} -properties : com.springboot.MyTodoList.config.VectorSearchProperties
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{method} -chooseBackend ( columnPresent : boolean ) : com.springboot.MyTodoList.service.vector.VectorSearchBackend
+	{method} -detectOracleVectorColumn () : boolean
+	{method} +findSimilar ( queryVector : [D , sprintId : Long , taskStatus : String , topK : int ) : java.util.List
+	{method} -findSimilarApplication ( queryVector : [D , sprintId : Long , taskStatus : String , topK : int ) : java.util.List
+	{method} -findSimilarOracle ( queryVector : [D , sprintId : Long , taskStatus : String , topK : int ) : java.util.List
+	{method} +hasStoredVector ( row : com.springboot.MyTodoList.model.TaskEmbedding ) : boolean
+	{method} -parseEmbedding ( json : String ) : [D
+	{method} ~resolveBackend () : void
+	{method} +save ( row : com.springboot.MyTodoList.model.TaskEmbedding , vector : [D , embeddingJson : String ) : void
+	{method} -writeOracleVector ( rowId : Long , vector : [D ) : void
+}
+
+
+class com.springboot.MyTodoList.service.vector.VectorCosineSimilarity {
+	{method}  {static} +cosineSimilarity ( a : [D , b : [D ) : double
+}
+
+
+enum com.springboot.MyTodoList.service.vector.VectorSearchBackend {
+	{field} +APPLICATION
+	{field} +ORACLE
+}
+
+
+
+
+com.springboot.MyTodoList.service.DashboardBundleService *--  com.springboot.MyTodoList.service.ProjectTeamRosterService : projectTeamRosterService
+com.springboot.MyTodoList.service.EmbeddingService -->  com.springboot.MyTodoList.service.vector.SprintInsightEmbeddingVectorStore : insightVectorStore
+com.springboot.MyTodoList.service.EmbeddingService -->  com.springboot.MyTodoList.service.vector.TaskEmbeddingVectorStore : vectorStore
+com.springboot.MyTodoList.service.GeminiService -->  com.springboot.MyTodoList.service.EmbeddingService : embeddingService
+com.springboot.MyTodoList.service.GeminiService -->  com.springboot.MyTodoList.service.KpiService : kpiService
+com.springboot.MyTodoList.service.ManagerChatService -->  com.springboot.MyTodoList.service.EmbeddingService : embeddingService
+com.springboot.MyTodoList.service.ProjectAccessAuthorization *--  com.springboot.MyTodoList.service.ProjectLookupService : projectLookupService
+com.springboot.MyTodoList.service.TaskAssignmentNotificationService -->  com.springboot.MyTodoList.service.EmailService : emailService
+com.springboot.MyTodoList.service.TaskAssignmentNotificationService -->  com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService : pendingTelegramAssignmentNoticeService
+com.springboot.MyTodoList.service.TaskAssignmentSyncService -->  com.springboot.MyTodoList.service.KpiService : kpiService
+com.springboot.MyTodoList.service.TaskAssignmentSyncService -->  com.springboot.MyTodoList.service.ProjectBundleCacheEvictor : projectBundleCacheEvictor
+com.springboot.MyTodoList.service.TaskDueReminderService *--  com.springboot.MyTodoList.service.EmailService : emailService
+com.springboot.MyTodoList.service.TaskService -->  com.springboot.MyTodoList.service.ProjectBundleCacheEvictor : projectBundleCacheEvictor
+com.springboot.MyTodoList.service.TaskService -->  com.springboot.MyTodoList.service.TaskAssignmentSyncService : taskAssignmentSyncService
+com.springboot.MyTodoList.service.TaskService -->  com.springboot.MyTodoList.service.TaskService : self
+com.springboot.MyTodoList.service.ToDoItemService -->  com.springboot.MyTodoList.service.TaskAssignmentSyncService : taskAssignmentSyncService
+com.springboot.MyTodoList.service.UserTaskService -->  com.springboot.MyTodoList.service.TaskAssignmentSyncService : taskAssignmentSyncService
+com.springboot.MyTodoList.service.vector.SprintInsightEmbeddingVectorStore -->  com.springboot.MyTodoList.service.vector.VectorSearchBackend : activeBackend
+com.springboot.MyTodoList.service.vector.TaskEmbeddingVectorStore -->  com.springboot.MyTodoList.service.vector.VectorSearchBackend : activeBackend
+
+
+@enduml

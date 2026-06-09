@@ -1,0 +1,168 @@
+@startuml
+
+class com.springboot.MyTodoList.dto.AuthLoginRequest {
+	{field} +identifier : String
+	{field} +password : String
+}
+
+
+class com.springboot.MyTodoList.dto.AuthLoginResponse {
+	{field} +projectId : Long
+	{field} +projectName : String
+	{field} +token : String
+}
+
+
+class com.springboot.MyTodoList.dto.AuthUserResponse {
+	{field} -id : Long
+	{field} -name : String
+	{field} -profilePicture : String
+	{field} -role : String
+	{field} -type : String
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardBundleResponse {
+	{field} +projectId : Long
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardSprintDto {
+	{field} +completionRate : java.math.BigDecimal
+	{field} +dueDate : java.time.LocalDateTime
+	{field} +efficiencyScore : java.math.BigDecimal
+	{field} +goal : String
+	{field} +id : Long
+	{field} +onTimeDelivery : java.math.BigDecimal
+	{field} +startDate : java.time.LocalDateTime
+	{field} +workloadBalance : java.math.BigDecimal
+	{method}  {static} +from ( sprint : com.springboot.MyTodoList.model.Sprint , projectId : Long ) : com.springboot.MyTodoList.dto.DashboardSprintDto
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardTaskDto {
+	{field} +assignedHours : Long
+	{field} +classification : String
+	{field} +description : String
+	{field} +dueDate : java.time.LocalDateTime
+	{field} +finishDate : java.time.LocalDateTime
+	{field} +id : Long
+	{field} +priority : String
+	{field} +startDate : java.time.LocalDateTime
+	{field} +status : String
+	{field} +title : String
+	{field} +updatedAt : java.time.LocalDateTime
+	{method}  {static} +from ( task : com.springboot.MyTodoList.model.Task ) : com.springboot.MyTodoList.dto.DashboardTaskDto
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardUserTaskDto {
+	{field} +blockedReason : String
+	{field} +completedAt : java.time.LocalDateTime
+	{field} +isBlocked : Boolean
+	{field} +status : String
+	{field} +workedHours : Double
+	{method}  {static} +from ( ut : com.springboot.MyTodoList.model.UserTask ) : com.springboot.MyTodoList.dto.DashboardUserTaskDto
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardUserTaskDto$TaskRefDto {
+	{field} +id : Long
+	{method}  {static} +from ( task : com.springboot.MyTodoList.model.Task ) : com.springboot.MyTodoList.dto.DashboardUserTaskDto$TaskRefDto
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardUserTaskDto$UserRefDto {
+	{field} +id : Long
+	{field} +name : String
+	{field} +phoneNumber : String
+	{method}  {static} +from ( user : com.springboot.MyTodoList.model.User ) : com.springboot.MyTodoList.dto.DashboardUserTaskDto$UserRefDto
+}
+
+
+class com.springboot.MyTodoList.dto.DashboardUserTaskDto$UserTaskKeyDto {
+	{field} +taskId : Long
+	{field} +userId : Long
+}
+
+
+class com.springboot.MyTodoList.dto.IdRefDto {
+	{field} +id : Long
+}
+
+
+class com.springboot.MyTodoList.dto.SimilarSprintInsightMatch {
+	{field} +generatedAt : java.time.LocalDateTime
+	{field} +projectId : Long
+	{field} +similarity : double
+	{field} +snippet : String
+	{field} +sprintId : Long
+	{field} +topAlertSeverity : String
+}
+
+
+class com.springboot.MyTodoList.dto.TaskBulkDeletePayload {
+	{field} +taskIds : java.util.List
+	{method} +normalizedTaskIds () : java.util.List
+}
+
+
+class com.springboot.MyTodoList.dto.TaskBulkDeleteResult {
+	{field} +deletedCount : int
+	{field} +requestedCount : int
+}
+
+
+class com.springboot.MyTodoList.dto.TaskCreatePayload {
+	{field} +assigneeUserIds : java.util.List
+	{field} +task : com.springboot.MyTodoList.model.Task
+}
+
+
+class com.springboot.MyTodoList.dto.TaskNewAssigneesPayload {
+	{field} +newAssigneeUserIds : java.util.List
+	{method} +normalizedNewAssigneeUserIds () : java.util.List
+}
+
+
+class com.springboot.MyTodoList.dto.TeamRosterDto {
+	{field} +email : String
+	{field} +id : Long
+	{field} +name : String
+	{field} +phoneNumber : String
+	{field} +profilePicture : String
+	{field} +type : String
+	{method}  {static} +fromUser ( user : com.springboot.MyTodoList.model.User ) : com.springboot.MyTodoList.dto.TeamRosterDto
+	{method}  {static} +fromUser ( user : com.springboot.MyTodoList.model.User , includeProfilePicture : boolean ) : com.springboot.MyTodoList.dto.TeamRosterDto
+}
+
+
+class com.springboot.MyTodoList.dto.UserDetailDTO {
+	{field} +email : String
+	{field} +id : Long
+	{field} +managedTeamName : String
+	{field} +name : String
+	{field} +phoneNumber : String
+	{field} +projectName : String
+	{field} +role : String
+	{field} +teamId : Long
+	{field} +teamName : String
+}
+
+
+
+
+com.springboot.MyTodoList.dto.AuthLoginResponse -->  com.springboot.MyTodoList.dto.AuthUserResponse : user
+com.springboot.MyTodoList.dto.DashboardBundleResponse "1" o-- "0..*"  com.springboot.MyTodoList.dto.DashboardSprintDto : sprints
+com.springboot.MyTodoList.dto.DashboardBundleResponse "1" o-- "0..*"  com.springboot.MyTodoList.dto.DashboardTaskDto : tasks
+com.springboot.MyTodoList.dto.DashboardBundleResponse "1" o-- "0..*"  com.springboot.MyTodoList.dto.DashboardUserTaskDto : userTasks
+com.springboot.MyTodoList.dto.DashboardBundleResponse "1" o-- "0..*"  com.springboot.MyTodoList.dto.TeamRosterDto : developers
+com.springboot.MyTodoList.dto.DashboardSprintDto -->  com.springboot.MyTodoList.dto.IdRefDto : assignedProject
+com.springboot.MyTodoList.dto.DashboardTaskDto -->  com.springboot.MyTodoList.dto.IdRefDto : assignedSprint
+com.springboot.MyTodoList.dto.DashboardUserTaskDto -->  com.springboot.MyTodoList.dto.DashboardUserTaskDto$TaskRefDto : task
+com.springboot.MyTodoList.dto.DashboardUserTaskDto -->  com.springboot.MyTodoList.dto.DashboardUserTaskDto$UserRefDto : user
+com.springboot.MyTodoList.dto.DashboardUserTaskDto -->  com.springboot.MyTodoList.dto.DashboardUserTaskDto$UserTaskKeyDto : id
+com.springboot.MyTodoList.dto.DashboardUserTaskDto$TaskRefDto -->  com.springboot.MyTodoList.dto.IdRefDto : assignedSprint
+
+
+@enduml

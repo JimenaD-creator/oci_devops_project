@@ -1,0 +1,235 @@
+@startuml
+
+class com.springboot.MyTodoList.controller.AdminController {
+	{field} -adminService : com.springboot.MyTodoList.service.AdminService
+	{method} +addMemberToTeam ( payload : java.util.Map ) : org.springframework.http.ResponseEntity
+	{method} +createProject ( payload : java.util.Map ) : org.springframework.http.ResponseEntity
+	{method} +createTeam ( payload : java.util.Map ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.AiStatusController {
+	{field} -deepSeekApiKey : String
+	{field} -geminiApiConfiguration : com.springboot.MyTodoList.config.GeminiApiConfiguration
+	{method} +status () : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.AuthController {
+	{field} -emailService : com.springboot.MyTodoList.service.EmailService
+	{field} -jwtService : com.springboot.MyTodoList.service.JwtService
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -passwordEncoder : org.springframework.security.crypto.password.PasswordEncoder
+	{field} -projectLookupService : com.springboot.MyTodoList.service.ProjectLookupService
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{field} -userService : com.springboot.MyTodoList.service.UserService
+	{method} +forgotPassword ( body : java.util.Map ) : org.springframework.http.ResponseEntity
+	{method} -isBlank ( value : String ) : boolean
+	{method} +login ( request : com.springboot.MyTodoList.dto.AuthLoginRequest ) : org.springframework.http.ResponseEntity
+	{method} +resetPassword ( body : java.util.Map ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.DeveloperRadarController {
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{field} -teamMembersRepository : com.springboot.MyTodoList.repository.TeamMembersRepository
+	{field} -userSprintRepository : com.springboot.MyTodoList.repository.UserSprintRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} -addProjectTeamRoster ( sprintId : Long , byUser : java.util.Map ) : void
+	{method} -buildDeveloperRadarRows ( sprintId : Long ) : java.util.List
+	{method}  {static} -emptyAggForUser ( u : com.springboot.MyTodoList.model.User , uid : Long ) : com.springboot.MyTodoList.controller.DeveloperRadarController$DeveloperAgg
+	{method} +getDeveloperRadar ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method}  {static} -isAssignmentComplete ( ut : com.springboot.MyTodoList.model.UserTask ) : boolean
+	{method} -scale ( ratio : double ) : int
+}
+
+
+class com.springboot.MyTodoList.controller.EmbeddingController {
+	{field} -embeddingRepository : com.springboot.MyTodoList.repository.TaskEmbeddingRepository
+	{field} -embeddingService : com.springboot.MyTodoList.service.EmbeddingService
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +getEmbeddingsBySprint ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +indexSprint ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +search ( body : java.util.Map ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.InsightsController {
+	{field} -embeddingService : com.springboot.MyTodoList.service.EmbeddingService
+	{field} -geminiApiConfiguration : com.springboot.MyTodoList.config.GeminiApiConfiguration
+	{field} -geminiService : com.springboot.MyTodoList.service.GeminiService
+	{field} -insightRepository : com.springboot.MyTodoList.repository.SprintInsightRepository
+	{field} {static} -log : org.slf4j.Logger
+	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{method} +acknowledgeInsights ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +backfillInsightEmbeddings ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} -buildResponsePayload ( insight : com.springboot.MyTodoList.model.SprintInsight ) : java.util.Map
+	{method} +generateInsights ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getDeveloperPerformanceSummary ( sprintId : Long , userId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getDeveloperVariationInsights ( body : java.util.Map ) : org.springframework.http.ResponseEntity
+	{method} +getInsightsByProject ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getInsightsBySprint ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getSimilarSprintInsights ( sprintId : Long , limit : int , minSimilarity : Double ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.KpiController {
+	{field} -kpiRepository : com.springboot.MyTodoList.repository.KpiRepository
+	{field} -kpiService : com.springboot.MyTodoList.service.KpiService
+	{method} +calculateKpis ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getAllKpis ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getCompletionRate ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getContributionScore ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getEfficiencyScore ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getOnTimeDelivery ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getWorkloadBalance ( sprintId : Long ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.ManagerChatController {
+	{field} -managerChatService : com.springboot.MyTodoList.service.ManagerChatService
+	{method} +chat ( request : com.springboot.MyTodoList.model.ManagerChatRequest ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.ProjectController {
+	{field} -dashboardBundleService : com.springboot.MyTodoList.service.DashboardBundleService
+	{field} -projectAccessAuthorization : com.springboot.MyTodoList.service.ProjectAccessAuthorization
+	{field} -projectLookupService : com.springboot.MyTodoList.service.ProjectLookupService
+	{field} -projectRepository : com.springboot.MyTodoList.repository.ProjectRepository
+	{field} -projectTeamRosterService : com.springboot.MyTodoList.service.ProjectTeamRosterService
+	{method} +getAllProjects () : java.util.List
+	{method} +getDashboardBundle ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectByDeveloper ( userId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectById ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectByManager ( managerId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectDevelopers ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectsByDeveloperList ( userId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getProjectsByManagerList ( managerId : Long ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.ProjectEventsController {
+	{field} -enabled : boolean
+	{field} -hub : com.springboot.MyTodoList.realtime.ProjectRealtimeHub
+	{field} -projectAccessAuthorization : com.springboot.MyTodoList.service.ProjectAccessAuthorization
+	{method} +subscribe ( projectId : Long ) : org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+}
+
+
+class com.springboot.MyTodoList.controller.SprintController {
+	{field} -projectRepository : com.springboot.MyTodoList.repository.ProjectRepository
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
+	{method} +createSprint ( sprint : com.springboot.MyTodoList.model.Sprint ) : org.springframework.http.ResponseEntity
+	{method} +deleteSprint ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +getAllSprints ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getSprintById ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} -resolveAssignedProject ( sprint : com.springboot.MyTodoList.model.Sprint ) : java.util.Optional
+	{method} +updateSprint ( id : Long , sprintDetails : com.springboot.MyTodoList.model.Sprint ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.TaskController {
+	{field} -projectBundleCacheEvictor : com.springboot.MyTodoList.service.ProjectBundleCacheEvictor
+	{field} -projectTaskEventPublisher : com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher
+	{field} -taskAssignmentNotificationService : com.springboot.MyTodoList.service.TaskAssignmentNotificationService
+	{field} -taskAssignmentSyncService : com.springboot.MyTodoList.service.TaskAssignmentSyncService
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -taskService : com.springboot.MyTodoList.service.TaskService
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{method} +bulkDeleteTasks ( payload : com.springboot.MyTodoList.dto.TaskBulkDeletePayload ) : org.springframework.http.ResponseEntity
+	{method}  {static} -canonicalTaskStatus ( raw : String ) : String
+	{method} +createTask ( payload : com.springboot.MyTodoList.dto.TaskCreatePayload ) : org.springframework.http.ResponseEntity
+	{method} +deleteTask ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} -evictDashboardBundleForTask ( taskId : Long ) : void
+	{method} +getAllTasks ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getTaskById ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +notifyNewAssignees ( id : Long , payload : com.springboot.MyTodoList.dto.TaskNewAssigneesPayload ) : org.springframework.http.ResponseEntity
+	{method} +updateTask ( id : Long , taskDetails : com.springboot.MyTodoList.model.Task ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.TeamController {
+	{field} -teamRepository : com.springboot.MyTodoList.repository.TeamRepository
+	{method} +getTeam ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +updateTeam ( id : Long , teamDetails : com.springboot.MyTodoList.model.Team ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.ToDoItemBotController {
+	{field} -botProps : com.springboot.MyTodoList.config.BotProps
+	{field} -deepSeekService : com.springboot.MyTodoList.service.DeepSeekService
+	{field} -geminiService : com.springboot.MyTodoList.service.GeminiService
+	{field} {static} -logger : org.slf4j.Logger
+	{field} -pendingTelegramAssignmentNoticeService : com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService
+	{field} -projectLookupService : com.springboot.MyTodoList.service.ProjectLookupService
+	{field} -sprintService : com.springboot.MyTodoList.service.SprintService
+	{field} -stateManager : com.springboot.MyTodoList.util.BotStateManager
+	{field} -teamMembersRepository : com.springboot.MyTodoList.repository.TeamMembersRepository
+	{field} -teamRepository : com.springboot.MyTodoList.repository.TeamRepository
+	{field} -telegramClient : org.telegram.telegrambots.meta.generics.TelegramClient
+	{field} -telegramUserMappingService : com.springboot.MyTodoList.service.TelegramUserMappingService
+	{field} -toDoItemService : com.springboot.MyTodoList.service.ToDoItemService
+	{field} -userService : com.springboot.MyTodoList.service.UserService
+	{field} -userTaskService : com.springboot.MyTodoList.service.UserTaskService
+	{method} +afterRegistration ( botSession : org.telegram.telegrambots.longpolling.BotSession ) : void
+	{method} +consume ( update : org.telegram.telegrambots.meta.api.objects.Update ) : void
+	{method} +getBotToken () : String
+	{method} +getUpdatesConsumer () : org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer
+	{method}  {static} -normalizeIncomingText ( raw : String ) : String
+}
+
+
+class com.springboot.MyTodoList.controller.ToDoItemController {
+	{field} -toDoItemService : com.springboot.MyTodoList.service.ToDoItemService
+	{method} +addToDoItem ( todoItem : com.springboot.MyTodoList.model.ToDoItem ) : org.springframework.http.ResponseEntity
+	{method} +deleteToDoItem ( id : int ) : org.springframework.http.ResponseEntity
+	{method} +getAllToDoItems () : java.util.List
+	{method} +getToDoItemById ( id : int ) : org.springframework.http.ResponseEntity
+	{method} +updateToDoItem ( toDoItem : com.springboot.MyTodoList.model.ToDoItem , id : int ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.UserController {
+	{field} -userService : com.springboot.MyTodoList.service.UserService
+	{method} +createUser ( user : com.springboot.MyTodoList.model.User ) : org.springframework.http.ResponseEntity
+	{method} +deleteUser ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +getAllUserDetails () : java.util.List
+	{method} +getAllUsers () : java.util.List
+	{method} +getUserById ( id : Long ) : org.springframework.http.ResponseEntity
+	{method} +updateUser ( id : Long , userDetails : com.springboot.MyTodoList.model.User ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.UserProfileController {
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{method} +deleteProfilePicture ( userId : Long ) : org.springframework.http.ResponseEntity
+	{method} +uploadProfilePicture ( userId : Long , body : java.util.Map ) : org.springframework.http.ResponseEntity
+}
+
+
+class com.springboot.MyTodoList.controller.UserTaskController {
+	{field} {static} -LOGGER : org.slf4j.Logger
+	{field} -projectBundleCacheEvictor : com.springboot.MyTodoList.service.ProjectBundleCacheEvictor
+	{field} -projectTaskEventPublisher : com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher
+	{field} -taskAssignmentSyncService : com.springboot.MyTodoList.service.TaskAssignmentSyncService
+	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
+	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
+	{field} -userTaskService : com.springboot.MyTodoList.service.UserTaskService
+	{method} +createUserTask ( payload : java.util.Map ) : org.springframework.http.ResponseEntity
+	{method} +deleteAssignmentsForTask ( taskId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getAllUserTasks ( projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getMyBlockers ( userId : Long , projectId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getUserTasksBySprint ( sprintId : Long ) : org.springframework.http.ResponseEntity
+	{method} +getUserTasksByTask ( taskId : Long ) : org.springframework.http.ResponseEntity
+	{method} +resolveMyBlocker ( userId : Long , taskId : Long ) : org.springframework.http.ResponseEntity
+	{method} +testInsert () : org.springframework.http.ResponseEntity
+}
+
+
+
+
+
+
+@enduml
