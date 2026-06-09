@@ -12,25 +12,57 @@ workspace "Project Manager" "Sprint work, KPIs, AI sprint insights, manager Q&A,
         taskManager = softwareSystem "Task Manager" "Plans and tracks work, KPIs, AI sprint narratives, manager chat over task data, and Telegram bot flows." {
             reactApp = container "React Frontend" "Web UI for tasks, KPIs, AI insights, manager chat, radar, and admin." "React 18" "Web Browser, Container, Single-page application"
             apiApp = container "Spring Boot Backend" "Runs business rules, exposes APIs, runs scheduled jobs, handles the Telegram bot, and coordinates AI features." "Java 11, Spring Boot" "Container, Server-side application" {
-                kpiApi = component "KPI API" "Exposes productivity and delivery metrics; supports on-demand KPI refresh." "Spring REST"
-                managerChatApi = component "Manager chat API" "Entry point for contextual manager chat over project and sprint data." "Spring REST"
-                insightsApi = component "Sprint insights API" "Starts and reads asynchronous sprint narratives; serves developer radar views." "Spring REST"
-                embeddingsApi = component "Embeddings API" "Builds and refreshes task embeddings for semantic search." "Spring REST"
-                domainApi = component "Domain API" "Tasks, projects, sprints, teams, users, assignments, admin, and legacy task list." "Spring REST"
+                kpiApi = component "KPI API" "Exposes productivity and delivery metrics; supports on-demand KPI refresh." "Spring REST" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/controller.puml"
+                }
+                managerChatApi = component "Manager chat API" "Entry point for contextual manager chat over project and sprint data." "Spring REST" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/controller.puml"
+                }
+                insightsApi = component "Sprint insights API" "Starts and reads asynchronous sprint narratives; serves developer radar views." "Spring REST" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/controller.puml"
+                }
+                embeddingsApi = component "Embeddings API" "Builds and refreshes task embeddings for semantic search." "Spring REST" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/controller.puml"
+                }
+                domainApi = component "Domain API" "Tasks, projects, sprints, teams, users, assignments, admin, and legacy task list." "Spring REST" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/controller.puml"
+                }
 
-                telegramBot = component "Telegram bot" "Receives messages and runs bot command flows." "TelegramBots SDK"
-                taskOps = component "Task operations" "Creates and updates tasks from the bot." "Spring Service"
-                sprintContext = component "Sprint context" "Handles sprint selection in bot flows." "Spring Service"
-                assignments = component "Assignments" "Reads and updates user–task and sprint-task data for the bot." "Spring Service"
-                userDirectory = component "User directory" "Resolves users for bot menus." "Spring Service"
-                telegramIdentity = component "Telegram identity bridge" "Links Telegram chats to application users." "Spring Service"
+                telegramBot = component "Telegram bot" "Receives messages and runs bot command flows." "TelegramBots SDK" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/util.puml"
+                }
+                taskOps = component "Task operations" "Creates and updates tasks from the bot." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                sprintContext = component "Sprint context" "Handles sprint selection in bot flows." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                assignments = component "Assignments" "Reads and updates user–task and sprint-task data for the bot." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                userDirectory = component "User directory" "Resolves users for bot menus." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                telegramIdentity = component "Telegram identity bridge" "Links Telegram chats to application users." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
 
-                kpiEngine = component "KPI engine" "Computes and stores sprint KPI fields from aggregates." "Spring Service"
-                geminiService = component "Gemini Service" "Builds sprint insight prompts, calls Gemini, and stores generated narratives." "Spring Service"
-                semanticRetrieval = component "Semantic retrieval" "Embeds text via Gemini; stores VECTOR(768) in TASK_EMBEDDINGS; searches with VECTOR_DISTANCE (Oracle) or in-app cosine (fallback)." "Spring Service"
-                chatOrchestration = component "Chat orchestration" "Builds retrieval context and calls the LLM for manager chat." "Spring Service"
+                kpiEngine = component "KPI engine" "Computes and stores sprint KPI fields from aggregates." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                geminiService = component "Gemini Service" "Builds sprint insight prompts, calls Gemini, and stores generated narratives." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                semanticRetrieval = component "Semantic retrieval" "Embeds text via Gemini; stores VECTOR(768) in TASK_EMBEDDINGS; searches with VECTOR_DISTANCE (Oracle) or in-app cosine (fallback)." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
+                chatOrchestration = component "Chat orchestration" "Builds retrieval context and calls the LLM for manager chat." "Spring Service" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/service.puml"
+                }
 
-                dataRepo = component "Data Repository" "Persists domain data, such as projects, tasks, and sprint KPI snapshots." "Spring Data JPA / JDBC"
+                dataRepo = component "Data Repository" "Persists domain data, such as projects, tasks, and sprint KPI snapshots." "Spring Data JPA / JDBC" {
+                    url "https://github.com/JimenaD-creator/oci_devops_project/blob/main/docs/diagrams/repository.puml"
+                }
             }
 
             database = container "Oracle Autonomous DB" "Stores application data, KPIs, AI insights, and task search vectors." "Oracle ADB" "Database"
