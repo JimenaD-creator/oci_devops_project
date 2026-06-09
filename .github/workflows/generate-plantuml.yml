@@ -28,7 +28,7 @@ jobs:
       - name: Generate PlantUML diagrams
         run: |
           cd MtdrSpring/backend
-          mvn -Pgenerate-puml -DskipTests process-classes
+          mvn -Pgenerate-puml -DskipTests -Dskip.installnodenpm=true -Dskip.npm=true process-classes
 
       - name: Commit generated PlantUML diagrams
         uses: stefanzweifel/git-auto-commit-action@v5
