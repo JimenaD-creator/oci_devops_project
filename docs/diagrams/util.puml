@@ -445,6 +445,28 @@ class com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil {
 }
 
 
+class com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil {
+	{field} {static} +ALERT_SOURCE : String
+	{field} {static} -COMPLETION_SIMILAR_FRACTION : double
+	{field} {static} -HOURS_PER_TASK_CHANGE_THRESHOLD : double
+	{method}  {static} -alertMap ( severity : String , message : String ) : java.util.Map
+	{method}  {static} +alertsAlreadyContainHoursVsPrevious ( alerts : com.fasterxml.jackson.databind.node.ArrayNode ) : boolean
+	{method}  {static} +buildAlert ( current : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previous : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previousSprintLabel : String , sprintEnded : boolean , sprintEarly : boolean ) : java.util.Optional
+	{method}  {static} ~completionCountsSimilar ( currentCompleted : int , previousCompleted : int ) : boolean
+	{method}  {static} -doubleFrom ( value : Object ) : double
+	{method}  {static} -formatHours ( hours : double ) : String
+	{method}  {static} -intFrom ( value : Object ) : int
+	{method}  {static} -labelOrDefault ( previousSprintLabel : String ) : String
+}
+
+
+class com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot {
+	{field} -completedTasks : int
+	{field} -workedHours : double
+	{method}  {static} +fromLiveKpis ( live : java.util.Map ) : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot
+}
+
+
 class com.springboot.MyTodoList.util.SprintLiveKpiUtil {
 	{method}  {static} +bucketTaskStatus ( raw : String ) : String
 	{method}  {static} -clampPercent ( value : int ) : int

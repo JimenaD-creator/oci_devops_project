@@ -201,6 +201,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -getCanonicalTaskStatusCounts ( sprintId : Long ) : java.util.Map
 	{method} -getLiveOnTimeSeriesChronological ( projectId : Long , currentSprintId : Long ) : java.util.List
 	{method} -injectBlockedAssignmentsSnapshot ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -injectSprintHoursCompletionAlert ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -injectTaskStatusBreakdownAndOverviewLead ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method}  {static} -insightsGetResponseCacheKey ( insight : com.springboot.MyTodoList.model.SprintInsight ) : String
 	{method}  {static} -intMetric ( value : Object ) : int
