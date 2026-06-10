@@ -18,9 +18,9 @@ import {
   applyOptimisticTaskUpdated,
 } from '../features/dashboard/dashboardSprintData';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
-import { markTasksSyncCaughtUp, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
+import { markTasksSyncCaughtUp, notifyTasksMutated, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
 
-const SSE_CONNECT_DELAY_MS = 2500;
+const SSE_CONNECT_DELAY_MS = 500;
 /** Minimum gap between SSE-driven force refreshes (avoids reload storms). */
 const SSE_REFRESH_COOLDOWN_MS = 4000;
 
@@ -48,6 +48,7 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
   const [loadEnabled, setLoadEnabled] = useState(Boolean(preload));
   const refreshPromiseRef = useRef(null);
   const lastSseRefreshAtRef = useRef(0);
+  const pendingSseRefreshRef = useRef(false);
   const invalidateAndRefreshRef = useRef(null);
 
   const applySnapshot = useCallback((snap) => {
@@ -192,15 +193,18 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     if (!pid) return undefined;
     let unsubscribe = () => {};
     const connectLater = window.setTimeout(() => {
-      unsubscribe = subscribeProjectTaskEvents(pid, (payload) => {
+      const runSseRefresh = (payload) => {
         const now = Date.now();
         if (now - lastSseRefreshAtRef.current < SSE_REFRESH_COOLDOWN_MS) {
+          pendingSseRefreshRef.current = true;
           return;
         }
         if (refreshPromiseRef.current) {
+          pendingSseRefreshRef.current = true;
           return;
         }
         lastSseRefreshAtRef.current = now;
+        pendingSseRefreshRef.current = false;
         let appliedOptimistic = false;
         if (payload?.type === 'task-deleted' && payload?.taskId != null) {
           const snap = applyOptimisticTaskDeleted(pid, payload.taskId);
@@ -209,13 +213,26 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
             appliedOptimistic = true;
           }
         }
+        notifyTasksMutated({
+          source: 'sse',
+          type: payload?.type || 'task-updated',
+          taskId: payload?.taskId,
+          userId: payload?.userId,
+        });
         invalidateAndRefreshRef
           .current?.({
             silent: true,
             confirmOnly: appliedOptimistic,
           })
-          .catch(() => {});
-      });
+          .catch(() => {})
+          .finally(() => {
+            if (!pendingSseRefreshRef.current) return;
+            pendingSseRefreshRef.current = false;
+            runSseRefresh(payload);
+          });
+      };
+
+      unsubscribe = subscribeProjectTaskEvents(pid, runSseRefresh);
     }, SSE_CONNECT_DELAY_MS);
 
     return () => {

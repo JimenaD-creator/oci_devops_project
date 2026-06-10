@@ -1279,7 +1279,7 @@ public class BotActions {
      */
     private void showTaskDetailsCompletedForAssignee(ToDoItem task, Long sprintId, Long assigneeUserId) {
         List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(new KeyboardRow("↩️ Reopen my part"));
+        keyboard.add(new KeyboardRow("↩️ Reopen task"));
         keyboard.add(new KeyboardRow("⬅️ Back to tasks"));
 
         ReplyKeyboardMarkup keyboardMarkup = ReplyKeyboardMarkup.builder()
@@ -1446,7 +1446,7 @@ public class BotActions {
             return;
         }
 
-        if ("↩️ Reopen my part".equals(requestText != null ? requestText.trim() : "")) {
+        if ("↩️ Reopen task".equals(requestText != null ? requestText.trim() : "")) {
             Integer taskId = stateManager.getSelectedTaskId(chatId);
             Long assigneeUserId = resolveActingAssigneeUserId();
             Long sprintId = stateManager.getViewingSprintId(chatId);

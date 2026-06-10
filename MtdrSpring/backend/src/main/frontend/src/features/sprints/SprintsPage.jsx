@@ -214,7 +214,7 @@ export default function SprintsPage({ projectId }) {
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceFresh: false }).catch((e) => {
+      loadData({ silent: true, forceFresh: true }).catch((e) => {
         console.error('SprintsPage bundle sync failed:', e);
       });
     }, [loadData]),
@@ -229,7 +229,12 @@ export default function SprintsPage({ projectId }) {
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'sprints-page') return;
-      if (event?.detail?.source === 'sse') return;
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceFresh: true }).catch((e) => {
+          console.error('SprintsPage SSE sync failed:', e);
+        });
+        return;
+      }
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setTasks((prev) => {

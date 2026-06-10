@@ -162,7 +162,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceFresh: false }).catch((err) => {
+      loadData({ silent: true, forceFresh: true }).catch((err) => {
         console.error('MyTasksPage bundle sync failed:', err);
       });
     }, [loadData]),
@@ -171,7 +171,12 @@ export default function MyTasksPage({ projectId, currentUser }) {
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'my-tasks-page') return;
-      if (event?.detail?.source === 'sse') return;
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceFresh: true }).catch((err) => {
+          console.error('MyTasksPage SSE sync failed:', err);
+        });
+        return;
+      }
       loadData({ silent: true, forceFresh: true }).catch((err) => {
         console.error('MyTasksPage sync refresh failed:', err);
       });

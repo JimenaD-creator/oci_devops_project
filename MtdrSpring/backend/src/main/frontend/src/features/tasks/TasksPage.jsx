@@ -177,7 +177,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceRefresh: false }).catch((e) => {
+      loadData({ silent: true, forceRefresh: true }).catch((e) => {
         console.error('TasksPage bundle sync failed:', e);
       });
     }, [loadData]),
@@ -192,7 +192,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'tasks-page') return;
-      if (event?.detail?.source === 'sse') return;
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceRefresh: true }).catch((e) => {
+          console.error('TasksPage SSE sync failed:', e);
+        });
+        return;
+      }
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setRawTasks((prev) => {
