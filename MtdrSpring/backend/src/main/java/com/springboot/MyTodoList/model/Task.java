@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -30,8 +31,9 @@ public class Task {
     @Column(name = "PRIORITY", length = 20)
     private String priority;
 
+    @JsonAlias({ "assigned_hours" })
     @Column(name = "ASSIGNED_HOURS")
-    private Long assignedHours;
+    private Double assignedHours;
 
     @Column(name = "START_DATE", nullable = false)
     private LocalDateTime startDate;
@@ -113,11 +115,11 @@ public class Task {
         this.description = description;
     }
 
-    public Long getAssignedHours() {
+    public Double getAssignedHours() {
         return assignedHours;
     }
 
-    public void setAssignedHours(Long assignedHours) {
+    public void setAssignedHours(Double assignedHours) {
         this.assignedHours = assignedHours;
     }
 

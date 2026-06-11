@@ -82,7 +82,7 @@ public final class SprintLiveKpiUtil {
                 ? (int) Math.round((100.0 * onTimeAssignments) / doneAssignments)
                 : 0;
 
-        long totalExpectedHours = 0L;
+        double totalExpectedHours = 0.0;
         if (sprintTasks != null) {
             for (Task task : sprintTasks) {
                 if (task == null || task.getAssignedHours() == null) {
@@ -111,7 +111,7 @@ public final class SprintLiveKpiUtil {
         kpis.put("totalTasks", totalTasks);
         kpis.put("totalCompleted", totalCompleted);
         kpis.put("totalWorkedHours", SprintDeveloperMetricsUtil.roundChartHours(totalWorkedHours));
-        kpis.put("totalExpectedHours", totalExpectedHours);
+        kpis.put("totalExpectedHours", SprintDeveloperMetricsUtil.roundChartHours(totalExpectedHours));
         return kpis;
     }
 

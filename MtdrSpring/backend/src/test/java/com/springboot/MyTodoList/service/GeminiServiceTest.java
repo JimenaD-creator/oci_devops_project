@@ -399,7 +399,7 @@ class GeminiServiceTest {
         task.setId(taskId);
         task.setStatus("TODO");
         task.setTitle("Open task");
-        task.setAssignedHours(4L);
+        task.setAssignedHours(4.0);
         UserTask ut = new UserTask(user, task);
         ut.setStatus("ASSIGNED");
         ut.setWorkedHours(1.0);
@@ -412,7 +412,7 @@ class GeminiServiceTest {
         ut.setStatus("IN_PROGRESS");
         ut.setIsBlocked(true);
         ut.setBlockedReason("Waiting on API access");
-        ut.getTask().setAssignedHours(16L);
+        ut.getTask().setAssignedHours(16.0);
         return ut;
     }
 }

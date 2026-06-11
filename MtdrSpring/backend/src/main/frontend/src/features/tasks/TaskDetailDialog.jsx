@@ -1329,7 +1329,7 @@ export function TaskDetailDialog({
                     onChange={(e) => setAssignedHours(e.target.value)}
                     fullWidth
                     size="small"
-                    inputProps={{ min: 0 }}
+                    inputProps={{ min: 0, step: 0.25 }}
                     sx={fieldSx}
                   />
                 </Stack>

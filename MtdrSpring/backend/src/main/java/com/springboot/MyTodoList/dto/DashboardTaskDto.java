@@ -11,7 +11,7 @@ public class DashboardTaskDto {
     private String description;
     private String status;
     private String priority;
-    private Long assignedHours;
+    private Double assignedHours;
     private LocalDateTime startDate;
     private LocalDateTime dueDate;
     private LocalDateTime finishDate;
@@ -92,11 +92,11 @@ public class DashboardTaskDto {
         this.priority = priority;
     }
 
-    public Long getAssignedHours() {
+    public Double getAssignedHours() {
         return assignedHours;
     }
 
-    public void setAssignedHours(Long assignedHours) {
+    public void setAssignedHours(Double assignedHours) {
         this.assignedHours = assignedHours;
     }
 

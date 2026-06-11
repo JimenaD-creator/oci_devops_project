@@ -842,8 +842,8 @@ public class GeminiService {
                 int unknownCompletionTiming;
                 int completedWithZeroHours;
                 double workedHours;
-                long assignedHours;
-                long pendingAssignedHours;
+                double assignedHours;
+                double pendingAssignedHours;
                 boolean fromSprintRosterOnly;
                 boolean fromProjectTeamOnly;
                 final List<Map<String, Object>> taskSamples = new ArrayList<>();
@@ -1722,8 +1722,8 @@ public class GeminiService {
                     name,
                     row.path("assignedTaskRows").asInt(0),
                     row.path("completedTasks").asInt(0),
-                    row.path("assignedHoursSum").asLong(0),
-                    row.path("pendingAssignedHoursSum").asLong(0),
+                    row.path("assignedHoursSum").asDouble(0),
+                    row.path("pendingAssignedHoursSum").asDouble(0),
                     row.path("workedHoursSum").asDouble(0),
                     rosterOnly));
             }
@@ -2154,12 +2154,12 @@ public class GeminiService {
                 final int completed;
                 final int pending;
                 final double workedHours;
-                final long assignedHours;
-                final long pendingAssignedHours;
+                final double assignedHours;
+                final double pendingAssignedHours;
                 final boolean rosterOnly;
 
                 Snap(String nameLower, int assigned, int completed, int pending, double workedHours,
-                    long assignedHours, long pendingAssignedHours, boolean rosterOnly) {
+                    double assignedHours, double pendingAssignedHours, boolean rosterOnly) {
                     this.nameLower = nameLower;
                     this.assigned = assigned;
                     this.completed = completed;
@@ -2184,8 +2184,8 @@ public class GeminiService {
                 int completed = row.path("completedTasks").asInt(0);
                 int pending = row.path("pendingTaskRows").asInt(Math.max(0, assigned - completed));
                 double wh = row.path("workedHoursSum").asDouble(0);
-                long ah = row.path("assignedHoursSum").asLong(0);
-                long pendingAh = row.path("pendingAssignedHoursSum").asLong(0);
+                double ah = row.path("assignedHoursSum").asDouble(0);
+                double pendingAh = row.path("pendingAssignedHoursSum").asDouble(0);
                 snaps.add(new Snap(dn, assigned, completed, pending, wh, ah, pendingAh, rosterOnly));
             }
             JsonNode insights = root.get("developerInsights");
@@ -2211,7 +2211,7 @@ public class GeminiService {
                 if (self == null || self.rosterOnly || self.pending < 1) {
                     continue;
                 }
-                long maxPeerPendingAh = 0L;
+                double maxPeerPendingAh = 0.0;
                 int peersWithSamePending = 0;
                 for (Snap p : snaps) {
                     if (p.rosterOnly || p.pending != self.pending) {
@@ -2227,9 +2227,9 @@ public class GeminiService {
                     continue;
                 }
                 boolean morePendingEstimatedHours =
-                    self.pendingAssignedHours >= maxPeerPendingAh + 8L
+                    self.pendingAssignedHours >= maxPeerPendingAh + 8.0
                         || (maxPeerPendingAh > 0
-                            && self.pendingAssignedHours >= (long) (maxPeerPendingAh * 1.35));
+                            && self.pendingAssignedHours >= maxPeerPendingAh * 1.35);
                 if (!morePendingEstimatedHours) {
                     o.put("overloaded", false);
                     o.put("overloadParityGuardrailCorrected", true);
@@ -3896,13 +3896,13 @@ public class GeminiService {
         final String nameLower;
         final int assignedRows;
         final int completed;
-        final long assignedHours;
-        final long pendingAssignedHours;
+        final double assignedHours;
+        final double pendingAssignedHours;
         final double workedHours;
         final boolean rosterOnly;
 
-        AssignmentLoadSnap(String name, int assignedRows, int completed, long assignedHours,
-            long pendingAssignedHours, double workedHours, boolean rosterOnly) {
+        AssignmentLoadSnap(String name, int assignedRows, int completed, double assignedHours,
+            double pendingAssignedHours, double workedHours, boolean rosterOnly) {
             this.name = name;
             this.nameLower = name.trim().toLowerCase(Locale.ROOT);
             this.assignedRows = assignedRows;
@@ -3935,7 +3935,7 @@ public class GeminiService {
             .collect(Collectors.toList());
         Comparator<AssignmentLoadSnap> byLightHours = Comparator
             .comparingDouble((AssignmentLoadSnap p) -> p.workedHours)
-            .thenComparingLong(p -> p.pendingAssignedHours)
+            .thenComparingDouble(p -> p.pendingAssignedHours)
             .thenComparingInt(AssignmentLoadSnap::pending);
         Optional<AssignmentLoadSnap> finishedAssigned = others.stream()
             .filter(p -> !p.rosterOnly && p.assignedRows > 0 && p.pending() < 1)
@@ -3952,7 +3952,7 @@ public class GeminiService {
         return others.stream()
             .min(Comparator.comparingInt((AssignmentLoadSnap p) -> p.pending())
                 .thenComparingDouble(p -> p.workedHours)
-                .thenComparingLong(p -> p.pendingAssignedHours))
+                .thenComparingDouble(p -> p.pendingAssignedHours))
             .orElse(null);
     }
 
@@ -3981,8 +3981,8 @@ public class GeminiService {
                     name,
                     row.path("assignedTaskRows").asInt(0),
                     row.path("completedTasks").asInt(0),
-                    row.path("assignedHoursSum").asLong(0),
-                    row.path("pendingAssignedHoursSum").asLong(0),
+                    row.path("assignedHoursSum").asDouble(0),
+                    row.path("pendingAssignedHoursSum").asDouble(0),
                     row.path("workedHoursSum").asDouble(0),
                     rosterOnly));
             }
@@ -4003,34 +4003,34 @@ public class GeminiService {
                 ? toPercent(sprint.getWorkloadBalance()) : -1.0;
 
             double avgRows = withWork.stream().mapToInt(s -> s.assignedRows).average().orElse(0.0);
-            double avgHours = withWork.stream().mapToLong(s -> s.assignedHours).average().orElse(0.0);
+            double avgHours = withWork.stream().mapToDouble(s -> s.assignedHours).average().orElse(0.0);
             double avgPendingRows = withWork.stream().mapToInt(AssignmentLoadSnap::pending).average().orElse(0.0);
-            double avgPendingHours = withWork.stream().mapToLong(s -> s.pendingAssignedHours).average().orElse(0.0);
+            double avgPendingHours = withWork.stream().mapToDouble(s -> s.pendingAssignedHours).average().orElse(0.0);
             AssignmentLoadSnap heaviest;
             AssignmentLoadSnap lightest;
             if (notStarted) {
                 heaviest = withWork.stream()
-                    .max(Comparator.comparingLong((AssignmentLoadSnap s) -> s.assignedHours)
+                    .max(Comparator.comparingDouble((AssignmentLoadSnap s) -> s.assignedHours)
                         .thenComparingInt(s -> s.assignedRows))
                     .orElse(null);
                 lightest = withWork.stream()
-                    .min(Comparator.comparingLong((AssignmentLoadSnap s) -> s.assignedHours)
+                    .min(Comparator.comparingDouble((AssignmentLoadSnap s) -> s.assignedHours)
                         .thenComparingInt(s -> s.assignedRows))
                     .orElse(null);
             } else {
                 heaviest = withWork.stream()
                     .max(Comparator.comparingInt(AssignmentLoadSnap::pending)
-                        .thenComparingLong(s -> s.pendingAssignedHours)
+                        .thenComparingDouble(s -> s.pendingAssignedHours)
                         .thenComparingDouble(s -> s.workedHours))
                     .orElse(null);
                 lightest = withWork.stream()
                     .filter(s -> s.pending() > 0)
                     .min(Comparator.comparingInt(AssignmentLoadSnap::pending)
-                        .thenComparingLong(s -> s.pendingAssignedHours)
+                        .thenComparingDouble(s -> s.pendingAssignedHours)
                         .thenComparingDouble(s -> s.workedHours))
                     .orElse(withWork.stream()
                         .min(Comparator.comparingInt(AssignmentLoadSnap::pending)
-                            .thenComparingLong(s -> s.pendingAssignedHours))
+                            .thenComparingDouble(s -> s.pendingAssignedHours))
                         .orElse(null));
             }
             if (heaviest == null || lightest == null || heaviest.nameLower.equals(lightest.nameLower)) {
@@ -4050,9 +4050,9 @@ public class GeminiService {
             boolean imbalancedByKpi = wb >= 0.0 && wb < 70.0;
             boolean imbalancedByRows = spreadRows >= 2;
             boolean imbalancedByHours = notStarted
-                ? heaviest.assignedHours >= lightest.assignedHours + 8L
+                ? heaviest.assignedHours >= lightest.assignedHours + 8.0
                     && (avgHours <= 0.0 || heaviest.assignedHours >= avgHours * 1.35)
-                : heaviest.pendingAssignedHours >= lightest.pendingAssignedHours + 8L
+                : heaviest.pendingAssignedHours >= lightest.pendingAssignedHours + 8.0
                     && (avgPendingHours <= 0.0 || heaviest.pendingAssignedHours >= avgPendingHours * 1.35);
             if (!imbalancedByKpi && !imbalancedByRows && !imbalancedByHours) {
                 return;
@@ -4130,7 +4130,7 @@ public class GeminiService {
                             && s.pending() >= Math.max(2, Math.ceil(avgPendingRows * 1.4))
                             && s.pending() > lightest.pending())
                         || (avgPendingHours > 0.0
-                            && s.pendingAssignedHours >= Math.max(8L, Math.round(avgPendingHours * 1.35))
+                            && s.pendingAssignedHours >= Math.max(8.0, avgPendingHours * 1.35)
                             && s.pendingAssignedHours > lightest.pendingAssignedHours);
                 }
                 if (!overloaded) {

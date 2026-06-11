@@ -41,7 +41,7 @@ class SprintLiveKpiUtilTest {
         assertEquals(79, kpis.get("productivityScore"));
     }
 
-    private static Task task(long id, String status, long assignedHours) {
+    private static Task task(long id, String status, double assignedHours) {
         Task task = new Task();
         task.setId(id);
         task.setStatus(status);
@@ -57,7 +57,7 @@ class SprintLiveKpiUtilTest {
 
         Task task = new Task();
         task.setId(taskId);
-        task.setAssignedHours(8L);
+        task.setAssignedHours(8.0);
 
         UserTask ut = new UserTask();
         ut.setId(new UserTaskId(userId, taskId));
