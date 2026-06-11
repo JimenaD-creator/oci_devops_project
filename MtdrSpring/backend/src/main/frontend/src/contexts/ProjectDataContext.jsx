@@ -12,14 +12,15 @@ import {
   fetchProjectBundleRaw,
   getCachedBundleSnapshot,
   invalidateDashboardCache,
+  isFullPageReload,
   applyOptimisticTaskDeleted,
   applyOptimisticTaskCreated,
+  applyOptimisticTaskUpdated,
 } from '../features/dashboard/dashboardSprintData';
-import { fetchProjectDevelopers } from '../features/dashboard/projectApi';
 import { subscribeProjectTaskEvents } from '../utils/projectEventStream';
-import { markTasksSyncCaughtUp, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
+import { markTasksSyncCaughtUp, notifyTasksMutated, TASKS_MUTATED_EVENT } from '../utils/taskSyncEvents';
 
-const SSE_CONNECT_DELAY_MS = 2500;
+const SSE_CONNECT_DELAY_MS = 500;
 /** Minimum gap between SSE-driven force refreshes (avoids reload storms). */
 const SSE_REFRESH_COOLDOWN_MS = 4000;
 
@@ -40,13 +41,14 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
   const [taskCount, setTaskCount] = useState(() =>
     Array.isArray(initialSnap?.tasks) ? initialSnap.tasks.length : (initialSnap?.taskCount ?? 0),
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(pid) && !initialSnap);
   const [refreshing, setRefreshing] = useState(false);
   const [dataUpdatedAt, setDataUpdatedAt] = useState(() => initialSnap?.timestamp ?? 0);
   const [error, setError] = useState(null);
   const [loadEnabled, setLoadEnabled] = useState(Boolean(preload));
   const refreshPromiseRef = useRef(null);
   const lastSseRefreshAtRef = useRef(0);
+  const pendingSseRefreshRef = useRef(false);
   const invalidateAndRefreshRef = useRef(null);
 
   const applySnapshot = useCallback((snap) => {
@@ -84,16 +86,14 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       setError(null);
       let succeeded = false;
       try {
-        const [data] = await Promise.all([
-          fetchDashboardSprints(pid, { forceFresh }),
-          fetchProjectDevelopers(pid, { forceFresh }).catch(() => []),
-        ]);
+        const data = await fetchDashboardSprints(pid, { forceFresh });
         setSprints(Array.isArray(data) ? data : []);
         const freshSnap = getCachedBundleSnapshot(pid);
         const updatedAt = freshSnap?.timestamp ?? Date.now();
-        if (freshSnap) {
-          setTaskCount(freshSnap.taskCount ?? 0);
-        }
+        setTaskCount(
+          freshSnap?.taskCount ??
+            (Array.isArray(freshSnap?.tasks) ? freshSnap.tasks.length : 0),
+        );
         setDataUpdatedAt(updatedAt);
         succeeded = true;
       } catch (e) {
@@ -128,10 +128,15 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     const snap = getCachedBundleSnapshot(pid);
     if (snap) {
       applySnapshot(snap);
-      load({ silent: true, forceFresh: false }).catch(() => {});
+      const looksEmpty =
+        (!Array.isArray(snap.enrichedSprints) || snap.enrichedSprints.length === 0) &&
+        (snap.taskCount ?? 0) === 0;
+      if (looksEmpty) {
+        load({ silent: false, forceFresh: true }).catch(() => {});
+      }
       return;
     }
-    load({ silent: false, forceFresh: false });
+    load({ silent: false, forceFresh: isFullPageReload() });
   }, [loadEnabled, pid, load, applySnapshot]);
 
   const ensureLoaded = useCallback(
@@ -141,6 +146,12 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
       const snap = getCachedBundleSnapshot(pid);
       if (snap && !options.forceFresh) {
         applySnapshot(snap);
+        const hasData =
+          (Array.isArray(snap.enrichedSprints) && snap.enrichedSprints.length > 0) ||
+          (snap.taskCount ?? 0) > 0;
+        if (hasData) {
+          return Promise.resolve();
+        }
         return load({ silent: true, forceFresh: false });
       }
       return load({ silent: Boolean(options.silent), forceFresh: Boolean(options.forceFresh) });
@@ -182,15 +193,18 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
     if (!pid) return undefined;
     let unsubscribe = () => {};
     const connectLater = window.setTimeout(() => {
-      unsubscribe = subscribeProjectTaskEvents(pid, (payload) => {
+      const runSseRefresh = (payload) => {
         const now = Date.now();
         if (now - lastSseRefreshAtRef.current < SSE_REFRESH_COOLDOWN_MS) {
+          pendingSseRefreshRef.current = true;
           return;
         }
         if (refreshPromiseRef.current) {
+          pendingSseRefreshRef.current = true;
           return;
         }
         lastSseRefreshAtRef.current = now;
+        pendingSseRefreshRef.current = false;
         let appliedOptimistic = false;
         if (payload?.type === 'task-deleted' && payload?.taskId != null) {
           const snap = applyOptimisticTaskDeleted(pid, payload.taskId);
@@ -199,13 +213,26 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
             appliedOptimistic = true;
           }
         }
+        notifyTasksMutated({
+          source: 'sse',
+          type: payload?.type || 'task-updated',
+          taskId: payload?.taskId,
+          userId: payload?.userId,
+        });
         invalidateAndRefreshRef
           .current?.({
             silent: true,
             confirmOnly: appliedOptimistic,
           })
-          .catch(() => {});
-      });
+          .catch(() => {})
+          .finally(() => {
+            if (!pendingSseRefreshRef.current) return;
+            pendingSseRefreshRef.current = false;
+            runSseRefresh(payload);
+          });
+      };
+
+      unsubscribe = subscribeProjectTaskEvents(pid, runSseRefresh);
     }, SSE_CONNECT_DELAY_MS);
 
     return () => {
@@ -236,9 +263,18 @@ export function ProjectDataProvider({ projectId, children, preload = true }) {
         } else {
           setTaskCount((count) => count + 1);
         }
+      } else if (detail.type === 'task-updated' && detail.task?.id != null) {
+        const snap = applyOptimisticTaskUpdated(pid, detail.task, detail.meta);
+        if (snap) {
+          applySnapshot(snap);
+          appliedOptimistic = true;
+        }
       }
 
-      invalidateDashboardCache();
+      const keepOptimisticCache = detail.type === 'task-updated' && appliedOptimistic;
+      if (!keepOptimisticCache) {
+        invalidateDashboardCache();
+      }
       setLoadEnabled(true);
       invalidateAndRefresh({
         silent: true,

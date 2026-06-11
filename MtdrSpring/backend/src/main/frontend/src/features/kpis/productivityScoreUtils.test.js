@@ -3,6 +3,8 @@ import {
   buildProductivityKpiAnalyticsGuideLine,
   appendProductivityEvolutionNote,
   finalizeProductivityManagerGuideText,
+  stripProductivityEvolutionNotesForEndedSprint,
+  appendProductivityEndedSprintClosing,
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
   softenProductivityGuideForSprintPhase,
@@ -156,6 +158,38 @@ describe('productivityScoreUtils (KPI Analytics)', () => {
     );
     expect(out).toContain('The Productivity Score is 42%');
     expect(out).toMatch(/keep updating/i);
+  });
+
+  it('stripProductivityEvolutionNotesForEndedSprint removes forward-looking sentences', () => {
+    const raw =
+      'The 99% productivity score demonstrates a healthy and sustainable pace for the team. ' +
+      'It will keep updating as tasks progress and completion, on-time delivery, participation, and workload balance change during the sprint.';
+    const out = stripProductivityEvolutionNotesForEndedSprint(raw, { phase: 'ended', isEarly: false });
+    expect(out).toContain('healthy and sustainable pace');
+    expect(out).not.toMatch(/keep updating|during the sprint/i);
+  });
+
+  it('finalizeProductivityManagerGuideText does not append evolution note when sprint ended', () => {
+    const pastStart = new Date();
+    pastStart.setDate(pastStart.getDate() - 30);
+    const pastDue = new Date();
+    pastDue.setDate(pastDue.getDate() - 7);
+    const out = finalizeProductivityManagerGuideText(
+      'The 99% productivity score demonstrates a healthy and sustainable pace for the team. ' +
+        'It will keep updating as tasks progress and completion, on-time delivery, participation, and workload balance change during the sprint.',
+      99,
+      { startDate: pastStart.toISOString(), dueDate: pastDue.toISOString() },
+    );
+    expect(out).toContain('healthy and sustainable pace');
+    expect(out).not.toMatch(/keep updating|during the sprint/i);
+    expect(out).toMatch(/final delivery for the completed sprint window/i);
+  });
+
+  it('appendProductivityEndedSprintClosing does not duplicate when closing already present', () => {
+    const raw =
+      'The productivity score is 88% and reflects final delivery for the completed sprint.';
+    const out = appendProductivityEndedSprintClosing(raw, { phase: 'ended', isEarly: false });
+    expect(out).toBe(raw);
   });
 
   it('softenProductivityGuideForSprintPhase strips judgment labels before sprint is mature', () => {

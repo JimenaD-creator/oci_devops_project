@@ -5,14 +5,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.springboot.MyTodoList.dto.DashboardBundleResponse;
+import com.springboot.MyTodoList.dto.TeamRosterDto;
 import com.springboot.MyTodoList.model.Project;
-import com.springboot.MyTodoList.model.Team;
-import com.springboot.MyTodoList.model.TeamMember;
-import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.ProjectRepository;
-import com.springboot.MyTodoList.repository.TeamMembersRepository;
+import com.springboot.MyTodoList.service.DashboardBundleService;
 import com.springboot.MyTodoList.service.ProjectAccessAuthorization;
 import com.springboot.MyTodoList.service.ProjectLookupService;
+import com.springboot.MyTodoList.service.ProjectTeamRosterService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -33,13 +33,16 @@ class ProjectControllerTest {
     private ProjectRepository projectRepository;
 
     @MockBean
-    private TeamMembersRepository teamMembersRepository;
-
-    @MockBean
     private ProjectLookupService projectLookupService;
 
     @MockBean
     private ProjectAccessAuthorization projectAccessAuthorization;
+
+    @MockBean
+    private ProjectTeamRosterService projectTeamRosterService;
+
+    @MockBean
+    private DashboardBundleService dashboardBundleService;
 
     @Test
     void getAllProjects_returnsList() throws Exception {
@@ -166,8 +169,8 @@ class ProjectControllerTest {
     void getProjectDevelopers_whenNoTeam_returnsEmptyList() throws Exception {
         Project p = new Project();
         p.setId(2L);
-        p.setAssignedTeam(null);
-        when(projectRepository.findById(2L)).thenReturn(Optional.of(p));
+        when(projectTeamRosterService.findProject(2L)).thenReturn(Optional.of(p));
+        when(projectTeamRosterService.listDevelopersForProject(p)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/projects/2/developers"))
                 .andExpect(status().isOk())
@@ -177,29 +180,20 @@ class ProjectControllerTest {
 
     @Test
     void getProjectDevelopers_whenTeamHasDevelopers_returnsDistinctList() throws Exception {
-        Team team = new Team();
-        team.setId(10L);
+        Project p = new Project();
+        p.setId(6L);
 
-        User dev = new User();
+        TeamRosterDto dev = new TeamRosterDto();
         dev.setId(20L);
         dev.setName("Dev One");
         dev.setType("DEVELOPER");
+        TeamRosterDto lead = new TeamRosterDto();
+        lead.setId(21L);
+        lead.setName("Lead Dev");
+        lead.setType("developer");
 
-        User managerDev = new User();
-        managerDev.setId(21L);
-        managerDev.setName("Lead Dev");
-        managerDev.setType("developer");
-        team.setManager(managerDev);
-
-        TeamMember memberRow = new TeamMember();
-        memberRow.setUser(dev);
-
-        Project p = new Project();
-        p.setId(6L);
-        p.setAssignedTeam(team);
-
-        when(projectRepository.findById(6L)).thenReturn(Optional.of(p));
-        when(teamMembersRepository.findByTeam_Id(10L)).thenReturn(List.of(memberRow));
+        when(projectTeamRosterService.findProject(6L)).thenReturn(Optional.of(p));
+        when(projectTeamRosterService.listDevelopersForProject(p)).thenReturn(List.of(dev, lead));
 
         mockMvc.perform(get("/api/projects/6/developers"))
                 .andExpect(status().isOk())
@@ -210,8 +204,26 @@ class ProjectControllerTest {
 
     @Test
     void getProjectDevelopers_whenProjectMissing_returnsNotFound() throws Exception {
-        when(projectRepository.findById(404L)).thenReturn(Optional.empty());
+        when(projectTeamRosterService.findProject(404L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/projects/404/developers")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getDashboardBundle_whenProjectExists_returnsBundle() throws Exception {
+        DashboardBundleResponse bundle = new DashboardBundleResponse();
+        bundle.setProjectId(8L);
+        when(dashboardBundleService.loadBundle(8L)).thenReturn(Optional.of(bundle));
+
+        mockMvc.perform(get("/api/projects/8/dashboard-bundle"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(8));
+    }
+
+    @Test
+    void getDashboardBundle_whenProjectMissing_returnsNotFound() throws Exception {
+        when(dashboardBundleService.loadBundle(8L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/projects/8/dashboard-bundle")).andExpect(status().isNotFound());
     }
 }

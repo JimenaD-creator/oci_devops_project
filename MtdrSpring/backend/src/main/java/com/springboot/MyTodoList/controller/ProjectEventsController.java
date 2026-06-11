@@ -1,7 +1,6 @@
 package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.realtime.ProjectRealtimeHub;
-import com.springboot.MyTodoList.service.ProjectAccessAuthorization;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,25 +18,23 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class ProjectEventsController {
 
     private final ProjectRealtimeHub hub;
-    private final ProjectAccessAuthorization projectAccessAuthorization;
     private final boolean enabled;
 
     public ProjectEventsController(
             ProjectRealtimeHub hub,
-            ProjectAccessAuthorization projectAccessAuthorization,
             @Value("${app.realtime.sse.enabled:true}") boolean enabled) {
         this.hub = hub;
-        this.projectAccessAuthorization = projectAccessAuthorization;
         this.enabled = enabled;
     }
 
+    /**
+     * SSE stream for project task mutations — same access model as dashboard-bundle
+     * (any authenticated user; JWT enforced by the security filter chain).
+     */
     @GetMapping(value = "/{projectId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe(@PathVariable Long projectId) {
         if (!enabled) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        if (!projectAccessAuthorization.userMayAccessProject(projectId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         return hub.subscribe(projectId);
     }

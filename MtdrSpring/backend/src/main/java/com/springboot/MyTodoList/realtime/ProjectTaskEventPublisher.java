@@ -3,21 +3,22 @@ package com.springboot.MyTodoList.realtime;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ProjectTaskEventPublisher {
 
-    private final ApplicationEventPublisher events;
+    private final ProjectRealtimeHub hub;
     private final TaskRepository taskRepository;
     private final boolean enabled;
 
     public ProjectTaskEventPublisher(
-            ApplicationEventPublisher events,
+            ProjectRealtimeHub hub,
             TaskRepository taskRepository,
             @Value("${app.realtime.sse.enabled:true}") boolean enabled) {
-        this.events = events;
+        this.hub = hub;
         this.taskRepository = taskRepository;
         this.enabled = enabled;
     }
@@ -59,7 +60,17 @@ public class ProjectTaskEventPublisher {
         if (!enabled || projectId == null) {
             return;
         }
-        events.publishEvent(ProjectTaskEvent.of(type, projectId, taskId, userId, source));
+        ProjectTaskEvent event = ProjectTaskEvent.of(type, projectId, taskId, userId, source);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    hub.broadcast(projectId, event);
+                }
+            });
+        } else {
+            hub.broadcast(projectId, event);
+        }
     }
 
     private Optional<Long> resolveProjectId(Long taskId) {

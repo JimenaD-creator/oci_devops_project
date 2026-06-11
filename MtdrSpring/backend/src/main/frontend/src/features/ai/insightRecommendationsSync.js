@@ -131,6 +131,22 @@ export function hasTeamOverloadFlag(developerInsights) {
   return developerInsights.some((dev) => dev?.overloaded === true);
 }
 
+function workedHoursForDeveloper(dev) {
+  return Math.max(0, Number(dev?.hours) || 0);
+}
+
+/** Receiver must have less open load and must not already carry more worked hours than the sender. */
+export function isValidRedistributionPair(fromDev, toDev) {
+  if (!fromDev || !toDev) return false;
+  const fromOpen = pendingTasksForDeveloper(fromDev);
+  const toOpen = pendingTasksForDeveloper(toDev);
+  if (fromOpen > 0 && toOpen >= fromOpen) return false;
+  const fromHours = workedHoursForDeveloper(fromDev);
+  const toHours = workedHoursForDeveloper(toDev);
+  if (toHours > fromHours) return false;
+  return true;
+}
+
 function participationPctForDeveloper(dev) {
   const h = Math.max(0, Number(dev?.hours) || 0);
   const est = Math.max(0, Number(dev?.assignedHoursEstimate) || 0);
@@ -156,6 +172,8 @@ export function pickRedistributionReceiver(teamDevelopers, fromName, blockedDeve
     .trim()
     .toLowerCase();
   const blocked = blockedDeveloperNames instanceof Set ? blockedDeveloperNames : new Set();
+  const fromDev = findTeamDeveloper(teamDevelopers, fromName);
+  const fromOpen = pendingTasksForDeveloper(fromDev);
   const candidates = (teamDevelopers || [])
     .filter((d) => {
       const n = String(d?.name ?? '').trim();
@@ -166,6 +184,8 @@ export function pickRedistributionReceiver(teamDevelopers, fromName, blockedDeve
         !isBlockedDeveloperName(n, blocked)
       );
     })
+    .filter((d) => fromOpen <= 0 || pendingTasksForDeveloper(d) < fromOpen)
+    .filter((d) => !fromDev || workedHoursForDeveloper(d) <= workedHoursForDeveloper(fromDev))
     .map((d) => {
       const assigned = Number(d.assigned) || 0;
       const pending = pendingTasksForDeveloper(d);
@@ -318,6 +338,79 @@ export function workloadRowsFromDeveloperInsights(
   return rows;
 }
 
+function buildOpenLoadReason(from, to, teamDevelopers) {
+  const fromDev = findTeamDeveloper(teamDevelopers, from);
+  const toDev = findTeamDeveloper(teamDevelopers, to);
+  const fromOpen = pendingTasksForDeveloper(fromDev);
+  const toOpen = pendingTasksForDeveloper(toDev);
+  return `${from} has ${fromOpen} open task(s) vs ${to}'s ${toOpen}; shifting work balances overall load across the team.`;
+}
+
+function refineStructuredWorkloadRows(rows, teamDevelopers, blockedDeveloperNames) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  return rows
+    .map((row) => {
+      const fromDev = findTeamDeveloper(teamDevelopers, row.from);
+      const toDev = findTeamDeveloper(teamDevelopers, row.to);
+      if (!fromDev || !toDev) return row;
+      if (!isValidRedistributionPair(fromDev, toDev)) {
+        const replacement = pickRedistributionReceiver(teamDevelopers, row.from, blockedDeveloperNames);
+        if (replacement && replacement !== row.to) {
+          return {
+            ...row,
+            to: replacement,
+            reason: buildOpenLoadReason(row.from, replacement, teamDevelopers),
+          };
+        }
+      }
+      return row;
+    })
+    .filter((row) => {
+      const fromDev = findTeamDeveloper(teamDevelopers, row.from);
+      const toDev = findTeamDeveloper(teamDevelopers, row.to);
+      if (!fromDev || !toDev) return true;
+      return isValidRedistributionPair(fromDev, toDev);
+    });
+}
+
+function parseExplicitWorkloadMove(text) {
+  const raw = String(text ?? '').trim();
+  const m = raw.match(/move\s+~?\s*(\d+)\s+task(?:\(s\))?\s+from\s+(.+?)\s+to\s+([^:.]+)/i);
+  if (!m) return null;
+  const tasksToMove = Number(m[1]);
+  const from = String(m[2] ?? '').trim();
+  const to = String(m[3] ?? '').trim();
+  if (!Number.isFinite(tasksToMove) || tasksToMove < 1) return null;
+  if (!isValidWorkloadDeveloperName(from) || !isValidWorkloadDeveloperName(to)) return null;
+  return { from, to, tasksToMove };
+}
+
+export function refineExplicitWorkloadRecommendation(rec, teamDevelopers, blockedDeveloperNames) {
+  if (!rec || !isWorkloadCategory(rec) || !hasExplicitWorkloadMove(rec.text)) return rec;
+  const parsed = parseExplicitWorkloadMove(rec.text);
+  if (!parsed) return rec;
+  const fromDev = findTeamDeveloper(teamDevelopers, parsed.from);
+  const toDev = findTeamDeveloper(teamDevelopers, parsed.to);
+  if (!fromDev || !toDev) return rec;
+  if (isValidRedistributionPair(fromDev, toDev)) return rec;
+  const replacement = pickRedistributionReceiver(teamDevelopers, parsed.from, blockedDeveloperNames);
+  if (!replacement) return rec;
+  const reasonMatch = String(rec.text).match(/:\s*(.+)$/);
+  const reason =
+    replacement !== parsed.to
+      ? buildOpenLoadReason(parsed.from, replacement, teamDevelopers)
+      : reasonMatch?.[1]?.trim() || buildOpenLoadReason(parsed.from, replacement, teamDevelopers);
+  return {
+    ...rec,
+    text: formatWorkloadRecommendationText({
+      from: parsed.from,
+      to: replacement,
+      tasksToMove: parsed.tasksToMove,
+      reason,
+    }),
+  };
+}
+
 function mergeStructuredWorkloadRows(primaryRows, supplementalRows) {
   const out = [...primaryRows];
   const seenPairs = new Set(primaryRows.map((r) => movePairKey(r.from, r.to)));
@@ -419,19 +512,36 @@ export function computeRecommendationList(ins, options = {}) {
     ? []
     : workloadRowsFromDeveloperInsights(ins.developerInsights, teamDevelopers, blockedDevelopers);
 
-  const structuredRows = mergeStructuredWorkloadRows(structuredFromApi, structuredFromOverload);
+  const structuredRows = refineStructuredWorkloadRows(
+    mergeStructuredWorkloadRows(structuredFromApi, structuredFromOverload),
+    teamDevelopers,
+    blockedDevelopers,
+  );
 
-  let workloadItem = null;
-  if (geminiHasExplicitMove) {
-    workloadItem = geminiWorkload;
-  } else {
-    workloadItem = pickSingleWorkloadRecommendation(structuredRows);
+  let workloadItem = pickSingleWorkloadRecommendation(structuredRows);
+  if (!workloadItem && geminiHasExplicitMove) {
+    workloadItem = refineExplicitWorkloadRecommendation(
+      geminiWorkload,
+      teamDevelopers,
+      blockedDevelopers,
+    );
+  }
+  if (workloadItem && hasExplicitWorkloadMove(workloadItem.text)) {
+    workloadItem = refineExplicitWorkloadRecommendation(
+      workloadItem,
+      teamDevelopers,
+      blockedDevelopers,
+    );
   }
   if (!workloadItem && teamOverload) {
     workloadItem = pickSingleWorkloadRecommendation(
-      mergeStructuredWorkloadRows(
-        structuredFromApi,
-        workloadRowsFromDeveloperInsights(ins.developerInsights, teamDevelopers, blockedDevelopers),
+      refineStructuredWorkloadRows(
+        mergeStructuredWorkloadRows(
+          structuredFromApi,
+          workloadRowsFromDeveloperInsights(ins.developerInsights, teamDevelopers, blockedDevelopers),
+        ),
+        teamDevelopers,
+        blockedDevelopers,
       ),
     );
   }

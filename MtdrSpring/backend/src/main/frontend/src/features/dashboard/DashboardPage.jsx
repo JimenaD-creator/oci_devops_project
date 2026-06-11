@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -27,12 +27,11 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TaskStatusDistributionChart from './TaskStatusDistributionChart';
 import DeveloperProductivityDonutChart from './DeveloperProductivityDonutChart';
 import DashboardTopMetrics from './DashboardTopMetrics';
-import DashboardDeveloperCharts from './DashboardDeveloperCharts';
-import DeveloperTable from '../kpis/DeveloperTable';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { getLastTasksMutatedAt } from '../../utils/taskSyncEvents';
 import {
   getCachedBundleSnapshot,
+  getCachedDevelopersSnapshot,
   mergeTaskStatusAcrossSprints,
   aggregateSelectionMetrics,
   sprintDbIdSortKey,
@@ -49,7 +48,7 @@ import {
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { pickDefaultSelectedSprint, buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import {
   fetchProjectById,
@@ -67,6 +66,15 @@ import {
 } from '../kpis/productivityScoreUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 import { resolveLoadErrorMessage } from '../../utils/auth';
+
+const DashboardDeveloperCharts = lazy(() => import('./DashboardDeveloperCharts'));
+const DeveloperTable = lazy(() => import('../kpis/DeveloperTable'));
+
+const ChartsSectionFallback = () => (
+  <Box sx={{ py: 3, px: 2 }}>
+    <LinearProgress />
+  </Box>
+);
 
 /** Oracle red used for block-notification emphasis on the dashboard bell. */
 const BLOCK_NOTIF_RED = '#C74126';
@@ -127,19 +135,23 @@ export default function DashboardPage({
     }
     let cancelled = false;
 
-    const devSnap = getCachedProjectDevelopersSnapshot(projectId);
-    if (devSnap) {
+    const devSnap =
+      getCachedProjectDevelopersSnapshot(projectId) || getCachedDevelopersSnapshot(projectId);
+    if (devSnap?.developers) {
       setProjectDevelopers(devSnap.developers);
     }
 
-    Promise.all([
-      fetchProjectById(projectId).catch(() => null),
-      fetchProjectDevelopers(projectId).catch(() => []),
-    ]).then(([project, developers]) => {
+    const developersPromise = devSnap?.developers
+      ? Promise.resolve(devSnap.developers)
+      : fetchProjectDevelopers(projectId).catch(() => []);
+
+    Promise.all([fetchProjectById(projectId).catch(() => null), developersPromise]).then(
+      ([project, developers]) => {
       if (cancelled) return;
-      if (project) setCurrentProject(project);
-      setProjectDevelopers(Array.isArray(developers) ? developers : []);
-    });
+        if (project) setCurrentProject(project);
+        setProjectDevelopers(Array.isArray(developers) ? developers : []);
+      },
+    );
 
     return () => {
       cancelled = true;
@@ -209,15 +221,19 @@ export default function DashboardPage({
     [allSprints],
   );
 
+  const sprintLabelMap = useMemo(
+    () => buildSprintNumberMap(allSprints),
+    [allSprints],
+  );
+
   const getSprintFilterLabel = useCallback(
     (sprintId) => {
       const sprint = allSprints.find((s) => Number(s.id) === Number(sprintId));
       if (sprint?.shortLabel) return sprint.shortLabel;
       if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-      const index = sortedSprintsForFilter.findIndex((s) => Number(s.id) === Number(sprintId));
-      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+      return formatSprintLabel(sprintLabelMap, sprintId) || `Sprint ${sprintId}`;
     },
-    [allSprints, sortedSprintsForFilter],
+    [allSprints, sprintLabelMap],
   );
 
   const selectedSprints = useMemo(() => {
@@ -468,7 +484,7 @@ export default function DashboardPage({
     );
   }
 
-  if (sharedLoading && sharedSprints.length === 0) {
+  if ((sharedLoading || sharedRefreshing) && sharedSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 
@@ -482,7 +498,11 @@ export default function DashboardPage({
     : null;
 
   const shouldShowEmptyDashboardView =
-    !loadErrorMessage && (allSprints.length === 0 || sharedTaskCount === 0);
+    !loadErrorMessage &&
+    !sharedLoading &&
+    !sharedRefreshing &&
+    allSprints.length === 0 &&
+    sharedTaskCount === 0;
 
   if (loadErrorMessage) {
     return (
@@ -704,10 +724,10 @@ export default function DashboardPage({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 0.5,
-                      px: 1.25,
-                      py: 0.45,
+                      px: 1.5,
+                      py: 0.6,
                       borderRadius: '999px',
-                      fontSize: { xs: '0.75rem', sm: '0.8125rem' },
+                      fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
                       fontWeight: 700,
                       lineHeight: 1.2,
                       letterSpacing: '0.01em',
@@ -744,7 +764,13 @@ export default function DashboardPage({
                       },
                     }}
                   >
-                    Productivity {formatProductivityScoreDisplay(sprintTeamProductivityScore)}
+                    Productivity{' '}
+                    <Box
+                      component="span"
+                      sx={{ fontSize: { xs: '0.9375rem', sm: '1.0625rem' }, fontWeight: 800 }}
+                    >
+                      {formatProductivityScoreDisplay(sprintTeamProductivityScore)}
+                    </Box>
                   </Box>
                 </Tooltip>
               ) : null}
@@ -1490,14 +1516,16 @@ export default function DashboardPage({
             </Typography>
           </Box>
         </ScrollReveal>
-        <DashboardDeveloperCharts
-          developers={selectionMetrics.developers}
-          selectedSprints={selectedSprints}
-          compareMode={compareMode}
-          projectDevelopers={projectDevelopers}
-          selectedDeveloperName={selectedDeveloperNameForMetrics}
-          allSprintsSelected={allSprintsSelected}
-        />
+        <Suspense fallback={<ChartsSectionFallback />}>
+          <DashboardDeveloperCharts
+            developers={selectionMetrics.developers}
+            selectedSprints={selectedSprints}
+            compareMode={compareMode}
+            projectDevelopers={projectDevelopers}
+            selectedDeveloperName={selectedDeveloperNameForMetrics}
+            allSprintsSelected={allSprintsSelected}
+          />
+        </Suspense>
 
         {showDeveloperProductivityDonut ? (
           <ScrollReveal delay={0.05}>
@@ -1558,13 +1586,15 @@ export default function DashboardPage({
               </Box>
             </ScrollReveal>
             <ScrollReveal delay={0.06}>
-              <DeveloperTable
-                selectedSprints={selectedSprints}
-                compareMode={compareMode}
-                projectDevelopers={projectDevelopers}
-                filterDeveloperName={selectedDeveloperNameForMetrics}
-                suppressCardTitle
-              />
+              <Suspense fallback={<ChartsSectionFallback />}>
+                <DeveloperTable
+                  selectedSprints={selectedSprints}
+                  compareMode={compareMode}
+                  projectDevelopers={projectDevelopers}
+                  filterDeveloperName={selectedDeveloperNameForMetrics}
+                  suppressCardTitle
+                />
+              </Suspense>
             </ScrollReveal>
           </>
         ) : null}

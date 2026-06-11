@@ -139,6 +139,8 @@ function App() {
     localStorage.getItem('currentProjectId') ? 'ready' : 'loading',
   );
   /** Pages already opened stay mounted (hidden) to avoid refetch on every sidebar click. */
+  const [managerChatEnabled, setManagerChatEnabled] = useState(false);
+
   const [visitedPages, setVisitedPages] = useState(() => {
     try {
       const stored = localStorage.getItem('currentUser');
@@ -261,6 +263,20 @@ function App() {
       cancelled = true;
     };
   }, [user?.id, user?.role, selectedProjectId, showProjectPicker]);
+
+  useEffect(() => {
+    if (isDeveloperRole(user?.role)) {
+      setManagerChatEnabled(false);
+      return undefined;
+    }
+    const enable = () => setManagerChatEnabled(true);
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(enable, { timeout: 5000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timerId = window.setTimeout(enable, 4000);
+    return () => window.clearTimeout(timerId);
+  }, [user?.role]);
 
   useEffect(() => {
     if (activePage === 'tasks' || activePage === 'sprints') setSprintsNavOpen(true);
@@ -967,7 +983,7 @@ function App() {
         )}
       </Box>
 
-      {!isDeveloper ? (
+      {!isDeveloper && managerChatEnabled ? (
         <Suspense fallback={null}>
           <ManagerChatbot projectId={selectedProjectId} />
         </Suspense>

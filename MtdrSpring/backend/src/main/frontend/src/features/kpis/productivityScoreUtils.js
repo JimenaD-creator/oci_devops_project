@@ -162,6 +162,16 @@ export function productivityScoreFromSprintKpis(kpis) {
   });
 }
 
+/** Same source of truth as KPI Analytics card (stored score when present). */
+export function resolveSprintProductivityScore(kpis) {
+  if (!kpis || typeof kpis !== 'object') return 0;
+  const stored = Number(kpis.productivityScore);
+  if (Number.isFinite(stored)) {
+    return Math.min(100, Math.max(0, stored <= 1 ? Math.round(stored * 100) : Math.round(stored)));
+  }
+  return productivityScoreFromSprintKpis(kpis);
+}
+
 /**
  * Canonical manager-guide line for Efficiency Score (matches KPI Analytics card).
  */
@@ -363,11 +373,14 @@ export function stripProductivityLowScoreExcuses(text, timeline) {
 }
 
 const EVOLUTION_NOTE_ALREADY =
-  /\b(?:will\s+update|will\s+change|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins|still\s+open|sprint\s+(?:is\s+)?(?:still\s+)?open|pending\s+task|live\s+snapshot|not\s+yet\s+done|not\s+a\s+final|active\s+tasks?|marked\s+done|updates?\s+as\s+more)\b/i;
+  /\b(?:will\s+update|will\s+change|will\s+keep\s+updating|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|during\s+the\s+sprint|tasks?\s+progress|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins|still\s+open|sprint\s+(?:is\s+)?(?:still\s+)?open|pending\s+task|live\s+snapshot|not\s+yet\s+done|not\s+a\s+final|active\s+tasks?|marked\s+done|updates?\s+as\s+more|change\s+during)\b/i;
 
-/** Short forward-looking note (not an excuse for a low %). */
+/** Short forward-looking note (not an excuse for a low %). Never used when the sprint has ended. */
 export function productivityEvolutionNote(timeline) {
   const phase = timeline?.phase;
+  if (phase === 'ended') {
+    return '';
+  }
   if (phase === 'not_started') {
     return (
       'It will update once the sprint begins and tasks move through statuses, ' +
@@ -375,23 +388,52 @@ export function productivityEvolutionNote(timeline) {
     );
   }
   if (phase === 'in_progress') {
+    if (timeline?.isEarly) {
+      return (
+        'It will keep updating as tasks progress and completion, on-time delivery, ' +
+        'participation, and workload balance change during the sprint.'
+      );
+    }
     return 'It updates as more work is marked Done—not a final grade while the sprint is open.';
-  }
-  if (timeline?.isEarly) {
-    return (
-      'It will keep updating as tasks progress and completion, on-time delivery, ' +
-      'participation, and workload balance change during the sprint.'
-    );
   }
   return '';
 }
 
-/** Appends evolution note when sprint has not started or is still early. */
+export const PRODUCTIVITY_ENDED_SPRINT_CLOSING =
+  'This reflects final delivery for the completed sprint window.';
+
+const ENDED_SPRINT_CLOSING_ALREADY =
+  /\b(?:final delivery|completed sprint(?: window)?|sprint has ended|full sprint window|final sprint outcomes?)\b/i;
+
+/** Appends a past-tense closing line once the sprint calendar has ended. */
+export function appendProductivityEndedSprintClosing(text, timeline) {
+  if (timeline?.phase !== 'ended') return text;
+  const raw = String(text ?? '').trim();
+  if (!raw) return raw;
+  if (ENDED_SPRINT_CLOSING_ALREADY.test(raw)) return raw;
+  return `${raw} ${PRODUCTIVITY_ENDED_SPRINT_CLOSING}`;
+}
+
+/** Removes forward-looking evolution sentences when the sprint has already ended. */
+export function stripProductivityEvolutionNotesForEndedSprint(text, timeline) {
+  if (text == null || timeline?.phase !== 'ended') return text;
+  const raw = String(text).trim();
+  if (!raw) return raw;
+  const parts = raw.split(/(?<=[.!?])\s+/);
+  if (parts.length <= 1) {
+    return EVOLUTION_NOTE_ALREADY.test(raw) ? '' : raw;
+  }
+  const kept = parts.map((p) => p.trim()).filter((p) => p && !EVOLUTION_NOTE_ALREADY.test(p));
+  const out = kept.join(' ').trim();
+  return out || raw;
+}
+
+/** Appends evolution note when sprint has not started or is still in progress. */
 export function appendProductivityEvolutionNote(text, timeline) {
   if (text == null) return text;
   const phase = timeline?.phase;
-  const needsNote =
-    phase === 'in_progress' || timeline?.isEarly === true || phase === 'not_started';
+  if (phase === 'ended') return stripProductivityEvolutionNotesForEndedSprint(text, timeline);
+  const needsNote = phase === 'in_progress' || phase === 'not_started';
   if (!needsNote) return text;
   const note = productivityEvolutionNote(timeline);
   if (!note) return text;
@@ -447,7 +489,10 @@ export function finalizeProductivityManagerGuideText(text, score, sprint = null)
     out = out ? `${lead} ${out}` : lead;
   }
   const timeline = resolveSprintTimelineContext(sprint);
-  if (timeline.isEarly || timeline.phase === 'not_started' || timeline.phase === 'in_progress') {
+  if (timeline.phase === 'ended') {
+    out = stripProductivityEvolutionNotesForEndedSprint(out, timeline);
+    out = appendProductivityEndedSprintClosing(out, timeline);
+  } else if (timeline.phase === 'not_started' || timeline.phase === 'in_progress') {
     out = appendProductivityEvolutionNote(out, timeline);
   }
   return polishProductivityGuideProse(out.trim());

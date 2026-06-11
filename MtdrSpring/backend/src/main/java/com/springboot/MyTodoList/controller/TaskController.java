@@ -1,5 +1,8 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.dto.DashboardTaskDto;
+import com.springboot.MyTodoList.dto.TaskBulkDeletePayload;
+import com.springboot.MyTodoList.dto.TaskBulkDeleteResult;
 import com.springboot.MyTodoList.dto.TaskCreatePayload;
 import com.springboot.MyTodoList.dto.TaskNewAssigneesPayload;
 import com.springboot.MyTodoList.model.Task;
@@ -9,6 +12,7 @@ import com.springboot.MyTodoList.repository.UserTaskRepository;
 import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
+import com.springboot.MyTodoList.service.ProjectBundleCacheEvictor;
 import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -40,6 +45,16 @@ public class TaskController {
     @Autowired
     private ProjectTaskEventPublisher projectTaskEventPublisher;
 
+    @Autowired
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
+
+    private void evictDashboardBundleForTask(Long taskId) {
+        if (taskId == null) {
+            return;
+        }
+        taskRepository.findProjectIdByTaskId(taskId).ifPresent(projectBundleCacheEvictor::evictDashboardBundle);
+    }
+
     private static String canonicalTaskStatus(String raw) {
         String n = Optional.ofNullable(raw).orElse("").trim().toUpperCase().replaceAll("[\\s-]+", "_");
         if ("IN_PROCESS".equals(n)) return "IN_PROGRESS";
@@ -53,11 +68,14 @@ public class TaskController {
      * Get tasks, optionally filtered by project (via sprint).
      */
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks(@RequestParam(required = false) Long projectId) {
-        List<Task> tasks = projectId != null
-                ? taskRepository.findByProjectId(projectId)
-                : taskRepository.findAll();
-        return ResponseEntity.ok(tasks);
+    public ResponseEntity<?> getAllTasks(@RequestParam(required = false) Long projectId) {
+        if (projectId != null) {
+            List<DashboardTaskDto> tasks = taskRepository.findByProjectIdWithSprint(projectId).stream()
+                    .map(DashboardTaskDto::from)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(tasks);
+        }
+        return ResponseEntity.ok(taskRepository.findAll());
     }
     
     /**
@@ -146,6 +164,7 @@ public class TaskController {
                 existingTask.setFinishDate(taskDetails.getDueDate());
             }
             Task updatedTask = taskRepository.save(existingTask);
+            evictDashboardBundleForTask(id);
             projectTaskEventPublisher.taskUpdated(id, null, "rest");
             return ResponseEntity.ok(updatedTask);
         }
@@ -185,5 +204,22 @@ public class TaskController {
         }
         taskService.deleteTaskById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Delete multiple tasks and their USER_TASK rows (FK-safe).
+     */
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<?> bulkDeleteTasks(@RequestBody TaskBulkDeletePayload payload) {
+        List<Long> ids = payload != null ? payload.normalizedTaskIds() : List.of();
+        if (ids.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        int deletedCount = taskService.deleteTasksByIds(ids);
+        if (deletedCount < 1) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new TaskBulkDeleteResult(deletedCount, ids.size()));
+        }
+        return ResponseEntity.ok(new TaskBulkDeleteResult(deletedCount, ids.size()));
     }
 }

@@ -3,9 +3,11 @@ import {
   computeRecommendationList,
   hasTeamOverloadFlag,
   isGenericWorkloadRedistributionText,
+  isValidRedistributionPair,
   parseMoveSuggestionFromInsight,
   pickGeminiWorkloadFromActionables,
   pickRedistributionReceiver,
+  refineExplicitWorkloadRecommendation,
   workloadRowsFromDeveloperInsights,
 } from './insightRecommendationsSync';
 
@@ -34,6 +36,40 @@ describe('parseMoveSuggestionFromInsight', () => {
         'Flagged as overloaded — consider moving ~1 task(s) to Ana López.',
       ),
     ).toEqual({ tasksToMove: 1, to: 'Ana López' });
+  });
+});
+
+describe('pickRedistributionReceiver', () => {
+  it('prefers a receiver with lower open load, not just fewer In progress tasks', () => {
+    expect(
+      pickRedistributionReceiver(
+        [
+          { name: 'Diego Carrillo', assigned: 2, completed: 0, pending: 2, hours: 12 },
+          { name: 'Erick Sánchez', assigned: 2, completed: 1, pending: 1, hours: 40 },
+          { name: 'Ana López', assigned: 1, completed: 0, pending: 1, hours: 5 },
+        ],
+        'Diego Carrillo',
+      ),
+    ).toBe('Ana López');
+  });
+
+  it('does not pick a teammate who already logged more hours than the sender', () => {
+    expect(
+      isValidRedistributionPair(
+        { name: 'Diego Carrillo', assigned: 2, completed: 0, pending: 2, hours: 12 },
+        { name: 'Erick Sánchez', assigned: 2, completed: 1, pending: 1, hours: 40 },
+      ),
+    ).toBe(false);
+    expect(
+      pickRedistributionReceiver(
+        [
+          { name: 'Diego Carrillo', assigned: 2, completed: 0, pending: 2, hours: 12 },
+          { name: 'Erick Sánchez', assigned: 2, completed: 1, pending: 1, hours: 40 },
+          { name: 'Jimena Díaz', assigned: 1, completed: 0, pending: 1, hours: 4 },
+        ],
+        'Diego Carrillo',
+      ),
+    ).toBe('Jimena Díaz');
   });
 });
 
@@ -201,11 +237,13 @@ describe('computeRecommendationList', () => {
           },
         ],
       },
-      [
-        { name: 'Erick Sánchez', assigned: 4, completed: 1, pending: 3 },
-        { name: 'Jimena Díaz', assigned: 1, completed: 1, pending: 0 },
-        { name: 'Diego Carrillo', assigned: 2, completed: 2, pending: 0 },
-      ],
+      {
+        teamDevelopers: [
+          { name: 'Erick Sánchez', assigned: 4, completed: 1, pending: 3 },
+          { name: 'Jimena Díaz', assigned: 1, completed: 1, pending: 0 },
+          { name: 'Diego Carrillo', assigned: 2, completed: 2, pending: 0 },
+        ],
+      },
     );
     const workload = list.filter((r) => r.category === 'workload_redistribution');
     expect(workload).toHaveLength(1);
@@ -262,7 +300,9 @@ describe('computeRecommendationList', () => {
           },
         ],
       },
-      [{ name: 'Erick Sánchez', assigned: 2, completed: 2, pending: 0 }],
+      {
+        teamDevelopers: [{ name: 'Erick Sánchez', assigned: 2, completed: 2, pending: 0 }],
+      },
     );
     const workload = list.filter((r) => r.category === 'workload_redistribution');
     expect(workload).toHaveLength(1);
@@ -292,10 +332,12 @@ describe('computeRecommendationList', () => {
           { developerName: 'Diego Carrillo', overloaded: false },
         ],
       },
-      [
-        { name: 'Erick Sánchez', assigned: 2, completed: 2, pending: 0 },
-        { name: 'Diego Carrillo', assigned: 1, completed: 1, pending: 0 },
-      ],
+      {
+        teamDevelopers: [
+          { name: 'Erick Sánchez', assigned: 2, completed: 2, pending: 0 },
+          { name: 'Diego Carrillo', assigned: 1, completed: 1, pending: 0 },
+        ],
+      },
     );
     const workload = list.filter((r) => r.category === 'workload_redistribution');
     expect(workload).toHaveLength(1);
@@ -322,13 +364,50 @@ describe('computeRecommendationList', () => {
           },
         ],
       },
-      [
-        { name: 'Erick Sánchez', assigned: 4, completed: 2, pending: 2 },
-        { name: 'Ana López', assigned: 1, completed: 1, pending: 0 },
-      ],
+      {
+        teamDevelopers: [
+          { name: 'Erick Sánchez', assigned: 4, completed: 2, pending: 2 },
+          { name: 'Ana López', assigned: 1, completed: 1, pending: 0 },
+        ],
+      },
     );
     const workload = list.filter((r) => r.category === 'workload_redistribution');
     expect(workload).toHaveLength(1);
     expect(workload[0].text).toMatch(/Move ~1 task\(s\) from Erick Sánchez to Ana López/);
+  });
+
+  it('rewrites API/Gemini move away from a high-hours receiver', () => {
+    const team = [
+      { name: 'Diego Carrillo', assigned: 2, completed: 0, pending: 2, hours: 12 },
+      { name: 'Erick Sánchez', assigned: 2, completed: 1, pending: 1, hours: 40 },
+      { name: 'Jimena Díaz', assigned: 1, completed: 0, pending: 1, hours: 4 },
+    ];
+    const refined = refineExplicitWorkloadRecommendation(
+      {
+        category: 'workload_redistribution',
+        text:
+          'Move ~1 task(s) from Diego Carrillo to Erick Sánchez: Diego Carrillo has 2 in "In progress" vs Erick Sánchez with 0 in that stage but 1 in To do (1 open overall); shifting ~1 task(s) spreads that stage more evenly.',
+      },
+      team,
+      new Set(),
+    );
+    expect(refined.text).toMatch(/from Diego Carrillo to Jimena Díaz/);
+    expect(refined.text).not.toMatch(/Erick Sánchez/);
+
+    const list = computeRecommendationList(
+      {
+        workloadRecommendations: [
+          {
+            from: 'Diego Carrillo',
+            to: 'Erick Sánchez',
+            tasksToMove: 1,
+            reason: 'Status spread',
+          },
+        ],
+        developerInsights: [{ developerName: 'Diego Carrillo', overloaded: true }],
+      },
+      { teamDevelopers: team },
+    );
+    expect(list[0].text).toMatch(/from Diego Carrillo to Jimena Díaz/);
   });
 });

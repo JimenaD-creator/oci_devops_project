@@ -15,6 +15,7 @@ import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.ProjectBundleCacheEvictor;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.UserTaskService;
 import com.springboot.MyTodoList.realtime.ProjectTaskEventPublisher;
@@ -54,6 +55,9 @@ class UserTaskControllerTest {
 
     @MockBean
     private ProjectTaskEventPublisher projectTaskEventPublisher;
+
+    @MockBean
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
 
     @Test
     void getAllUserTasks_returnsList() throws Exception {

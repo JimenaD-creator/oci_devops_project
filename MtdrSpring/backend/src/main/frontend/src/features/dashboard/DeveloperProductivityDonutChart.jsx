@@ -22,27 +22,35 @@ function formatComponentPct(key, value) {
   return `${Math.round(value)}%`;
 }
 
-function ProductivityBreakdown({ components, compact = false }) {
+function ProductivityBreakdown({ components, compact = false, emphasized = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
+  const spacing = compact ? 0.75 : emphasized ? 2 : 1.5;
+  const cardPadding = compact ? 0.85 : emphasized ? 1.75 : 1.25;
+  const labelGap = compact ? 0.45 : emphasized ? 1 : 0.75;
+  const labelFontSize = compact ? '0.625rem' : emphasized ? '0.8125rem' : '0.7rem';
+  const barHeight = compact ? 4 : emphasized ? 8 : 5;
+  const valueFontSize = compact ? '0.6875rem' : emphasized ? '0.9375rem' : '0.75rem';
+  const valueMinWidth = emphasized ? 36 : 28;
+
   return (
-    <Grid container spacing={compact ? 0.75 : 1.5} sx={{ width: '100%' }}>
+    <Grid container spacing={spacing} sx={{ width: '100%' }}>
       {components.map(({ key, label, value, weight, color }) => (
         <Grid item xs={12} sm={4} key={label}>
           <Box
             sx={{
               bgcolor: isDark ? '#16181C' : '#F8F9FA',
-              borderRadius: 1.25,
-              p: compact ? 0.85 : 1.25,
+              borderRadius: emphasized ? 1.5 : 1.25,
+              p: cardPadding,
               height: '100%',
               boxSizing: 'border-box',
             }}
           >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: compact ? 0.45 : 0.75 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: labelGap }}>
               <Typography
                 sx={{
-                  fontSize: compact ? '0.625rem' : '0.7rem',
+                  fontSize: labelFontSize,
                   color: isDark ? '#9A9A9A' : '#607D8B',
                   fontWeight: 600,
                   lineHeight: 1.2,
@@ -52,7 +60,7 @@ function ProductivityBreakdown({ components, compact = false }) {
               </Typography>
               <Typography
                 sx={{
-                  fontSize: compact ? '0.625rem' : '0.7rem',
+                  fontSize: labelFontSize,
                   color: '#90A4AE',
                   flexShrink: 0,
                   ml: 0.5,
@@ -61,11 +69,11 @@ function ProductivityBreakdown({ components, compact = false }) {
                 {weight}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: emphasized ? 1 : 0.75 }}>
               <Box
                 sx={{
                   flex: 1,
-                  height: compact ? 4 : 5,
+                  height: barHeight,
                   bgcolor: isDark ? '#2A2C32' : '#E0E0E0',
                   borderRadius: 99,
                   overflow: 'hidden',
@@ -82,10 +90,10 @@ function ProductivityBreakdown({ components, compact = false }) {
               </Box>
               <Typography
                 sx={{
-                  fontSize: compact ? '0.6875rem' : '0.75rem',
+                  fontSize: valueFontSize,
                   fontWeight: 700,
                   color: 'text.primary',
-                  minWidth: 28,
+                  minWidth: valueMinWidth,
                   textAlign: 'right',
                 }}
               >
@@ -192,7 +200,7 @@ export default function DeveloperProductivityDonutChart({
           justifyContent: wide ? { sm: 'center' } : undefined,
           gap: { xs: 1.25, sm: wide ? 2.5 : 1.5 },
           width: '100%',
-          maxWidth: wide ? 720 : undefined,
+          maxWidth: wide ? 780 : undefined,
           mx: wide ? 'auto' : undefined,
         }}
       >
@@ -202,7 +210,7 @@ export default function DeveloperProductivityDonutChart({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: { xs: '100%', sm: wide ? 168 : 132 },
+            width: { xs: '100%', sm: wide ? 180 : 132 },
           }}
         >
           <KpiDonutChart
@@ -210,16 +218,20 @@ export default function DeveloperProductivityDonutChart({
             pct={normalizedScore}
             displayValue={formatProductivityScoreDisplay(normalizedScore)}
             arcColor={arcColor}
-            height={{ xs: 132, sm: wide ? 168 : 140 }}
-            innerRadius={wide ? 54 : 46}
-            outerRadius={wide ? 72 : 62}
-            width={{ xs: 132, sm: wide ? 168 : 132 }}
-            maxWidth={wide ? 168 : 132}
-            valueFontSize={{ xs: '1.5rem', sm: wide ? '2rem' : '1.65rem' }}
+            height={{ xs: 136, sm: wide ? 180 : 140 }}
+            innerRadius={wide ? 58 : 46}
+            outerRadius={wide ? 76 : 62}
+            width={{ xs: 136, sm: wide ? 180 : 132 }}
+            maxWidth={wide ? 180 : 132}
+            valueFontSize={{ xs: '1.625rem', sm: wide ? '2.25rem' : '1.65rem' }}
           />
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0, maxWidth: wide ? 420 : undefined }}>
-          <ProductivityBreakdown components={components} compact={embedded && !wide} />
+        <Box sx={{ flex: 1, minWidth: 0, maxWidth: wide ? 540 : undefined }}>
+          <ProductivityBreakdown
+            components={components}
+            compact={embedded && !wide}
+            emphasized={wide}
+          />
         </Box>
       </Box>
     </Box>

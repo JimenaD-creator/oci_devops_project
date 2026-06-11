@@ -69,7 +69,7 @@ function ChartPlot({ children, height = CHART_H }) {
   );
 }
 
-function ChartCard({ title, subtitle, iconElement, children }) {
+function ChartCard({ title, subtitle, iconElement, children, compact = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -77,22 +77,34 @@ function ChartCard({ title, subtitle, iconElement, children }) {
     <Paper
       sx={{
         p: 2.5,
-        borderRadius: 3,
+        borderRadius: compact ? 2 : 3,
         border: `1px solid ${isDark ? '#2A2C32' : '#EFEFEF'}`,
         boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
         bgcolor: 'background.paper',
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
+        minHeight: compact ? 0 : undefined,
+        flex: compact ? 1 : undefined,
+        display: compact ? 'flex' : undefined,
+        flexDirection: compact ? 'column' : undefined,
         boxSizing: 'border-box',
         overflow: 'visible',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: subtitle ? 0.75 : 1.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: compact ? 1 : 1.25,
+          mb: compact ? 1 : subtitle ? 0.75 : 1.5,
+          flexShrink: 0,
+        }}
+      >
         <Box
           sx={{
-            width: 40,
-            height: 40,
+            width: compact ? 36 : 40,
+            height: compact ? 36 : 40,
             borderRadius: 2,
             bgcolor: getChartAccentIconBg(isDark),
             display: 'flex',
@@ -104,7 +116,12 @@ function ChartCard({ title, subtitle, iconElement, children }) {
         </Box>
         <Box>
           <Typography
-            sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1.12rem', lineHeight: 1.3 }}
+            sx={{
+              fontWeight: 800,
+              color: 'text.primary',
+              fontSize: compact ? '1rem' : '1.12rem',
+              lineHeight: 1.3,
+            }}
           >
             {title}
           </Typography>
@@ -113,7 +130,7 @@ function ChartCard({ title, subtitle, iconElement, children }) {
               sx={{
                 color: 'text.secondary',
                 display: 'block',
-                fontSize: '0.95rem',
+                fontSize: compact ? '0.85rem' : '0.95rem',
                 mt: 0.35,
                 fontWeight: 500,
               }}
@@ -123,7 +140,17 @@ function ChartCard({ title, subtitle, iconElement, children }) {
           ) : null}
         </Box>
       </Box>
-      {children}
+      <Box
+        sx={{
+          flex: compact ? 1 : undefined,
+          display: compact ? 'flex' : undefined,
+          flexDirection: compact ? 'column' : undefined,
+          justifyContent: compact ? 'center' : undefined,
+          minHeight: compact ? 0 : undefined,
+        }}
+      >
+        {children}
+      </Box>
     </Paper>
   );
 }
@@ -149,6 +176,26 @@ function resolveUniqueTeamTotals(sp, uniqueTeamTotalsBySprintId) {
     return null;
   }
   return raw;
+}
+
+/**
+ * One row per sprint: team totals for estimated vs hours worked (summed across developers).
+ */
+export function buildTeamWorkedEstimatedHoursRows(selectedSprints) {
+  if (!selectedSprints?.length) return [];
+  return selectedSprints.map((sp) => {
+    const devs = sp.developers || [];
+    const totalEstimated = devs.reduce((a, d) => a + (Number(d.assignedHoursEstimate) || 0), 0);
+    const totalWorked = devs.reduce((a, d) => a + (Number(d.hours) || 0), 0);
+    const label =
+      sp.shortLabel || (typeof sp.name === 'string' && sp.name.trim()) || `Sprint ${sp.id}`;
+    return {
+      name: label,
+      _full: `sprint-${sp.id}`,
+      [sprintFieldKey(sp, 'e')]: totalEstimated,
+      [sprintFieldKey(sp, 'h')]: totalWorked,
+    };
+  });
 }
 
 /**
@@ -261,38 +308,60 @@ function HoursWorkedEstimatedLegendKey({ selectedSprints }) {
 
 export default function DeveloperWorkloadCharts({
   selectedSprints = [],
-  /** If false, hides the hours bar chart (e.g. when that view is already on the dashboard). */
+  /**
+   * Primary sprint-level bar chart:
+   * - 'assignedCompleted': tasks assigned vs completed (default)
+   * - 'teamHours': team total estimated hours vs hours worked
+   */
+  primaryChart = 'assignedCompleted',
+  /** If false, hides the per-developer hours bar chart. */
   showHoursChart = true,
   /**
    * Per sprint id: unique task totals for the team row (assigned / completed).
    * Use when per-developer counts double-count shared tasks.
    */
   uniqueTeamTotalsBySprintId,
-  /** Optional custom height for assigned vs completed chart. */
+  /** Optional custom height for the primary sprint-level chart. */
   assignedCompletedHeight,
-  /** Optional max width for assigned vs completed chart container. */
+  /** Optional max width for the primary sprint-level chart container. */
   assignedCompletedMaxWidth,
   /** When true, removes bottom margin on the root so a sibling card can align height in a grid row. */
   suppressOuterMargin = false,
+  /** Compact card + chart sizing to match Productivity Score in a side-by-side KPI row. */
+  fillColumnHeight = false,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  const { combinedAssignedCompletedRows, workedEstimatedRows, hasData } = useMemo(() => {
+  const {
+    combinedAssignedCompletedRows,
+    teamWorkedEstimatedRows,
+    workedEstimatedRows,
+    hasData,
+    emptyMessage,
+  } = useMemo(() => {
     if (!selectedSprints?.length) {
       return {
         combinedAssignedCompletedRows: [],
+        teamWorkedEstimatedRows: [],
         workedEstimatedRows: [],
         hasData: false,
+        emptyMessage: 'No task assignment data for the selected sprint(s).',
       };
     }
 
     const combinedData = buildAssignedCompletedRows(selectedSprints, uniqueTeamTotalsBySprintId);
+    const teamHoursData = buildTeamWorkedEstimatedHoursRows(selectedSprints);
     const workedEstimatedRows = buildWorkedEstimatedHoursRows(selectedSprints);
     const hasCompleted = combinedData.some((r) =>
       selectedSprints.some((sp) => (r[sprintFieldKey(sp, 'c')] || 0) > 0),
     );
     const hasHours = workedEstimatedRows.some((r) =>
+      selectedSprints.some(
+        (sp) => (r[sprintFieldKey(sp, 'h')] || 0) > 0 || (r[sprintFieldKey(sp, 'e')] || 0) > 0,
+      ),
+    );
+    const hasTeamHours = teamHoursData.some((r) =>
       selectedSprints.some(
         (sp) => (r[sprintFieldKey(sp, 'h')] || 0) > 0 || (r[sprintFieldKey(sp, 'e')] || 0) > 0,
       ),
@@ -307,16 +376,21 @@ export default function DeveloperWorkloadCharts({
     const n = devNames.size;
 
     const hasAssignedCompletedChart = hasCompleted || hasAssigned;
-    const hasData = showHoursChart
-      ? n > 0 && (hasCompleted || hasHours || hasAssigned)
-      : hasAssignedCompletedChart;
+    const showTeamHoursPrimary = primaryChart === 'teamHours';
+    const hasPrimaryChart = showTeamHoursPrimary ? hasTeamHours : hasAssignedCompletedChart;
+    const hasSecondaryHours = showHoursChart && n > 0 && hasHours;
+    const hasData = hasPrimaryChart || hasSecondaryHours;
 
     return {
       combinedAssignedCompletedRows: combinedData,
+      teamWorkedEstimatedRows: teamHoursData,
       workedEstimatedRows,
       hasData,
+      emptyMessage: showTeamHoursPrimary
+        ? 'No hours data for the selected sprint(s).'
+        : 'No task assignment data for the selected sprint(s).',
     };
-  }, [selectedSprints, showHoursChart, uniqueTeamTotalsBySprintId]);
+  }, [selectedSprints, showHoursChart, primaryChart, uniqueTeamTotalsBySprintId]);
 
   const hoursWorkedChartHeight = useMemo(() => {
     if (!workedEstimatedRows?.length || !selectedSprints?.length) return CHART_H;
@@ -348,7 +422,7 @@ export default function DeveloperWorkloadCharts({
         }}
       >
         <Typography sx={{ color: 'text.secondary', fontSize: '1rem' }}>
-          No task assignment data for the selected sprint(s).
+          {emptyMessage}
         </Typography>
       </Box>
     );
@@ -358,7 +432,36 @@ export default function DeveloperWorkloadCharts({
   const axisTick = getAxisTick(isDark);
   const axisLine = getAxisLine(isDark);
   const gridStroke = getGridStroke(isDark);
-  const showAssignedCompleted = combinedAssignedCompletedRows.length > 0;
+  const showAssignedCompleted =
+    primaryChart === 'assignedCompleted' && combinedAssignedCompletedRows.length > 0;
+  const showTeamHoursPrimary =
+    primaryChart === 'teamHours' && teamWorkedEstimatedRows.length > 0;
+  const primaryChartHeight = assignedCompletedHeight ?? CHART_H;
+  const primaryChartMaxWidth = assignedCompletedMaxWidth ?? '100%';
+  const compactTeamHoursChart = fillColumnHeight && showTeamHoursPrimary;
+
+  const renderSprintHoursBars = () =>
+    selectedSprints.map((sp) => {
+      const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
+      return (
+        <React.Fragment key={`hrs-${sp.id}`}>
+          <Bar
+            dataKey={sprintFieldKey(sp, 'e')}
+            name={`${sp.shortLabel} · Estimated hours`}
+            fill={hexToRgba(accent, 0.55)}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={compactTeamHoursChart ? 28 : 34}
+          />
+          <Bar
+            dataKey={sprintFieldKey(sp, 'h')}
+            name={`${sp.shortLabel} · Hours worked`}
+            fill={accent}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={compactTeamHoursChart ? 28 : 34}
+          />
+        </React.Fragment>
+      );
+    });
 
   return (
     <Box
@@ -367,10 +470,102 @@ export default function DeveloperWorkloadCharts({
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
+        minHeight: fillColumnHeight ? 0 : undefined,
+        flex: fillColumnHeight ? 1 : undefined,
+        display: fillColumnHeight ? 'flex' : undefined,
+        flexDirection: fillColumnHeight ? 'column' : undefined,
         boxSizing: 'border-box',
       }}
     >
-      <Stack spacing={2} sx={{ width: '100%', minWidth: 0 }}>
+      <Stack
+        spacing={2}
+        sx={{
+          width: '100%',
+          minWidth: 0,
+          flex: fillColumnHeight ? 1 : undefined,
+          minHeight: fillColumnHeight ? 0 : undefined,
+        }}
+      >
+        {showTeamHoursPrimary ? (
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: compactTeamHoursChart
+                ? '100%'
+                : assignedCompletedMaxWidth
+                  ? assignedCompletedMaxWidth + 120
+                  : '100%',
+              mx: compactTeamHoursChart ? 0 : 'auto',
+              flex: compactTeamHoursChart ? 1 : undefined,
+              display: compactTeamHoursChart ? 'flex' : undefined,
+              flexDirection: compactTeamHoursChart ? 'column' : undefined,
+              minHeight: compactTeamHoursChart ? 0 : undefined,
+            }}
+          >
+            <ChartCard
+              title="Estimated hours vs hours worked"
+              iconElement={
+                <ScheduleIcon sx={{ color: '#C74634', fontSize: compactTeamHoursChart ? 22 : 26 }} />
+              }
+              compact={compactTeamHoursChart}
+            >
+              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ width: '100%', maxWidth: compactTeamHoursChart ? '100%' : primaryChartMaxWidth }}>
+                  <ChartPlot height={primaryChartHeight}>
+                    <BarChart
+                      data={teamWorkedEstimatedRows}
+                      margin={{
+                        top: compactTeamHoursChart ? 6 : 14,
+                        right: 8,
+                        left: 0,
+                        bottom: 0,
+                      }}
+                      barGap={2}
+                      barCategoryGap={compactTeamHoursChart ? '28%' : '22%'}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} interval={0} />
+                      <YAxis
+                        tick={compactTeamHoursChart ? { ...axisTick, fontSize: 12 } : axisTick}
+                        axisLine={false}
+                        width={compactTeamHoursChart ? 40 : 48}
+                        label={
+                          compactTeamHoursChart
+                            ? undefined
+                            : {
+                                value: 'Hours',
+                                angle: -90,
+                                position: 'insideLeft',
+                                fontSize: 12,
+                                fill: isDark ? '#9A9A9A' : '#555',
+                              }
+                        }
+                      />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(v, name) => {
+                          const isEstimated = String(name).includes('Estimated');
+                          return [
+                            `${Number(v).toFixed(1)} h`,
+                            isEstimated ? 'Estimated hours' : 'Hours worked',
+                          ];
+                        }}
+                      />
+                      <Legend
+                        wrapperStyle={{
+                          ...CHART_LEGEND_STYLE,
+                          color: isDark ? '#F0F0F0' : '#1A1A1A',
+                        }}
+                      />
+                      {renderSprintHoursBars()}
+                    </BarChart>
+                  </ChartPlot>
+                </Box>
+              </Box>
+            </ChartCard>
+          </Box>
+        ) : null}
+
         {showAssignedCompleted ? (
           <Box
             sx={{
@@ -384,8 +579,8 @@ export default function DeveloperWorkloadCharts({
               iconElement={<AssignmentOutlinedIcon sx={{ color: '#C74634', fontSize: 26 }} />}
             >
               <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <Box sx={{ width: '100%', maxWidth: assignedCompletedMaxWidth ?? '100%' }}>
-                  <ChartPlot height={assignedCompletedHeight ?? CHART_H}>
+                <Box sx={{ width: '100%', maxWidth: primaryChartMaxWidth }}>
+                  <ChartPlot height={primaryChartHeight}>
                     <BarChart
                       data={combinedAssignedCompletedRows}
                       margin={{ top: 14, right: 12, left: 2, bottom: 0 }}
@@ -482,7 +677,7 @@ export default function DeveloperWorkloadCharts({
                 {selectedSprints.map((sp) => {
                   const accent = sp.accentColor ?? FALLBACK_SPRINT_COLOR;
                   return (
-                    <React.Fragment key={`hrs-${sp.id}`}>
+                    <React.Fragment key={`dev-hrs-${sp.id}`}>
                       <Bar
                         dataKey={sprintFieldKey(sp, 'e')}
                         name={`${sp.shortLabel} · Estimated hours`}

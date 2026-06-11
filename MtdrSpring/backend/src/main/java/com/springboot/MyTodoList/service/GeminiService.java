@@ -15,6 +15,8 @@ import com.springboot.MyTodoList.model.UserSprint;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil;
+import com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil;
+import com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil;
 import com.springboot.MyTodoList.util.SprintLiveKpiUtil;
 import com.springboot.MyTodoList.util.UserRoleUtil;
 import com.springboot.MyTodoList.util.UserTaskOnTimeUtil;
@@ -24,6 +26,8 @@ import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.TeamMembersRepository;
 import com.springboot.MyTodoList.repository.UserSprintRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -56,6 +60,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GeminiService {
+
+    public static final String INSIGHT_STATUS_PROCESSING = "PROCESSING";
+
+    private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
     private static final long ENRICH_RESPONSE_CACHE_MS = 180_000;
     private static final long INSIGHTS_GET_RESPONSE_CACHE_MS = 120_000;
@@ -142,6 +150,9 @@ public class GeminiService {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private EmbeddingService embeddingService;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(60))
@@ -207,10 +218,36 @@ public class GeminiService {
         return buildDeveloperVariationFallback(sprintSnapshots);
     }
 
-    @Async
+    /**
+     * Marks a sprint as generating before the async job starts so GET polling sees {@code status: processing}
+     * immediately and logs confirm the request was accepted.
+     */
+    public void markInsightGenerationStarted(Long sprintId) {
+        log.info("AI insight generation queued for sprint {}", sprintId);
+        Long projectId = sprintRepository.findById(sprintId)
+            .map(s -> s.getAssignedProject() != null ? s.getAssignedProject().getId() : null)
+            .orElse(null);
+        SprintInsight insight = insightRepository.findBySprintId(sprintId)
+            .orElse(new SprintInsight());
+        insight.setSprintId(sprintId);
+        if (projectId != null) {
+            insight.setProjectId(projectId);
+        } else if (insight.getProjectId() == null) {
+            insight.setProjectId(-1L);
+        }
+        insight.setInsightsJson(null);
+        insight.setErrorMessage(INSIGHT_STATUS_PROCESSING);
+        insight.setGeneratedAt(LocalDateTime.now());
+        insight.setAcknowledged(false);
+        insightRepository.save(insight);
+        invalidateInsightsGetResponseCache(sprintId);
+    }
+
+    @Async("geminiInsightsExecutor")
     public CompletableFuture<SprintInsight> generateInsightsForSprint(Long sprintId) {
-        System.out.println("[GeminiService] API key present: "
-            + (geminiApiConfiguration.isConfigured() ? "YES" : "NO/EMPTY"));
+        long startedAtMs = System.currentTimeMillis();
+        log.info("AI insight generation started for sprint {} (thread={})",
+            sprintId, Thread.currentThread().getName());
         if (!geminiApiConfiguration.isConfigured()) {
             saveErrorInsight(sprintId, null, GeminiApiConfiguration.ERROR_CODE);
             return CompletableFuture.failedFuture(
@@ -233,6 +270,7 @@ public class GeminiService {
             }
 
             // Same live KPI formula as dashboard / KPI Analytics (not SQL snapshot that can diverge).
+            log.info("Sprint {}: syncing live KPIs before Gemini prompt", sprintId);
             syncLiveKpisToSprintEntity(sprintId);
             sprint = sprintRepository.findById(sprintId).orElse(sprint);
 
@@ -240,15 +278,19 @@ public class GeminiService {
                 .findByAssignedProjectIdOrderByStartDateAsc(projectId);
 
             String prompt = buildPrompt(sprint, historicalSprints, sprintId);
-            System.out.println("[GeminiService] Prompt length: " + prompt.length());
-            System.out.println("[GeminiService] Prompt preview: " + prompt.substring(0, Math.min(200, prompt.length())));
+            log.info("Sprint {}: Gemini prompt ready ({} chars)", sprintId, prompt.length());
             String rawJson = callGemini(prompt);
+            log.info("Sprint {}: Gemini response received ({} ms elapsed)",
+                sprintId, System.currentTimeMillis() - startedAtMs);
             String insightsJson = extractJsonFromGeminiResponse(rawJson);
             JsonNode rawTree = mapper.readTree(insightsJson);
             if (rawTree.isObject()) {
                 stampDeveloperAiNarrativesFromRaw((ObjectNode) rawTree);
             }
             JsonNode enriched = enrichInsightsForResponse(rawTree, sprintId);
+            if (enriched != null && enriched.isObject()) {
+                stampGenerationKpiSnapshot((ObjectNode) enriched, sprintId);
+            }
             insightsJson = mapper.writeValueAsString(enriched);
 
             SprintInsight insight = insightRepository.findBySprintId(sprintId)
@@ -261,17 +303,21 @@ public class GeminiService {
             insight.setErrorMessage(null); // clear any previous error
             insightRepository.save(insight);
             invalidateInsightsGetResponseCache(sprintId);
+            embeddingService.embedSprintInsight(insight);
 
-            System.out.println("[GeminiService] Insights saved for sprint " + sprintId);
+            log.info("Sprint {}: insights saved ({} ms total)",
+                sprintId, System.currentTimeMillis() - startedAtMs);
             return CompletableFuture.completedFuture(insight);
 
         } catch (Exception e) {
-            System.err.println("[GeminiService] Error generating insights: " + e.getMessage());
+            log.error("Sprint {}: insight generation failed after {} ms — {}",
+                sprintId, System.currentTimeMillis() - startedAtMs, e.getMessage(), e);
             // Persist the error so the frontend stops polling immediately
             try {
                 saveErrorInsight(sprintId, null, e.getMessage());
             } catch (Exception saveEx) {
-                System.err.println("[GeminiService] Could not save error insight: " + saveEx.getMessage());
+                log.error("Sprint {}: could not persist error insight — {}",
+                    sprintId, saveEx.getMessage(), saveEx);
             }
             return CompletableFuture.failedFuture(e);
         }
@@ -635,6 +681,82 @@ public class GeminiService {
         insightsGetResponseCache.keySet().removeIf(k -> k.startsWith(prefix));
         enrichResponseCache.keySet().removeIf(k -> k.startsWith(String.valueOf(sprintId)));
         liveApplyCache.keySet().removeIf(k -> k.startsWith(prefix));
+    }
+
+    /**
+     * Adds {@code kpiValuesChanged} / {@code changedKpiMetrics} to GET payload by comparing live data
+     * with {@code generationKpiSnapshot} stamped at the last Generate (not re-computed on every enrich).
+     */
+    public void attachInsightsFreshnessMetadata(Map<String, Object> payload, Long sprintId) {
+        if (payload == null || sprintId == null) {
+            return;
+        }
+        payload.put("kpiSnapshotAvailable", false);
+        payload.put("kpiValuesChanged", false);
+        payload.put("changedKpiMetrics", List.of());
+
+        Object insightsObj = payload.get("insights");
+        if (!(insightsObj instanceof JsonNode)) {
+            return;
+        }
+        JsonNode insightsNode = (JsonNode) insightsObj;
+        if (!insightsNode.isObject()) {
+            return;
+        }
+        JsonNode snapshotNode = insightsNode.get("generationKpiSnapshot");
+        if (snapshotNode == null || !snapshotNode.isObject()) {
+            return;
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+        ObjectNode liveBreakdown = buildTaskStatusBreakdownNode(getCanonicalTaskStatusCounts(sprintId));
+        List<String> changed =
+            GeminiInsightKpiAlignUtil.detectGenerationKpiDrift(snapshotNode, live, liveBreakdown);
+        payload.put("kpiSnapshotAvailable", true);
+        payload.put("kpiValuesChanged", !changed.isEmpty());
+        payload.put("changedKpiMetrics", changed);
+    }
+
+    private ObjectNode buildTaskStatusBreakdownNode(Map<String, Long> counts) {
+        ObjectNode breakdown = mapper.createObjectNode();
+        long todo = counts.getOrDefault("TODO", 0L);
+        long inProcess = counts.getOrDefault("IN_PROCESS", 0L);
+        long inReview = counts.getOrDefault("IN_REVIEW", 0L);
+        long done = counts.getOrDefault("DONE", 0L);
+        long unknown = counts.getOrDefault("UNKNOWN", 0L);
+        long total = todo + inProcess + inReview + done + unknown;
+        breakdown.put("toDo", todo);
+        breakdown.put("inProgress", inProcess);
+        breakdown.put("inReview", inReview);
+        breakdown.put("done", done);
+        breakdown.put("unknown", unknown);
+        breakdown.put("total", total);
+        return breakdown;
+    }
+
+    private void stampGenerationKpiSnapshot(ObjectNode root, Long sprintId) {
+        if (root == null || sprintId == null) {
+            return;
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        Map<String, Object> live = resolveLiveKpisForSprint(sprint);
+        ObjectNode snapshot = mapper.createObjectNode();
+        snapshot.put("capturedAt", java.time.Instant.now().toString());
+        ObjectNode kpis = mapper.createObjectNode();
+        kpis.put("completionRate", GeminiInsightKpiAlignUtil.intMetric(live, "completionRate"));
+        kpis.put("onTimeDelivery", GeminiInsightKpiAlignUtil.intMetric(live, "onTimeDelivery"));
+        kpis.put("efficiencyScore", GeminiInsightKpiAlignUtil.intMetric(live, "efficiencyScore"));
+        kpis.put("workloadBalance", GeminiInsightKpiAlignUtil.intMetric(live, "workloadBalance"));
+        kpis.put("productivityScore", GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore"));
+        snapshot.set("kpis", kpis);
+        snapshot.set("taskStatusBreakdown", buildTaskStatusBreakdownNode(getCanonicalTaskStatusCounts(sprintId)));
+        root.set("generationKpiSnapshot", snapshot);
     }
 
     private static String insightsGetResponseCacheKey(SprintInsight insight) {
@@ -1224,6 +1346,7 @@ public class GeminiService {
             "- kpiManagerGuide.byMetric.productivityScore: same style as completionRate, onTimeDelivery, efficiencyScore, and workloadBalance — "
             + "1-2 sentences with the productivityScore %% from \"Current Sprint\" and what that value means for delivery and team load (composite of the four KPIs). "
             + "When phase is in_progress, add one brief line only if needed: the score updates as work is marked Done and is not a final grade while the sprint is open. "
+            + "When Sprint timeline.phase is ended: use past tense and describe final sprint outcomes only — NEVER say the score will update, keep updating, or change during the sprint; do NOT mention live snapshot, tasks still in progress, or pending work; you MAY close with one short sentence that this reflects final delivery for the completed sprint window. "
             + "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: interpret the %% like the other metrics — do NOT justify a low %% "
             + "(no baseline, expected, underperforming, sprint not started, early snapshot, little work completed yet, or similar excuses). "
             + "You MAY add one short sentence that the score will update as the sprint runs and tasks or hours change. "
@@ -1437,6 +1560,7 @@ public class GeminiService {
             normalizeAlertSeverities(root);
             filterPrematureSprintKpiAlerts(root, sprintId);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            injectSprintHoursCompletionAlert(root, sprintId);
             enrichKpiManagerGuideIfEmpty(root, sprintId);
             normalizeKpiManagerGuidePercentSpacing(root);
             normalizeKpiManagerGuideWorkloadBalance(root, sprintId);
@@ -2841,6 +2965,7 @@ public class GeminiService {
         int inReview;
         int done;
         int total;
+        double workedHours;
     }
 
     private static class DeveloperUrgencyLoad {
@@ -2863,6 +2988,56 @@ public class GeminiService {
         int spread;
     }
 
+    private static int openPending(DeveloperStatusLoad d) {
+        if (d == null) {
+            return 0;
+        }
+        return Math.max(0, d.todo + d.inProcess + d.inReview);
+    }
+
+    private static String formatStatusSpreadReason(
+            DeveloperStatusLoad from,
+            DeveloperStatusLoad to,
+            String statusLabel,
+            int fromStageCount,
+            int toStageCount,
+            int tasksToMove) {
+        int toOpen = openPending(to);
+        if (to.todo > 0 && toStageCount == 0 && !"To do".equals(statusLabel)) {
+            return String.format(
+                "%s has %d in \"%s\" vs %s with %d in that stage but %d in To do (%d open overall); "
+                    + "shifting ~%d task(s) spreads that stage more evenly.",
+                from.name,
+                fromStageCount,
+                statusLabel,
+                to.name,
+                toStageCount,
+                to.todo,
+                toOpen,
+                tasksToMove);
+        }
+        if (toOpen > toStageCount) {
+            return String.format(
+                "%s has %d in \"%s\" vs %s with %d in that stage (%d open overall); "
+                    + "shifting ~%d task(s) spreads that stage more evenly.",
+                from.name,
+                fromStageCount,
+                statusLabel,
+                to.name,
+                toStageCount,
+                toOpen,
+                tasksToMove);
+        }
+        return String.format(
+            "%s has %d in \"%s\" vs %s’s %d; shifting ~%d task(s) spreads that stage more evenly.",
+            from.name,
+            fromStageCount,
+            statusLabel,
+            to.name,
+            toStageCount,
+            tasksToMove);
+    }
+
     private Map<String, DeveloperStatusLoad> buildDeveloperStatusLoad(Long sprintId) {
         Map<String, DeveloperStatusLoad> byName = new LinkedHashMap<>();
         try {
@@ -2870,40 +3045,36 @@ public class GeminiService {
             if (raw == null) {
                 return byName;
             }
-            LinkedHashMap<String, UserTask> deduped = new LinkedHashMap<>();
-            for (UserTask ut : raw) {
-                if (ut == null || ut.getId() == null || ut.getTask() == null) {
+            for (Map<String, Object> row : SprintDeveloperMetricsUtil.buildDeveloperSummaryRows(raw)) {
+                if (row == null) {
                     continue;
                 }
-                String key = ut.getId().getUserId() + ":" + ut.getId().getTaskId();
-                deduped.putIfAbsent(key, ut);
-            }
-            for (UserTask ut : deduped.values()) {
-                Long uid = ut.getId() != null ? ut.getId().getUserId() : null;
-                if (uid == null) {
+                String name = row.get("name") != null ? String.valueOf(row.get("name")).trim() : "";
+                if (name.isBlank()) {
                     continue;
                 }
-                User u = ut.getUser();
-                String name = (u != null && u.getName() != null && !u.getName().isBlank())
-                    ? u.getName().trim()
-                    : ("User " + uid);
-                DeveloperStatusLoad d = byName.computeIfAbsent(name, k -> {
-                    DeveloperStatusLoad x = new DeveloperStatusLoad();
-                    x.name = k;
-                    return x;
-                });
-                String norm = normalizeWorkflowStatus(ut.getTask().getStatus());
-                if ("TODO".equals(norm)) d.todo++;
-                else if ("IN_PROCESS".equals(norm)) d.inProcess++;
-                else if ("IN_REVIEW".equals(norm)) d.inReview++;
-                else if ("DONE".equals(norm)) d.done++;
-                // Keep total derived from status buckets so each bucket (including done) is used.
-                d.total = d.todo + d.inProcess + d.inReview + d.done;
+                DeveloperStatusLoad d = new DeveloperStatusLoad();
+                d.name = name;
+                d.todo = intMetric(row.get("toDo"));
+                d.inProcess = intMetric(row.get("inProgress"));
+                d.inReview = intMetric(row.get("inReview"));
+                d.done = intMetric(row.get("completed"));
+                d.total = Math.max(0, d.todo + d.inProcess + d.inReview + d.done);
+                Object wh = row.get("workedHours");
+                d.workedHours = wh instanceof Number ? Math.max(0.0, ((Number) wh).doubleValue()) : 0.0;
+                byName.put(name, d);
             }
         } catch (Exception e) {
             System.err.println("[GeminiService] buildDeveloperStatusLoad: " + e.getMessage());
         }
         return byName;
+    }
+
+    private static int intMetric(Object value) {
+        if (!(value instanceof Number)) {
+            return 0;
+        }
+        return Math.max(0, ((Number) value).intValue());
     }
 
     private StatusSpread computeStatusSpread(List<DeveloperStatusLoad> rows, String statusKey,
@@ -2912,35 +3083,49 @@ public class GeminiService {
             return null;
         }
         Comparator<DeveloperStatusLoad> byName = Comparator.comparing(d -> d.name == null ? "" : d.name);
-        DeveloperStatusLoad max = rows.stream()
+        DeveloperStatusLoad from = rows.stream()
             .max((a, b) -> {
                 int va = statusValue(a, statusKey);
                 int vb = statusValue(b, statusKey);
                 if (va != vb) return Integer.compare(va, vb);
+                int oa = openPending(a);
+                int ob = openPending(b);
+                if (oa != ob) return Integer.compare(oa, ob);
                 return -byName.compare(a, b);
             })
             .orElse(null);
-        DeveloperStatusLoad min = rows.stream()
+        if (from == null || statusValue(from, statusKey) <= 0) {
+            return null;
+        }
+        final int fromOpen = openPending(from);
+        final double fromHours = from.workedHours;
+        DeveloperStatusLoad to = rows.stream()
+            .filter(d -> d != null && d.name != null && !d.name.isBlank())
+            .filter(d -> !Objects.equals(d.name, from.name))
             .filter(d -> !isBlockedDeveloper(d.name, blockedDeveloperNamesLower))
+            .filter(d -> openPending(d) < fromOpen)
+            .filter(d -> d.workedHours <= fromHours + 1e-6)
             .min((a, b) -> {
+                int oa = openPending(a);
+                int ob = openPending(b);
+                if (oa != ob) return Integer.compare(oa, ob);
                 int va = statusValue(a, statusKey);
                 int vb = statusValue(b, statusKey);
                 if (va != vb) return Integer.compare(va, vb);
+                int hourCmp = Double.compare(a.workedHours, b.workedHours);
+                if (hourCmp != 0) return hourCmp;
                 return byName.compare(a, b);
             })
             .orElse(null);
-        if (max == null || min == null) {
-            return null;
-        }
-        if (Objects.equals(max.name, min.name)) {
+        if (to == null) {
             return null;
         }
         StatusSpread s = new StatusSpread();
         s.statusKey = statusKey;
         s.statusLabel = statusLabel(statusKey);
-        s.from = max;
-        s.to = min;
-        s.spread = Math.max(0, statusValue(max, statusKey) - statusValue(min, statusKey));
+        s.from = from;
+        s.to = to;
+        s.spread = Math.max(0, statusValue(from, statusKey) - statusValue(to, statusKey));
         return s;
     }
 
@@ -3195,14 +3380,16 @@ public class GeminiService {
                 o.put(
                     "text",
                     String.format(
-                        "Shift about %d task(s) toward %s: %s has %d in \"%s\" vs %s with %d — that stage is uneven even if total assignments match.",
+                        "Shift about %d task(s) toward %s: %s",
                         targetMove,
                         targetSpread.to.name,
-                        targetSpread.from.name,
-                        targetFrom,
-                        targetSpread.statusLabel,
-                        targetSpread.to.name,
-                        targetTo));
+                        formatStatusSpreadReason(
+                            targetSpread.from,
+                            targetSpread.to,
+                            targetSpread.statusLabel,
+                            targetFrom,
+                            targetTo,
+                            targetMove)));
                 o.put("guardrailCorrected", true);
                 actionableRevised.add(o);
             }
@@ -3215,12 +3402,11 @@ public class GeminiService {
                 o.put("to", best.to.name);
                 o.put("tasksToMove", tasksToMove);
                 o.put("reason",
-                    String.format(
-                        "%s has %d in \"%s\" vs %s’s %d; shifting ~%d task(s) spreads that stage more evenly.",
-                        best.from.name,
-                        fromCount,
+                    formatStatusSpreadReason(
+                        best.from,
+                        best.to,
                         best.statusLabel,
-                        best.to.name,
+                        fromCount,
                         toCount,
                         tasksToMove));
                 workloadRecs.add(o);
@@ -3233,12 +3419,11 @@ public class GeminiService {
                     o.put("tasksToMove", tasksToMove);
                     o.put(
                         "reason",
-                        String.format(
-                            "%s has %d in \"%s\" vs %s’s %d; shifting ~%d task(s) spreads that stage more evenly.",
-                            best.from.name,
-                            fromCount,
+                        formatStatusSpreadReason(
+                            best.from,
+                            best.to,
                             best.statusLabel,
-                            best.to.name,
+                            fromCount,
                             toCount,
                             tasksToMove));
                 }
@@ -3574,30 +3759,84 @@ public class GeminiService {
     }
 
     private static final Pattern PRODUCTIVITY_EVOLUTION_NOTE_ALREADY = Pattern.compile(
-        "(?i)\\b(?:will\\s+update|will\\s+change|keeps?\\s+updating|continues?\\s+to\\s+update|"
-            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|task\\s+(?:progress|updates?)|"
+        "(?i)\\b(?:will\\s+update|will\\s+change|will\\s+keep\\s+updating|keeps?\\s+updating|continues?\\s+to\\s+update|"
+            + "as\\s+the\\s+sprint\\s+(?:runs|progresses)|during\\s+the\\s+sprint|tasks?\\s+progress|task\\s+(?:progress|updates?)|"
             + "once\\s+(?:the\\s+)?sprint\\s+begins|once\\s+work\\s+begins|still\\s+open|"
             + "sprint\\s+(?:is\\s+)?(?:still\\s+)?open|pending\\s+task|live\\s+snapshot|"
             + "not\\s+yet\\s+done|not\\s+a\\s+final|active\\s+tasks?|marked\\s+done|"
-            + "updates?\\s+as\\s+more)\\b");
+            + "updates?\\s+as\\s+more|change\\s+during)\\b");
 
     private static String productivityEvolutionNote(Sprint sprint) {
         String phase = resolveSprintPhase(sprint);
+        if ("ended".equals(phase)) {
+            return "";
+        }
         if ("not_started".equals(phase)) {
             return "It will update once the sprint begins and tasks move through statuses, "
                 + "assignments, and logged hours feed the four KPIs.";
         }
         if ("in_progress".equals(phase)) {
+            if (isSprintEarlyForProductivityGuide(sprint)) {
+                return "It will keep updating as tasks progress and completion, on-time delivery, "
+                    + "participation, and workload balance change during the sprint.";
+            }
             return "It updates as more work is marked Done—not a final grade while the sprint is open.";
-        }
-        if (isSprintEarlyForProductivityGuide(sprint)) {
-            return "It will keep updating as tasks progress and completion, on-time delivery, "
-                + "participation, and workload balance change during the sprint.";
         }
         return "";
     }
 
+    private static final String PRODUCTIVITY_ENDED_SPRINT_CLOSING =
+        "This reflects final delivery for the completed sprint window.";
+
+    private static final Pattern ENDED_SPRINT_CLOSING_ALREADY = Pattern.compile(
+        "(?i)\\b(?:final delivery|completed sprint(?: window)?|sprint has ended|full sprint window|final sprint outcomes?)\\b");
+
+    /** Appends a past-tense closing line once the sprint calendar has ended. */
+    private static String appendProductivityEndedSprintClosing(String text, Sprint sprint) {
+        if (!"ended".equals(resolveSprintPhase(sprint))) {
+            return text;
+        }
+        if (text == null || text.isBlank()) {
+            return text == null ? "" : text.trim();
+        }
+        String raw = text.trim();
+        if (ENDED_SPRINT_CLOSING_ALREADY.matcher(raw).find()) {
+            return raw;
+        }
+        return raw + " " + PRODUCTIVITY_ENDED_SPRINT_CLOSING;
+    }
+
+    /** Drops forward-looking evolution sentences once the sprint calendar has ended. */
+    private static String stripProductivityEvolutionNotesForEndedSprint(String text, Sprint sprint) {
+        if (text == null || text.isBlank() || !"ended".equals(resolveSprintPhase(sprint))) {
+            return text;
+        }
+        String[] parts = text.split("(?<=[.!?])\\s+");
+        if (parts.length <= 1) {
+            return PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(text).find() ? "" : text.trim();
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String part : parts) {
+            String s = part.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            if (!PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(s).find()) {
+                if (kept.length() > 0) {
+                    kept.append(' ');
+                }
+                kept.append(s);
+            }
+        }
+        String out = kept.toString().trim();
+        return out.isEmpty() ? text.trim() : out;
+    }
+
     private static String appendProductivityEvolutionNote(String text, Sprint sprint) {
+        if ("ended".equals(resolveSprintPhase(sprint))) {
+            return stripProductivityEvolutionNotesForEndedSprint(
+                text == null ? "" : text, sprint);
+        }
         if (text == null || text.isBlank()) {
             return productivityEvolutionNote(sprint);
         }
@@ -3626,13 +3865,16 @@ public class GeminiService {
     private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
         int clamped = Math.min(100, Math.max(0, scorePct));
         if (existing == null || existing.isBlank()) {
-            return polishProductivityGuideProse(appendProductivityEvolutionNote(
-                String.format(
-                    Locale.ROOT,
-                    "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
-                        + "team participation, and workload balance into one indicator for overall sprint performance.",
-                    clamped),
-                sprint));
+            String fallback = String.format(
+                Locale.ROOT,
+                "The Productivity Score is %d%%, combining completion rate, on-time delivery, "
+                    + "team participation, and workload balance into one indicator for overall sprint performance.",
+                clamped);
+            if ("ended".equals(resolveSprintPhase(sprint))) {
+                return polishProductivityGuideProse(
+                    appendProductivityEndedSprintClosing(fallback, sprint));
+            }
+            return polishProductivityGuideProse(appendProductivityEvolutionNote(fallback, sprint));
         }
         String out = stripProductivityGuideInstructionEcho(existing);
         out = stripProductivityLowScoreExcuses(out, sprint);
@@ -3640,7 +3882,13 @@ public class GeminiService {
             out = softenProductivityGuidePerformanceLabels(out);
         }
         out = replaceProductivityScoreMentionsInProse(out, clamped);
-        return polishProductivityGuideProse(appendProductivityEvolutionNote(out, sprint));
+        if ("ended".equals(resolveSprintPhase(sprint))) {
+            out = stripProductivityEvolutionNotesForEndedSprint(out, sprint);
+            out = appendProductivityEndedSprintClosing(out, sprint);
+        } else {
+            out = appendProductivityEvolutionNote(out, sprint);
+        }
+        return polishProductivityGuideProse(out);
     }
 
     private static final class AssignmentLoadSnap {
@@ -3683,6 +3931,7 @@ public class GeminiService {
         List<AssignmentLoadSnap> others = withWork.stream()
             .filter(p -> !p.nameLower.equals(from.nameLower))
             .filter(p -> !isBlockedDeveloper(p.name, blockedDeveloperNamesLower))
+            .filter(p -> p.workedHours <= from.workedHours + 1e-6)
             .collect(Collectors.toList());
         Comparator<AssignmentLoadSnap> byLightHours = Comparator
             .comparingDouble((AssignmentLoadSnap p) -> p.workedHours)
@@ -4203,6 +4452,54 @@ public class GeminiService {
     }
 
     /**
+     * Adds a deterministic alert when logged hours per completed task diverges materially from the
+     * immediately previous sprint (see {@link SprintHoursCompletionAlertUtil}).
+     */
+    private void injectSprintHoursCompletionAlert(ObjectNode root, Long sprintId) {
+        try {
+            Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+            if (sprint == null) {
+                return;
+            }
+            String phase = resolveSprintPhase(sprint);
+            if ("not_started".equals(phase)) {
+                return;
+            }
+            Long projectId = sprint.getAssignedProject() != null ? sprint.getAssignedProject().getId() : null;
+            Sprint previous = findImmediatePreviousSprint(sprint, projectId);
+            if (previous == null) {
+                return;
+            }
+            JsonNode alertsNode = root.get("alerts");
+            ArrayNode alerts;
+            if (alertsNode == null || !alertsNode.isArray()) {
+                alerts = mapper.createArrayNode();
+                root.set("alerts", alerts);
+            } else {
+                alerts = (ArrayNode) alertsNode;
+            }
+            if (SprintHoursCompletionAlertUtil.alertsAlreadyContainHoursVsPrevious(alerts)) {
+                return;
+            }
+            Map<String, Object> curLive = resolveLiveKpisForSprint(sprint);
+            Map<String, Object> prevLive = resolveLiveKpisForSprint(previous);
+            Map<Long, Integer> displayMap = buildSprintDisplayIndexMap(projectId);
+            String prevLabel = sprintDisplayLabel(displayMap, previous.getId());
+            boolean ended = "ended".equals(phase);
+            boolean early = isSprintEarlyForProductivityGuide(sprint);
+            SprintHoursCompletionAlertUtil.buildAlert(
+                    SprintHoursCompletionAlertUtil.DeliverySnapshot.fromLiveKpis(curLive),
+                    SprintHoursCompletionAlertUtil.DeliverySnapshot.fromLiveKpis(prevLive),
+                    prevLabel,
+                    ended,
+                    early
+            ).ifPresent(alertMap -> alerts.add(mapper.valueToTree(alertMap)));
+        } catch (Exception e) {
+            System.err.println("[GeminiService] injectSprintHoursCompletionAlert: " + e.getMessage());
+        }
+    }
+
+    /**
      * Aligns severities with prompt rules: high scores on "higher is better" KPIs are not warnings;
      * when {@code blockedAssignments} is non-empty, blocker-themed alerts are {@code warning}, not info.
      */
@@ -4662,17 +4959,18 @@ public class GeminiService {
     }
 
     /**
-     * Same labels as frontend {@code buildSprintNumberMap}: sprints sorted by DB id → Sprint 0, Sprint 1, …
+     * Same labels as frontend {@code buildSprintNumberMap}: per-project 0-based index by startDate.
      */
     private Map<Long, Integer> buildSprintDisplayIndexMap(Long projectId) {
         Map<Long, Integer> map = new HashMap<>();
         if (projectId == null) {
             return map;
         }
-        List<Sprint> sprints = sprintRepository.findByAssignedProjectId(projectId);
-        sprints.sort(Comparator.comparing(Sprint::getId));
+        List<Sprint> sprints = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
         for (int i = 0; i < sprints.size(); i++) {
-            map.put(sprints.get(i).getId(), i);
+            if (sprints.get(i).getId() != null) {
+                map.put(sprints.get(i).getId(), i);
+            }
         }
         return map;
     }
@@ -4954,21 +5252,13 @@ public class GeminiService {
         }
         ObjectNode pred = (ObjectNode) predNode;
         int livePs = GeminiInsightKpiAlignUtil.intMetric(live, "productivityScore");
-        int predicted = livePs;
+        int rawPredicted = livePs;
         if (pred.has("predictedScore") && pred.get("predictedScore").isNumber()) {
-            predicted = Math.max(0, Math.min(100, pred.get("predictedScore").asInt()));
+            rawPredicted = Math.max(0, Math.min(100, pred.get("predictedScore").asInt()));
         }
+        int predicted = GeminiInsightKpiAlignUtil.resolveForecastPredictedScore(livePs, rawPredicted);
         pred.put("predictedScore", predicted);
-        int deltaVsCurrent = predicted - livePs;
-        String trend;
-        if (deltaVsCurrent > 0) {
-            trend = "up";
-        } else if (deltaVsCurrent < 0) {
-            trend = "down";
-        } else {
-            trend = "stable";
-        }
-        pred.put("trend", trend);
+        pred.put("trend", GeminiInsightKpiAlignUtil.productivityForecastTrend(livePs, rawPredicted));
         if (pred.path("reasoning").isTextual()) {
             pred.put(
                 "reasoning",

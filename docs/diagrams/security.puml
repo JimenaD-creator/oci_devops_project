@@ -1,0 +1,30 @@
+@startuml
+
+class com.springboot.MyTodoList.security.SecurityUtils {
+	{method}  {static} +canAccessDeveloperResource ( userId : Long ) : boolean
+	{method}  {static} +canAccessManagerResource ( managerId : Long ) : boolean
+	{method}  {static} +currentJwt () : java.util.Optional
+	{method}  {static} +currentUserId () : java.util.Optional
+	{method}  {static} +currentUserRole () : java.util.Optional
+}
+
+
+class com.springboot.MyTodoList.security.WebSecurityConfiguration {
+	{field} -jwtSecret : String
+	{method} +corsConfigurationSource () : org.springframework.web.cors.CorsConfigurationSource
+	{method}  {static} -isLoginPath ( request : jakarta.servlet.http.HttpServletRequest ) : boolean
+	{method} +jwtDecoder ( jwtSecretKey : javax.crypto.SecretKey ) : org.springframework.security.oauth2.jwt.JwtDecoder
+	{method} +jwtEncoder ( jwtSecretKey : javax.crypto.SecretKey ) : org.springframework.security.oauth2.jwt.JwtEncoder
+	{method} +jwtSecretKey () : javax.crypto.SecretKey
+	{method} +loginSecurityFilterChain ( http : org.springframework.security.config.annotation.web.builders.HttpSecurity ) : org.springframework.security.web.SecurityFilterChain
+	{method} +passwordEncoder () : org.springframework.security.crypto.password.PasswordEncoder
+	{method} +publicAwareBearerTokenResolver () : org.springframework.security.oauth2.server.resource.web.BearerTokenResolver
+	{method} +securityFilterChain ( http : org.springframework.security.config.annotation.web.builders.HttpSecurity ) : org.springframework.security.web.SecurityFilterChain
+}
+
+
+
+
+
+
+@enduml

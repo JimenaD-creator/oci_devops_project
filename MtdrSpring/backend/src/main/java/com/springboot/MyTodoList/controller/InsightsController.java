@@ -5,7 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.repository.SprintInsightRepository;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
+import com.springboot.MyTodoList.dto.SimilarSprintInsightMatch;
 import com.springboot.MyTodoList.service.GeminiService;
+import com.springboot.MyTodoList.service.EmbeddingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +33,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/insights")
 public class InsightsController {
 
+    private static final Logger log = LoggerFactory.getLogger(InsightsController.class);
+
     @Autowired
     private GeminiService geminiService;
 
@@ -37,6 +43,9 @@ public class InsightsController {
 
     @Autowired
     private SprintInsightRepository insightRepository;
+
+    @Autowired
+    private EmbeddingService embeddingService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -55,13 +64,16 @@ public class InsightsController {
             return ResponseEntity.unprocessableEntity().body(response);
         }
         try {
+            log.info("POST /api/insights/sprint/{}/generate accepted", sprintId);
+            geminiService.markInsightGenerationStarted(sprintId);
+
             CompletableFuture<SprintInsight> future =
                 geminiService.generateInsightsForSprint(sprintId);
 
             future.whenComplete((result, ex) -> {
                 if (ex != null) {
-                    System.err.println("[InsightsController] Async generation failed for sprint "
-                        + sprintId + ": " + ex.getMessage());
+                    log.error("Async insight generation failed for sprint {}: {}",
+                        sprintId, ex.getMessage(), ex);
                 }
             });
 
@@ -98,11 +110,14 @@ public class InsightsController {
         }
         SprintInsight insight = opt.get();
         Optional<Map<String, Object>> cached = geminiService.getCachedInsightsGetResponse(insight);
+        Map<String, Object> payload;
         if (cached.isPresent()) {
-            return ResponseEntity.ok(cached.get());
+            payload = new HashMap<>(cached.get());
+        } else {
+            payload = buildResponsePayload(insight);
+            geminiService.putCachedInsightsGetResponse(insight, payload);
         }
-        Map<String, Object> payload = buildResponsePayload(insight);
-        geminiService.putCachedInsightsGetResponse(insight, payload);
+        geminiService.attachInsightsFreshnessMetadata(payload, sprintId);
         return ResponseEntity.ok(payload);
     }
 
@@ -117,6 +132,79 @@ public class InsightsController {
             .collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Semantically similar sprint insights within the same project (vector search over insight summaries).
+     * GET /api/insights/sprint/{sprintId}/similar?limit=5&minSimilarity=0.72
+     */
+    @GetMapping("/sprint/{sprintId}/similar")
+    public ResponseEntity<Map<String, Object>> getSimilarSprintInsights(
+            @PathVariable Long sprintId,
+            @RequestParam(defaultValue = "5") int limit,
+            @RequestParam(required = false) Double minSimilarity) {
+        Map<String, Object> response = new HashMap<>();
+        if (!geminiApiConfiguration.isConfigured()) {
+            response.put("configured", false);
+            response.put("matches", List.of());
+            response.put("message", GeminiApiConfiguration.USER_MESSAGE);
+            return ResponseEntity.ok(response);
+        }
+        Optional<SprintInsight> source = insightRepository.findBySprintId(sprintId);
+        if (source.isEmpty() || source.get().getInsightsJson() == null || source.get().getInsightsJson().isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        double threshold = minSimilarity != null
+            ? minSimilarity
+            : EmbeddingService.DEFAULT_INSIGHT_SIMILARITY_THRESHOLD;
+        int topK = Math.max(1, Math.min(limit, 10));
+        try {
+            List<SimilarSprintInsightMatch> matches =
+                embeddingService.findSimilarSprintInsights(sprintId, topK, threshold);
+            Long projectId = source.get().getProjectId();
+            int indexed = embeddingService.countIndexedInsightsForProject(projectId);
+            int withInsights = embeddingService.countInsightsWithJsonForProject(projectId);
+            response.put("configured", true);
+            response.put("sprintId", sprintId);
+            response.put("projectId", projectId);
+            response.put("minSimilarity", threshold);
+            response.put("indexedSprints", indexed);
+            response.put("insightsAvailable", withInsights);
+            response.put("vectorSearchBackend", embeddingService.getInsightVectorSearchBackend().name());
+            response.put("matches", matches);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Similar insights lookup failed for sprint {}: {}", sprintId, e.getMessage());
+            response.put("error", "Failed to find similar sprint insights.");
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    /**
+     * One-time backfill: embed all persisted insights for a project (for historical sprints).
+     * POST /api/insights/project/{projectId}/embeddings/backfill
+     */
+    @PostMapping("/project/{projectId}/embeddings/backfill")
+    public ResponseEntity<Map<String, Object>> backfillInsightEmbeddings(@PathVariable Long projectId) {
+        Map<String, Object> response = new HashMap<>();
+        if (!geminiApiConfiguration.isConfigured()) {
+            response.put("status", "skipped");
+            response.put("error", GeminiApiConfiguration.ERROR_CODE);
+            response.put("message", GeminiApiConfiguration.USER_MESSAGE);
+            return ResponseEntity.unprocessableEntity().body(response);
+        }
+        try {
+            int embedded = embeddingService.backfillProjectInsightEmbeddings(projectId);
+            response.put("status", "ok");
+            response.put("projectId", projectId);
+            response.put("embeddedCount", embedded);
+            response.put("vectorSearchBackend", embeddingService.getInsightVectorSearchBackend().name());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("status", "failed");
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
     }
 
     /**
@@ -188,6 +276,9 @@ public class InsightsController {
         if (insight.getErrorMessage() != null) {
             payload.put("error", insight.getErrorMessage());
             payload.put("insights", null);
+            if (GeminiService.INSIGHT_STATUS_PROCESSING.equals(insight.getErrorMessage())) {
+                payload.put("status", "processing");
+            }
             return payload;
         }
 

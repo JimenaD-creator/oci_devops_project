@@ -73,7 +73,7 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
           dueDate: new Date(dueDate).toISOString(),
           completionRate: sprintKpiNumber(sprint, 'completionRate'),
           onTimeDelivery: sprintKpiNumber(sprint, 'onTimeDelivery'),
-          teamParticipation: sprintKpiNumber(sprint, 'teamParticipation'),
+          efficiencyScore: sprintKpiNumber(sprint, 'efficiencyScore'),
           workloadBalance: sprintKpiNumber(sprint, 'workloadBalance'),
           goal: goalTrim || null,
         }),

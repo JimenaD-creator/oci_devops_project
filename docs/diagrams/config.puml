@@ -1,0 +1,118 @@
+@startuml
+
+class com.springboot.MyTodoList.config.AsyncConfiguration {
+	{field} {static} -log : org.slf4j.Logger
+	{method} +geminiInsightsExecutor () : java.util.concurrent.Executor
+}
+
+
+class com.springboot.MyTodoList.config.BotProps {
+	{field} +token : String
+	{field} +username : String
+}
+
+
+class com.springboot.MyTodoList.config.CorsConfig {
+	{field} ~logger : org.slf4j.Logger
+	{method} +corsFilter () : org.springframework.web.filter.CorsFilter
+}
+
+
+class com.springboot.MyTodoList.config.DbSettings {
+	{field} +driver_class_name : String
+	{field} +password : String
+	{field} +url : String
+	{field} +username : String
+}
+
+
+class com.springboot.MyTodoList.config.DeepSeekConfig {
+	{field} -apiKey : String
+	{method} +deepSeekRequest ( apiUrl : String ) : org.apache.hc.client5.http.classic.methods.HttpPost
+	{method} +httpClient () : org.apache.hc.client5.http.impl.classic.CloseableHttpClient
+}
+
+
+class com.springboot.MyTodoList.config.DotEnvLoader {
+	{method}  {static} +loadIntoSystemProperties () : void
+	{method}  {static} -parseAndApply ( path : java.nio.file.Path ) : int
+	{method}  {static} -stripQuotes ( value : String ) : String
+}
+
+
+class com.springboot.MyTodoList.config.GeminiApiConfiguration {
+	{field} {static} +ERROR_CODE : String
+	{field} {static} +USER_MESSAGE : String
+	{field} -apiKey : String
+	{field} -apiUrl : String
+	{method} +isConfigured () : boolean
+	{method} ~logStartupStatus () : void
+	{method} +requireConfigured () : void
+}
+
+
+class com.springboot.MyTodoList.config.OracleConfiguration {
+	{field} -env : org.springframework.core.env.Environment
+	{field} {static} -logger : org.slf4j.Logger
+	{method} +dataSource () : javax.sql.DataSource
+}
+
+
+class com.springboot.MyTodoList.config.SpaWebConfig {
+	{method} #doFilterInternal ( request : jakarta.servlet.http.HttpServletRequest , response : jakarta.servlet.http.HttpServletResponse , filterChain : jakarta.servlet.FilterChain ) : void
+	{method}  {static} -shouldNotForward ( uri : String ) : boolean
+}
+
+
+class com.springboot.MyTodoList.config.SprintInsightEmbeddingSchemaInitializer {
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{method} +ensureTable () : void
+	{method}  {static} -isAlreadyExists ( e : Exception ) : boolean
+	{method} -tableExists () : boolean
+}
+
+
+class com.springboot.MyTodoList.config.SprintSchemaMigrationInitializer {
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{method} -addGoalColumnIfNeeded () : void
+	{method} +applySprintSchemaMigrations () : void
+	{method} -columnExists ( tableName : String , columnName : String ) : boolean
+	{method} -renameEfficiencyColumnIfNeeded () : void
+}
+
+
+class com.springboot.MyTodoList.config.StaticResourceCacheConfig {
+	{method} +addResourceHandlers ( registry : org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry ) : void
+}
+
+
+class com.springboot.MyTodoList.config.VectorSearchProperties {
+	{field} +dimensions : int
+	{field} +indexTargetAccuracy : int
+	{field} +insightVectorIndexName : String
+	{field} +legacyJsonColumn : String
+	{field} +schema : String
+	{field} +taskTable : String
+	{field} +vectorColumn : String
+	{field} +vectorIndexName : String
+	{method} +qualifiedEmbeddingsTable () : String
+	{method} +qualifiedInsightEmbeddingsTable () : String
+}
+
+
+enum com.springboot.MyTodoList.config.VectorSearchProperties$Mode {
+	{field} +APPLICATION
+	{field} +AUTO
+	{field} +ORACLE
+}
+
+
+
+
+com.springboot.MyTodoList.config.OracleConfiguration -->  com.springboot.MyTodoList.config.DbSettings : dbSettings
+com.springboot.MyTodoList.config.VectorSearchProperties -->  com.springboot.MyTodoList.config.VectorSearchProperties$Mode : mode
+
+
+@enduml

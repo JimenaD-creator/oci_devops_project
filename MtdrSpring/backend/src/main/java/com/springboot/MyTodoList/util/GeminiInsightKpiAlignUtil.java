@@ -1,5 +1,6 @@
 package com.springboot.MyTodoList.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -55,9 +56,13 @@ public final class GeminiInsightKpiAlignUtil {
         "(?i)\\b(?:not done yet|not finished|sprint is still|still open|still running|"
             + "still in progress|work is still|open tasks?|unfinished|score is lower because|score may rise)\\b");
 
-    /** Gemini often writes relative % change (e.g. 24%) instead of absolute score points (e.g. 15). */
+    /** Gemini often writes relative % (e.g. 24%) instead of absolute score points (e.g. 15). */
     private static final Pattern PRODUCTIVITY_TREND_DELTA_PERCENT = Pattern.compile(
         "(?i)(productivity(?:\\s+score)?\\s+(?:has\\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*%");
+
+    /** Gemini may also write wrong absolute points (e.g. 18 points when live delta is 13). */
+    private static final Pattern PRODUCTIVITY_TREND_DELTA_POINTS = Pattern.compile(
+        "(?i)(productivity(?:\\s+score)?\\s+(?:has\\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*(?:percentage\\s+)?points?");
 
     /** Trends are UI-facing coaching lines — keep them brief and direct. */
     private static final int EXECUTIVE_TRENDS_MAX_CHARS = 180;
@@ -75,7 +80,7 @@ public final class GeminiInsightKpiAlignUtil {
     private static final int ON_TIME_STRONG_PERCENT = 70;
 
     private static final String[] LIVE_METRIC_KEYS = {
-        "completionRate", "onTimeDelivery", "teamParticipation", "workloadBalance", "productivityScore"
+        "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore"
     };
 
     private GeminiInsightKpiAlignUtil() {}
@@ -85,6 +90,9 @@ public final class GeminiInsightKpiAlignUtil {
             return 0;
         }
         Object v = live.get(key);
+        if (v == null && "efficiencyScore".equals(key)) {
+            v = live.get("teamParticipation");
+        }
         if (v instanceof Number) {
             return Math.min(100, Math.max(0, ((Number) v).intValue()));
         }
@@ -107,6 +115,110 @@ public final class GeminiInsightKpiAlignUtil {
         return text != null && !text.isBlank() && ON_TIME_DECLINE_CLAIM.matcher(text).find();
     }
 
+    /** Point band within which next-sprint forecast is treated as flat vs current productivity. */
+    public static int forecastStabilityBand(int currentProductivityScore) {
+        if (currentProductivityScore >= 98) {
+            return 2;
+        }
+        if (currentProductivityScore >= 90) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /** Trend for productivityPrediction vs live sprint score (not vs previous sprint). */
+    public static String productivityForecastTrend(int liveProductivityScore, int predictedScore) {
+        int delta = predictedScore - liveProductivityScore;
+        int band = forecastStabilityBand(liveProductivityScore);
+        if (Math.abs(delta) <= band) {
+            return "stable";
+        }
+        if (delta > 0) {
+            return "up";
+        }
+        if (delta < 0) {
+            return "down";
+        }
+        return "stable";
+    }
+
+    /** When forecast is within stability band, show live score so UI matches "about the same". */
+    public static int resolveForecastPredictedScore(int liveProductivityScore, int rawPredicted) {
+        int predicted = Math.max(0, Math.min(100, rawPredicted));
+        if ("stable".equals(productivityForecastTrend(liveProductivityScore, predicted))
+            && predicted != liveProductivityScore) {
+            return liveProductivityScore;
+        }
+        return predicted;
+    }
+
+    private static final List<String> GENERATION_KPI_SNAPSHOT_KEYS = List.of(
+        "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore");
+
+    private static final List<String> GENERATION_TASK_BREAKDOWN_KEYS = List.of(
+        "total", "done", "toDo", "inProgress", "inReview");
+
+    /**
+     * Compares persisted {@code generationKpiSnapshot} (stored at Generate) with live sprint KPIs / task counts.
+     */
+    public static List<String> detectGenerationKpiDrift(JsonNode snapshotNode, Map<String, Object> liveKpis, JsonNode liveBreakdown) {
+        if (snapshotNode == null || !snapshotNode.isObject() || liveKpis == null) {
+            return List.of();
+        }
+        JsonNode snapKpis = snapshotNode.get("kpis");
+        if (snapKpis == null || !snapKpis.isObject()) {
+            return List.of();
+        }
+        List<String> changed = new ArrayList<>();
+        for (String key : GENERATION_KPI_SNAPSHOT_KEYS) {
+            int expected = snapKpis.path(key).asInt(-1);
+            int actual = intMetric(liveKpis, key);
+            if (expected >= 0 && expected != actual) {
+                changed.add(key);
+            }
+        }
+        JsonNode snapBreakdown = snapshotNode.get("taskStatusBreakdown");
+        if (snapBreakdown != null && snapBreakdown.isObject() && liveBreakdown != null && liveBreakdown.isObject()) {
+            for (String key : GENERATION_TASK_BREAKDOWN_KEYS) {
+                if (!snapBreakdown.has(key) || !liveBreakdown.has(key)) {
+                    continue;
+                }
+                int expected = snapBreakdown.path(key).asInt(-1);
+                int actual = liveBreakdown.path(key).asInt(-1);
+                if (expected >= 0 && actual >= 0 && expected != actual) {
+                    changed.add("taskStatusBreakdown." + key);
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * "Productivity remained stable at 100 points" → live KPI score (e.g. 99 points).
+     */
+    public static String alignProductivityStableLevelInProse(String text, int productivityScore) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        Pattern pattern = Pattern.compile(
+            "(?i)(productivity\\s+(?:remained|stays|stayed|is|was)\\s+(?:stable\\s+)?at\\s+)(-?\\d+(?:\\.\\d+)?)(\\s*(?:percentage\\s+)?points?)?");
+        Matcher matcher = pattern.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String suffix = matcher.group(3);
+            String replacement;
+            if (suffix != null && suffix.toLowerCase(Locale.ROOT).contains("point")) {
+                String unit = productivityScore == 1 ? " point" : " points";
+                replacement = matcher.group(1) + productivityScore + unit;
+            } else {
+                replacement = matcher.group(1) + productivityScore + "%";
+            }
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
     /**
      * Replaces percentage literals in prose with live KPI values when the text mentions that metric.
      */
@@ -121,6 +233,7 @@ public final class GeminiInsightKpiAlignUtil {
         int otd = intMetric(live, "onTimeDelivery");
         out = alignLooseAtPhrases(out, otd);
         out = alignLooseAtPhrases(out, intMetric(live, "productivityScore"));
+        out = alignProductivityStableLevelInProse(out, intMetric(live, "productivityScore"));
         out = fixHavingIsAtGrammar(out);
         out = reconcileOnTimeDeliveryConcernProse(out, otd);
         out = fixProductivityPercentMisattributedToOnTime(out, live);
@@ -219,10 +332,13 @@ public final class GeminiInsightKpiAlignUtil {
                 }
                 return alignOnTimePhrasesInProse(text, actualPercent);
             case "teamParticipation":
-                if (!lower.contains("participation") && !lower.contains("engagement")) {
+            case "efficiencyScore":
+                if (!lower.contains("efficiency")
+                        && !lower.contains("participation")
+                        && !lower.contains("engagement")) {
                     return text;
                 }
-                return applyTightMetricPatterns(text, display, TEAM_PARTICIPATION_PATTERNS);
+                return applyTightMetricPatterns(text, display, EFFICIENCY_SCORE_PATTERNS);
             case "workloadBalance":
                 if (!lower.contains("workload") && !lower.contains("balance")) {
                     return text;
@@ -248,7 +364,9 @@ public final class GeminiInsightKpiAlignUtil {
         Pattern.compile("(?i)(on[- ]?time\\s*delivery\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
     };
 
-    private static final Pattern[] TEAM_PARTICIPATION_PATTERNS = {
+    private static final Pattern[] EFFICIENCY_SCORE_PATTERNS = {
+        Pattern.compile("(?i)(efficiency\\s*score(?:\\s+is\\s+(?:currently\\s+)?|\\s*(?:of|is|was|at)\\s*))(-?\\d+(?:\\.\\d+)?)\\s*%?"),
+        Pattern.compile("(?i)(efficiency\\s*score\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
         Pattern.compile("(?i)(team\\s*participation(?:\\s+is\\s+(?:currently\\s+)?|\\s*(?:of|is|was|at)\\s*))(-?\\d+(?:\\.\\d+)?)\\s*%?"),
         Pattern.compile("(?i)(team\\s*participation\\s+is\\s+at\\s+)(-?\\d+(?:\\.\\d+)?)\\s*%?"),
     };
@@ -451,14 +569,17 @@ public final class GeminiInsightKpiAlignUtil {
         if (text == null || text.isBlank() || deltaProductivityPoints == 0) {
             return text;
         }
-        if (!PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).find()) {
-            return text;
-        }
         int absPoints = Math.abs(deltaProductivityPoints);
         String pointsLabel = absPoints == 1 ? " point" : " points";
         String verb = deltaProductivityPoints > 0 ? "increased" : "decreased";
-        return PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).replaceAll(
-            "Productivity " + verb + " by " + absPoints + pointsLabel);
+        String replacement = "Productivity " + verb + " by " + absPoints + pointsLabel;
+        if (PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).find()) {
+            return PRODUCTIVITY_TREND_DELTA_PERCENT.matcher(text).replaceAll(replacement);
+        }
+        if (PRODUCTIVITY_TREND_DELTA_POINTS.matcher(text).find()) {
+            return PRODUCTIVITY_TREND_DELTA_POINTS.matcher(text).replaceAll(replacement);
+        }
+        return text;
     }
 
     /** Repairs prose broken when legacy summaries had % stripped (e.g. "from to completion"). */
@@ -502,7 +623,7 @@ public final class GeminiInsightKpiAlignUtil {
             return text;
         }
         int cr = intMetric(live, "completionRate");
-        int tp = intMetric(live, "teamParticipation");
+        int es = intMetric(live, "efficiencyScore");
         int wb = intMetric(live, "workloadBalance");
         String out = text;
         out = out.replaceAll("(?i)remained stable at\\s*,", "remained stable at " + cr + "%,");
@@ -511,12 +632,12 @@ public final class GeminiInsightKpiAlignUtil {
             "(?i)(completion(?:\\s+rate)?s?)\\s+remained stable at\\s*,",
             "$1 remained stable at " + cr + "%,");
         out = out.replaceAll(
-            "(?i)(team participation|participation)\\s+stayed at\\s*,",
-            "$1 stayed at " + tp + "%,");
+            "(?i)(efficiency\\s+score|team participation|participation)\\s+stayed at\\s*,",
+            "efficiency score stayed at " + es + "%,");
         out = out.replaceAll(
-            "(?i)(team participation|participation)\\s+stayed at\\s*\\.",
-            "$1 stayed at " + tp + "%.");
-        out = out.replaceAll("(?i)\\bstayed at\\s*\\.", "stayed at " + tp + "%.");
+            "(?i)(efficiency\\s+score|team participation|participation)\\s+stayed at\\s*\\.",
+            "efficiency score stayed at " + es + "%.");
+        out = out.replaceAll("(?i)\\bstayed at\\s*\\.", "stayed at " + es + "%.");
         out = out.replaceAll(
             "(?i)(workload balance)\\s+(?:saw[^.]*?at|stayed at|remained at)\\s*,",
             "$1 remained at " + wb + "%,");
@@ -524,7 +645,7 @@ public final class GeminiInsightKpiAlignUtil {
             out = DANGLING_AT_COMMA.matcher(out).replaceFirst("at " + cr + "%,");
         }
         if (DANGLING_AT_PERIOD.matcher(out).find()) {
-            out = DANGLING_AT_PERIOD.matcher(out).replaceFirst("at " + tp + "%.");
+            out = DANGLING_AT_PERIOD.matcher(out).replaceFirst("at " + es + "%.");
         }
         return out;
     }

@@ -22,6 +22,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t FROM Task t WHERE t.assignedSprint.assignedProject.id = :projectId")
     List<Task> findByProjectId(@Param("projectId") Long projectId);
 
+    /** Eager sprint id only — avoids N+1 when serializing dashboard task lists. */
+    @Query(
+            "SELECT DISTINCT t FROM Task t JOIN FETCH t.assignedSprint s "
+                    + "WHERE s.assignedProject.id = :projectId")
+    List<Task> findByProjectIdWithSprint(@Param("projectId") Long projectId);
+
     @Query("SELECT t.assignedSprint.assignedProject.id FROM Task t WHERE t.id = :taskId")
     Optional<Long> findProjectIdByTaskId(@Param("taskId") Long taskId);
 }

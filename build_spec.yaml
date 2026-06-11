@@ -1,6 +1,6 @@
 version: 0.1
 component: build
-timeoutInSeconds: 600
+timeoutInSeconds: 900
 shell: bash
 
 env:
@@ -36,11 +36,6 @@ steps:
       ls -la backend
 
   - type: Command
-    name: "Docker Hub Login"
-    command: |
-      echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "dockerdiegojules" --password-stdin
-
-  - type: Command
     name: "Validate Kubernetes manifest YAML"
     command: |
       python3 -m pip install --quiet pyyaml
@@ -53,6 +48,18 @@ steps:
           raise SystemExit('Manifest must contain at least one Kubernetes document')
       print('OK: parsed', len(docs), 'documents from', path)
       "
+
+  - type: Command
+    name: "Automated tests"
+    command: |
+      export PATH=$JAVA_HOME/bin:$PATH
+      cd MtdrSpring/backend
+      mvn -B test -Dspring.profiles.active=test
+
+  - type: Command
+    name: "Docker Hub Login"
+    command: |
+      echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "dockerdiegojules" --password-stdin
 
   - type: Command
     name: "Build"

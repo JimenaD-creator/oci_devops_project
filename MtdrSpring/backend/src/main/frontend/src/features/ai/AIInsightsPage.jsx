@@ -19,9 +19,9 @@ import {
   formatSprintLabel,
 } from '../sprints/utils/sprintUtils';
 import { SECTION_ACCENT, sectionRgba } from '../dashboard/constants/dashboardConstants';
-import { pageEase, getErrorMessage } from './aiInsightsConstants';
+import { pageEase, getErrorMessage, isProcessingInsight } from './aiInsightsConstants';
 import {
-  productivityScoreFromSprintKpis,
+  resolveSprintProductivityScore,
   normalizeWorkloadBalancePercent,
 } from '../kpis/productivityScoreUtils';
 import InsightCard from './InsightCard';
@@ -29,6 +29,7 @@ import { DeveloperInsightsTable } from './InsightCardParts';
 import DeveloperRadarCards from './DeveloperRadarCards';
 import { fetchProjectDevelopers } from '../dashboard/projectApi';
 import { fetchSprintInsights } from './insightsApi';
+import { taskBreakdownFromSprint } from './insightsFreshness';
 import { mergeDeveloperInsightRows } from '../../utils/teamRosterUtils';
 import PageLoadingSpinner from '../../components/common/PageLoadingSpinner';
 
@@ -141,7 +142,13 @@ export default function AIInsightsPage({ projectId }) {
     ({ sprintId: sid, loading, notFound, data, fetchFailed }) => {
       if (sid == null || Number(sid) !== Number(selectedSprintId)) return;
       setInsightsLoading(Boolean(loading));
-      if (loading) return;
+      if (loading || isProcessingInsight(data)) {
+        setInsightsLoading(true);
+        if (isProcessingInsight(data)) {
+          setInsightsError(null);
+        }
+        return;
+      }
       if (notFound || !data) {
         setRawDeveloperInsightRows([]);
         setInsightsGeneratedAt(null);
@@ -173,11 +180,18 @@ export default function AIInsightsPage({ projectId }) {
     ? {
         completionRate: normalizeKpiPercent(selectedSprint.kpis?.completionRate),
         onTimeDelivery: normalizeKpiPercent(selectedSprint.kpis?.onTimeDelivery),
-        teamParticipation: normalizeKpiPercent(selectedSprint.kpis?.teamParticipation),
+        efficiencyScore: normalizeKpiPercent(
+          selectedSprint.kpis?.efficiencyScore ?? selectedSprint.kpis?.teamParticipation,
+        ),
         workloadBalance: normalizeWorkloadBalancePercent(selectedSprint.kpis?.workloadBalance),
-        productivityScore: productivityScoreFromSprintKpis(selectedSprint.kpis),
+        productivityScore: resolveSprintProductivityScore(selectedSprint.kpis),
       }
     : null;
+
+  const liveTaskStatusBreakdown = useMemo(
+    () => taskBreakdownFromSprint(selectedSprint),
+    [selectedSprint],
+  );
 
   /** Sprints sorted chronologically for "next sprint" comparisons. */
   const sortedSprints = useMemo(() => {
@@ -209,10 +223,10 @@ export default function AIInsightsPage({ projectId }) {
     if (selectedSprintId == null || sortedSprints.length < 2) return null;
     const idx = sortedSprints.findIndex((s) => Number(s.id) === Number(selectedSprintId));
     if (idx <= 0) return null;
-    const current = productivityScoreFromSprintKpis(sortedSprints[idx]?.kpis);
-    const previous = productivityScoreFromSprintKpis(sortedSprints[idx - 1]?.kpis);
+    const current = resolveSprintProductivityScore(sortedSprints[idx]?.kpis);
+    const previous = resolveSprintProductivityScore(sortedSprints[idx - 1]?.kpis);
     if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
-    return Math.round(current) - Math.round(previous);
+    return current - previous;
   }, [selectedSprintId, sortedSprints]);
 
   if (loading && sprints.length === 0) return <PageLoadingSpinner />;
@@ -360,9 +374,10 @@ export default function AIInsightsPage({ projectId }) {
             showPredictionsSection={showPredictionsSection}
             showNextSprintForecast={showNextSprintForecast}
             nextSprintLabel={nextSprintForSelected ? getSprintLabel(nextSprintForSelected.id) : null}
-            nextSprintActualScore={productivityScoreFromSprintKpis(nextSprintForSelected?.kpis)}
-            currentSprintActualScore={productivityScoreFromSprintKpis(selectedSprint?.kpis)}
+            nextSprintActualScore={resolveSprintProductivityScore(nextSprintForSelected?.kpis)}
+            currentSprintActualScore={resolveSprintProductivityScore(selectedSprint?.kpis)}
             currentSprintMetrics={currentSprintKpiMetrics}
+            liveTaskStatusBreakdown={liveTaskStatusBreakdown}
             productivityDeltaPoints={productivityDeltaPoints}
             refreshToken={0}
             autoGenerateOnMissing={false}
@@ -443,7 +458,15 @@ export default function AIInsightsPage({ projectId }) {
             <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: 'text.primary', mb: 2 }}>
               Developer radar
             </Typography>
-            <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} />
+            {insightsLoading || !insightsGeneratedAt ? (
+              <Typography sx={{ fontSize: '0.9rem', color: 'text.secondary', fontStyle: 'italic' }}>
+                {insightsLoading
+                  ? 'Radar charts load after sprint insights finish generating.'
+                  : 'Generate sprint insights above to load developer radar charts.'}
+              </Typography>
+            ) : (
+              <DeveloperRadarCards sprintId={selectedSprint.id} sprintNumberMap={sprintNumberMap} enabled />
+            )}
           </Paper>
         </>
       )}

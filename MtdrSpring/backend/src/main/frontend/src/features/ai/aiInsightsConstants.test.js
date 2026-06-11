@@ -10,6 +10,8 @@ import {
   resolveProductivityPredictionDisplay,
   formatProductivityForecastDeltaLine,
   alignProductivityTrendDelta,
+  alignProductivityScoreProse,
+  isHoursVsPreviousSprintAlert,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -70,6 +72,19 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(resolved.deltaVsCurrent).toBe(-2);
     expect(formatProductivityForecastDeltaLine(resolved)).toBe(
       '−2 points vs current sprint (87%)',
+    );
+  });
+
+  it('resolveProductivityPredictionDisplay treats a 1-point drop at 100 as stable (99 vs 100)', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 99, trend: 'down' },
+      { productivityScore: 100 },
+    );
+    expect(resolved.trend).toBe('stable');
+    expect(resolved.predictedScore).toBe(100);
+    expect(resolved.deltaVsCurrent).toBe(0);
+    expect(formatProductivityForecastDeltaLine(resolved)).toBe(
+      'About the same as current sprint (100%)',
     );
   });
 
@@ -158,5 +173,32 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toContain('decreased by 15 points');
     expect(out).not.toContain('24%');
     expect(out).toContain('work is still in progress');
+  });
+
+  it('alignProductivityTrendDelta replaces wrong point delta with live score points', () => {
+    const text =
+      'Productivity decreased by 18 points compared to the previous sprint.';
+    const out = alignProductivityTrendDelta(text, -13);
+    expect(out).toContain('decreased by 13 points');
+    expect(out).not.toContain('18 points');
+  });
+
+  it('alignProductivityScoreProse fixes stable-at-level when Gemini rounds up (99 vs 100 points)', () => {
+    const text =
+      'Productivity remained stable at 100 points compared to the previous sprint.';
+    const out = alignProductivityScoreProse(text, 99);
+    expect(out).toBe(
+      'Productivity remained stable at 99 points compared to the previous sprint.',
+    );
+  });
+
+  it('isHoursVsPreviousSprintAlert detects backend-injected sprint comparison alerts', () => {
+    expect(
+      isHoursVsPreviousSprintAlert({
+        alertSource: 'hoursVsPreviousSprint',
+        kpi: 'sprintComparison',
+      }),
+    ).toBe(true);
+    expect(isHoursVsPreviousSprintAlert({ kpi: 'efficiencyScore', value: 100 })).toBe(false);
   });
 });

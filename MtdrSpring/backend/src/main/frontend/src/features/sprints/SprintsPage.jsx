@@ -66,6 +66,8 @@ import {
   getRecentlyDeletedTaskIdSet,
   notifyTasksMutated,
 } from '../../utils/taskSyncEvents';
+import { deleteTasksByIds } from '../tasks/taskDetailApi';
+import { BULK_DELETE_BATCH_SIZE, bulkDeleteTasksConfirmMessage } from '../tasks/constants/taskConstants';
 
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
@@ -84,6 +86,9 @@ export default function SprintsPage({ projectId }) {
   const [newTaskDialogOpen, setNewTaskDialogOpen] = useState(false);
   const [sprintForEdit, setSprintForEdit] = useState(null);
   const [selectedTaskForDialog, setSelectedTaskForDialog] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState(null);
   const [projectName, setProjectName] = useState(
     () => localStorage.getItem('currentProjectName') || '',
   );
@@ -209,7 +214,7 @@ export default function SprintsPage({ projectId }) {
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceFresh: false }).catch((e) => {
+      loadData({ silent: true, forceFresh: true }).catch((e) => {
         console.error('SprintsPage bundle sync failed:', e);
       });
     }, [loadData]),
@@ -224,7 +229,12 @@ export default function SprintsPage({ projectId }) {
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'sprints-page') return;
-      if (event?.detail?.source === 'sse') return;
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceFresh: true }).catch((e) => {
+          console.error('SprintsPage SSE sync failed:', e);
+        });
+        return;
+      }
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setTasks((prev) => {
@@ -273,24 +283,29 @@ export default function SprintsPage({ projectId }) {
     return () => window.removeEventListener(TASKS_MUTATED_EVENT, onTasksMutated);
   }, [loadData]);
 
+  const removeTaskFromLists = useCallback((taskId) => {
+    const tid = String(taskId);
+    recentlyDeletedTaskIdsRef.current.add(tid);
+    setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
+    setTasks((prev) => {
+      const next = prev.filter((t) => taskEntityId(t) !== tid);
+      setSprints((sp) => sortSprintsForDisplay(sp, next));
+      return next;
+    });
+    setUserTasks((prev) =>
+      prev.filter((ut) => {
+        const utTid = userTaskRowTaskId(ut);
+        return !Number.isFinite(utTid) || String(utTid) !== tid;
+      }),
+    );
+    if (selectedTaskForDialog && taskEntityId(selectedTaskForDialog) === tid) {
+      setSelectedTaskForDialog(null);
+    }
+  }, [selectedTaskForDialog]);
+
   const handleTaskDeleted = useCallback(
     async (taskId) => {
-      const tid = String(taskId);
-      recentlyDeletedTaskIdsRef.current.add(tid);
-      setTimeout(() => recentlyDeletedTaskIdsRef.current.delete(tid), 15000);
-
-      setTasks((prev) => {
-        const next = prev.filter((t) => taskEntityId(t) !== tid);
-        setSprints((sp) => sortSprintsForDisplay(sp, next));
-        return next;
-      });
-      setUserTasks((prev) =>
-        prev.filter((ut) => {
-          const utTid = userTaskRowTaskId(ut);
-          return !Number.isFinite(utTid) || String(utTid) !== tid;
-        }),
-      );
-      setSelectedTaskForDialog(null);
+      removeTaskFromLists(taskId);
       notifyTasksMutated({ source: 'sprints-page', type: 'task-deleted', taskId });
       try {
         await invalidateAndRefresh({ silent: true, confirmOnly: true });
@@ -299,7 +314,7 @@ export default function SprintsPage({ projectId }) {
         console.error('Failed to refresh project data after task delete:', e);
       }
     },
-    [invalidateAndRefresh, loadData],
+    [removeTaskFromLists, invalidateAndRefresh, loadData],
   );
 
   const handleTaskCreated = useCallback(
@@ -511,6 +526,72 @@ export default function SprintsPage({ projectId }) {
       return true;
     });
   }, [selectedSprintRows, developerFilter, statusFilter, priorityFilter, dueDateFilter]);
+
+  useEffect(() => {
+    setSelectedTaskIds(new Set());
+  }, [selectedSprint?.id, developerFilter, statusFilter, priorityFilter, dueDateFilter]);
+
+  const handleTaskSelectionChange = useCallback((taskId, checked) => {
+    const id = String(taskId);
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAllTasksChange = useCallback(
+    (checked) => {
+      if (checked) {
+        setSelectedTaskIds(new Set(filteredSprintRows.map((row) => String(row.id))));
+      } else {
+        setSelectedTaskIds(new Set());
+      }
+    },
+    [filteredSprintRows],
+  );
+
+  const handleBulkDeleteTasks = useCallback(async () => {
+    const ids = Array.from(selectedTaskIds)
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id));
+    if (!ids.length) return;
+    if (!window.confirm(bulkDeleteTasksConfirmMessage(ids.length))) return;
+
+    setBulkDeleting(true);
+    setBulkDeleteProgress({ done: 0, total: ids.length });
+    try {
+      const result = await deleteTasksByIds(ids, {
+        onProgress: (done, total) => setBulkDeleteProgress({ done, total }),
+      });
+      if (!result.ok || result.deletedCount < 1) {
+        window.alert(
+          `No se pudieron borrar las tareas (HTTP ${result.status ?? '?'}). ` +
+            `Borradas: ${result.deletedCount ?? 0} de ${ids.length}. ` +
+            'Reinicia el backend si acabas de actualizar el código.',
+        );
+        return;
+      }
+      ids.forEach((id) => removeTaskFromLists(id));
+      setSelectedTaskIds(new Set());
+      ids.forEach((id) =>
+        notifyTasksMutated({ source: 'sprints-page', type: 'task-deleted', taskId: id }),
+      );
+      try {
+        await invalidateAndRefresh({ silent: true, confirmOnly: true });
+        await loadData({ silent: true, forceFresh: true });
+      } catch (e) {
+        console.error('Failed to refresh project data after bulk delete:', e);
+      }
+    } catch (e) {
+      console.error('Bulk delete failed:', e);
+      window.alert('Connection error while deleting tasks.');
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteProgress(null);
+    }
+  }, [selectedTaskIds, removeTaskFromLists, invalidateAndRefresh, loadData]);
 
   if (loading) return <PageLoadingSpinner color={ORACLE_RED} />;
 
@@ -776,6 +857,51 @@ export default function SprintsPage({ projectId }) {
               >
                 New Task
               </Button>
+              {selectedTaskIds.size > 0 ? (
+                <>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => setSelectedTaskIds(new Set())}
+                    disabled={bulkDeleting}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      height: 40,
+                      minHeight: 40,
+                      color: ORACLE_RED,
+                      '&:hover': { bgcolor: alpha(ORACLE_RED, 0.08) },
+                    }}
+                  >
+                    Clear selection
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    startIcon={<DeleteOutlineIcon sx={{ fontSize: 20 }} />}
+                    onClick={handleBulkDeleteTasks}
+                    disabled={bulkDeleting}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      height: 40,
+                      minHeight: 40,
+                      px: 2,
+                      width: { xs: '100%', sm: 'auto' },
+                      flex: { xs: '1 1 100%', sm: '0 0 auto' },
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {bulkDeleting
+                      ? bulkDeleteProgress && bulkDeleteProgress.total > BULK_DELETE_BATCH_SIZE
+                        ? `Deleting… (${bulkDeleteProgress.done}/${bulkDeleteProgress.total})`
+                        : 'Deleting…'
+                      : `Delete selected (${selectedTaskIds.size})`}
+                  </Button>
+                </>
+              ) : null}
               {hasTaskTableFilters ? (
                 <Button
                   size="small"
@@ -854,6 +980,10 @@ export default function SprintsPage({ projectId }) {
               <TaskTable
                 items={filteredSprintRows}
                 variant="manager"
+                selectionEnabled
+                selectedTaskIds={selectedTaskIds}
+                onTaskSelectionChange={handleTaskSelectionChange}
+                onSelectAllChange={handleSelectAllTasksChange}
                 onRowClick={(row) => {
                   const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
                   if (task) setSelectedTaskForDialog(task);

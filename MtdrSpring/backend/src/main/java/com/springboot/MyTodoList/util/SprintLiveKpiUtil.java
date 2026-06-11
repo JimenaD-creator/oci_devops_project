@@ -7,10 +7,8 @@ import com.springboot.MyTodoList.model.UserTask;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Live sprint KPIs aligned with {@code dashboardSprintData.deriveKpisFromLiveData} and KPI Analytics.
@@ -93,21 +91,21 @@ public final class SprintLiveKpiUtil {
                 totalExpectedHours += task.getAssignedHours();
             }
         }
-        int teamParticipation = totalExpectedHours > 0
-                ? (int) Math.round((100.0 * totalWorkedHours) / totalExpectedHours)
+        // KPI Analytics / dashboard: planned hours vs logged hours (capped at 100%).
+        int efficiencyScore = totalWorkedHours > 0
+                ? (int) Math.min(100, Math.round((100.0 * totalExpectedHours) / totalWorkedHours))
                 : 0;
-        teamParticipation = Math.min(100, Math.max(0, teamParticipation));
 
         int workloadBalance = normalizeWorkloadBalancePercent(
                 sprint != null ? sprint.getWorkloadBalance() : null);
 
         int productivityScore = computeProductivityScore(
-                completionRate, onTimeDelivery, teamParticipation, workloadBalance);
+                completionRate, onTimeDelivery, efficiencyScore, workloadBalance);
 
         Map<String, Object> kpis = new LinkedHashMap<>();
         kpis.put("completionRate", completionRate);
         kpis.put("onTimeDelivery", onTimeDelivery);
-        kpis.put("teamParticipation", teamParticipation);
+        kpis.put("efficiencyScore", efficiencyScore);
         kpis.put("workloadBalance", workloadBalance);
         kpis.put("productivityScore", productivityScore);
         kpis.put("totalTasks", totalTasks);
@@ -146,14 +144,14 @@ public final class SprintLiveKpiUtil {
         return (int) Math.min(100, Math.max(0, Math.round(pct)));
     }
 
-    /** Same weights as {@code productivityScoreUtils.js}. */
+    /** Same weights as {@code productivityScoreUtils.js} — uses efficiency score, not participation. */
     public static int computeProductivityScore(
-            int completionRate, int onTimeDelivery, int teamParticipation, int workloadBalance) {
+            int completionRate, int onTimeDelivery, int efficiencyScore, int workloadBalance) {
         int cr = clampPercent(completionRate);
         int otd = clampPercent(onTimeDelivery);
-        int tp = clampPercent(teamParticipation);
+        int es = clampPercent(efficiencyScore);
         int wb = clampPercent(workloadBalance);
-        int score = (int) Math.round(cr * 0.4 + otd * 0.3 + tp * 0.2 + wb * 0.1);
+        int score = (int) Math.round(cr * 0.4 + otd * 0.3 + es * 0.2 + wb * 0.1);
         return Math.min(100, Math.max(0, score));
     }
 

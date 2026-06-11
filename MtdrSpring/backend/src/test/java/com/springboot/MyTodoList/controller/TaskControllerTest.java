@@ -21,6 +21,7 @@ import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
+import com.springboot.MyTodoList.service.ProjectBundleCacheEvictor;
 import com.springboot.MyTodoList.service.TaskAssignmentNotificationService;
 import com.springboot.MyTodoList.service.TaskAssignmentSyncService;
 import com.springboot.MyTodoList.service.TaskService;
@@ -62,6 +63,9 @@ class TaskControllerTest {
     @MockBean
     private ProjectTaskEventPublisher projectTaskEventPublisher;
 
+    @MockBean
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
+
     @Test
     void getAllTasks_withoutProjectId_returnsAll() throws Exception {
         Task task = new Task();
@@ -77,13 +81,13 @@ class TaskControllerTest {
 
     @Test
     void getAllTasks_withProjectId_filtersByProject() throws Exception {
-        when(taskRepository.findByProjectId(2L)).thenReturn(Collections.emptyList());
+        when(taskRepository.findByProjectIdWithSprint(2L)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/tasks").param("projectId", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
 
-        verify(taskRepository).findByProjectId(2L);
+        verify(taskRepository).findByProjectIdWithSprint(2L);
     }
 
     @Test
@@ -270,6 +274,28 @@ class TaskControllerTest {
         when(taskRepository.existsById(8L)).thenReturn(false);
 
         mockMvc.perform(delete("/api/tasks/8")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void bulkDeleteTasks_validIds_returnsOkWithCounts() throws Exception {
+        when(taskService.deleteTasksByIds(List.of(1L, 2L, 3L))).thenReturn(3);
+
+        mockMvc.perform(post("/api/tasks/bulk-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[1,2,3]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedCount").value(3))
+                .andExpect(jsonPath("$.requestedCount").value(3));
+
+        verify(taskService).deleteTasksByIds(List.of(1L, 2L, 3L));
+    }
+
+    @Test
+    void bulkDeleteTasks_emptyIds_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/tasks/bulk-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[]}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
