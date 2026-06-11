@@ -112,7 +112,7 @@ class com.springboot.MyTodoList.controller.ProjectController {
 class com.springboot.MyTodoList.controller.ProjectEventsController {
 	{field} -enabled : boolean
 	{field} -hub : com.springboot.MyTodoList.realtime.ProjectRealtimeHub
-	{method} +subscribe ( projectId : Long ) : org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+	{method} +subscribe ( projectId : Long ) : org.springframework.http.ResponseEntity
 }
 
 
