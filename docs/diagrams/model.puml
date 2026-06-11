@@ -63,7 +63,7 @@ class com.springboot.MyTodoList.model.SprintInsightEmbedding {
 
 
 class com.springboot.MyTodoList.model.Task {
-	{field} +assignedHours : Long
+	{field} +assignedHours : Double
 	{field} +classification : String
 	{field} +createdAt : java.time.LocalDateTime
 	{field} +description : String

@@ -41,7 +41,7 @@ class com.springboot.MyTodoList.dto.DashboardSprintDto {
 
 
 class com.springboot.MyTodoList.dto.DashboardTaskDto {
-	{field} +assignedHours : Long
+	{field} +assignedHours : Double
 	{field} +classification : String
 	{field} +description : String
 	{field} +dueDate : java.time.LocalDateTime
