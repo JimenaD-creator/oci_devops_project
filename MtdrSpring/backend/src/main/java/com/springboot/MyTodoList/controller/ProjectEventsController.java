@@ -2,8 +2,10 @@ package com.springboot.MyTodoList.controller;
 
 import com.springboot.MyTodoList.realtime.ProjectRealtimeHub;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,10 +34,14 @@ public class ProjectEventsController {
      * (any authenticated user; JWT enforced by the security filter chain).
      */
     @GetMapping(value = "/{projectId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@PathVariable Long projectId) {
+    public ResponseEntity<SseEmitter> subscribe(@PathVariable Long projectId) {
         if (!enabled) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        return hub.subscribe(projectId);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .header("X-Accel-Buffering", "no")
+                .header("Connection", "keep-alive")
+                .body(hub.subscribe(projectId));
     }
 }

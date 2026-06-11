@@ -84,6 +84,9 @@ spec:
                   optional: false
             - name: OCI_REGION
               value: "%OCI_REGION%"
+            # Cross-pod SSE: Telegram may hit pod A while browser SSE is on pod B (replicas > 1).
+            - name: REALTIME_RELAY_ENABLED
+              value: "true"
           volumeMounts:
             - name: creds
               mountPath: /mtdrworkshop/creds

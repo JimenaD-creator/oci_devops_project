@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.realtime;
 
 import com.springboot.MyTodoList.repository.TaskRepository;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -11,16 +12,22 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ProjectTaskEventPublisher {
 
     private final ProjectRealtimeHub hub;
+    private final ProjectTaskEventRelayStore relayStore;
     private final TaskRepository taskRepository;
     private final boolean enabled;
+    private final boolean relayEnabled;
 
     public ProjectTaskEventPublisher(
             ProjectRealtimeHub hub,
             TaskRepository taskRepository,
-            @Value("${app.realtime.sse.enabled:true}") boolean enabled) {
+            @Autowired(required = false) ProjectTaskEventRelayStore relayStore,
+            @Value("${app.realtime.sse.enabled:true}") boolean enabled,
+            @Value("${app.realtime.relay.enabled:true}") boolean relayEnabled) {
         this.hub = hub;
         this.taskRepository = taskRepository;
+        this.relayStore = relayStore;
         this.enabled = enabled;
+        this.relayEnabled = relayEnabled;
     }
 
     public void taskUpdated(Long taskId, Long userId, String source) {
@@ -61,16 +68,29 @@ public class ProjectTaskEventPublisher {
             return;
         }
         ProjectTaskEvent event = ProjectTaskEvent.of(type, projectId, taskId, userId, source);
+        Runnable deliver = () -> deliver(event);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    hub.broadcast(projectId, event);
+                    deliver.run();
                 }
             });
         } else {
-            hub.broadcast(projectId, event);
+            deliver.run();
         }
+    }
+
+    private void deliver(ProjectTaskEvent event) {
+        if (useRelay()) {
+            relayStore.save(event);
+            return;
+        }
+        hub.broadcast(event.getProjectId(), event);
+    }
+
+    private boolean useRelay() {
+        return relayEnabled && relayStore != null && relayStore.isEnabled();
     }
 
     private Optional<Long> resolveProjectId(Long taskId) {
