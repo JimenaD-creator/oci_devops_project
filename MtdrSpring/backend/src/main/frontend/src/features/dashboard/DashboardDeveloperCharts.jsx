@@ -1583,6 +1583,14 @@ export default function DashboardDeveloperCharts({
   const numericValueAxisProps = useCallback(
     (axisSpec, { width, label, labelAngle = 0, labelPosition, labelOffset, labelFill } = {}) => {
       const fill = isDark ? '#9A9A9A' : '#1A1A1A';
+      const resolvedLabelPosition =
+        labelPosition === 'insideLeft' ? 'left' : labelPosition;
+      const resolvedLabelOffset =
+        labelOffset != null
+          ? labelOffset
+          : labelPosition === 'insideLeft' && labelAngle === -90
+            ? 10
+            : undefined;
       const props = {
         type: 'number',
         allowDecimals: false,
@@ -1593,15 +1601,15 @@ export default function DashboardDeveloperCharts({
           fill,
           fontSize: singleDeveloperFocus ? 8 : axisTickStyle.fontSize,
         },
-        tickMargin: singleDeveloperFocus ? 4 : 8,
+        tickMargin: singleDeveloperFocus ? 6 : 10,
       };
       if (width != null) props.width = width;
       if (label) {
         props.label = {
           value: label,
           angle: labelAngle,
-          position: labelPosition,
-          offset: labelOffset,
+          position: resolvedLabelPosition,
+          offset: resolvedLabelOffset,
           fill: labelFill ?? fill,
           ...axisTitleStyle,
         };

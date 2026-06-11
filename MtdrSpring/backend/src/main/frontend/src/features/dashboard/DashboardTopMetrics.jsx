@@ -31,6 +31,19 @@ function formatAverage(n, devCount) {
 const TREND_SUMMARY_TITLES = new Set(['Tasks Completed', 'Total hours worked']);
 const TREND_CHART_TITLES = new Set(['Average tasks per developer', 'Average hours per developer']);
 
+/** Room for Y-axis tick labels (e.g. "12.5") inside compact scorecard trend charts. */
+const TREND_LINE_CHART_MARGIN = { top: 6, right: 8, left: 16, bottom: 2 };
+const TREND_Y_AXIS_WIDTH = 54;
+const TREND_Y_AXIS_TICK = (isDark) => ({
+  fontSize: 9,
+  fill: isDark ? '#9A9A9A' : '#424242',
+});
+const formatTrendYAxisTick = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+};
+
 function isTrendSummaryCard(title, showTrendCharts) {
   return showTrendCharts && TREND_SUMMARY_TITLES.has(title);
 }
@@ -376,12 +389,14 @@ export default function DashboardTopMetrics({
                           width: '100%',
                           flex: 1,
                           minHeight: compactCompareRow ? { md: 130 } : 140,
+                          overflow: 'visible',
+                          pl: 0.25,
                         }}
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart
                             data={avgTrendSeries}
-                            margin={{ top: 4, right: 6, left: 0, bottom: 2 }}
+                            margin={TREND_LINE_CHART_MARGIN}
                           >
                             <CartesianGrid
                               strokeDasharray="3 3"
@@ -403,8 +418,10 @@ export default function DashboardTopMetrics({
                               dy={6}
                             />
                             <YAxis
-                              width={24}
-                              tick={{ fontSize: 9, fill: isDark ? '#9A9A9A' : '#424242' }}
+                              width={TREND_Y_AXIS_WIDTH}
+                              tick={TREND_Y_AXIS_TICK(isDark)}
+                              tickFormatter={formatTrendYAxisTick}
+                              tickMargin={4}
                               axisLine={{ stroke: isDark ? '#2A2C32' : '#000000' }}
                               tickLine={false}
                               domain={['dataMin - 0.5', 'dataMax + 0.5']}
