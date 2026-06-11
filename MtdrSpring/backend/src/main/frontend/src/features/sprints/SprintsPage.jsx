@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
   TextField,
+  useMediaQuery,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
@@ -72,6 +73,7 @@ import { BULK_DELETE_BATCH_SIZE, bulkDeleteTasksConfirmMessage } from '../tasks/
 export default function SprintsPage({ projectId }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -601,18 +603,35 @@ export default function SprintsPage({ projectId }) {
     sprints[0]?.assignedProject?.name ||
     'Project';
   const subtitleProjectId = effectiveProjectIdNum;
+  
+  // Responsive styles
+  const headerFlexDirection = isMobile ? 'column' : 'row';
+  const headerGap = isMobile ? 2 : 0;
+  const buttonGroupMt = isMobile ? 2 : 0;
+  const filtersFlexDirection = isMobile ? 'column' : 'row';
+  const sprintCardWidth = isMobile ? '100%' : '320px';
+  const sprintCardMinWidth = isMobile ? 280 : 280;
+  const sprintScrollPb = isMobile ? 1 : 0.5;
+
   return (
     <Box
       component={motion.div}
       variants={sprintsOverviewVariants.page}
       initial="hidden"
       animate="show"
-      sx={{ maxWidth: 1200, width: '100%' }}
+      sx={{ maxWidth: 1200, width: '100%', px: { xs: 1, sm: 0 } }}
     >
       <Box
         component={motion.div}
         variants={sprintsOverviewVariants.block}
-        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}
+        sx={{ 
+          display: 'flex', 
+          flexDirection: headerFlexDirection,
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'stretch', sm: 'flex-start' }, 
+          mb: 4,
+          gap: headerGap,
+        }}
       >
         <Box>
           <Typography
@@ -632,7 +651,7 @@ export default function SprintsPage({ projectId }) {
             sprints
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ mt: buttonGroupMt, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           <Button
             variant="outlined"
             startIcon={<EditIcon />}
@@ -644,7 +663,6 @@ export default function SprintsPage({ projectId }) {
               borderColor: isDark ? '#2A2C32' : '#DDD',
               color: isDark ? '#9A9A9A' : '#555',
               borderRadius: 2,
-              mr: 1,
             }}
           >
             Edit sprint
@@ -660,7 +678,6 @@ export default function SprintsPage({ projectId }) {
               borderColor: isDark ? '#7F3030' : '#E0B4AF',
               color: '#B64536',
               borderRadius: 2,
-              mr: 1,
             }}
           >
             Delete sprint
@@ -690,7 +707,7 @@ export default function SprintsPage({ projectId }) {
                 fontWeight: 800,
                 color: 'text.primary',
                 mb: 1.5,
-                fontSize: '1.15rem',
+                fontSize: { xs: '1rem', sm: '1.15rem' },
                 letterSpacing: '-0.02em',
               }}
             >
@@ -702,9 +719,11 @@ export default function SprintsPage({ projectId }) {
                 flexDirection: 'row',
                 gap: 2,
                 overflowX: 'auto',
-                pb: 0.5,
+                pb: sprintScrollPb,
                 pr: 0.5,
                 scrollSnapType: 'x proximity',
+                mx: { xs: -1, sm: 0 },
+                px: { xs: 1, sm: 0 },
               }}
             >
               {sprints.map((sprint, i) => (
@@ -718,7 +737,7 @@ export default function SprintsPage({ projectId }) {
                     duration: 0.36,
                     ease: EASE_OUT,
                   }}
-                  sx={{ flex: '0 0 320px', minWidth: 280, maxWidth: 360, scrollSnapAlign: 'start' }}
+                  sx={{ flex: `0 0 ${sprintCardWidth}`, minWidth: sprintCardMinWidth, maxWidth: 360, scrollSnapAlign: 'start' }}
                 >
                   <SprintCard
                     sprint={sprint}
@@ -736,7 +755,7 @@ export default function SprintsPage({ projectId }) {
               sx={{
                 fontWeight: 800,
                 color: 'text.primary',
-                fontSize: '1.02rem',
+                fontSize: { xs: '0.95rem', sm: '1.02rem' },
                 mb: 1.25,
                 display: 'block',
               }}
@@ -749,6 +768,7 @@ export default function SprintsPage({ projectId }) {
               sx={{
                 display: 'flex',
                 flexWrap: 'wrap',
+                flexDirection: filtersFlexDirection,
                 alignItems: 'center',
                 gap: 1.25,
                 mb: 1.5,
@@ -988,7 +1008,7 @@ export default function SprintsPage({ projectId }) {
                   const task = selectedSprintTasks.find((t) => Number(t.id) === Number(row.id));
                   if (task) setSelectedTaskForDialog(task);
                 }}
-                scrollMaxHeight={420}
+                scrollMaxHeight={isMobile ? 380 : 420}
               />
             )}
           </Grid>

@@ -259,8 +259,8 @@ export default function ManagerChatbot({ projectId }) {
 
   return (
     <>
-      {/* Floating button */}
-      <Box sx={{ position: 'fixed', bottom: 28, right: 28, zIndex: 1300 }}>
+      {/* Floating button - posición adaptada para móvil */}
+      <Box sx={{ position: 'fixed', bottom: { xs: 76, sm: 28 }, right: 28, zIndex: 1300 }}>
         <AnimatePresence>
           {!open && (
             <motion.div
@@ -314,7 +314,7 @@ export default function ManagerChatbot({ projectId }) {
           )}
         </AnimatePresence>
 
-        {/* Chat window */}
+        {/* Chat window - responsive */}
         <AnimatePresence>
           {open && (
             <motion.div
@@ -326,9 +326,9 @@ export default function ManagerChatbot({ projectId }) {
             >
               <Box
                 sx={{
-                  width: 380,
-                  height: 560,
-                  borderRadius: '20px',
+                  width: { xs: 'calc(100vw - 56px)', sm: 380 },
+                  height: { xs: '75vh', sm: 560 },
+                  borderRadius: { xs: '16px 0 0 16px', sm: '20px' },
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',

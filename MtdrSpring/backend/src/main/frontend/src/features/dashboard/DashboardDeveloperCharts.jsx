@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Box, Paper, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import {
   BarChart,
   Bar,
@@ -1465,6 +1466,8 @@ export default function DashboardDeveloperCharts({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
+  const yAxisWidth = isMobile ? 120 : 168;
 
   const orderedSelectedSprints = useMemo(
     () => [...(selectedSprints || [])].sort((a, b) => sprintDbIdSortKey(a) - sprintDbIdSortKey(b)),
@@ -1521,58 +1524,57 @@ export default function DashboardDeveloperCharts({
   const axisTickStyle = useMemo(
     () => ({
       ...CHART_TICK(isDark),
-      fontSize: singleDeveloperFocus ? 10 : 13,
+      fontSize: singleDeveloperFocus ? (isMobile ? 9 : 10) : (isMobile ? 11 : 13),
       fontWeight: singleDeveloperFocus ? 500 : 600,
     }),
-    [isDark, singleDeveloperFocus],
+    [isDark, singleDeveloperFocus, isMobile],
   );
 
   const axisTitleStyle = useMemo(
     () =>
-      singleDeveloperFocus ? { fontSize: 11, fontWeight: 700 } : { ...CHART_AXIS_LABEL },
-    [singleDeveloperFocus],
+      singleDeveloperFocus ? { fontSize: isMobile ? 9 : 11, fontWeight: 700 } : { ...CHART_AXIS_LABEL },
+    [singleDeveloperFocus, isMobile],
   );
 
   const developerNameAxisTickStyle = useMemo(
     () => ({
       ...axisTickStyle,
-      fontSize: singleDeveloperFocus ? 15 : axisTickStyle.fontSize,
+      fontSize: singleDeveloperFocus ? (isMobile ? 12 : 15) : axisTickStyle.fontSize,
       fontWeight: singleDeveloperFocus ? 700 : axisTickStyle.fontWeight,
     }),
-    [axisTickStyle, singleDeveloperFocus],
+    [axisTickStyle, singleDeveloperFocus, isMobile],
   );
 
-  /** Compare mode + one developer: developer name on the X axis (tasks / hours charts). */
   const compareDeveloperNameTickStyle = useMemo(
     () => ({
       ...CHART_TICK(isDark),
-      fontSize: singleDevMultiSprintCompare ? 14 : axisTickStyle.fontSize,
+      fontSize: singleDevMultiSprintCompare ? (isMobile ? 11 : 14) : axisTickStyle.fontSize,
       fontWeight: singleDevMultiSprintCompare ? 700 : axisTickStyle.fontWeight,
     }),
-    [isDark, singleDevMultiSprintCompare, axisTickStyle],
+    [isDark, singleDevMultiSprintCompare, axisTickStyle, isMobile],
   );
 
   const compareDeveloperAxisTitleStyle = useMemo(
     () =>
       singleDevMultiSprintCompare
-        ? { fontSize: 13, fontWeight: 700 }
+        ? { fontSize: isMobile ? 10 : 13, fontWeight: 700 }
         : axisTitleStyle,
-    [singleDevMultiSprintCompare, axisTitleStyle],
+    [singleDevMultiSprintCompare, axisTitleStyle, isMobile],
   );
 
   const compareDeveloperAxisLabelProps = useMemo(
     () =>
       singleDevMultiSprintCompare
-        ? { position: 'bottom', offset: 14 }
+        ? { position: 'bottom', offset: isMobile ? 10 : 14 }
         : { position: 'insideBottom', offset: -4 },
-    [singleDevMultiSprintCompare],
+    [singleDevMultiSprintCompare, isMobile],
   );
 
-  const developerNameAxisWidth = singleDeveloperFocus ? 148 : 168;
+  const developerNameAxisWidth = singleDeveloperFocus ? (isMobile ? 120 : 148) : (isMobile ? 130 : 168);
 
-  const barValueLabelSize = singleDeveloperFocus ? 10 : 12;
-  const productivityTrendValueLabelSize = singleDeveloperFocus ? 15 : 12;
-  const stackValueLabelSize = singleDeveloperFocus ? 11 : 14;
+  const barValueLabelSize = singleDeveloperFocus ? (isMobile ? 8 : 10) : (isMobile ? 9 : 12);
+  const productivityTrendValueLabelSize = singleDeveloperFocus ? (isMobile ? 10 : 15) : (isMobile ? 10 : 12);
+  const stackValueLabelSize = singleDeveloperFocus ? (isMobile ? 9 : 11) : (isMobile ? 10 : 14);
 
   const axisFocusOpts = useMemo(
     () => ({ focusSingleDeveloper: singleDeveloperFocus }),
@@ -1591,9 +1593,9 @@ export default function DashboardDeveloperCharts({
         tick: {
           ...axisTickStyle,
           fill,
-          fontSize: singleDeveloperFocus ? 8 : axisTickStyle.fontSize,
+          fontSize: singleDeveloperFocus ? (isMobile ? 7 : 8) : axisTickStyle.fontSize,
         },
-        tickMargin: singleDeveloperFocus ? 4 : 8,
+        tickMargin: singleDeveloperFocus ? (isMobile ? 2 : 4) : (isMobile ? 4 : 8),
       };
       if (width != null) props.width = width;
       if (label) {
@@ -1608,7 +1610,7 @@ export default function DashboardDeveloperCharts({
       }
       return props;
     },
-    [axisTickStyle, axisTitleStyle, isDark, singleDeveloperFocus],
+    [axisTickStyle, axisTitleStyle, isDark, singleDeveloperFocus, isMobile],
   );
 
   const selectedDeveloperUserId = useMemo(() => {
@@ -2092,7 +2094,7 @@ export default function DashboardDeveloperCharts({
     );
     const compareBarRadius = [6, 6, 0, 0];
     const sprintXTickFontSize =
-      nSprints > 7 ? 9 : nSprints > 5 ? 10 : emphasizedSprintLegendLabels ? 14 : 12;
+      nSprints > 7 ? (isMobile ? 7 : 9) : nSprints > 5 ? (isMobile ? 8 : 10) : emphasizedSprintLegendLabels ? (isMobile ? 10 : 14) : (isMobile ? 9 : 12);
     const renderCompareSprintXTick = (props) => {
       const { x, y, payload } = props;
       const row = sprintWorkloadRowsWithTotals.find((d) => d.shortLabel === payload.value);
@@ -2168,6 +2170,9 @@ export default function DashboardDeveloperCharts({
       ? 'Hours worked by sprint'
       : 'Hours worked by developer';
 
+    const yAxisWorkloadWidth = singleDeveloperFocus ? (isMobile ? 38 : 52) : (isMobile ? 48 : 52);
+    const yAxisHoursWidth = singleDeveloperFocus ? (isMobile ? 38 : 52) : (isMobile ? 50 : 56);
+
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', minWidth: 0 }}>
         <Box sx={tasksHoursChartsWrapperSx}>
@@ -2226,7 +2231,7 @@ export default function DashboardDeveloperCharts({
             />
             <YAxis
               {...numericValueAxisProps(compareWorkloadTaskAxis, {
-                width: singleDeveloperFocus ? 38 : 52,
+                width: yAxisWorkloadWidth,
                 label: 'Tasks',
                 labelAngle: -90,
                 labelPosition: 'insideLeft',
@@ -2464,7 +2469,7 @@ export default function DashboardDeveloperCharts({
             />
             <YAxis
               {...numericValueAxisProps(compareHoursAxis, {
-                width: singleDeveloperFocus ? 38 : 56,
+                width: yAxisHoursWidth,
                 label: Y_AXIS_HOURS,
                 labelAngle: -90,
                 labelPosition: 'insideLeft',
@@ -2728,6 +2733,9 @@ export default function DashboardDeveloperCharts({
   const singleTasksHoursWrapperSx = singleDeveloperFocus
     ? tasksHoursPairGridSx
     : { display: 'flex', flexDirection: 'column', gap: 3, width: '100%', minWidth: 0 };
+    
+  const comboChartMarginRight = isMobile ? 22 : 22;
+  const yAxisSingleWidth = isMobile ? 120 : 148;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: singleDeveloperFocus ? 2 : 3, width: '100%', minWidth: 0 }}>
@@ -2759,7 +2767,7 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={developerNameAxisWidth}
+            width={yAxisSingleWidth}
             tick={{ ...developerNameAxisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
@@ -2877,7 +2885,7 @@ export default function DashboardDeveloperCharts({
           <YAxis
             type="category"
             dataKey="name"
-            width={developerNameAxisWidth}
+            width={yAxisSingleWidth}
             tick={{ ...developerNameAxisTickStyle, fill: isDark ? '#9A9A9A' : '#1A1A1A' }}
             tickMargin={8}
             interval={0}
@@ -2952,7 +2960,7 @@ export default function DashboardDeveloperCharts({
         accent="#7E57C2"
         tint={isDark ? 'rgba(126, 87, 194, 0.12)' : 'rgba(126, 87, 194, 0.08)'}
       >
-        <ComposedChart data={forCombo} margin={{ top: 12, right: 22, left: 10, bottom: 82 }}>
+        <ComposedChart data={forCombo} margin={{ top: 12, right: comboChartMarginRight, left: 10, bottom: 82 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis
             dataKey="shortName"
