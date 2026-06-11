@@ -97,6 +97,27 @@ class com.springboot.MyTodoList.config.StaticResourceCacheConfig {
 }
 
 
+class com.springboot.MyTodoList.config.TaskSchemaMigrationInitializer {
+	{field} {static} -UNCONSTRAINED_NUMBER : String
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{method} +applyTaskSchemaMigrations () : void
+	{method} -columnExists ( tableName : String , columnName : String ) : boolean
+	{method} -columnMeta ( tableName : String , columnName : String ) : java.util.Map
+	{method}  {static} ~fractionalScale ( meta : java.util.Map ) : int
+	{method}  {static} ~isFloatingPointType ( meta : java.util.Map ) : boolean
+	{method}  {static} -isOra01440 ( ex : Throwable ) : boolean
+	{method}  {static} ~needsAssignedHoursWidening ( assigned : java.util.Map , worked : java.util.Map ) : boolean
+	{method}  {static} -normalizeType ( value : Object ) : String
+	{method}  {static} ~oracleColumnTypeSql ( meta : java.util.Map ) : String
+	{method}  {static} ~supportsFractionalHours ( meta : java.util.Map ) : boolean
+	{method}  {static} -toInteger ( value : Object ) : Integer
+	{method} -tryModifyAssignedHours ( typeSql : String ) : boolean
+	{method} -widenAssignedHoursForDecimalsIfNeeded () : void
+	{method}  {static} ~widenAssignedHoursTypeSql ( assigned : java.util.Map , worked : java.util.Map ) : String
+}
+
+
 class com.springboot.MyTodoList.config.VectorSearchProperties {
 	{field} +dimensions : int
 	{field} +indexTargetAccuracy : int

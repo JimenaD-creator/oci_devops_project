@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  useMediaQuery,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -71,6 +72,7 @@ import {
 export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   const effectiveProjectId = resolveActiveProjectId(projectId);
   const currentUserId = developerMode ? Number(currentUser?.id) : null;
@@ -947,8 +949,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     );
   }
 
+  // Responsive paddings
+  const headerPadding = isMobile ? 1.5 : 2;
+  const kanbanPadding = isMobile ? 1.5 : 2;
+
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%' }}>
+    <Box sx={{ maxWidth: 1200, width: '100%', px: { xs: 1, sm: 0 } }}>
       {loadError ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLoadError('')}>
           {loadError}
@@ -961,13 +967,13 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
         elevation={0}
-        sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
+        sx={{ p: headerPadding, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'flex-start' }, gap: { xs: 1.5, sm: 0 } }}>
           <Box>
             <Typography
               variant="h4"
-              sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}
+              sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px', fontSize: { xs: '1.5rem', sm: '2rem' } }}
             >
               Kanban Board
             </Typography>
@@ -979,9 +985,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           </Box>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            spacing={1.25}
+            spacing={isMobile ? 1 : 1.25}
             alignItems={{ xs: 'stretch', sm: 'center' }}
-            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' }, mt: { xs: 1, sm: 0 } }}
           >
             <FormControl
               size="small"
@@ -1053,6 +1059,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   textTransform: 'none',
                   fontWeight: 700,
                   minHeight: 40,
+                  width: { xs: '100%', sm: 'auto' },
                   '&:hover': { bgcolor: '#A83B2D' },
                 }}
               >
@@ -1072,7 +1079,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
           elevation={0}
           sx={{
-            p: 1.5,
+            p: isMobile ? 1.25 : 1.5,
             mb: 1.25,
             borderRadius: 3,
             border: `1px solid ${borderColor}`,
@@ -1080,12 +1087,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           }}
         >
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-            <FilterListIcon sx={{ fontSize: 21, color: ORACLE_RED }} />
-            <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1rem' }}>
+            <FilterListIcon sx={{ fontSize: isMobile ? 18 : 21, color: ORACLE_RED }} />
+            <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: isMobile ? '0.9rem' : '1rem' }}>
               Filter tasks
             </Typography>
           </Stack>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'flex-end' }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: 1.25, alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
             <FormControl
               size="small"
               sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
@@ -1172,7 +1179,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             <Chip
               label={`${filteredItems.length} shown`}
               size="small"
-              sx={{ bgcolor: chipBg, fontWeight: 700, height: 22 }}
+              sx={{ bgcolor: chipBg, fontWeight: 700, height: 22, alignSelf: { xs: 'flex-start', sm: 'center' } }}
             />
           </Box>
         </Paper>
@@ -1185,12 +1192,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
         container
-        spacing={3}
+        spacing={isMobile ? 2 : 3}
       >
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
             <Box sx={{ width: 10, height: 10, bgcolor: ORACLE_RED, borderRadius: '50%' }} />
-            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: isMobile ? '1rem' : '1.2rem', color: 'text.primary' }}>
               {developerMode ? 'Kanban Board' : 'Tasks'}
             </Typography>
             <Chip
@@ -1202,7 +1209,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           <Paper
             elevation={0}
             sx={{
-              p: 2,
+              p: kanbanPadding,
               mb: 3,
               borderRadius: 3,
               border: `1px solid ${borderColor}`,
@@ -1252,9 +1259,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         onClose={() => setMultiDoneTaskId(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper' } }}
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper', margin: { xs: 1, sm: 'auto' } } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'text.primary' }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: isMobile ? '1rem' : '1.1rem', color: 'text.primary' }}>
           Complete each assignment
         </DialogTitle>
         <DialogContent>
@@ -1304,7 +1311,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                             size="small"
                             variant="outlined"
                             onClick={() => markAssigneeDone(multiDoneTaskId, ut)}
-                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                            sx={{ textTransform: 'none', fontWeight: 600, width: { xs: '100%', sm: 'auto' } }}
                           >
                             Mark complete
                           </Button>
@@ -1315,7 +1322,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               : null}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 2.5, pb: 2 }}>
+        <DialogActions sx={{ px: isMobile ? 2 : 2.5, pb: 2 }}>
           <Button
             onClick={() => setMultiDoneTaskId(null)}
             sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}
