@@ -58,6 +58,15 @@ class com.springboot.MyTodoList.config.OracleConfiguration {
 }
 
 
+class com.springboot.MyTodoList.config.ProjectTaskEventSchemaInitializer {
+	{field} -jdbcTemplate : org.springframework.jdbc.core.JdbcTemplate
+	{field} {static} -log : org.slf4j.Logger
+	{method} +ensureTable () : void
+	{method}  {static} -isAlreadyExists ( e : Exception ) : boolean
+	{method} -tableExists () : boolean
+}
+
+
 class com.springboot.MyTodoList.config.SpaWebConfig {
 	{method} #doFilterInternal ( request : jakarta.servlet.http.HttpServletRequest , response : jakarta.servlet.http.HttpServletResponse , filterChain : jakarta.servlet.FilterChain ) : void
 	{method}  {static} -shouldNotForward ( uri : String ) : boolean
