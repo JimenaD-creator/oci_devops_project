@@ -1,6 +1,6 @@
-<testsuites id="" name="" tests="22" failures="0" skipped="0" errors="0" time="218.703867">
-<testsuite name="tests\setup\manager.auth.setup.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="setup-manager" tests="1" failures="0" skipped="0" time="5.185" errors="0">
-<testcase name="authenticate as manager" classname="tests\setup\manager.auth.setup.ts" time="5.185">
+<testsuites id="" name="" tests="22" failures="0" skipped="0" errors="0" time="419.667461">
+<testsuite name="tests\setup\manager.auth.setup.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="setup-manager" tests="1" failures="0" skipped="0" time="4.219" errors="0">
+<testcase name="authenticate as manager" classname="tests\setup\manager.auth.setup.ts" time="4.219">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\manager.auth.setup.ts-authenticate-as-manager-setup-manager\video.webm]]
@@ -8,36 +8,36 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\suites\02-manager.spec.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="manager" tests="5" failures="0" skipped="0" time="23.505" errors="0">
-<testcase name="Suite 2: Manager › views dashboard and opens KPI Analytics @smoke" classname="tests\suites\02-manager.spec.ts" time="4.544">
+<testsuite name="tests\suites\02-manager.spec.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="manager" tests="5" failures="0" skipped="0" time="83.159" errors="0">
+<testcase name="Suite 2: Manager › views dashboard and opens KPI Analytics @smoke" classname="tests\suites\02-manager.spec.ts" time="15.657">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\02-manager-Suite-2-Manager-4109f-d-opens-KPI-Analytics-smoke-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 2: Manager › filters dashboard analytics by developer" classname="tests\suites\02-manager.spec.ts" time="5.789">
+<testcase name="Suite 2: Manager › filters dashboard analytics by developer" classname="tests\suites\02-manager.spec.ts" time="17.614">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\02-manager-Suite-2-Manager-6abbd-oard-analytics-by-developer-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 2: Manager › views dashboard scorecards and completion metrics" classname="tests\suites\02-manager.spec.ts" time="3.783">
+<testcase name="Suite 2: Manager › views dashboard scorecards and completion metrics" classname="tests\suites\02-manager.spec.ts" time="15.237">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\02-manager-Suite-2-Manager-475c9-ards-and-completion-metrics-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 2: Manager › explores AI Insights" classname="tests\suites\02-manager.spec.ts" time="4.17">
+<testcase name="Suite 2: Manager › explores AI Insights" classname="tests\suites\02-manager.spec.ts" time="16.849">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\02-manager-Suite-2-Manager-explores-AI-Insights-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 2: Manager › opens Tasks and Kanban board" classname="tests\suites\02-manager.spec.ts" time="5.219">
+<testcase name="Suite 2: Manager › opens Tasks and Kanban board" classname="tests\suites\02-manager.spec.ts" time="17.802">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\02-manager-Suite-2-Manager-opens-Tasks-and-Kanban-board-manager\video.webm]]
@@ -45,29 +45,29 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\suites\03-tasks.spec.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="manager" tests="4" failures="0" skipped="0" time="80.793" errors="0">
-<testcase name="Suite 3: Tasks › creates three tasks with full information @smoke" classname="tests\suites\03-tasks.spec.ts" time="42.885">
+<testsuite name="tests\suites\03-tasks.spec.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="manager" tests="4" failures="0" skipped="0" time="129.483" errors="0">
+<testcase name="Suite 3: Tasks › creates three tasks with full information @smoke" classname="tests\suites\03-tasks.spec.ts" time="54.605">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\03-tasks-Suite-3-Tasks-cre-491ad-with-full-information-smoke-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 3: Tasks › creates task assigned to developer for Kanban" classname="tests\suites\03-tasks.spec.ts" time="15.101">
+<testcase name="Suite 3: Tasks › creates task assigned to developer for Kanban" classname="tests\suites\03-tasks.spec.ts" time="27.032">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\03-tasks-Suite-3-Tasks-cre-da6ea-ned-to-developer-for-Kanban-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 3: Tasks › manager filters completed tasks by Done status" classname="tests\suites\03-tasks.spec.ts" time="6.751">
+<testcase name="Suite 3: Tasks › manager filters completed tasks by Done status" classname="tests\suites\03-tasks.spec.ts" time="19.761">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\03-tasks-Suite-3-Tasks-man-55fca-pleted-tasks-by-Done-status-manager\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 3: Tasks › manager deletes a task" classname="tests\suites\03-tasks.spec.ts" time="16.056">
+<testcase name="Suite 3: Tasks › manager deletes a task" classname="tests\suites\03-tasks.spec.ts" time="28.085">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\03-tasks-Suite-3-Tasks-manager-deletes-a-task-manager\video.webm]]
@@ -75,8 +75,8 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\setup\developer.auth.setup.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="setup-developer" tests="1" failures="0" skipped="0" time="3.66" errors="0">
-<testcase name="authenticate as developer" classname="tests\setup\developer.auth.setup.ts" time="3.66">
+<testsuite name="tests\setup\developer.auth.setup.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="setup-developer" tests="1" failures="0" skipped="0" time="4.69" errors="0">
+<testcase name="authenticate as developer" classname="tests\setup\developer.auth.setup.ts" time="4.69">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\developer.auth.setup.ts-authenticate-as-developer-setup-developer\video.webm]]
@@ -84,8 +84,8 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\suites\01-auth.spec.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="auth" tests="2" failures="0" skipped="0" time="27.255" errors="0">
-<testcase name="Suite 1: Authentication › login — invalid credentials shows error @smoke" classname="tests\suites\01-auth.spec.ts" time="13.784">
+<testsuite name="tests\suites\01-auth.spec.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="auth" tests="2" failures="0" skipped="0" time="48.031" errors="0">
+<testcase name="Suite 1: Authentication › login — invalid credentials shows error @smoke" classname="tests\suites\01-auth.spec.ts" time="13.982">
 <properties>
 <property name="slow" value="">
 </property>
@@ -100,7 +100,7 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 1: Authentication › login — valid manager reaches dashboard @smoke" classname="tests\suites\01-auth.spec.ts" time="13.471">
+<testcase name="Suite 1: Authentication › login — valid manager reaches dashboard @smoke" classname="tests\suites\01-auth.spec.ts" time="34.049">
 <properties>
 <property name="slow" value="">
 </property>
@@ -114,36 +114,36 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\suites\05-mock-api.spec.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="mock-api" tests="5" failures="0" skipped="0" time="28.139" errors="0">
-<testcase name="Suite 5: Mock API › rejects invalid login via page.route @mock" classname="tests\suites\05-mock-api.spec.ts" time="5.568">
+<testsuite name="tests\suites\05-mock-api.spec.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="mock-api" tests="5" failures="0" skipped="0" time="30.317" errors="0">
+<testcase name="Suite 5: Mock API › rejects invalid login via page.route @mock" classname="tests\suites\05-mock-api.spec.ts" time="5.41">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\05-mock-api-Suite-5-Mock-A-916db-d-login-via-page-route-mock-mock-api\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 5: Mock API › rejects invalid login via mock helper @mock" classname="tests\suites\05-mock-api.spec.ts" time="5.321">
+<testcase name="Suite 5: Mock API › rejects invalid login via mock helper @mock" classname="tests\suites\05-mock-api.spec.ts" time="6.029">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\05-mock-api-Suite-5-Mock-A-212cf--login-via-mock-helper-mock-mock-api\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 5: Mock API › logs in with mocks @mock" classname="tests\suites\05-mock-api.spec.ts" time="6.022">
+<testcase name="Suite 5: Mock API › logs in with mocks @mock" classname="tests\suites\05-mock-api.spec.ts" time="6.669">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\05-mock-api-Suite-5-Mock-API-logs-in-with-mocks-mock-mock-api\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 5: Mock API › replays failed login from HAR @mock" classname="tests\suites\05-mock-api.spec.ts" time="5.144">
+<testcase name="Suite 5: Mock API › replays failed login from HAR @mock" classname="tests\suites\05-mock-api.spec.ts" time="5.393">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\05-mock-api-Suite-5-Mock-A-bc1f7--failed-login-from-HAR-mock-mock-api\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 5: Mock API › logs in with full manager session from HAR @mock" classname="tests\suites\05-mock-api.spec.ts" time="6.084">
+<testcase name="Suite 5: Mock API › logs in with full manager session from HAR @mock" classname="tests\suites\05-mock-api.spec.ts" time="6.816">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\05-mock-api-Suite-5-Mock-A-5bb88-nager-session-from-HAR-mock-mock-api\video.webm]]
@@ -151,22 +151,22 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="tests\suites\04-developer.spec.ts" timestamp="2026-06-08T17:27:49.137Z" hostname="developer" tests="4" failures="0" skipped="0" time="43.265" errors="0">
-<testcase name="Suite 4: Developer › verifies assigned task metrics @smoke" classname="tests\suites\04-developer.spec.ts" time="4.584">
+<testsuite name="tests\suites\04-developer.spec.ts" timestamp="2026-06-12T19:40:19.363Z" hostname="developer" tests="4" failures="0" skipped="0" time="111.345" errors="0">
+<testcase name="Suite 4: Developer › verifies assigned task metrics @smoke" classname="tests\suites\04-developer.spec.ts" time="16.588">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\04-developer-Suite-4-Devel-8c7c3-assigned-task-metrics-smoke-developer\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 4: Developer › shows table rows when tasks are assigned" classname="tests\suites\04-developer.spec.ts" time="4.36">
+<testcase name="Suite 4: Developer › shows table rows when tasks are assigned" classname="tests\suites\04-developer.spec.ts" time="16.188">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\04-developer-Suite-4-Devel-4ce66-ows-when-tasks-are-assigned-developer\video.webm]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 4: Developer › marks a task as completed in Kanban" classname="tests\suites\04-developer.spec.ts" time="18.644">
+<testcase name="Suite 4: Developer › marks a task as completed in Kanban" classname="tests\suites\04-developer.spec.ts" time="61.148">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\04-developer-Suite-4-Devel-8e611-task-as-completed-in-Kanban-developer\attachments\kanban-task-in-done-png-9961483ed23711fdcf6858ff9b2f95d7854ebcbd.png]]
@@ -177,7 +177,7 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="Suite 4: Developer › opens My Performance" classname="tests\suites\04-developer.spec.ts" time="15.677">
+<testcase name="Suite 4: Developer › opens My Performance" classname="tests\suites\04-developer.spec.ts" time="17.421">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|test-results\04-developer-Suite-4-Developer-opens-My-Performance-developer\video.webm]]

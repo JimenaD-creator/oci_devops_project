@@ -19,7 +19,7 @@ export const ROUTES = {
 export const USERS: Record<string, User> = {
   MANAGER: {
     username: '4494467983',
-    password: 'hola',
+    password: 'manager2026',
     role: 'manager',
   },
   DEVELOPER: {

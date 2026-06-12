@@ -294,7 +294,7 @@ export type HarMockOptions = {
   url?: string;
   /** When true, records network traffic into the HAR instead of replaying */
   update?: boolean;
-  /** What to do when no HAR entry matches — use 'abort' to guarantee no real API */
+  /** 'Abort' to guarantee no real API */
   notFound?: 'abort' | 'fallback';
 };
 
@@ -304,8 +304,7 @@ export function resolveHarPath(harFile: string): string {
 }
 
 /**
- * Generic HAR replay helper (Playwright routeFromHAR).
- * @see https://playwright.dev/docs/mock#mocking-with-har-files
+ * Generic HAR replay helper.
  */
 export async function mockFromHar(page: Page, options: HarMockOptions = {}): Promise<void> {
   const harFile = options.harFile ?? HAR_FILES.loginSuccess;
@@ -330,10 +329,11 @@ export async function mockLoginFromHar(
 
 /** Replays POST /api/auth/login from auth-login-failed.har (401 response). */
 export async function mockLoginFailedFromHar(page: Page): Promise<void> {
+  await mockLoginUnauthorized(page);
   await mockFromHar(page, {
     harFile: HAR_FILES.loginFailed,
     url: `**${API_ENDPOINTS.LOGIN}`,
-    notFound: 'abort',
+    notFound: 'fallback',
   });
 }
 
@@ -344,16 +344,20 @@ export async function mockLoginFailedFromHar(page: Page): Promise<void> {
  */
 export async function mockManagerSessionFromHar(page: Page): Promise<void> {
   await mockUnhandledApi(page);
+  await mockLoginSuccess(page, MOCK_MANAGER_LOGIN);
+  await mockManagerProjects(page);
+  await mockDashboardBundle(page);
+  await mockProjectEvents(page);
+  await mockSprints(page);
+  await mockTasks(page);
+  await mockProjectDevelopers(page);
+  await mockUserTasks(page);
+  await mockTaskById(page);
   await mockFromHar(page, {
     harFile: HAR_FILES.managerSession,
     url: '**/api/**',
     notFound: 'fallback',
   });
-
-  // Fallback mocks for endpoints not captured in the HAR file
-  await mockProjectDevelopers(page);
-  await mockUserTasks(page);
-  await mockTaskById(page);
 }
 
 /** Records live API traffic into a HAR file */
