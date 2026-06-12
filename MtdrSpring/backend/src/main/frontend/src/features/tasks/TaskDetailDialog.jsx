@@ -48,8 +48,11 @@ import {
   putTask,
 } from './taskDetailApi';
 import {
+  buildSprintNumberMap,
   formatDate,
+  formatSprintLabel,
   resolveProjectIdForDevelopers,
+  sortSprintsByStartDate,
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
@@ -409,11 +412,8 @@ export function TaskDetailDialog({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [taskUserTasks, setTaskUserTasks] = useState([]);
 
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+  const sortedSprints = useMemo(() => sortSprintsByStartDate(sprints), [sprints]);
   const resolvedDeveloperProjectId = useMemo(() => {
     const source =
       task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
@@ -993,7 +993,8 @@ export function TaskDetailDialog({
                   <FieldLabel color="#5C6BC0">Sprint</FieldLabel>
                   <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
                     {task.assignedSprint?.id != null
-                      ? `Sprint ${sprintNumberMap.get(task.assignedSprint.id) ?? task.assignedSprint.id}`
+                      ? formatSprintLabel(sprintNumberMap, task.assignedSprint.id) ||
+                        `Sprint ${task.assignedSprint.id}`
                       : '—'}
                   </Typography>
                 </Box>
@@ -1335,9 +1336,9 @@ export function TaskDetailDialog({
                       onChange={(e) => setSprintId(e.target.value)}
                       label="Sprint"
                     >
-                      {sprints.map((s) => (
+                      {sortedSprints.map((s) => (
                         <MenuItem key={s.id} value={String(s.id)}>
-                          {`Sprint ${sprintNumberMap.get(s.id) ?? s.id}`}
+                          {formatSprintLabel(sprintNumberMap, s.id) || `Sprint ${s.id}`}
                         </MenuItem>
                       ))}
                     </Select>

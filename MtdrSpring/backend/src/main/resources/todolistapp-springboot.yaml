@@ -86,6 +86,24 @@ spec:
               value: "%OCI_REGION%"
             - name: REALTIME_RELAY_ENABLED
               value: "true"
+            - name: TASK_ASSIGNMENT_EMAIL_ENABLED
+              value: "true"
+            - name: SPRING_MAIL_HOST
+              value: "smtp.gmail.com"
+            - name: SPRING_MAIL_PORT
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-mail-secret
+                  key: username
+                  optional: true
+            - name: SPRING_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-mail-secret
+                  key: password
+                  optional: true
           volumeMounts:
             - name: creds
               mountPath: /mtdrworkshop/creds

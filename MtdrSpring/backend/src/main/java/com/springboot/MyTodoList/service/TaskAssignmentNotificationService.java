@@ -3,6 +3,7 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.Sprint;
 import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.User;
+import com.springboot.MyTodoList.repository.SprintRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.security.SecurityUtils;
@@ -14,8 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Sends email when developers are assigned to a task.
@@ -35,7 +38,14 @@ public class TaskAssignmentNotificationService {
     private TaskRepository taskRepository;
 
     @Autowired
+    private SprintRepository sprintRepository;
+
+    @Autowired
     private PendingTelegramAssignmentNoticeService pendingTelegramAssignmentNoticeService;
+
+    @Autowired
+    @Lazy
+    private TaskAssignmentNotificationService self;
 
     @Value("${app.notifications.task-assignment.enabled:true}")
     private boolean enabled;
@@ -46,10 +56,15 @@ public class TaskAssignmentNotificationService {
         }
         Set<Long> distinct = distinctPositiveIds(assigneeUserIds);
         if (distinct.isEmpty()) {
+            logger.info("Skipping assignment notifications for task {}: no assigneeUserIds", task.getId());
             return;
         }
         String assignedBy = resolveAssignerDisplayName();
-        notifyAssigneesAsync(task, distinct, assignedBy);
+        logger.info(
+                "Queueing assignment notifications for task {} to {} assignee(s)",
+                task.getId(),
+                distinct.size());
+        self.dispatchAssigneeNotifications(task.getId(), distinct, assignedBy);
     }
 
     /** Notifies only developers newly added when editing assignees on an existing task. */
@@ -62,22 +77,22 @@ public class TaskAssignmentNotificationService {
             return;
         }
         String assignedBy = resolveAssignerDisplayName();
-        notifyNewAssigneesAsync(taskId, distinct, assignedBy);
+        logger.info(
+                "Queueing reassignment notifications for task {} to {} new assignee(s)",
+                taskId,
+                distinct.size());
+        self.dispatchAssigneeNotifications(taskId, distinct, assignedBy);
     }
 
     @Async
-    public void notifyAssigneesAsync(Task task, Set<Long> assigneeUserIds, String assignedBy) {
-        notifyAssignees(task, assigneeUserIds, assignedBy);
-    }
-
-    @Async
-    public void notifyNewAssigneesAsync(Long taskId, Set<Long> newAssigneeUserIds, String assignedBy) {
+    @Transactional(readOnly = true)
+    public void dispatchAssigneeNotifications(Long taskId, Set<Long> assigneeUserIds, String assignedBy) {
         Optional<Task> taskOpt = taskRepository.findById(taskId);
         if (taskOpt.isEmpty()) {
-            logger.warn("Skipping reassignment emails: task {} not found", taskId);
+            logger.warn("Skipping assignment notifications: task {} not found", taskId);
             return;
         }
-        notifyAssignees(taskOpt.get(), newAssigneeUserIds, assignedBy);
+        notifyAssignees(taskOpt.get(), assigneeUserIds, assignedBy);
     }
 
     private boolean notificationsActive() {
@@ -93,7 +108,7 @@ public class TaskAssignmentNotificationService {
         String priority = task.getPriority() != null && !task.getPriority().isBlank()
                 ? task.getPriority().trim()
                 : null;
-        String sprintLabel = formatSprintLabel(task.getAssignedSprint());
+        String sprintLabel = formatSprintLabel(task);
 
         for (Long userId : assigneeUserIds) {
             try {
@@ -165,18 +180,21 @@ public class TaskAssignmentNotificationService {
                 .orElse("Your manager");
     }
 
-    private static String formatSprintLabel(Sprint sprint) {
-        if (sprint == null || sprint.getId() == null) {
+    private String formatSprintLabel(Task task) {
+        if (task == null || task.getAssignedSprint() == null || task.getAssignedSprint().getId() == null) {
             return null;
         }
-        if (sprint.getGoal() != null && !sprint.getGoal().isBlank()) {
-            String goal = sprint.getGoal().trim();
-            if (goal.length() > 80) {
-                goal = goal.substring(0, 77) + "...";
+        Long sprintId = task.getAssignedSprint().getId();
+        Long projectId = taskRepository.findProjectIdByTaskId(task.getId()).orElse(null);
+        if (projectId != null) {
+            List<Sprint> ordered = sprintRepository.findByAssignedProjectIdOrderByStartDateAsc(projectId);
+            for (int i = 0; i < ordered.size(); i++) {
+                if (sprintId.equals(ordered.get(i).getId())) {
+                    return "Sprint " + i;
+                }
             }
-            return "Sprint #" + sprint.getId() + " — " + goal;
         }
-        return "Sprint #" + sprint.getId();
+        return "Sprint " + sprintId;
     }
 
     private static boolean isValidEmail(String email) {
