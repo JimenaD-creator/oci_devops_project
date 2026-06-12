@@ -97,6 +97,7 @@ interface com.springboot.MyTodoList.repository.UserSprintRepository {
 
 
 interface com.springboot.MyTodoList.repository.UserTaskRepository {
+	{method}  {abstract} +countAssigneesGroupedByTaskId ( taskIds : java.util.Collection ) : java.util.List
 	{method}  {abstract} +findAllWithUserAndTask () : java.util.List
 	{method}  {abstract} +findAssignmentsDueBefore ( windowEnd : java.time.LocalDateTime ) : java.util.List
 	{method}  {abstract} +findBlockerReportsByUserIdAndProjectId ( userId : Long , projectId : Long ) : java.util.List

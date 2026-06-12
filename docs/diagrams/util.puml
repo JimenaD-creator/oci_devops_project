@@ -254,7 +254,9 @@ class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil {
 	{field} {static} -MECHANICAL_EXECUTIVE_TRENDS : java.util.regex.Pattern
 	{field} {static} -ON_TIME_CONTEXT : java.util.regex.Pattern
 	{field} {static} -ON_TIME_DECLINE_CLAIM : java.util.regex.Pattern
+	{field} {static} -ON_TIME_DELIVERY_PROBLEM_CLAIM : java.util.regex.Pattern
 	{field} {static} -ON_TIME_IMPROVEMENT_PERCENT : java.util.regex.Pattern
+	{field} {static} -ON_TIME_PERFECT_BAND_PERCENT : int
 	{field} {static} -ON_TIME_PRIMARY_CONCERN_CLAUSE : java.util.regex.Pattern
 	{field} {static} -ON_TIME_STRONG_PERCENT : int
 	{field} {static} -ON_TIME_TIGHT_PATTERNS : [Ljava.util.regex.Pattern;
@@ -288,6 +290,7 @@ class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil {
 	{method}  {static} +buildStructuredTeamChangeSummary ( previousLabel : String , currentLabel : String , prevCompletion : int , prevOnTime : int , prevParticipation : int , prevWorkload : int , prevProductivity : int , curCompletion : int , curOnTime : int , curParticipation : int , curWorkload : int , curProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , deltaProductivity : int , teamWorkloadNote : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
 	{method}  {static} -capitalizeFirst ( text : String ) : String
 	{method}  {static} -capitalizeSentenceStarts ( text : String ) : String
+	{method}  {static} +completionRateAlertSeverityForEndedSprint ( completionRate : int ) : String
 	{method}  {static} +condenseExecutiveTrends ( text : String ) : String
 	{method}  {static} +containsObviousMetricNumbers ( text : String ) : boolean
 	{method}  {static} -countTrendSentences ( text : String ) : int
@@ -324,6 +327,7 @@ class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil {
 	{method}  {static} +polishSprintChangeSummary ( text : String , live : java.util.Map ) : String
 	{method}  {static} +productivityForecastTrend ( liveProductivityScore : int , predictedScore : int ) : String
 	{method}  {static} +proseClaimsOnTimeDecline ( text : String ) : boolean
+	{method}  {static} +proseClaimsOnTimeDeliveryProblem ( text : String ) : boolean
 	{method}  {static} +qualitativeMovementPhrase ( label : String , deltaPoints : int ) : String
 	{method}  {static} +reconcileOnTimeDeliveryConcernProse ( text : String , onTimePercent : int ) : String
 	{method}  {static} +refineExecutiveTrends ( geminiTrends : String , immediatePreviousLabel : String , deltaProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
@@ -331,6 +335,9 @@ class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil {
 	{method}  {static} +resolveForecastPredictedScore ( liveProductivityScore : int , rawPredicted : int ) : int
 	{method}  {static} -rewriteOpenSprintSentence ( sentence : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
 	{method}  {static} +sanitizeTeamChangeSummary ( text : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +shouldDropOnTimeDeliveryAlertAtStrongScore ( kpi : String , message : String , liveOtd : int ) : boolean
+	{method}  {static} +shouldDropOnTimeEstimationRecommendation ( text : String , liveOtd : int ) : boolean
+	{method}  {static} +shouldElevateCompletionRateAlertForEndedSprint ( sprintPhase : String , completionRate : int ) : boolean
 	{method}  {static} +stripMetricNumbersFromTeamChangeSummary ( text : String ) : String
 	{method}  {static} -summarizePriorTrajectory ( label : String , priorMetrics : java.util.List , metricIndex : int , currentValue : int , deltaVsLastPrior : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , openContextEstablished : boolean , immediatePriorLabel : String ) : String
 	{method}  {static} -textAlreadyEstablishesOpenSprint ( text : String ) : boolean
@@ -497,9 +504,15 @@ class com.springboot.MyTodoList.util.UserRoleUtil {
 
 
 class com.springboot.MyTodoList.util.UserTaskOnTimeUtil {
+	{method}  {static} +assignmentTimingSnapshot ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : java.util.Map
+	{method}  {static} ~completionCalendarDay ( completedAt : java.time.LocalDateTime ) : java.time.LocalDate
+	{method}  {static} ~dueCalendarDay ( dueAt : java.time.LocalDateTime ) : java.time.LocalDate
+	{method}  {static} +enrichAssignmentTimingFields ( target : java.util.Map , ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : void
 	{method}  {static} +evaluateAssignmentOnTime ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : Boolean
+	{method}  {static} +evaluateDeliveryTiming ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : String
 	{method}  {static} +isAssignmentComplete ( ut : com.springboot.MyTodoList.model.UserTask ) : boolean
-	{method}  {static} -resolveCompletionTime ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : java.time.LocalDateTime
+	{method}  {static} +isCompletionOnOrBeforeDueDay ( completedAt : java.time.LocalDateTime , dueDate : java.time.LocalDateTime ) : boolean
+	{method}  {static} +resolveAssigneeCompletionTime ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : java.time.LocalDateTime
 }
 
 

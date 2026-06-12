@@ -33,6 +33,12 @@ class com.springboot.MyTodoList.config.DeepSeekConfig {
 }
 
 
+class com.springboot.MyTodoList.config.DisplayTimezone {
+	{field} {static} -zone : java.time.ZoneId
+	{method}  {static} +get () : java.time.ZoneId
+}
+
+
 class com.springboot.MyTodoList.config.DotEnvLoader {
 	{method}  {static} +loadIntoSystemProperties () : void
 	{method}  {static} -parseAndApply ( path : java.nio.file.Path ) : int
