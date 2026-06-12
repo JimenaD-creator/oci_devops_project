@@ -8,6 +8,7 @@ export class DashboardPage {
   readonly navKpiAnalytics: Locator;
   readonly navSprints: Locator;
   readonly developerFilter: Locator;
+  readonly allSprintsFilter: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -16,6 +17,7 @@ export class DashboardPage {
     this.navKpiAnalytics = page.getByRole('button', { name: UI.kpiAnalytics, exact: true });
     this.navSprints = page.getByRole('button', { name: 'Sprints', exact: true });
     this.developerFilter = page.locator(SELECTORS.dashboard.developerFilter);
+    this.allSprintsFilter = page.getByRole('checkbox', { name: 'All Sprints' });
   }
 
   static async open(page: Page): Promise<DashboardPage> {
@@ -58,13 +60,28 @@ export class DashboardPage {
     }
   }
 
-  async expectScorecardsVisible(): Promise<void> {
+  async selectAllSprints(): Promise<void> {
+    await expect(this.allSprintsFilter).toBeVisible({ timeout: TIMEOUTS.settle });
+    if (!(await this.allSprintsFilter.isChecked())) {
+      await this.allSprintsFilter.check();
+    }
+    await expect(this.allSprintsFilter).toBeChecked();
+  }
+
+  async expectScorecardsVisible(options?: { allSprints?: boolean }): Promise<void> {
     await expect(this.page.getByRole('heading', { name: 'Scorecards', exact: true })).toBeVisible();
     await expect(this.page.getByText('Tasks Completed').first()).toBeVisible();
     await expect(this.page.getByText('Total hours worked').first()).toBeVisible();
     await expect(this.page.getByText('Average tasks per developer').first()).toBeVisible();
     await expect(this.page.getByText('Average hours per developer').first()).toBeVisible();
     await expect(this.page.getByText('Completion Rate').first()).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Project status', exact: true })).toBeVisible();
+    if (options?.allSprints) {
+      await expect(this.allSprintsFilter).toBeChecked();
+      await expect(
+        this.page.getByRole('heading', { name: 'Multi-sprint comparison', exact: true }),
+      ).toBeVisible();
+    } else {
+      await expect(this.page.getByRole('heading', { name: 'Project status', exact: true })).toBeVisible();
+    }
   }
 }

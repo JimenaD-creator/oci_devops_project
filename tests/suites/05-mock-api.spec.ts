@@ -6,7 +6,6 @@ import { DashboardPage, LoginPage } from '../pages';
 import {
   mockAllForManager,
   mockLoginFailedFromHar,
-  mockLoginUnauthorized,
   mockManagerSessionFromHar,
 } from '../mocks/apiMocks';
 
@@ -31,13 +30,6 @@ test.describe('Suite 5: Mock API', { tag: TAGS.mock }, () => {
     await login.login(USERS.MANAGER);
     await login.expectInvalidCredentialsError();
     expect(intercepted).toBe(true);
-  });
-  test('rejects invalid login via mock helper @mock', async ({ page }) => {
-    await new LoginPage(page).clearSession();
-    await mockLoginUnauthorized(page);
-    const login = new LoginPage(page);
-    await login.loginWith(USERS.MANAGER);
-    await login.expectInvalidCredentialsError();
   });
   test('logs in with mocks @mock', async ({ page }) => {
     await new LoginPage(page).clearSession();

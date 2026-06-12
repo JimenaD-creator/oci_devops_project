@@ -169,12 +169,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4219,
+                  "duration": 5487,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-06-12T19:40:20.300Z",
+                  "startTime": "2026-06-12T20:48:42.422Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -229,12 +229,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 15657,
+                      "duration": 15404,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:41:52.995Z",
+                      "startTime": "2026-06-12T20:50:10.760Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -271,12 +271,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 17614,
+                      "duration": 17750,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:42:08.866Z",
+                      "startTime": "2026-06-12T20:50:26.340Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -296,7 +296,7 @@
               "column": 7
             },
             {
-              "title": "views dashboard scorecards and completion metrics",
+              "title": "views scorecards and completion metrics with all sprints filter",
               "ok": true,
               "tags": [
                 "manager"
@@ -313,18 +313,18 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 15237,
+                      "duration": 16748,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:42:26.506Z",
+                      "startTime": "2026-06-12T20:50:44.118Z",
                       "annotations": [],
                       "attachments": [
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-475c9-ards-and-completion-metrics-manager\\video.webm"
+                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\02-manager-Suite-2-Manager-7573d-ics-with-all-sprints-filter-manager\\video.webm"
                         }
                       ]
                     }
@@ -332,7 +332,7 @@
                   "status": "expected"
                 }
               ],
-              "id": "b663833bd2617a2efa18-8fcfd37463c757f8a7a9",
+              "id": "b663833bd2617a2efa18-84a6908369304c15ede7",
               "file": "tests/suites/02-manager.spec.ts",
               "line": 34,
               "column": 7
@@ -355,12 +355,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 16849,
+                      "duration": 17194,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:42:41.768Z",
+                      "startTime": "2026-06-12T20:51:00.886Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -376,7 +376,7 @@
               ],
               "id": "b663833bd2617a2efa18-2df750a2f43a0f6eed4b",
               "file": "tests/suites/02-manager.spec.ts",
-              "line": 38,
+              "line": 40,
               "column": 7
             },
             {
@@ -397,12 +397,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 17802,
+                      "duration": 18049,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:42:58.643Z",
+                      "startTime": "2026-06-12T20:51:18.098Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -418,7 +418,7 @@
               ],
               "id": "b663833bd2617a2efa18-81f636c8af87210968ee",
               "file": "tests/suites/02-manager.spec.ts",
-              "line": 45,
+              "line": 47,
               "column": 7
             }
           ]
@@ -459,12 +459,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 54605,
+                      "duration": 53977,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:43:16.474Z",
+                      "startTime": "2026-06-12T20:51:36.184Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -501,12 +501,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 27032,
+                      "duration": 27340,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:44:11.098Z",
+                      "startTime": "2026-06-12T20:52:30.178Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -543,12 +543,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 19761,
+                      "duration": 19164,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:44:38.151Z",
+                      "startTime": "2026-06-12T20:52:57.536Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -585,12 +585,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 28085,
+                      "duration": 28149,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:44:57.934Z",
+                      "startTime": "2026-06-12T20:53:16.719Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -635,12 +635,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4690,
+                  "duration": 4341,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-06-12T19:40:25.704Z",
+                  "startTime": "2026-06-12T20:48:49.515Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -704,7 +704,7 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 13982,
+                      "duration": 13934,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
@@ -712,14 +712,14 @@
                       "steps": [
                         {
                           "title": "Enter invalid credentials and submit",
-                          "duration": 5877
+                          "duration": 5834
                         },
                         {
                           "title": "Invalid credentials error is shown",
-                          "duration": 2116
+                          "duration": 2090
                         }
                       ],
-                      "startTime": "2026-06-12T19:40:31.623Z",
+                      "startTime": "2026-06-12T20:48:55.097Z",
                       "annotations": [
                         {
                           "type": "slow",
@@ -787,7 +787,7 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 34049,
+                      "duration": 33832,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
@@ -795,14 +795,14 @@
                       "steps": [
                         {
                           "title": "Enter valid manager credentials and submit",
-                          "duration": 6258
+                          "duration": 6250
                         },
                         {
                           "title": "Manager dashboard loaded after login",
-                          "duration": 14798
+                          "duration": 14578
                         }
                       ],
-                      "startTime": "2026-06-12T19:40:45.796Z",
+                      "startTime": "2026-06-12T20:49:09.380Z",
                       "annotations": [
                         {
                           "type": "slow",
@@ -849,7 +849,7 @@
         {
           "title": "Suite 5: Mock API",
           "file": "tests/suites/05-mock-api.spec.ts",
-          "line": 13,
+          "line": 12,
           "column": 6,
           "specs": [
             {
@@ -871,12 +871,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5410,
+                      "duration": 5749,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:41:20.807Z",
+                      "startTime": "2026-06-12T20:49:44.081Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -892,50 +892,7 @@
               ],
               "id": "dd6fbe5ae98c6e92f21e-dddf5708b2571215d8cb",
               "file": "tests/suites/05-mock-api.spec.ts",
-              "line": 18,
-              "column": 7
-            },
-            {
-              "title": "rejects invalid login via mock helper @mock",
-              "ok": true,
-              "tags": [
-                "mock",
-                "mock"
-              ],
-              "tests": [
-                {
-                  "timeout": 120000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "mock-api",
-                  "projectName": "mock-api",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 6029,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-12T19:41:26.416Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "video",
-                          "contentType": "video/webm",
-                          "path": "C:\\Users\\HP\\Documents\\TEC DE MONTERREY\\SOFTWARE DEVELOPMENT\\CHALLENGE\\oci_devops_project\\test-results\\05-mock-api-Suite-5-Mock-A-212cf--login-via-mock-helper-mock-mock-api\\video.webm"
-                        }
-                      ]
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "dd6fbe5ae98c6e92f21e-f2427175cb986f37c37d",
-              "file": "tests/suites/05-mock-api.spec.ts",
-              "line": 35,
+              "line": 17,
               "column": 7
             },
             {
@@ -957,12 +914,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6669,
+                      "duration": 7181,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:41:32.467Z",
+                      "startTime": "2026-06-12T20:49:50.052Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -978,7 +935,7 @@
               ],
               "id": "dd6fbe5ae98c6e92f21e-16d09316fda5504aa8f3",
               "file": "tests/suites/05-mock-api.spec.ts",
-              "line": 42,
+              "line": 34,
               "column": 7
             },
             {
@@ -1000,12 +957,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5393,
+                      "duration": 5619,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:41:39.156Z",
+                      "startTime": "2026-06-12T20:49:57.268Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1021,7 +978,7 @@
               ],
               "id": "dd6fbe5ae98c6e92f21e-509cbaefe9e49f57bb9e",
               "file": "tests/suites/05-mock-api.spec.ts",
-              "line": 49,
+              "line": 41,
               "column": 7
             },
             {
@@ -1043,12 +1000,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6816,
+                      "duration": 6587,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:41:44.571Z",
+                      "startTime": "2026-06-12T20:50:02.913Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1064,7 +1021,7 @@
               ],
               "id": "dd6fbe5ae98c6e92f21e-c212a4f9990764d47b8b",
               "file": "tests/suites/05-mock-api.spec.ts",
-              "line": 57,
+              "line": 49,
               "column": 7
             }
           ]
@@ -1105,12 +1062,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 16588,
+                      "duration": 16160,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:45:27.091Z",
+                      "startTime": "2026-06-12T20:53:46.168Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1147,12 +1104,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 16188,
+                      "duration": 16308,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:45:43.857Z",
+                      "startTime": "2026-06-12T20:54:02.471Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1189,7 +1146,7 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 61148,
+                      "duration": 61779,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
@@ -1197,14 +1154,14 @@
                       "steps": [
                         {
                           "title": "Developer completes task in Kanban with hours worked",
-                          "duration": 20215
+                          "duration": 20593
                         },
                         {
                           "title": "My Tasks table shows Done status",
-                          "duration": 26732
+                          "duration": 26689
                         }
                       ],
-                      "startTime": "2026-06-12T19:46:00.067Z",
+                      "startTime": "2026-06-12T20:54:18.800Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1251,12 +1208,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 17421,
+                      "duration": 17324,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-06-12T19:47:01.233Z",
+                      "startTime": "2026-06-12T20:55:20.598Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1282,9 +1239,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-06-12T19:40:19.129Z",
-    "duration": 419667.461,
-    "expected": 22,
+    "startTime": "2026-06-12T20:48:41.086Z",
+    "duration": 417017.08800000005,
+    "expected": 21,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

@@ -31,9 +31,11 @@ test.describe('Suite 2: Manager', { tag: TAGS.manager }, () => {
     await dashboard.filterByDeveloper(1);
     await dashboard.expectDashboardVisible();
   });
-  test('views dashboard scorecards and completion metrics', async ({ page }) => {
+  test('views scorecards and completion metrics with all sprints filter', async ({ page }) => {
     await DashboardPage.open(page);
-    await new DashboardPage(page).expectScorecardsVisible();
+    const dashboard = new DashboardPage(page);
+    await dashboard.selectAllSprints();
+    await dashboard.expectScorecardsVisible({ allSprints: true });
   });
   test('explores AI Insights', async ({ page }) => {
     await DashboardPage.open(page);
