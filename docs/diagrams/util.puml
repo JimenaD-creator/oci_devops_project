@@ -459,11 +459,15 @@ class com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil {
 	{method}  {static} -alertMap ( severity : String , message : String ) : java.util.Map
 	{method}  {static} +alertsAlreadyContainHoursVsPrevious ( alerts : com.fasterxml.jackson.databind.node.ArrayNode ) : boolean
 	{method}  {static} +buildAlert ( current : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previous : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previousSprintLabel : String , sprintEnded : boolean , sprintEarly : boolean ) : java.util.Optional
+	{method}  {static} -buildBaselineComparisonMessage ( current : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previous : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , prevLabel : String , prevRate : double , curRate : double , rateChangeFraction : double ) : String
 	{method}  {static} ~completionCountsSimilar ( currentCompleted : int , previousCompleted : int ) : boolean
 	{method}  {static} -doubleFrom ( value : Object ) : double
 	{method}  {static} -formatHours ( hours : double ) : String
+	{method}  {static} ~formatHoursPerTaskRateChange ( rateChangeFraction : double ) : String
+	{method}  {static} -hoursPerCompletedTask ( snapshot : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot ) : double
 	{method}  {static} -intFrom ( value : Object ) : int
 	{method}  {static} -labelOrDefault ( previousSprintLabel : String ) : String
+	{method}  {static} +removeHoursVsPreviousAlerts ( alerts : com.fasterxml.jackson.databind.node.ArrayNode ) : void
 }
 
 
