@@ -848,6 +848,7 @@ export default function KPIAnalytics({ projectId, onOpenAiInsights }) {
           productivityDelta={productivityDelta}
           currentProductivityScore={kpis.productivityScore}
           currentSprintKpis={kpis}
+          currentSprint={currentSprint}
           onOpenAiInsights={onOpenAiInsights}
         />
       </Box>

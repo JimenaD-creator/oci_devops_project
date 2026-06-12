@@ -2,34 +2,25 @@ import { describe, expect, test } from 'vitest';
 import { developerInsightDisplayText } from './developerInsightDisplay';
 
 describe('developerInsightDisplayText', () => {
-  test('prefers aiNarrative and merges live snapshot suffix when present', () => {
+  test('prefers backend-composed insight (includes live on-time corrections)', () => {
     expect(
       developerInsightDisplayText({
-        aiNarrative: 'Completed 2 tasks on time; 1 task remains in the To do status.',
+        aiNarrative:
+          'Completed 5 tasks, though 2 were finished after their due date.',
         insight:
-          'Completed 2 tasks on time; 1 task remains in the To do status. Current snapshot: live text.',
+          'Completed 5 assignments, all finished on or before the due date. Performance is consistent.',
       }),
     ).toBe(
-      'Completed 2 tasks on time; 1 task remains in the To do status. Current snapshot: live text.',
+      'Completed 5 assignments, all finished on or before the due date. Performance is consistent.',
     );
   });
 
-  test('appends Current snapshot suffix from composed insight when aiNarrative is primary', () => {
+  test('falls back to aiNarrative when insight is empty', () => {
     expect(
       developerInsightDisplayText({
-        aiNarrative:
-          'Completed 2 tasks on time with 12 hours logged. Has 1 Pending task remaining.',
-        insight:
-          'Completed 2 tasks on time with 12 hours logged. Has 1 Pending task remaining. Current snapshot: Completed 3 assignments, all finished on or before the due date.',
+        aiNarrative: 'Completed 2 tasks on time; 1 task remains in the To do status.',
+        insight: '',
       }),
-    ).toContain('Current snapshot:');
-    expect(
-      developerInsightDisplayText({
-        aiNarrative:
-          'Completed 2 tasks on time with 12 hours logged. Has 1 Pending task remaining.',
-        insight:
-          'Completed 2 tasks on time with 12 hours logged. Has 1 Pending task remaining. Current snapshot: Completed 3 assignments, all finished on or before the due date.',
-      }),
-    ).toMatch(/^Completed 2 tasks on time with 12 hours logged/);
+    ).toBe('Completed 2 tasks on time; 1 task remains in the To do status.');
   });
 });

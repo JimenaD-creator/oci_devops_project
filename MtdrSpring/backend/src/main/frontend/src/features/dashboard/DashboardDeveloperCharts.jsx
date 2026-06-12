@@ -1268,13 +1268,16 @@ function ChartShell({
   const bg = tint ?? (isDark ? 'rgba(92, 107, 192, 0.1)' : 'rgba(92, 107, 192, 0.06)');
   const chartBoxSx =
     typeof height === 'object' && height !== null
-      ? { width: '100%', minWidth: 0, overflow: bareContent ? 'visible' : 'visible', height }
+      ? { width: '100%', minWidth: 0, overflow: 'visible', height }
       : {
           width: '100%',
           minWidth: 0,
           overflow: 'visible',
           height: typeof height === 'number' ? height : 400,
           ...(bareContent ? { display: 'flex', flexDirection: 'column', minHeight: 0 } : {}),
+          '& .recharts-wrapper, & .recharts-surface': {
+            overflow: 'visible',
+          },
         };
   const descMb = belowDescription != null ? 1.25 : compact ? 1 : 1.35;
   const chartMt = belowDescription != null ? 0 : compact ? 0.25 : description ? 0.25 : 0.5;
@@ -1591,7 +1594,11 @@ export default function DashboardDeveloperCharts({
         labelOffset != null
           ? labelOffset
           : labelPosition === 'insideLeft' && labelAngle === -90
-            ? 10
+            ? singleDeveloperFocus
+              ? 10
+              : isMobile
+                ? 16
+                : 22
             : undefined;
       const props = {
         type: 'number',
@@ -2074,18 +2081,38 @@ export default function DashboardDeveloperCharts({
 
     const legendItemCount = compareGroupBySprint ? nDevsPerGroup : nSprints;
     const xCategoryCount = compareGroupBySprint ? nSprints : Math.max(workloadRows.length, hoursRows.length);
+    const multiSprintTeamCompare = compareGroupBySprint && !singleDeveloperFocus;
+    const compareChartMarginLeft = multiSprintTeamCompare
+      ? isMobile
+        ? 24
+        : allSprintsSelected
+          ? 38
+          : 30
+      : 8;
+    const compareXAxisTitleBottomExtra = multiSprintTeamCompare
+      ? isMobile
+        ? 12
+        : allSprintsSelected
+          ? 20
+          : 16
+      : 0;
+
+    const marginTopWorkloadCap = multiSprintTeamCompare && allSprintsSelected ? 152 : 132;
+    const marginTopHoursCap = multiSprintTeamCompare && allSprintsSelected ? 112 : 84;
 
     const marginTopWorkload = Math.min(
-      132,
+      marginTopWorkloadCap,
       10 +
         Math.ceil(legendItemCount / 2) * (legendItemCount <= 3 ? 18 : 22) +
-        (legendItemCount <= 2 ? 4 : legendItemCount <= 4 ? 8 : 10),
+        (legendItemCount <= 2 ? 4 : legendItemCount <= 4 ? 8 : 10) +
+        (multiSprintTeamCompare ? 12 : 0),
     );
     const marginTopHours = Math.min(
-      84,
+      marginTopHoursCap,
       8 +
         Math.ceil(legendItemCount / 2) * (legendItemCount <= 3 ? 14 : 18) +
-        (legendItemCount <= 2 ? 4 : legendItemCount <= 4 ? 6 : 8),
+        (legendItemCount <= 2 ? 4 : legendItemCount <= 4 ? 6 : 8) +
+        (multiSprintTeamCompare ? 14 : 0),
     );
     const bottomAxisWorkloadHours = Math.min(
       78,
@@ -2095,7 +2122,7 @@ export default function DashboardDeveloperCharts({
     );
     const bottomAxisWorkloadHoursAdjusted = singleDevMultiSprintCompare
       ? bottomAxisWorkloadHours + 16
-      : bottomAxisWorkloadHours;
+      : bottomAxisWorkloadHours + compareXAxisTitleBottomExtra;
     const xAxisTickHeightWorkloadHours = Math.min(
       64,
       44 + Math.max(0, xCategoryCount - 4) * 5 + Math.min(8, Math.max(0, xCategoryCount - 5) * 2),
@@ -2178,8 +2205,37 @@ export default function DashboardDeveloperCharts({
       ? 'Hours worked by sprint'
       : 'Hours worked by developer';
 
-    const yAxisWorkloadWidth = singleDeveloperFocus ? (isMobile ? 38 : 52) : (isMobile ? 48 : 52);
-    const yAxisHoursWidth = singleDeveloperFocus ? (isMobile ? 38 : 52) : (isMobile ? 50 : 56);
+    const yAxisWorkloadWidth = singleDeveloperFocus
+      ? isMobile
+        ? 38
+        : 52
+      : multiSprintTeamCompare
+        ? isMobile
+          ? 58
+          : 66
+        : isMobile
+          ? 48
+          : 52;
+    const yAxisHoursWidth = singleDeveloperFocus
+      ? isMobile
+        ? 38
+        : 52
+      : multiSprintTeamCompare
+        ? isMobile
+          ? 60
+          : 68
+        : isMobile
+          ? 50
+          : 56;
+    const compareSprintXAxisTitleOffset = multiSprintTeamCompare
+      ? isMobile
+        ? 14
+        : allSprintsSelected
+          ? 22
+          : 18
+      : singleDevMultiSprintCompare
+        ? 14
+        : 8;
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', minWidth: 0 }}>
@@ -2198,7 +2254,7 @@ export default function DashboardDeveloperCharts({
             margin={{
               top: marginTopWorkloadTight,
               right: 56,
-              left: 8,
+              left: compareChartMarginLeft,
               bottom: bottomAxisWorkloadHoursAdjusted,
             }}
             barCategoryGap={workloadBarCategoryGap}
@@ -2226,7 +2282,7 @@ export default function DashboardDeveloperCharts({
                 ...(compareGroupBySprint
                   ? {
                       position: 'bottom',
-                      offset: singleDevMultiSprintCompare ? 14 : 8,
+                      offset: compareSprintXAxisTitleOffset,
                       fill: isDark ? '#9A9A9A' : '#1A1A1A',
                       ...axisTitleStyle,
                     }
@@ -2438,7 +2494,7 @@ export default function DashboardDeveloperCharts({
         >
           <BarChart
             data={hoursChartData}
-            margin={{ top: marginTopHours, right: 56, left: 8, bottom: bottomAxisWorkloadHoursAdjusted }}
+            margin={{ top: marginTopHours, right: 56, left: compareChartMarginLeft, bottom: bottomAxisWorkloadHoursAdjusted }}
             barCategoryGap={hoursBarCategoryGap}
             barGap={hoursBarGap}
           >
@@ -2464,7 +2520,7 @@ export default function DashboardDeveloperCharts({
                 ...(compareGroupBySprint
                   ? {
                       position: 'bottom',
-                      offset: singleDevMultiSprintCompare ? 14 : 8,
+                      offset: compareSprintXAxisTitleOffset,
                       fill: isDark ? '#9A9A9A' : '#1A1A1A',
                       ...axisTitleStyle,
                     }

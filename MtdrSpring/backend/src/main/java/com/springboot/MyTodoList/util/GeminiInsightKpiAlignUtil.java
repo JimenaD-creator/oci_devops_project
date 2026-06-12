@@ -79,6 +79,20 @@ public final class GeminiInsightKpiAlignUtil {
     /** On-time at or above this level should not be framed as a "primary concern". */
     private static final int ON_TIME_STRONG_PERCENT = 70;
 
+    /** On-time at or above this level should not trigger delay/missed-deadline alerts or estimates advice. */
+    private static final int ON_TIME_PERFECT_BAND_PERCENT = 90;
+
+    private static final Pattern ON_TIME_DELIVERY_PROBLEM_CLAIM = Pattern.compile(
+        "(?i)\\b(?:slight\\s+)?delay(?:ed|s)?\\b(?:\\s+in\\s+meeting)?|"
+            + "\\bmissed\\b.{0,48}\\b(?:due|deadline)\\b|"
+            + "\\b(?:after|past|beyond)\\s+(?:their\\s+|the\\s+)?(?:original\\s+)?(?:due|deadline)\\b|"
+            + "\\blate\\s+delivery\\b|"
+            + "\\bbehind\\s+schedule\\b|"
+            + "\\bnot\\s+on\\s+time\\b|"
+            + "\\bmonitor(?:\\s+deadlines?|\\s+due\\s+dates?)\\s+more\\s+closely\\b|"
+            + "\\brefine\\s+future\\s+estimation\\b|"
+            + "\\bmissed\\s+their\\s+original\\s+due\\s+dates?\\b");
+
     private static final String[] LIVE_METRIC_KEYS = {
         "completionRate", "onTimeDelivery", "efficiencyScore", "workloadBalance", "productivityScore"
     };
@@ -113,6 +127,49 @@ public final class GeminiInsightKpiAlignUtil {
 
     public static boolean proseClaimsOnTimeDecline(String text) {
         return text != null && !text.isBlank() && ON_TIME_DECLINE_CLAIM.matcher(text).find();
+    }
+
+    /** Delay / missed-deadline wording that contradicts a strong on-time KPI (e.g. 100%). */
+    public static boolean proseClaimsOnTimeDeliveryProblem(String text) {
+        return text != null && !text.isBlank() && ON_TIME_DELIVERY_PROBLEM_CLAIM.matcher(text).find();
+    }
+
+    public static boolean shouldDropOnTimeDeliveryAlertAtStrongScore(String kpi, String message, int liveOtd) {
+        if (liveOtd < ON_TIME_PERFECT_BAND_PERCENT) {
+            return false;
+        }
+        String normKpi = kpi == null ? "" : kpi.toLowerCase(Locale.ROOT).replace("_", "");
+        boolean onTimeKpi = "ontimedelivery".equals(normKpi);
+        String msg = message == null ? "" : message;
+        if (liveOtd >= 100 && onTimeKpi) {
+            return true;
+        }
+        if (proseClaimsOnTimeDeliveryProblem(msg) || proseClaimsOnTimeDecline(msg)) {
+            return onTimeKpi || ON_TIME_CONTEXT.matcher(msg).find();
+        }
+        return false;
+    }
+
+    public static boolean shouldDropOnTimeEstimationRecommendation(String text, int liveOtd) {
+        if (liveOtd < ON_TIME_PERFECT_BAND_PERCENT) {
+            return false;
+        }
+        return proseClaimsOnTimeDeliveryProblem(text) || proseClaimsOnTimeDecline(text);
+    }
+
+    /**
+     * When the sprint window has ended, incomplete scope is a delivery gap — not a neutral info note.
+     * @return {@code critical} if {@code completionRate < 40}, else {@code warning}; {@code null} if complete.
+     */
+    public static String completionRateAlertSeverityForEndedSprint(int completionRate) {
+        if (completionRate >= 100) {
+            return null;
+        }
+        return completionRate < 40 ? "critical" : "warning";
+    }
+
+    public static boolean shouldElevateCompletionRateAlertForEndedSprint(String sprintPhase, int completionRate) {
+        return "ended".equals(sprintPhase) && completionRate >= 0 && completionRate < 100;
     }
 
     /** Point band within which next-sprint forecast is treated as flat vs current productivity. */
@@ -201,13 +258,16 @@ public final class GeminiInsightKpiAlignUtil {
             return text;
         }
         Pattern pattern = Pattern.compile(
-            "(?i)(productivity\\s+(?:remained|stays|stayed|is|was)\\s+(?:stable\\s+)?at\\s+)(-?\\d+(?:\\.\\d+)?)(\\s*(?:percentage\\s+)?points?)?");
+            "(?i)(productivity\\s+(?:remained|stays|stayed|is|was)\\s+(?:stable\\s+)?at\\s+)"
+                + "(-?\\d+(?:\\.\\d+)?)(\\s*%|\\s*(?:percentage\\s+)?points?)?");
         Matcher matcher = pattern.matcher(text);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
             String suffix = matcher.group(3);
             String replacement;
-            if (suffix != null && suffix.toLowerCase(Locale.ROOT).contains("point")) {
+            if (suffix != null
+                && suffix.toLowerCase(Locale.ROOT).contains("point")
+                && !"%".equals(suffix.trim())) {
                 String unit = productivityScore == 1 ? " point" : " points";
                 replacement = matcher.group(1) + productivityScore + unit;
             } else {
@@ -456,7 +516,8 @@ public final class GeminiInsightKpiAlignUtil {
         if (text == null) {
             return text;
         }
-        return text.replaceAll("(\\d+)\\s*%([a-zA-Z])", "$1% $2");
+        String out = text.replaceAll("(\\d+)\\s*%([a-zA-Z])", "$1% $2");
+        return out.replaceAll("(\\d(?:\\.\\d+)?)(?:\\s*%){2,}", "$1%");
     }
 
     /**

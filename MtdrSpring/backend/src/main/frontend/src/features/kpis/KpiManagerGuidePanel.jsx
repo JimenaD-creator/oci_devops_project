@@ -23,6 +23,8 @@ import {
   softenProductivityGuideForSprintPhase,
   stripProductivityGuideInstructionEcho,
   stripProductivityLowScoreExcuses,
+  isSprintDeliveryFinalized,
+  stripProductivityEvolutionNotesForEndedSprint,
 } from './productivityScoreUtils';
 import {
   SECTION_BRAND_DARK,
@@ -145,6 +147,9 @@ export default function KpiManagerGuidePanel({
   const introText = hasCurrentProductivityScore
     ? alignProductivityScoreProse(alignedIntroText, resolvedCurrentProductivityScore)
     : alignedIntroText;
+  const introTextFinalized = isSprintDeliveryFinalized(sprintTimeline, currentSprintKpis)
+    ? stripProductivityEvolutionNotesForEndedSprint(introText, sprintTimeline, currentSprintKpis)
+    : introText;
   const productivityDeltaTextRaw = clampOver100ForDisplay(
     typeof productivityDelta?.text === 'string' ? productivityDelta.text.trim() : '',
     { aggressive: true },
@@ -162,7 +167,7 @@ export default function KpiManagerGuidePanel({
     ? alignProductivityScoreProse(productivityDeltaTextAligned, resolvedCurrentProductivityScore)
     : productivityDeltaTextAligned;
   const hasMetricLines = METRIC_KEYS.some((k) => Boolean(guideMetricText(byMetric, k)));
-  const hasGuide = introText !== '' || hasMetricLines;
+  const hasGuide = introTextFinalized !== '' || hasMetricLines;
 
   // Colores para el delta de productividad
   const deltaColors = {
@@ -334,7 +339,7 @@ export default function KpiManagerGuidePanel({
 
       {!loading && !fetchFailed && hasGuide && (
         <Box>
-          {introText !== '' && (
+          {introTextFinalized !== '' && (
             <Typography
               sx={{
                 fontSize: { xs: '1rem', sm: '1.05rem' },
@@ -344,7 +349,7 @@ export default function KpiManagerGuidePanel({
                 mb: hasMetricLines ? 2.5 : 0,
               }}
             >
-              {introText}
+              {introTextFinalized}
             </Typography>
           )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -382,12 +387,14 @@ export default function KpiManagerGuidePanel({
                   displayText = buildProductivityKpiAnalyticsGuideLine(
                     resolvedCurrentProductivityScore,
                     currentSprint,
+                    currentSprintKpis,
                   );
                 } else if (hasCurrentProductivityScore) {
                   displayText = finalizeProductivityManagerGuideText(
                     displayText,
                     resolvedCurrentProductivityScore,
                     currentSprint,
+                    currentSprintKpis,
                   );
                 }
               }

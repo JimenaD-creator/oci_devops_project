@@ -23,6 +23,7 @@ import { pageEase, getErrorMessage, isProcessingInsight } from './aiInsightsCons
 import {
   resolveSprintProductivityScore,
   normalizeWorkloadBalancePercent,
+  resolveSprintTimelineContext,
 } from '../kpis/productivityScoreUtils';
 import InsightCard from './InsightCard';
 import { DeveloperInsightsTable } from './InsightCardParts';
@@ -186,6 +187,10 @@ export default function AIInsightsPage({ projectId }) {
         workloadBalance: normalizeWorkloadBalancePercent(selectedSprint.kpis?.workloadBalance),
         productivityScore: resolveSprintProductivityScore(selectedSprint.kpis),
       }
+    : null;
+
+  const selectedSprintPhase = selectedSprint
+    ? resolveSprintTimelineContext(selectedSprint).phase
     : null;
 
   const liveTaskStatusBreakdown = useMemo(
@@ -377,6 +382,7 @@ export default function AIInsightsPage({ projectId }) {
             nextSprintActualScore={resolveSprintProductivityScore(nextSprintForSelected?.kpis)}
             currentSprintActualScore={resolveSprintProductivityScore(selectedSprint?.kpis)}
             currentSprintMetrics={currentSprintKpiMetrics}
+            sprintPhase={selectedSprintPhase}
             liveTaskStatusBreakdown={liveTaskStatusBreakdown}
             productivityDeltaPoints={productivityDeltaPoints}
             refreshToken={0}

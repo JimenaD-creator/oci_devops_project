@@ -80,7 +80,12 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
       onTimeDelivery: `On-time delivery is ${otd}% — completed work finished by the due date.`,
       efficiencyScore: `Efficiency score is ${es}% — estimated hours vs hours logged (100% means on or ahead of estimates).`,
       workloadBalance: `Workload balance is ${wb}% — how evenly tasks are distributed across assignees.`,
-      productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint),
+      productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint, {
+        completionRate: cr,
+        onTimeDelivery: otd,
+        efficiencyScore: es,
+        workloadBalance: wb,
+      }),
     },
   };
 }
@@ -165,7 +170,7 @@ export function clampTrendsPercentLikeValues(text) {
     return c === n ? m : `${prefix}${toDisplay(n)}`;
   });
 
-  return out;
+  return fixGluedPercentProse(out);
 }
 
 /**
@@ -231,9 +236,9 @@ export function alignProductivityStableLevelInProse(text, actualScore) {
   if (!Number.isFinite(score)) return text;
   const displayPct = formatProductivityScoreDisplay(score);
   return String(text).replace(
-    /(productivity\s+(?:remained|stays|stayed|is|was)\s+(?:stable\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*(?:percentage\s+)?points?)?/gi,
+    /(productivity\s+(?:remained|stays|stayed|is|was)\s+(?:stable\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*%|\s*(?:percentage\s+)?points?)?/gi,
     (_, prefix, _num, suffix) => {
-      if (suffix && /points?/i.test(suffix)) {
+      if (suffix && /points?/i.test(suffix) && !/^\s*%$/.test(suffix)) {
         const unit = score === 1 ? ' point' : ' points';
         return `${prefix}${score}${unit}`;
       }
@@ -272,7 +277,7 @@ export function alignProductivityScoreProse(text, actualScore) {
     /(composite(?:\s+\w+){0,8}?\s+(?:is\s+)?(?:at\s+)?)(-?\d+(?:\.\d+)?)\s*%?/gi,
     `$1${display}`,
   );
-  return out;
+  return fixGluedPercentProse(out);
 }
 
 function formatKpiMetricNumber(rawValue) {
@@ -353,10 +358,12 @@ export function alignAlertLoosePercents(text, actualPercent) {
   return fixHavingIsAtGrammar(out);
 }
 
-/** Fixes "0%as" → "0% as" after KPI % alignment (regex consumed optional %). */
+/** Fixes "0%as" → "0% as" and collapses "100%%%" → "100%" after KPI alignment passes. */
 export function fixGluedPercentProse(text) {
   if (text == null) return text;
-  return String(text).replace(/(\d+)\s*%([a-zA-Z])/g, '$1% $2');
+  let out = String(text).replace(/(\d+)\s*%([a-zA-Z])/g, '$1% $2');
+  out = out.replace(/(\d(?:\.\d+)?)(?:\s*%){2,}/g, '$1%');
+  return out;
 }
 
 function applyKpiMetricPatterns(text, key, actual) {
@@ -489,6 +496,11 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
 const ON_TIME_DECLINE_CLAIM_RE =
   /declined|declining|dropped|fell|decreased|reduced|worsened|declined\s+for\s+\d+\s+consecutive/i;
 
+const ON_TIME_DELIVERY_PROBLEM_RE =
+  /\b(?:slight\s+)?delay(?:ed|s)?\b(?:\s+in\s+meeting)?|\bmissed\b.{0,48}\b(?:due|deadline)\b|\b(?:after|past|beyond)\s+(?:their\s+|the\s+)?(?:original\s+)?(?:due|deadline)\b|\blate\s+delivery\b|\bbehind\s+schedule\b|\bnot\s+on\s+time\b|\bmonitor(?:\s+deadlines?|\s+due\s+dates?)\s+more\s+closely\b|\brefine\s+future\s+estimation\b|\bmissed\s+their\s+original\s+due\s+dates?\b/i;
+
+const ON_TIME_STRONG_PERCENT = 90;
+
 /**
  * Drops on-time "decline" sentences when the live KPI card shows strong delivery (e.g. 100%).
  */
@@ -501,10 +513,83 @@ export function fixHavingIsAtGrammar(text) {
 /**
  * On-time ≥ 70% should not be called the "primary concern".
  */
+export function mentionsOnTimeDeliveryProblem(text) {
+  if (text == null || typeof text !== 'string') return false;
+  return ON_TIME_DELIVERY_PROBLEM_RE.test(text) || ON_TIME_DECLINE_CLAIM_RE.test(text);
+}
+
+export function shouldDropOnTimeDeliveryAlert(alert, onTimePercent) {
+  const otd = Number(onTimePercent);
+  if (!Number.isFinite(otd) || otd < ON_TIME_STRONG_PERCENT) return false;
+  const kpi = String(alert?.kpi ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '');
+  const message = String(alert?.message ?? '');
+  if (otd >= 100 && kpi === 'ontimedelivery') return true;
+  if (!mentionsOnTimeDeliveryProblem(message)) return false;
+  return kpi === 'ontimedelivery' || /on[- ]?time/i.test(message);
+}
+
+export function shouldDropOnTimeEstimationRecommendation(text, onTimePercent) {
+  const otd = Number(onTimePercent);
+  if (!Number.isFinite(otd) || otd < ON_TIME_STRONG_PERCENT) return false;
+  return mentionsOnTimeDeliveryProblem(text);
+}
+
+export function filterAlertsForStrongOnTimeDelivery(alerts, onTimePercent) {
+  if (!Array.isArray(alerts)) return [];
+  return alerts.filter((alert) => !shouldDropOnTimeDeliveryAlert(alert, onTimePercent));
+}
+
+/** Ended sprint with open scope: warning if CR >= 40, critical if below. */
+export function completionRateAlertSeverityForEndedSprint(completionRate) {
+  const cr = Number(completionRate);
+  if (!Number.isFinite(cr) || cr >= 100) return null;
+  return cr < 40 ? 'critical' : 'warning';
+}
+
+export function normalizeSprintAlertSeverities(alerts, sprintPhase, metrics = {}) {
+  if (!Array.isArray(alerts)) return [];
+  const cr = Number(metrics.completionRate);
+  if (sprintPhase !== 'ended' || !Number.isFinite(cr) || cr >= 100) {
+    return alerts;
+  }
+  const elevated = completionRateAlertSeverityForEndedSprint(cr);
+  if (!elevated) return alerts;
+  return alerts.map((alert) => {
+    const kpi = String(alert?.kpi ?? '')
+      .replace(/_/g, '')
+      .toLowerCase();
+    if (kpi !== 'completionrate') return alert;
+    return { ...alert, severity: elevated, value: cr };
+  });
+}
+
+export function prepareInsightAlerts(alerts, onTimePercent, sprintPhase, metrics = {}) {
+  return normalizeSprintAlertSeverities(
+    filterAlertsForStrongOnTimeDelivery(alerts, onTimePercent),
+    sprintPhase,
+    metrics,
+  );
+}
+
+export function stripContradictoryOnTimeDeliveryProblems(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return text;
+  const otd = Number(onTimePercent);
+  if (otd < ON_TIME_STRONG_PERCENT || !mentionsOnTimeDeliveryProblem(text)) return text;
+  const sentences = String(text).split(/(?<=[.!?])\s+/);
+  const kept = sentences.filter((s) => !mentionsOnTimeDeliveryProblem(s));
+  return kept.join(' ').trim();
+}
+
 export function reconcileOnTimeDeliveryConcernProse(text, onTimePercent) {
   if (text == null || !Number.isFinite(Number(onTimePercent))) return fixHavingIsAtGrammar(text);
   const otd = Number(onTimePercent);
   let out = fixHavingIsAtGrammar(text);
+  if (otd >= ON_TIME_STRONG_PERCENT) {
+    out = stripContradictoryOnTimeDeliveryProblems(out, otd);
+  }
   if (otd < 70 || !/on[- ]?time/i.test(out)) return out;
   const primaryClause =
     /on[- ]?time\s+delivery\s+is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at|currently\s+at|now\s+at|stands\s+at)?\s*\d+(?:\.\d+)?\s*%\.?\s*/i;

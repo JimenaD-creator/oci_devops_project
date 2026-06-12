@@ -1,22 +1,67 @@
 import { isUserTaskAssigneeComplete } from './taskUtils';
 
+/** Must match backend {@code app.display.timezone} / DisplayTimezone.java */
+export const DISPLAY_TIMEZONE = 'America/Mexico_City';
+
 export function toTimeMs(value) {
   if (value == null || value === '') return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** Compare on calendar day (UTC) so due-date at midnight is not "late" same afternoon. */
-export function calendarDayIndexUtc(ms) {
-  if (ms == null || !Number.isFinite(ms)) return null;
-  const d = new Date(ms);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+function hasExplicitTimezone(iso) {
+  return /[Zz]|[+-]\d{2}:?\d{2}$/.test(String(iso).trim());
 }
 
-export function isCompletionOnOrBeforeDueDay(doneMs, dueMs) {
-  if (dueMs == null || doneMs == null) return null;
-  const dueDay = calendarDayIndexUtc(dueMs);
-  const doneDay = calendarDayIndexUtc(doneMs);
+/** Server stores USER_TASK.completedAt as UTC wall-clock in a naive LocalDateTime. */
+export function parseNaiveUtcWallClockMs(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?/.exec(String(iso).trim());
+  if (!m) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+}
+
+export function calendarDayInTimezone(utcMs, timeZone = DISPLAY_TIMEZONE) {
+  if (utcMs == null || !Number.isFinite(utcMs)) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(utcMs));
+  const y = parts.find((p) => p.type === 'year')?.value;
+  const mo = parts.find((p) => p.type === 'month')?.value;
+  const d = parts.find((p) => p.type === 'day')?.value;
+  return y && mo && d ? `${y}-${mo}-${d}` : null;
+}
+
+/** Due dates come from a date picker — the Y-M-D portion is authoritative. */
+export function dueCalendarDayFromTaskDue(dueValue) {
+  if (dueValue == null || dueValue === '') return null;
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(dueValue).trim());
+  if (m) return m[1];
+  const ms = toTimeMs(dueValue);
+  return ms != null ? calendarDayInTimezone(ms) : null;
+}
+
+export function completionCalendarDayFromAssignee(doneMs, completedAtIso = null) {
+  if (completedAtIso != null && completedAtIso !== '') {
+    const raw = String(completedAtIso).trim();
+    if (hasExplicitTimezone(raw)) {
+      const ms = toTimeMs(raw);
+      return ms != null ? calendarDayInTimezone(ms) : null;
+    }
+    const naive = parseNaiveUtcWallClockMs(raw);
+    if (naive != null) return calendarDayInTimezone(naive);
+  }
+  if (doneMs != null && Number.isFinite(doneMs)) {
+    return calendarDayInTimezone(doneMs);
+  }
+  return null;
+}
+
+export function isCompletionOnOrBeforeDueDay(doneMs, dueValue, completedAtIso = null) {
+  const dueDay = dueCalendarDayFromTaskDue(dueValue);
+  const doneDay = completionCalendarDayFromAssignee(doneMs, completedAtIso);
   if (dueDay == null || doneDay == null) return null;
   return doneDay <= dueDay;
 }
@@ -27,12 +72,23 @@ export function isCompletionOnOrBeforeDueDay(doneMs, dueMs) {
  */
 export function assigneeCompletionTimeMs(ut, taskMeta = {}) {
   if (!isUserTaskAssigneeComplete(ut)) return null;
-  const fromRow = toTimeMs(ut?.completedAt ?? ut?.completed_at);
-  if (fromRow != null) return fromRow;
+  const raw = ut?.completedAt ?? ut?.completed_at;
+  if (raw != null && raw !== '') {
+    if (hasExplicitTimezone(raw)) {
+      return toTimeMs(raw);
+    }
+    const naive = parseNaiveUtcWallClockMs(raw);
+    if (naive != null) return naive;
+  }
 
   const assigneeCount = Number(taskMeta.assigneeCount ?? 1);
   if (assigneeCount <= 1) {
-    return toTimeMs(taskMeta.finishDate ?? taskMeta.finish_date);
+    const finish = taskMeta.finishDate ?? taskMeta.finish_date;
+    if (finish != null && finish !== '') {
+      if (hasExplicitTimezone(finish)) return toTimeMs(finish);
+      const naiveFinish = parseNaiveUtcWallClockMs(finish);
+      if (naiveFinish != null) return naiveFinish;
+    }
   }
 
   const legacy = toTimeMs(ut?.updatedAt ?? ut?.updated_at ?? ut?.createdAt ?? ut?.created_at);
@@ -41,10 +97,23 @@ export function assigneeCompletionTimeMs(ut, taskMeta = {}) {
 
 /** true = on time, false = late, null = unknown / not completed */
 export function isAssigneeCompletionOnTime(ut, taskDueDate, taskMeta = {}) {
-  const dueMs = toTimeMs(taskDueDate);
   const doneMs = assigneeCompletionTimeMs(ut, taskMeta);
-  if (dueMs == null || doneMs == null) return null;
-  return isCompletionOnOrBeforeDueDay(doneMs, dueMs);
+  const completedAtIso = ut?.completedAt ?? ut?.completed_at ?? null;
+  if (taskDueDate == null || doneMs == null) return null;
+  return isCompletionOnOrBeforeDueDay(doneMs, taskDueDate, completedAtIso);
+}
+
+/** @returns {'early'|'on_time'|'late'|null} */
+export function assigneeDeliveryTiming(ut, taskDueDate, taskMeta = {}) {
+  const onTime = isAssigneeCompletionOnTime(ut, taskDueDate, taskMeta);
+  if (onTime == null) return null;
+  if (!onTime) return 'late';
+  const doneMs = assigneeCompletionTimeMs(ut, taskMeta);
+  const completedAtIso = ut?.completedAt ?? ut?.completed_at ?? null;
+  const dueDay = dueCalendarDayFromTaskDue(taskDueDate);
+  const doneDay = completionCalendarDayFromAssignee(doneMs, completedAtIso);
+  if (dueDay != null && doneDay != null && doneDay < dueDay) return 'early';
+  return 'on_time';
 }
 
 export function onTimeLabelFromResult(result) {
@@ -61,9 +130,13 @@ export function allAssigneesComplete(taskUserTasks = []) {
 
 /** Task closed when every assignee is done; uses TASK.finishDate vs dueDate (calendar day). */
 export function taskTeamCompletionOnTime(task) {
-  const finishMs = toTimeMs(task?.finishDate ?? task?.finish_date);
-  const dueMs = toTimeMs(task?.dueDate ?? task?.due_date);
-  return isCompletionOnOrBeforeDueDay(finishMs, dueMs);
+  const finishRaw = task?.finishDate ?? task?.finish_date;
+  const dueRaw = task?.dueDate ?? task?.due_date;
+  const finishMs = assigneeCompletionTimeMs(
+    { status: 'COMPLETED', completedAt: finishRaw },
+    { assigneeCount: 1, finishDate: finishRaw },
+  );
+  return isCompletionOnOrBeforeDueDay(finishMs, dueRaw, finishRaw);
 }
 
 /** Per-assignee label for Task Details (always show delivery state when complete). */
@@ -72,11 +145,14 @@ export function assigneeDeliveryStatus(ut, taskDueDate, taskMeta = {}) {
     return { complete: false, label: 'Pending', tone: 'pending', completedAt: null };
   }
   const completedAt = ut?.completedAt ?? ut?.completed_at ?? null;
-  const onTime = isAssigneeCompletionOnTime(ut, taskDueDate, taskMeta);
-  if (onTime === true) {
+  const timing = assigneeDeliveryTiming(ut, taskDueDate, taskMeta);
+  if (timing === 'early') {
+    return { complete: true, label: 'Early', tone: 'onTime', completedAt };
+  }
+  if (timing === 'on_time') {
     return { complete: true, label: 'On time', tone: 'onTime', completedAt };
   }
-  if (onTime === false) {
+  if (timing === 'late') {
     return { complete: true, label: 'Late', tone: 'late', completedAt };
   }
   return {
@@ -97,58 +173,29 @@ function assigneeProgressOnTimeResult(row, dueDate, taskMeta) {
   );
 }
 
-/**
- * Multi-assignee task: on time only if every assignee finished and each was on time.
- * Returns true | false | null (pending or unknown — not "late").
- */
-export function multiAssigneeTaskOnTime(assigneeProgress, dueDate, taskMeta = {}) {
-  const progress = Array.isArray(assigneeProgress) ? assigneeProgress : [];
-  if (progress.length <= 1) return null;
-
-  if (!progress.every((row) => row.completed)) return null;
-
-  const results = progress.map((row) => assigneeProgressOnTimeResult(row, dueDate, taskMeta));
-  if (results.some((r) => r === false)) return false;
-  if (results.every((r) => r === true)) return true;
-  return null;
+/** Multi-assignee: true only when every assignee completed on or before due day. */
+export function multiAssigneeTaskOnTime(assigneeProgress = [], taskDueDate, taskMeta = {}) {
+  const rows = Array.isArray(assigneeProgress) ? assigneeProgress : [];
+  if (rows.length === 0) return null;
+  if (!rows.every((r) => r?.completed)) return null;
+  return rows.every((r) => assigneeProgressOnTimeResult(r, taskDueDate, taskMeta) === true);
 }
 
-/** Manager task row: per-assignee on-time when multiple developers are assigned. */
+/** Manager task list: Yes / No / — based on assignee completion vs due date. */
 export function taskOnTimeDisplayForManager(item) {
-  const progress = Array.isArray(item?.assigneeProgress) ? item.assigneeProgress : [];
-  const dueDate = item?.dueDate;
-  const taskMeta = {
-    finishDate: item?.completedAt ?? item?.completed_at,
-    assigneeCount: progress.length > 0 ? progress.length : item?.developers?.length || 1,
+  const due = item?.dueDate ?? item?.due_date;
+  const progress = item?.assigneeProgress;
+  const meta = {
+    assigneeCount: progress?.length ?? item?.assigneeCount ?? 1,
+    finishDate: item?.finishDate ?? item?.finish_date,
   };
-
-  if (progress.length > 1) {
-    const teamOnTime = multiAssigneeTaskOnTime(progress, dueDate, taskMeta);
-    if (teamOnTime === true) return 'Yes';
-    if (teamOnTime === false) return 'No';
-    if (!item?.done && !isCompletedStatus(item)) return '—';
-    return 'No';
+  if (Array.isArray(progress) && progress.length > 0) {
+    const result = multiAssigneeTaskOnTime(progress, due, meta);
+    return onTimeLabelFromResult(result);
   }
-
-  if (progress.length === 1) {
-    const r = assigneeProgressOnTimeResult(progress[0], dueDate, taskMeta);
-    if (r === true) return 'Yes';
-    if (r === false) return 'No';
-    if (!progress[0].completed) return '—';
-    return '—';
-  }
-
-  const dueMs = toTimeMs(dueDate);
-  const finishMs = toTimeMs(taskMeta.finishDate);
-  if (!item?.done && !isCompletedStatus(item)) return '—';
-  if (dueMs == null || finishMs == null) return '—';
-  return isCompletionOnOrBeforeDueDay(finishMs, dueMs) ? 'Yes' : 'No';
-}
-
-function isCompletedStatus(item) {
-  const st = String(item?.statusRaw ?? item?.status ?? '')
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, '_');
-  return st === 'DONE' || st === 'COMPLETED';
+  const ut = {
+    status: item?.statusRaw ?? item?.status,
+    completedAt: item?.completedAt ?? item?.completed_at,
+  };
+  return onTimeLabelFromResult(isAssigneeCompletionOnTime(ut, due, meta));
 }

@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeminiInsightKpiAlignUtilTest {
@@ -46,6 +47,19 @@ class GeminiInsightKpiAlignUtilTest {
     void alertContradictsLiveOnTimeTrend_whenHistoryShowsImprovement() {
         String msg = "On-Time Delivery has declined for three consecutive sprints, currently at 100%.";
         assertTrue(GeminiInsightKpiAlignUtil.alertContradictsLiveOnTimeTrend(msg, List.of(60, 80, 100)));
+    }
+
+    @Test
+    void shouldDropOnTimeDeliveryAlertAt100_whenMessageClaimsDelay() {
+        String msg = "On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.";
+        assertTrue(GeminiInsightKpiAlignUtil.shouldDropOnTimeDeliveryAlertAtStrongScore(
+            "onTimeDelivery", msg, 100));
+    }
+
+    @Test
+    void shouldDropEstimationRecommendation_whenOnTimeIsPerfect() {
+        String rec = "Analyze the tasks that missed their original due dates to refine future estimation accuracy.";
+        assertTrue(GeminiInsightKpiAlignUtil.shouldDropOnTimeEstimationRecommendation(rec, 100));
     }
 
     @Test
@@ -151,6 +165,28 @@ class GeminiInsightKpiAlignUtilTest {
         assertTrue(out.contains("payment API"));
         assertFalse(out.toLowerCase(Locale.ROOT).contains("prior sprint"));
         assertTrue(out.split("(?<=[.!?])\\s+").length <= 4);
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_warningWhenIncompleteAbove40() {
+        assertEquals("warning", GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(78));
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_criticalWhenBelow40() {
+        assertEquals("critical", GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(35));
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_nullWhenComplete() {
+        assertNull(GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(100));
+    }
+
+    @Test
+    void shouldElevateCompletionRateAlertForEndedSprint_whenScopeOpen() {
+        assertTrue(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("ended", 78));
+        assertFalse(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("in_progress", 78));
+        assertFalse(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("ended", 100));
     }
 
     @Test
@@ -538,6 +574,21 @@ class GeminiInsightKpiAlignUtilTest {
         assertEquals(
             "Productivity remained stable at 99 points compared to the previous sprint.",
             out);
+    }
+
+    @Test
+    void alignProductivityStableLevelInProse_doesNotDuplicatePercentSign() {
+        String gemini =
+            "Productivity remained stable at 100% compared to the previous sprint.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityStableLevelInProse(gemini, 100);
+        assertEquals(
+            "Productivity remained stable at 100% compared to the previous sprint.",
+            out);
+        String doubled =
+            "Productivity remained stable at 100%% compared to the previous sprint.";
+        assertEquals(
+            "Productivity remained stable at 100% compared to the previous sprint.",
+            GeminiInsightKpiAlignUtil.fixGluedPercentSpacing(doubled));
     }
 
     @Test

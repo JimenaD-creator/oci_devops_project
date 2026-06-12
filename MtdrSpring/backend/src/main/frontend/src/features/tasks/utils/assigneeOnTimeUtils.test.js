@@ -1,12 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import {
   assigneeCompletionTimeMs,
+  assigneeDeliveryTiming,
   isAssigneeCompletionOnTime,
   multiAssigneeTaskOnTime,
   taskOnTimeDisplayForManager,
 } from './assigneeOnTimeUtils';
 
 describe('assigneeOnTimeUtils', () => {
+  it('identifies early completion before due calendar day', () => {
+    const ut = {
+      status: 'COMPLETED',
+      completedAt: '2026-01-10T12:00:00.000Z',
+    };
+    const due = '2026-01-15T23:59:59.999';
+    expect(isAssigneeCompletionOnTime(ut, due, { assigneeCount: 1 })).toBe(true);
+    expect(
+      assigneeDeliveryTiming(ut, due, { assigneeCount: 1 }),
+    ).toBe('early');
+  });
+
+  it('evening completion same due day in display timezone is on time', () => {
+    // Jan 15 11pm America/Mexico_City ≈ Jan 16 05:00 UTC wall-clock stored as naive datetime
+    const ut = {
+      status: 'COMPLETED',
+      completedAt: '2026-01-16T05:00:00',
+    };
+    const due = '2026-01-15T23:59:59';
+    expect(isAssigneeCompletionOnTime(ut, due, { assigneeCount: 1 })).toBe(true);
+    expect(assigneeDeliveryTiming(ut, due, { assigneeCount: 1 })).toBe('on_time');
+  });
+
   it('uses assignee completedAt, not task finishDate, for multi-assignee tasks', () => {
     const ut = {
       status: 'COMPLETED',

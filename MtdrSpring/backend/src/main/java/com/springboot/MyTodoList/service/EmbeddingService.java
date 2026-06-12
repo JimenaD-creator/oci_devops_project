@@ -3,6 +3,7 @@ package com.springboot.MyTodoList.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springboot.MyTodoList.config.GeminiApiConfiguration;
+import com.springboot.MyTodoList.config.VectorSearchProperties;
 import com.springboot.MyTodoList.dto.SimilarSprintInsightMatch;
 import com.springboot.MyTodoList.model.SprintInsight;
 import com.springboot.MyTodoList.model.SprintInsightEmbedding;
@@ -29,6 +30,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,6 +54,9 @@ public class EmbeddingService {
 
     @Autowired
     private GeminiApiConfiguration geminiApiConfiguration;
+
+    @Autowired
+    private VectorSearchProperties vectorSearchProperties;
 
     @Autowired
     private TaskEmbeddingRepository embeddingRepository;
@@ -219,13 +225,13 @@ public class EmbeddingService {
 
     private double[] generateEmbedding(String texto) throws Exception {
         geminiApiConfiguration.requireConfigured();
+        int dimensions = vectorSearchProperties.getDimensions();
 
-        String body = mapper.writeValueAsString(Map.of(
-            "model", "models/gemini-embedding-001",
-            "content", Map.of(
-                "parts", List.of(Map.of("text", texto))
-            )
-        ));
+        Map<String, Object> bodyMap = new LinkedHashMap<>();
+        bodyMap.put("model", "models/gemini-embedding-001");
+        bodyMap.put("content", Map.of("parts", List.of(Map.of("text", texto))));
+        bodyMap.put("outputDimensionality", dimensions);
+        String body = mapper.writeValueAsString(bodyMap);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(EMBEDDING_URL + "?key=" + geminiApiConfiguration.getApiKey()))
@@ -251,7 +257,28 @@ public class EmbeddingService {
         for (int i = 0; i < values.size(); i++) {
             vector[i] = values.get(i).asDouble();
         }
-        return vector;
+        return normalizeEmbeddingVector(vector, dimensions);
+    }
+
+    /**
+     * Oracle VECTOR columns are fixed width (e.g. 768). gemini-embedding-001 defaults to 3072 unless
+     * {@code outputDimensionality} is set — truncate defensively when the API still returns a longer vector.
+     */
+    static double[] normalizeEmbeddingVector(double[] vector, int expectedDimensions) {
+        if (vector == null) {
+            throw new IllegalArgumentException("Embedding vector is null");
+        }
+        if (expectedDimensions <= 0) {
+            throw new IllegalArgumentException("expectedDimensions must be positive");
+        }
+        if (vector.length == expectedDimensions) {
+            return vector;
+        }
+        if (vector.length > expectedDimensions) {
+            return Arrays.copyOf(vector, expectedDimensions);
+        }
+        throw new IllegalStateException(
+            "Embedding API returned " + vector.length + " dimensions but " + expectedDimensions + " were expected");
     }
 
     // ─────────────────────────────────────────────────────────────────────────

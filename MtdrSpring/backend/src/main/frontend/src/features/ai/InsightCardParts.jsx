@@ -34,6 +34,7 @@ import {
   alignKpiProseForMetric,
   alignCompletionRatePercentLabels,
   stripContradictoryOnTimeDecline,
+  stripContradictoryOnTimeDeliveryProblems,
   reconcileOnTimeDeliveryConcernProse,
   alignProductivityScoreProse,
   alignProductivityTrendDelta,
@@ -95,6 +96,10 @@ export function AlertCard({ alert, currentSprintMetrics = null }) {
   messageText = alignAlertMessagePercent(messageText, effectiveAlertValue);
   if (currentSprintMetrics?.onTimeDelivery != null) {
     messageText = stripContradictoryOnTimeDecline(messageText, currentSprintMetrics.onTimeDelivery);
+    messageText = stripContradictoryOnTimeDeliveryProblems(
+      messageText,
+      currentSprintMetrics.onTimeDelivery,
+    );
     messageText = reconcileOnTimeDeliveryConcernProse(
       messageText,
       currentSprintMetrics.onTimeDelivery,
@@ -472,6 +477,7 @@ export function ExecutiveSummaryBlock({
         : withKpis;
     if (alignedMetrics?.onTimeDelivery != null) {
       out = stripContradictoryOnTimeDecline(out, alignedMetrics.onTimeDelivery);
+      out = stripContradictoryOnTimeDeliveryProblems(out, alignedMetrics.onTimeDelivery);
       out = reconcileOnTimeDeliveryConcernProse(out, alignedMetrics.onTimeDelivery);
     }
     if (productivityDeltaPoints != null) {

@@ -373,14 +373,38 @@ export function stripProductivityLowScoreExcuses(text, timeline) {
 }
 
 const EVOLUTION_NOTE_ALREADY =
-  /\b(?:will\s+update|will\s+change|will\s+keep\s+updating|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|during\s+the\s+sprint|tasks?\s+progress|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins|still\s+open|sprint\s+(?:is\s+)?(?:still\s+)?open|pending\s+task|live\s+snapshot|not\s+yet\s+done|not\s+a\s+final|active\s+tasks?|marked\s+done|updates?\s+as\s+more|change\s+during)\b/i;
+  /\b(?:will\s+update|will\s+change|will\s+keep\s+updating|keeps?\s+updating|continues?\s+to\s+update|as\s+the\s+sprint\s+(?:runs|progresses)|during\s+the\s+sprint|tasks?\s+progress|task\s+(?:progress|updates?)|once\s+(?:the\s+)?sprint\s+begins|once\s+work\s+begins|still\s+open|sprint\s+(?:is\s+)?(?:still\s+)?open|pending\s+task|live\s+snapshot|not\s+yet\s+done|not\s+a\s+final|active\s+tasks?|marked\s+done|updates?\s+as\s+more|change\s+during|not\s+a\s+final\s+grade\s+while\s+the\s+sprint\s+is\s+open)\b/i;
 
-/** Short forward-looking note (not an excuse for a low %). Never used when the sprint has ended. */
-export function productivityEvolutionNote(timeline) {
-  const phase = timeline?.phase;
-  if (phase === 'ended') {
+/** True when delivery should read as final — sprint window closed or every task is Done. */
+export function isSprintDeliveryFinalized(timeline, kpis = {}) {
+  if (timeline?.phase === 'ended') return true;
+  const cr = Number(kpis.completionRate);
+  if (Number.isFinite(cr) && cr >= 100) return true;
+  const total = Number(kpis.totalTasks);
+  const completed = Number(kpis.completedTasks);
+  return Number.isFinite(total) && total > 0 && Number.isFinite(completed) && completed >= total;
+}
+
+/** Removes forward-looking "sprint still open" evolution sentences. */
+export function stripProductivityOpenSprintEvolutionNotes(text) {
+  if (text == null) return text;
+  const raw = String(text).trim();
+  if (!raw) return raw;
+  const parts = raw.split(/(?<=[.!?])\s+/);
+  if (parts.length <= 1) {
+    return EVOLUTION_NOTE_ALREADY.test(raw) ? '' : raw;
+  }
+  const kept = parts.map((p) => p.trim()).filter((p) => p && !EVOLUTION_NOTE_ALREADY.test(p));
+  const out = kept.join(' ').trim();
+  return out || '';
+}
+
+/** Short forward-looking note (not an excuse for a low %). Never used when delivery is finalized. */
+export function productivityEvolutionNote(timeline, kpis = {}) {
+  if (isSprintDeliveryFinalized(timeline, kpis)) {
     return '';
   }
+  const phase = timeline?.phase;
   if (phase === 'not_started') {
     return (
       'It will update once the sprint begins and tasks move through statuses, ' +
@@ -414,32 +438,26 @@ export function appendProductivityEndedSprintClosing(text, timeline) {
   return `${raw} ${PRODUCTIVITY_ENDED_SPRINT_CLOSING}`;
 }
 
-/** Removes forward-looking evolution sentences when the sprint has already ended. */
-export function stripProductivityEvolutionNotesForEndedSprint(text, timeline) {
-  if (text == null || timeline?.phase !== 'ended') return text;
-  const raw = String(text).trim();
-  if (!raw) return raw;
-  const parts = raw.split(/(?<=[.!?])\s+/);
-  if (parts.length <= 1) {
-    return EVOLUTION_NOTE_ALREADY.test(raw) ? '' : raw;
-  }
-  const kept = parts.map((p) => p.trim()).filter((p) => p && !EVOLUTION_NOTE_ALREADY.test(p));
-  const out = kept.join(' ').trim();
-  return out || raw;
+/** Removes forward-looking evolution sentences when the sprint has ended or scope is fully done. */
+export function stripProductivityEvolutionNotesForEndedSprint(text, timeline, kpis = {}) {
+  if (text == null || !isSprintDeliveryFinalized(timeline, kpis)) return text;
+  return stripProductivityOpenSprintEvolutionNotes(text);
 }
 
-/** Appends evolution note when sprint has not started or is still in progress. */
-export function appendProductivityEvolutionNote(text, timeline) {
+/** Appends evolution note when sprint has not started or is still in progress with open scope. */
+export function appendProductivityEvolutionNote(text, timeline, kpis = {}) {
   if (text == null) return text;
+  if (isSprintDeliveryFinalized(timeline, kpis)) {
+    return stripProductivityOpenSprintEvolutionNotes(text);
+  }
   const phase = timeline?.phase;
-  if (phase === 'ended') return stripProductivityEvolutionNotesForEndedSprint(text, timeline);
   const needsNote = phase === 'in_progress' || phase === 'not_started';
   if (!needsNote) return text;
-  const note = productivityEvolutionNote(timeline);
+  const note = productivityEvolutionNote(timeline, kpis);
   if (!note) return text;
   const raw = String(text).trim();
   if (!raw) return note;
-  if (EVOLUTION_NOTE_ALREADY.test(raw)) return raw;
+  if (EVOLUTION_NOTE_ALREADY.test(raw)) return stripProductivityOpenSprintEvolutionNotes(raw) || raw;
   return `${raw} ${note}`;
 }
 
@@ -480,7 +498,7 @@ function productivityScorePercentPresent(text, score) {
 /**
  * KPI Manager Guide: always show current score % even when excuse-stripping left only the evolution note.
  */
-export function finalizeProductivityManagerGuideText(text, score, sprint = null) {
+export function finalizeProductivityManagerGuideText(text, score, sprint = null, kpis = {}) {
   const display = formatProductivityScoreDisplay(score);
   if (!display) return String(text ?? '').trim();
   let out = String(text ?? '').trim();
@@ -489,11 +507,13 @@ export function finalizeProductivityManagerGuideText(text, score, sprint = null)
     out = out ? `${lead} ${out}` : lead;
   }
   const timeline = resolveSprintTimelineContext(sprint);
-  if (timeline.phase === 'ended') {
-    out = stripProductivityEvolutionNotesForEndedSprint(out, timeline);
-    out = appendProductivityEndedSprintClosing(out, timeline);
+  if (isSprintDeliveryFinalized(timeline, kpis)) {
+    out = stripProductivityEvolutionNotesForEndedSprint(out, timeline, kpis);
+    if (timeline.phase === 'ended') {
+      out = appendProductivityEndedSprintClosing(out, timeline);
+    }
   } else if (timeline.phase === 'not_started' || timeline.phase === 'in_progress') {
-    out = appendProductivityEvolutionNote(out, timeline);
+    out = appendProductivityEvolutionNote(out, timeline, kpis);
   }
   return polishProductivityGuideProse(out.trim());
 }
@@ -518,8 +538,8 @@ export function softenProductivityGuideForSprintPhase(text, timeline) {
  * @param {number} score
  * @param {{ startDate?: string, dueDate?: string, start_date?: string, due_date?: string }|null} [sprint]
  */
-export function buildProductivityKpiAnalyticsGuideLine(score, sprint = null) {
-  return finalizeProductivityManagerGuideText('', score, sprint);
+export function buildProductivityKpiAnalyticsGuideLine(score, sprint = null, kpis = {}) {
+  return finalizeProductivityManagerGuideText('', score, sprint, kpis);
 }
 
 /** @deprecated Use buildProductivityKpiAnalyticsGuideLine for KPI Analytics. */

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -70,4 +71,9 @@ public interface UserTaskRepository extends JpaRepository<UserTask, UserTaskId> 
                     + "AND (ut.status IS NULL OR UPPER(ut.status) NOT IN ('DONE', 'COMPLETED', 'COMPLETE')) "
                     + "AND ut.completedAt IS NULL")
     List<UserTask> findAssignmentsDueBefore(@Param("windowEnd") java.time.LocalDateTime windowEnd);
+
+    @Query(
+            "SELECT ut.id.taskId, COUNT(ut) FROM UserTask ut "
+                    + "WHERE ut.id.taskId IN :taskIds GROUP BY ut.id.taskId")
+    List<Object[]> countAssigneesGroupedByTaskId(@Param("taskIds") Collection<Long> taskIds);
 }

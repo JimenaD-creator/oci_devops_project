@@ -433,23 +433,21 @@ public class GeminiService {
     private PerformanceStats aggregatePerformanceStats(List<UserTask> myTasks) {
         PerformanceStats stats = new PerformanceStats();
         stats.taskDetails = new ArrayList<>();
-        Map<Long, Integer> assigneeCountByTask = new HashMap<>();
+        Set<Long> taskIds = new LinkedHashSet<>();
         for (UserTask ut : myTasks) {
             Task t = ut.getTask();
-            if (t == null || t.getId() == null) {
-                continue;
+            if (t != null && t.getId() != null) {
+                taskIds.add(t.getId());
             }
-            assigneeCountByTask.merge(t.getId(), 1, Integer::sum);
         }
+        Map<Long, Integer> assigneeCountByTask = loadAssigneeCountByTaskIds(taskIds);
         for (UserTask ut : myTasks) {
             Task t = ut.getTask();
             if (t == null) {
                 continue;
             }
             stats.total++;
-            boolean isDone = UserTask.isCompletedAssignmentStatus(ut.getStatus())
-                || (t.getStatus() != null && "DONE".equalsIgnoreCase(t.getStatus().trim()));
-            if (isDone) {
+            if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
                 stats.completed++;
                 int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
                 Boolean onTimeFlag = UserTaskOnTimeUtil.evaluateAssignmentOnTime(ut, t, assigneeCount);
@@ -481,6 +479,10 @@ public class GeminiService {
                 } else if (t.getFinishDate() != null) {
                     td.put("finishDate", t.getFinishDate().toString());
                 }
+                if (UserTask.isCompletedAssignmentStatus(ut.getStatus())) {
+                    int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                    UserTaskOnTimeUtil.enrichAssignmentTimingFields(td, ut, t, assigneeCount);
+                }
                 if (Boolean.TRUE.equals(ut.getIsBlocked())) {
                     td.put("blocked", true);
                     if (ut.getBlockedReason() != null && !ut.getBlockedReason().isBlank()) {
@@ -494,6 +496,20 @@ public class GeminiService {
         int onTimeKnown = stats.onTime + stats.late;
         stats.onTimeRate = onTimeKnown > 0 ? (stats.onTime * 100.0 / onTimeKnown) : 0.0;
         return stats;
+    }
+
+    private Map<Long, Integer> loadAssigneeCountByTaskIds(Set<Long> taskIds) {
+        Map<Long, Integer> counts = new HashMap<>();
+        if (taskIds == null || taskIds.isEmpty()) {
+            return counts;
+        }
+        for (Object[] row : userTaskRepository.countAssigneesGroupedByTaskId(taskIds)) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                continue;
+            }
+            counts.put(((Number) row[0]).longValue(), ((Number) row[1]).intValue());
+        }
+        return counts;
     }
 
     private String formatSprintContextForSummary(Sprint sprint) {
@@ -560,7 +576,13 @@ public class GeminiService {
             + "\"bad\", \"poor\", \"concerning\", \"alarming\", \"critical\" about their results. Focus on what will happen once work starts, "
             + "and frame suggestions as gentle preparation (e.g. \"once the sprint is underway, you can...\").\n"
             + "- Even when the sprint is in progress, keep the tone supportive and coaching-oriented. Describe metrics neutrally "
-            + "and suggest 1–2 specific improvements without sounding harsh or judgmental.\n\n"
+            + "and suggest 1–2 specific improvements without sounding harsh or judgmental.\n"
+            + "- onTimeCompletedTasks and lateCompletedTasks are authoritative for on-time counts. "
+            + "Never say work was finished after the due date when lateCompletedTasks is 0. "
+            + "When lateCompletedTasks is 0 and onTimeCompletedTasks equals completedTasks (all > 0), "
+            + "state clearly that every completed assignment was on time.\n"
+            + "- taskDetails[].onTime and taskDetails[].deliveryTiming (early | on_time | late) are computed from "
+            + "assigneeCompletedAt vs dueCalendarDay — never contradict them.\n\n"
             + "Cover: overall completion, on-time delivery, hours logged, blocked work if any, how radar "
             + "scores compare to the team (if provided), one concrete improvement tip, and a brief motivational close. "
             + "Address the developer as " + firstName + ".";
@@ -838,6 +860,7 @@ public class GeminiService {
                 int taskRows;
                 int completedTasks;
                 int onTimeCompletedTasks;
+                int earlyCompletedTasks;
                 int lateCompletedTasks;
                 int unknownCompletionTiming;
                 int completedWithZeroHours;
@@ -889,6 +912,9 @@ public class GeminiService {
                         a.unknownCompletionTiming++;
                     } else if (onTime) {
                         a.onTimeCompletedTasks++;
+                        if ("early".equals(UserTaskOnTimeUtil.evaluateDeliveryTiming(ut, t, assigneeCount))) {
+                            a.earlyCompletedTasks++;
+                        }
                     } else {
                         a.lateCompletedTasks++;
                     }
@@ -928,6 +954,10 @@ public class GeminiService {
                         if (ut.getBlockedReason() != null && !ut.getBlockedReason().isBlank()) {
                             sm.put("blockedReason", ut.getBlockedReason().trim());
                         }
+                    }
+                    if (isUserTaskAssignmentComplete(ut)) {
+                        int assigneeCount = assigneeCountByTask.getOrDefault(t.getId(), 1);
+                        UserTaskOnTimeUtil.enrichAssignmentTimingFields(sm, ut, t, assigneeCount);
                     }
                     a.taskSamples.add(sm);
                 }
@@ -1009,6 +1039,7 @@ public class GeminiService {
                 row.put("pendingTaskRows", Math.max(0, a.taskRows - a.completedTasks));
                 row.put("pendingAssignedHoursSum", a.pendingAssignedHours);
                 row.put("onTimeCompletedTasks", a.onTimeCompletedTasks);
+                row.put("earlyCompletedTasks", a.earlyCompletedTasks);
                 row.put("lateCompletedTasks", a.lateCompletedTasks);
                 row.put("unknownCompletionTiming", a.unknownCompletionTiming);
                 row.put("completedWithZeroHours", a.completedWithZeroHours);
@@ -1309,7 +1340,9 @@ public class GeminiService {
             + "Counts must still match the integers in \"Canonical status totals\".\n"
             + "- Anti-meta: Do not quote, paraphrase, or paste long internal instructions, metric definitions, or methodology from this prompt into user-facing strings. Write naturally for a PM or engineering lead — short, concrete coaching, not spec language.\n" +
             "- alerts: severity must follow the numeric 'value' on the 0-100 scale for the five main KPIs: 'critical' only if value < 40 (or the message states a 20+ point drop across 2+ sprints), " +
-            "'warning' only if 40 <= value < 60, and 'info' if value >= 60. For efficiencyScore and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
+            "'warning' only if 40 <= value < 60, and 'info' if value >= 60 — EXCEPT when Sprint timeline.phase is ended and completionRate is below 100: incomplete scope at sprint close is a delivery gap; use severity 'warning' if completionRate >= 40 and 'critical' if completionRate < 40, never 'info' solely because completionRate >= 60. " +
+            "For efficiencyScore and productivityScore, 100 is a strong/ideal score, not a problem — never use 'warning' or 'critical' solely because participation or productivity is high; that contradicts the scale. " +
+            "When onTimeDelivery is >= 90 (especially 100), do NOT create alerts or estimates recommendations about delays, missed due dates, or refining estimation for late work — state that completed assignments were on time or omit on-time alerts entirely. " +
             "When Sprint timeline.phase is not_started OR isEarlySnapshot is true: use alerts: [] OR only blocker/workload-planning alerts — never critical/warning for completionRate, onTimeDelivery, efficiencyScore, or productivityScore at 0% because work has not started or just began. " +
             "For workloadBalance, values >= 70 mean reasonably balanced work distribution; 'warning' typically applies when value is below 70. For blocker-related alerts, prefer severity 'warning' when the blocked-assignment list is non-empty; do not put a 0-100 percentage in 'value' for those — omit 'value' or use the count of blocked rows. Use [] if there are no alerts.\n" +
             "- actionableRecommendations: 3-8 items when useful if phase is in_progress or ended; if phase is not_started, follow the \"Sprint not started yet\" limits above instead. If phase is in_progress and (task counts show any tasks OR team workload is non-empty), include at least 2 items grounded in task counts by status, sample tasks in team workload (respecting task startDate vs asOf), blocked-assignment list above, or KPIs — but do not add filler recommendations for tasks whose startDate is after asOf. category must be one of: workload_redistribution, estimates, planning, training, blockers. Use [] only when there is truly no task or team data, or when not_started rules cap recommendations.\n" +
@@ -1329,7 +1362,14 @@ public class GeminiService {
             "  When overloaded=true, the same developer's 'insight' text must explicitly justify it in plain English (cite the higher hours or task count vs the team, or the urgent/blocked work driving the pressure), mention that uncompleted work remains, and name a specific teammate to receive moved tasks (use the least-loaded assignee by pendingTaskRows/pendingAssignedHoursSum who is not in the blocked-assignments list).\n" +
             "  When overloaded=false, developerInsights insight text must describe workload and delivery facts only — do NOT recommend moving, rebalancing, redistributing, or shifting tasks to teammates. Those suggestions belong in workloadRecommendations / actionableRecommendations, not in the per-developer insight row.\n" +
             "  If the blocked-assignment list includes a developer, mention their blocked task(s) and reason in that developer's insight (plain language only).\n" +
-            "  Use completedTasks, onTimeCompletedTasks, and lateCompletedTasks to evaluate delivery quality per developer (on-time vs late outcomes).\n" +
+            "  Use completedTasks, onTimeCompletedTasks, earlyCompletedTasks, and lateCompletedTasks to evaluate delivery quality. "
+            + "Each taskSamples entry includes assigneeCompletedAt, dueCalendarDay, completedCalendarDay, onTime, and deliveryTiming "
+            + "(early = finished before the due calendar day; on_time = same day or on due day; late = after due day). "
+            + "These fields are authoritative: when lateCompletedTasks is 0 and onTimeCompletedTasks equals completedTasks (all > 0), "
+            + "state that all completed work was on or before the due date — never claim late or after-deadline delivery. "
+            + "When lateCompletedTasks is 0, never phrase delivery as if only some tasks were on time "
+            + "(forbidden: 'with N tasks finished ahead of schedule' after 'all on time' — early and on-due-day both count as on time). "
+            + "Say 'Completed all N assignments on or before the due date' and stop; optional one clause 'including M before the due date' only if helpful.\n" +
             "  Data-quality guardrail: if completedWithZeroHours > 0 or workedHoursSum is 0 while completedTasks > 0, do NOT praise this as strong performance; explicitly flag missing/inconsistent hour logging and request timesheet validation.\n" +
             "  When completedTasks is 0 for everyone, still return one developerInsights entry per person in Team workload (concise English with workload vs peers, assigned hours/rows, roster-only, or that no completed work appears in the snapshot yet). Do not omit developers solely because completions are zero. If phase is not_started, keep these neutral (planned/upcoming work only; no implied underperformance).\n" +
             "- predictions: all three string fields in English, grounded in the KPIs/trends and Task counts by status; for in_progress sprints, frame outlook/risks/delivery as conditional on remaining time (not only post-mortem). productivityOutlook may cite score trajectory; risks should mention blockers or delivery gaps when relevant; deliveryEstimate compares pace to plan.\n" +
@@ -1525,6 +1565,8 @@ public class GeminiService {
         ensureWorkloadGuidanceFromAssignments(copy, sprintId, sprint);
         applyOverloadGuardrails(copy, sprintId);
         finalizeDeveloperInsightNarratives(copy);
+        removeContradictoryOnTimeDeliveryAlerts(copy, sprintId);
+        pruneContradictoryOnTimeRecommendations(copy, sprintId);
         liveApplyCache.put(liveKey, new CachedEnrichedInsights(copy, now + LIVE_APPLY_CACHE_MS));
         if (liveApplyCache.size() > 80) {
             liveApplyCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
@@ -1557,9 +1599,12 @@ public class GeminiService {
             enrichExecutiveSummaryIfSparse(root);
             injectTaskStatusBreakdownAndOverviewLead(root, sprintId);
             injectBlockedAssignmentsSnapshot(root, sprintId);
-            normalizeAlertSeverities(root);
+            normalizeAlertSeverities(root, sprintId);
+            ensureEndedSprintIncompleteCompletionAlert(root, sprintId);
             filterPrematureSprintKpiAlerts(root, sprintId);
             removeContradictoryWorkloadBalanceAlerts(root, sprintId);
+            removeContradictoryOnTimeDeliveryAlerts(root, sprintId);
+            pruneContradictoryOnTimeRecommendations(root, sprintId);
             injectSprintHoursCompletionAlert(root, sprintId);
             enrichKpiManagerGuideIfEmpty(root, sprintId);
             normalizeKpiManagerGuidePercentSpacing(root);
@@ -2407,6 +2452,9 @@ public class GeminiService {
                 int pending = Math.max(0, assignedRows - completed);
                 o.put("pendingAssignments", pending);
                 o.put("liveCompletedTasks", completed);
+                o.put("liveOnTimeCompletedTasks", row.path("onTimeCompletedTasks").asInt(0));
+                o.put("liveEarlyCompletedTasks", row.path("earlyCompletedTasks").asInt(0));
+                o.put("liveLateCompletedTasks", row.path("lateCompletedTasks").asInt(0));
                 o.put("liveWorkedHours", row.path("workedHoursSum").asDouble(0));
                 o.put("liveDataSynced", true);
             }
@@ -2631,6 +2679,11 @@ public class GeminiService {
         if (!overloaded) {
             ai = stripRedistributionGuidanceFromNarrative(ai);
         }
+        ai = reconcileAiNarrativeWithLiveOnTime(
+                ai,
+                o.path("liveLateCompletedTasks").asInt(-1),
+                o.path("liveOnTimeCompletedTasks").asInt(-1),
+                o.path("liveCompletedTasks").asInt(-1));
 
         if (!ai.isEmpty()) {
             StringBuilder sb = new StringBuilder(ai);
@@ -2703,7 +2756,13 @@ public class GeminiService {
         int completedLive = row.path("liveCompletedTasks").asInt(-1);
         double workedLive = row.path("liveWorkedHours").asDouble(-1);
 
-        if (aiNarrativeFactsStaleVsLive(aiNarrative, pendingLive, completedLive, workedLive, live)) {
+        if (aiNarrativeFactsStaleVsLive(
+                aiNarrative,
+                pendingLive,
+                completedLive,
+                workedLive,
+                live,
+                row.path("liveLateCompletedTasks").asInt(-1))) {
             return true;
         }
 
@@ -2726,7 +2785,8 @@ public class GeminiService {
             int pendingLive,
             int completedLive,
             double workedLive,
-            String live) {
+            String live,
+            int liveLate) {
         if (ai == null || ai.isBlank() || live == null || live.isBlank()) {
             return false;
         }
@@ -2762,7 +2822,137 @@ public class GeminiService {
             }
         }
 
+        if (liveLate == 0 && mentionsLateDelivery(ai)) {
+            return true;
+        }
+        if (liveLate >= 0) {
+            Integer aiLate = extractLateCountFromAiNarrative(ai);
+            if (aiLate != null && aiLate != liveLate) {
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    private static boolean mentionsLateDelivery(String ai) {
+        if (ai == null || ai.isBlank()) {
+            return false;
+        }
+        String a = ai.toLowerCase(Locale.ROOT);
+        return a.contains("after the due date")
+                || a.contains("after their due date")
+                || a.contains("after the deadline")
+                || a.contains("finished late")
+                || a.contains("were late")
+                || a.contains("was late")
+                || a.contains("missed the deadline")
+                || a.contains("not on time")
+                || a.contains("behind schedule");
+    }
+
+    private static Integer extractLateCountFromAiNarrative(String ai) {
+        if (ai == null || ai.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "(\\d+)\\s+(?:tasks?|assignments?).{0,48}?(?:after|late|deadline)",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(ai);
+        if (m.find()) {
+            return Integer.parseInt(m.group(1));
+        }
+        m = java.util.regex.Pattern.compile(
+                "(?:though|but|with)\\s+(\\d+)\\s+(?:were|was)",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(ai);
+        if (m.find() && mentionsLateDelivery(ai)) {
+            return Integer.parseInt(m.group(1));
+        }
+        return null;
+    }
+
+    private static final Pattern LATE_DELIVERY_SENTENCE = Pattern.compile(
+            ".*\\b(?:"
+                    + "after (?:their |the )?due date|after the deadline|finished late|"
+                    + "were late|was late|late delivery|not on time|missed (?:the )?deadline|"
+                    + "behind schedule|though \\d+ were|deadlines? (?:are|were) monitored"
+                    + ")\\b.*",
+            Pattern.CASE_INSENSITIVE);
+
+    /** Drops Gemini late-delivery claims when live USER_TASK rows show zero late completions. */
+    private static String reconcileAiNarrativeWithLiveOnTime(
+            String ai, int liveLate, int liveOnTime, int liveCompleted) {
+        if (ai == null || ai.isBlank() || liveLate < 0) {
+            return ai == null ? "" : ai;
+        }
+        if (liveLate > 0) {
+            return ai;
+        }
+        boolean allKnownOnTime = liveCompleted > 0 && liveOnTime >= liveCompleted;
+        boolean contradicts = mentionsLateDelivery(ai)
+                || (extractLateCountFromAiNarrative(ai) != null && extractLateCountFromAiNarrative(ai) > 0);
+        String out = ai;
+        if (liveLate == 0 && (allKnownOnTime || contradicts)) {
+            out = stripLateDeliverySentences(out);
+        }
+        if (liveLate == 0 && allKnownOnTime) {
+            out = clarifyAllOnTimeDeliveryWording(out, liveCompleted);
+        }
+        return out;
+    }
+
+    /**
+     * Gemini often writes "all N on time, with 3 ahead of schedule" — early counts as on time;
+     * that wording sounds like only 3 of N were on time.
+     */
+    private static String clarifyAllOnTimeDeliveryWording(String ai, int completed) {
+        if (ai == null || ai.isBlank() || completed <= 0) {
+            return ai == null ? "" : ai;
+        }
+        String factual = String.format(
+            Locale.ROOT,
+            "Completed all %d assigned task%s on or before the due date",
+            completed,
+            completed == 1 ? "" : "s");
+        String out = ai.trim();
+        out = out.replaceAll(
+            "(?i),?\\s*with\\s+\\d+\\s+tasks?\\s+finished\\s+(?:ahead of schedule|early|before the due date)\\b",
+            "");
+        out = out.replaceAll(
+            "(?i)completed\\s+all\\s+\\d+\\s+(?:assigned\\s+)?tasks?\\s+on\\s+time\\b",
+            factual);
+        out = out.replaceAll(
+            "(?i)completed\\s+all\\s+\\d+\\s+(?:assigned\\s+)?tasks?\\s+on\\s+or\\s+before\\s+the\\s+due\\s+date\\b",
+            factual);
+        return out.replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private static String stripLateDeliverySentences(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String trimmed = text.trim();
+        String[] parts = trimmed.split("(?<=[.!?])\\s+");
+        if (parts.length <= 1) {
+            return LATE_DELIVERY_SENTENCE.matcher(trimmed).matches() ? "" : trimmed;
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String part : parts) {
+            String sentence = part == null ? "" : part.trim();
+            if (sentence.isEmpty()) {
+                continue;
+            }
+            if (LATE_DELIVERY_SENTENCE.matcher(sentence).matches()) {
+                continue;
+            }
+            if (kept.length() > 0) {
+                kept.append(' ');
+            }
+            kept.append(sentence);
+            if (!sentence.endsWith(".") && !sentence.endsWith("!") && !sentence.endsWith("?")) {
+                kept.append('.');
+            }
+        }
+        return kept.toString().trim();
     }
 
     private static Integer extractCompletedCountFromAiNarrative(String ai) {
@@ -2808,6 +2998,7 @@ public class GeminiService {
         boolean projectTeamOnly = row.path("fromProjectTeamOnly").asBoolean(false);
         int completed = row.path("completedTasks").asInt(0);
         int onTime = row.path("onTimeCompletedTasks").asInt(0);
+        int early = row.path("earlyCompletedTasks").asInt(0);
         int late = row.path("lateCompletedTasks").asInt(0);
         int unknown = row.path("unknownCompletionTiming").asInt(0);
         double worked = row.path("workedHoursSum").asDouble(0);
@@ -2832,7 +3023,16 @@ public class GeminiService {
                 sb.append(
                     "; completion time is not recorded yet (set USER_TASK.COMPLETED_AT or re-complete to judge on-time delivery).");
             } else if (late == 0 && onTime > 0) {
-                sb.append(", all finished on or before the due date.");
+                if (early > 0 && early == onTime) {
+                    sb.append(", all finished before the due date.");
+                } else if (early > 0) {
+                    sb.append(String.format(
+                        ", all on time (%d before the due date, %d on the due day).",
+                        early,
+                        onTime - early));
+                } else {
+                    sb.append(", all finished on or before the due date.");
+                }
             } else if (onTime == 0 && late > 0) {
                 sb.append(", all finished after the deadline.");
             } else if (late > 0 && onTime > 0) {
@@ -3657,13 +3857,24 @@ public class GeminiService {
         java.time.LocalDate today = now.toLocalDate();
         java.time.LocalDate startDay = start.toLocalDate();
         java.time.LocalDate dueDay = due.toLocalDate();
+        LocalDateTime endOfDueDay = dueDay.atTime(23, 59, 59, 999_999_999);
         if (today.isBefore(startDay)) {
             return "not_started";
         }
-        if (today.isAfter(dueDay)) {
+        if (now.isAfter(endOfDueDay)) {
             return "ended";
         }
         return "in_progress";
+    }
+
+    private static boolean isSprintDeliveryFinalized(Sprint sprint, Map<String, Object> liveKpis) {
+        if ("ended".equals(resolveSprintPhase(sprint))) {
+            return true;
+        }
+        if (liveKpis == null) {
+            return false;
+        }
+        return GeminiInsightKpiAlignUtil.intMetric(liveKpis, "completionRate") >= 100;
     }
 
     private static boolean isSprintEarlyForProductivityGuide(Sprint sprint) {
@@ -3766,11 +3977,11 @@ public class GeminiService {
             + "not\\s+yet\\s+done|not\\s+a\\s+final|active\\s+tasks?|marked\\s+done|"
             + "updates?\\s+as\\s+more|change\\s+during)\\b");
 
-    private static String productivityEvolutionNote(Sprint sprint) {
-        String phase = resolveSprintPhase(sprint);
-        if ("ended".equals(phase)) {
+    private static String productivityEvolutionNote(Sprint sprint, Map<String, Object> liveKpis) {
+        if (isSprintDeliveryFinalized(sprint, liveKpis)) {
             return "";
         }
+        String phase = resolveSprintPhase(sprint);
         if ("not_started".equals(phase)) {
             return "It will update once the sprint begins and tasks move through statuses, "
                 + "assignments, and logged hours feed the four KPIs.";
@@ -3807,8 +4018,9 @@ public class GeminiService {
     }
 
     /** Drops forward-looking evolution sentences once the sprint calendar has ended. */
-    private static String stripProductivityEvolutionNotesForEndedSprint(String text, Sprint sprint) {
-        if (text == null || text.isBlank() || !"ended".equals(resolveSprintPhase(sprint))) {
+    private static String stripProductivityEvolutionNotesForEndedSprint(
+            String text, Sprint sprint, Map<String, Object> liveKpis) {
+        if (text == null || text.isBlank() || !isSprintDeliveryFinalized(sprint, liveKpis)) {
             return text;
         }
         String[] parts = text.split("(?<=[.!?])\\s+");
@@ -3832,21 +4044,22 @@ public class GeminiService {
         return out.isEmpty() ? text.trim() : out;
     }
 
-    private static String appendProductivityEvolutionNote(String text, Sprint sprint) {
-        if ("ended".equals(resolveSprintPhase(sprint))) {
+    private static String appendProductivityEvolutionNote(
+            String text, Sprint sprint, Map<String, Object> liveKpis) {
+        if (isSprintDeliveryFinalized(sprint, liveKpis)) {
             return stripProductivityEvolutionNotesForEndedSprint(
-                text == null ? "" : text, sprint);
+                text == null ? "" : text, sprint, liveKpis);
         }
         if (text == null || text.isBlank()) {
-            return productivityEvolutionNote(sprint);
+            return productivityEvolutionNote(sprint, liveKpis);
         }
-        String note = productivityEvolutionNote(sprint);
+        String note = productivityEvolutionNote(sprint, liveKpis);
         if (note.isBlank()) {
             return text.trim();
         }
         String raw = text.trim();
         if (PRODUCTIVITY_EVOLUTION_NOTE_ALREADY.matcher(raw).find()) {
-            return raw;
+            return stripProductivityEvolutionNotesForEndedSprint(raw, sprint, liveKpis);
         }
         return raw + " " + note;
     }
@@ -3862,8 +4075,9 @@ public class GeminiService {
     }
 
     /** Align %% with KPI card; keep Gemini prose like other metrics (strip prompt echoes only). */
-    private static String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
+    private String normalizeProductivityScoreGuideText(String existing, int scorePct, Sprint sprint) {
         int clamped = Math.min(100, Math.max(0, scorePct));
+        Map<String, Object> liveKpis = resolveLiveKpisForSprint(sprint);
         if (existing == null || existing.isBlank()) {
             String fallback = String.format(
                 Locale.ROOT,
@@ -3874,7 +4088,7 @@ public class GeminiService {
                 return polishProductivityGuideProse(
                     appendProductivityEndedSprintClosing(fallback, sprint));
             }
-            return polishProductivityGuideProse(appendProductivityEvolutionNote(fallback, sprint));
+            return polishProductivityGuideProse(appendProductivityEvolutionNote(fallback, sprint, liveKpis));
         }
         String out = stripProductivityGuideInstructionEcho(existing);
         out = stripProductivityLowScoreExcuses(out, sprint);
@@ -3882,11 +4096,13 @@ public class GeminiService {
             out = softenProductivityGuidePerformanceLabels(out);
         }
         out = replaceProductivityScoreMentionsInProse(out, clamped);
-        if ("ended".equals(resolveSprintPhase(sprint))) {
-            out = stripProductivityEvolutionNotesForEndedSprint(out, sprint);
-            out = appendProductivityEndedSprintClosing(out, sprint);
+        if (isSprintDeliveryFinalized(sprint, liveKpis)) {
+            out = stripProductivityEvolutionNotesForEndedSprint(out, sprint, liveKpis);
+            if ("ended".equals(resolveSprintPhase(sprint))) {
+                out = appendProductivityEndedSprintClosing(out, sprint);
+            }
         } else {
-            out = appendProductivityEvolutionNote(out, sprint);
+            out = appendProductivityEvolutionNote(out, sprint, liveKpis);
         }
         return polishProductivityGuideProse(out);
     }
@@ -4502,12 +4718,18 @@ public class GeminiService {
     /**
      * Aligns severities with prompt rules: high scores on "higher is better" KPIs are not warnings;
      * when {@code blockedAssignments} is non-empty, blocker-themed alerts are {@code warning}, not info.
+     * Ended sprints with completionRate below 100 are elevated to warning/critical (not info).
      */
-    private void normalizeAlertSeverities(ObjectNode root) {
+    private void normalizeAlertSeverities(ObjectNode root, Long sprintId) {
         JsonNode alertsNode = root.get("alerts");
         if (alertsNode == null || !alertsNode.isArray()) {
             return;
         }
+        Sprint sprint = sprintId != null ? sprintRepository.findById(sprintId).orElse(null) : null;
+        String phase = sprint != null ? resolveSprintPhase(sprint) : "";
+        int liveCr = sprint != null
+            ? GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "completionRate")
+            : -1;
         int blockedCount = 0;
         JsonNode blockedArr = root.get("blockedAssignments");
         if (blockedArr != null && blockedArr.isArray()) {
@@ -4522,6 +4744,23 @@ public class GeminiService {
             ObjectNode o = (ObjectNode) item;
             String kpiRaw = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
             String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            if ("completionrate".equals(kpi)
+                && GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint(phase, liveCr)) {
+                int crVal = o.has("value") && o.get("value").isNumber()
+                    ? (int) Math.round(o.get("value").asDouble())
+                    : liveCr;
+                if (crVal < 0) {
+                    crVal = liveCr;
+                }
+                if (crVal >= 0 && crVal < 100) {
+                    String severity = GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(crVal);
+                    if (severity != null) {
+                        o.put("severity", severity);
+                        o.put("value", crVal);
+                    }
+                    continue;
+                }
+            }
             if (o.has("value") && o.get("value").isNumber()) {
                 double v = o.get("value").asDouble();
                 if ("efficiencyscore".equals(kpi)
@@ -4562,6 +4801,58 @@ public class GeminiService {
                 o.put("severity", "warning");
             }
         }
+    }
+
+    /**
+     * Ensures managers see a delivery-gap alert when a sprint ended with tasks still not Done.
+     */
+    private void ensureEndedSprintIncompleteCompletionAlert(ObjectNode root, Long sprintId) {
+        if (sprintId == null) {
+            return;
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null || !"ended".equals(resolveSprintPhase(sprint))) {
+            return;
+        }
+        int cr = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "completionRate");
+        if (!GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("ended", cr)) {
+            return;
+        }
+        String severity = GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(cr);
+        if (severity == null) {
+            return;
+        }
+        JsonNode alertsNode = root.get("alerts");
+        ArrayNode alerts;
+        if (alertsNode == null || !alertsNode.isArray()) {
+            alerts = mapper.createArrayNode();
+            root.set("alerts", alerts);
+        } else {
+            alerts = (ArrayNode) alertsNode;
+        }
+        for (JsonNode item : alerts) {
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            String kpiRaw = item.path("kpi").isTextual() ? item.get("kpi").asText("").trim() : "";
+            String kpi = kpiRaw.toLowerCase(Locale.ROOT).replace("_", "");
+            String message = item.path("message").isTextual() ? item.get("message").asText("") : "";
+            if ("completionrate".equals(kpi) || message.toLowerCase(Locale.ROOT).contains("completion rate")) {
+                return;
+            }
+        }
+        ObjectNode alert = mapper.createObjectNode();
+        alert.put("kpi", "completionRate");
+        alert.put("severity", severity);
+        alert.put("value", cr);
+        alert.put(
+            "message",
+            String.format(
+                Locale.ROOT,
+                "Completion rate is %d%% — the sprint window has ended but not all tasks are marked Done. "
+                    + "Review incomplete scope and carry over or close remaining work.",
+                cr));
+        alerts.add(alert);
     }
 
     private static final Set<String> EXECUTION_KPI_ALERT_KEYS = Set.of(
@@ -4672,6 +4963,55 @@ public class GeminiService {
      * Drops alerts that claim uneven workload when the sprint KPI is already balanced (&gt;= 70).
      * Gemini sometimes contradicts the numeric workloadBalance score (e.g. 98% + "uneven distribution").
      */
+    private void removeContradictoryOnTimeDeliveryAlerts(ObjectNode root, Long sprintId) {
+        JsonNode alertsNode = root.get("alerts");
+        if (alertsNode == null || !alertsNode.isArray()) {
+            return;
+        }
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        int otd = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "onTimeDelivery");
+        ArrayNode in = (ArrayNode) alertsNode;
+        ArrayNode out = mapper.createArrayNode();
+        for (int i = 0; i < in.size(); i++) {
+            JsonNode item = in.get(i);
+            if (item == null || !item.isObject()) {
+                continue;
+            }
+            ObjectNode o = (ObjectNode) item;
+            String kpi = o.path("kpi").isTextual() ? o.get("kpi").asText("").trim() : "";
+            String message = o.path("message").isTextual() ? o.get("message").asText("") : "";
+            if (GeminiInsightKpiAlignUtil.shouldDropOnTimeDeliveryAlertAtStrongScore(kpi, message, otd)) {
+                continue;
+            }
+            out.add(item);
+        }
+        root.set("alerts", out);
+    }
+
+    private void pruneContradictoryOnTimeRecommendations(ObjectNode root, Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElse(null);
+        if (sprint == null) {
+            return;
+        }
+        int otd = GeminiInsightKpiAlignUtil.intMetric(resolveLiveKpisForSprint(sprint), "onTimeDelivery");
+        ArrayNode actionable = ensureArrayField(root, "actionableRecommendations");
+        ArrayNode kept = mapper.createArrayNode();
+        for (JsonNode n : actionable) {
+            if (!n.isObject()) {
+                continue;
+            }
+            String text = n.path("text").asText("");
+            if (GeminiInsightKpiAlignUtil.shouldDropOnTimeEstimationRecommendation(text, otd)) {
+                continue;
+            }
+            kept.add(n);
+        }
+        root.set("actionableRecommendations", kept);
+    }
+
     private void removeContradictoryWorkloadBalanceAlerts(ObjectNode root, Long sprintId) {
         JsonNode alertsNode = root.get("alerts");
         if (alertsNode == null || !alertsNode.isArray()) {

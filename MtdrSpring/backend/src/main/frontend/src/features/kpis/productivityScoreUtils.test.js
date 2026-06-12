@@ -181,8 +181,34 @@ describe('productivityScoreUtils (KPI Analytics)', () => {
       { startDate: pastStart.toISOString(), dueDate: pastDue.toISOString() },
     );
     expect(out).toContain('healthy and sustainable pace');
-    expect(out).not.toMatch(/keep updating|during the sprint/i);
+    expect(out).not.toMatch(/keep updating|during the sprint|not a final grade/i);
     expect(out).toMatch(/final delivery for the completed sprint window/i);
+  });
+
+  it('finalizeProductivityManagerGuideText strips open-sprint note when all tasks are done', () => {
+    const futureDue = new Date();
+    futureDue.setDate(futureDue.getDate() + 7);
+    const out = finalizeProductivityManagerGuideText(
+      'The Productivity Score is 95%. It updates as more work is marked Done—not a final grade while the sprint is open.',
+      95,
+      { startDate: new Date().toISOString(), dueDate: futureDue.toISOString() },
+      { completionRate: 80, totalTasks: 10, completedTasks: 10 },
+    );
+    expect(out).toContain('Productivity Score is 95%');
+    expect(out).not.toMatch(/not a final grade|marked Done/i);
+  });
+
+  it('finalizeProductivityManagerGuideText strips open-sprint note when completion is 100%', () => {
+    const futureDue = new Date();
+    futureDue.setDate(futureDue.getDate() + 7);
+    const out = finalizeProductivityManagerGuideText(
+      'The Productivity Score is 95%. It updates as more work is marked Done—not a final grade while the sprint is open.',
+      95,
+      { startDate: new Date().toISOString(), dueDate: futureDue.toISOString() },
+      { completionRate: 100 },
+    );
+    expect(out).toContain('Productivity Score is 95%');
+    expect(out).not.toMatch(/not a final grade|marked Done/i);
   });
 
   it('appendProductivityEndedSprintClosing does not duplicate when closing already present', () => {

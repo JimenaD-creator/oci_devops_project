@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -125,6 +126,44 @@ class GeminiServiceTest {
     @Test
     void enrichInsightsForResponse_nullInput_returnsNull() {
         assertNull(geminiService.enrichInsightsForResponse(null, 1L));
+    }
+
+    @Test
+    void enrichInsightsForResponse_stripsStaleLateDeliveryFromDeveloperAnalysis() throws Exception {
+        long sprintId = 42L;
+        LocalDateTime due = LocalDateTime.of(2026, 3, 15, 23, 59, 59);
+        List<UserTask> done = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            UserTask ut = userTaskWithDoneWork(10L, "Diego", 100L + i);
+            ut.getTask().setDueDate(due);
+            ut.setCompletedAt(LocalDateTime.of(2026, 3, 15, 20, 0));
+            done.add(ut);
+        }
+        when(userTaskRepository.findBySprintIdWithUserAndTask(sprintId)).thenReturn(done);
+        when(userSprintRepository.findBySprintIdWithUser(sprintId)).thenReturn(Collections.emptyList());
+        when(sprintRepository.findById(sprintId)).thenReturn(Optional.empty());
+        List<Object[]> statusCounts = new ArrayList<>();
+        statusCounts.add(new Object[] { "DONE", 5L });
+        when(taskRepository.countTasksByStatusForSprint(sprintId)).thenReturn(statusCounts);
+
+        ObjectNode input = MAPPER.createObjectNode();
+        ArrayNode dev = input.putArray("developerInsights");
+        ObjectNode row = dev.addObject();
+        row.put("developerName", "Diego");
+        row.put(
+                "aiNarrative",
+                "Completed 5 tasks, though 2 were finished after their due date. "
+                        + "Performance is consistent, but ensure task deadlines are monitored more closely.");
+        row.put("overloaded", false);
+
+        JsonNode enriched = geminiService.enrichInsightsForResponse(input, sprintId);
+        String insight = enriched.get("developerInsights").get(0).get("insight").asText().toLowerCase(Locale.ROOT);
+        assertFalse(
+                insight.contains("after their due date"),
+                () -> "stale late claim should be removed: " + insight);
+        assertTrue(
+                insight.contains("on or before the due date") || insight.contains("all finished"),
+                () -> "live on-time summary expected: " + insight);
     }
 
     @Test
@@ -340,6 +379,24 @@ class GeminiServiceTest {
         String out = (String) m.invoke(null, row, live, ai, Collections.emptyList());
         assertTrue(out.contains("Current snapshot:"), () -> "unexpected: " + out);
         assertTrue(out.startsWith(ai));
+    }
+
+    @Test
+    void reconcileAiNarrativeWithLiveOnTime_clarifiesMisleadingEarlySubsetWording() throws Exception {
+        Method m = GeminiService.class.getDeclaredMethod(
+            "reconcileAiNarrativeWithLiveOnTime",
+            String.class,
+            int.class,
+            int.class,
+            int.class);
+        m.setAccessible(true);
+        String gemini =
+            "Completed all 5 assigned tasks on time, with 3 tasks finished ahead of schedule. "
+                + "Performance is excellent.";
+        String out = (String) m.invoke(null, gemini, 0, 5, 5);
+        assertTrue(out.contains("on or before the due date"), () -> "unexpected: " + out);
+        assertFalse(out.toLowerCase().contains("ahead of schedule"), () -> "unexpected: " + out);
+        assertTrue(out.contains("Performance is excellent"), () -> "unexpected: " + out);
     }
 
     @Test

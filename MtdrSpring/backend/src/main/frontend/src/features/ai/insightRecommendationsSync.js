@@ -1,6 +1,7 @@
 import {
   isValidWorkloadDeveloperName,
   isValidWorkloadMoveRecommendation,
+  shouldDropOnTimeEstimationRecommendation,
 } from './aiInsightsConstants';
 
 const GENERIC_WORKLOAD_RE = [
@@ -560,8 +561,15 @@ export function computeRecommendationList(ins, options = {}) {
   const out = [];
   let workloadKept = false;
 
+  const onTimePercent = Number(options.onTimeDelivery);
   for (const rec of merged) {
     if (!rec || typeof rec.text !== 'string' || !rec.text.trim()) continue;
+    if (
+      Number.isFinite(onTimePercent) &&
+      shouldDropOnTimeEstimationRecommendation(rec.text, onTimePercent)
+    ) {
+      continue;
+    }
     if (isWorkloadCategory(rec)) {
       if (workloadKept) continue;
       const isExplicitMove = hasExplicitWorkloadMove(rec.text);

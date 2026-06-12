@@ -6,6 +6,12 @@ import {
   alignCompletionRatePercentLabels,
   alignSingleMetricBlock,
   stripContradictoryOnTimeDecline,
+  stripContradictoryOnTimeDeliveryProblems,
+  shouldDropOnTimeDeliveryAlert,
+  shouldDropOnTimeEstimationRecommendation,
+  filterAlertsForStrongOnTimeDelivery,
+  normalizeSprintAlertSeverities,
+  prepareInsightAlerts,
   reconcileOnTimeDeliveryConcernProse,
   resolveProductivityPredictionDisplay,
   formatProductivityForecastDeltaLine,
@@ -158,6 +164,61 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toContain('blocked tasks');
   });
 
+  it('elevates completion rate alert to warning when ended sprint is incomplete', () => {
+    const alerts = [
+      {
+        kpi: 'completionRate',
+        severity: 'info',
+        value: 78,
+        message: 'Completion rate is 78%, indicating some tasks remain in progress after the sprint ended.',
+      },
+    ];
+    const out = prepareInsightAlerts(alerts, 100, 'ended', { completionRate: 78 });
+    expect(out).toHaveLength(1);
+    expect(out[0].severity).toBe('warning');
+  });
+
+  it('elevates completion rate alert to critical when ended sprint completion is below 40', () => {
+    const out = normalizeSprintAlertSeverities(
+      [{ kpi: 'completionRate', severity: 'info', value: 30 }],
+      'ended',
+      { completionRate: 30 },
+    );
+    expect(out[0].severity).toBe('critical');
+  });
+
+  it('drops on-time alert at 100% when message claims delay', () => {
+    expect(
+      shouldDropOnTimeDeliveryAlert(
+        {
+          kpi: 'onTimeDelivery',
+          message:
+            'On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.',
+        },
+        100,
+      ),
+    ).toBe(true);
+    expect(
+      filterAlertsForStrongOnTimeDelivery(
+        [
+          {
+            kpi: 'onTimeDelivery',
+            message:
+              'On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.',
+          },
+        ],
+        100,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('drops estimates recommendation about missed due dates at 100% on-time', () => {
+    const text =
+      'Analyze the tasks that missed their original due dates to refine future estimation accuracy.';
+    expect(shouldDropOnTimeEstimationRecommendation(text, 100)).toBe(true);
+    expect(stripContradictoryOnTimeDeliveryProblems(text, 100)).toBe('');
+  });
+
   it('stripContradictoryOnTimeDecline removes false decline at 100%', () => {
     const text =
       'On-Time Delivery has declined for three consecutive sprints, currently at 100%. Focus on tasks.';
@@ -189,6 +250,20 @@ describe('aiInsightsConstants KPI alignment', () => {
     const out = alignProductivityScoreProse(text, 99);
     expect(out).toBe(
       'Productivity remained stable at 99 points compared to the previous sprint.',
+    );
+  });
+
+  it('alignProductivityScoreProse does not duplicate % on stable-at-level trends', () => {
+    const text =
+      'Productivity remained stable at 100% compared to the previous sprint.';
+    const out = alignProductivityScoreProse(text, 100);
+    expect(out).toBe(
+      'Productivity remained stable at 100% compared to the previous sprint.',
+    );
+    const doubled =
+      'Productivity remained stable at 100%% compared to the previous sprint.';
+    expect(alignProductivityScoreProse(doubled, 100)).toBe(
+      'Productivity remained stable at 100% compared to the previous sprint.',
     );
   });
 
