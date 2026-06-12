@@ -402,16 +402,16 @@ class com.springboot.MyTodoList.service.SprintService {
 class com.springboot.MyTodoList.service.TaskAssignmentNotificationService {
 	{field} -enabled : boolean
 	{field} {static} -logger : org.slf4j.Logger
+	{field} -sprintRepository : com.springboot.MyTodoList.repository.SprintRepository
 	{field} -taskRepository : com.springboot.MyTodoList.repository.TaskRepository
 	{field} -userRepository : com.springboot.MyTodoList.repository.UserRepository
+	{method} +dispatchAssigneeNotifications ( taskId : Long , assigneeUserIds : java.util.Set , assignedBy : String ) : void
 	{method}  {static} -distinctPositiveIds ( ids : java.util.List ) : java.util.Set
-	{method}  {static} -formatSprintLabel ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -formatSprintLabel ( task : com.springboot.MyTodoList.model.Task ) : String
 	{method}  {static} -isValidEmail ( email : String ) : boolean
 	{method} -notificationsActive () : boolean
 	{method} -notifyAssignees ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.Set , assignedBy : String ) : void
-	{method} +notifyAssigneesAsync ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.Set , assignedBy : String ) : void
 	{method} +notifyAssigneesOnTaskCreated ( task : com.springboot.MyTodoList.model.Task , assigneeUserIds : java.util.List ) : void
-	{method} +notifyNewAssigneesAsync ( taskId : Long , newAssigneeUserIds : java.util.Set , assignedBy : String ) : void
 	{method} +notifyNewAssigneesOnReassignment ( taskId : Long , newAssigneeUserIds : java.util.List ) : void
 	{method} -resolveAssignerDisplayName () : String
 }
@@ -616,6 +616,7 @@ com.springboot.MyTodoList.service.ManagerChatService -->  com.springboot.MyTodoL
 com.springboot.MyTodoList.service.ProjectAccessAuthorization *--  com.springboot.MyTodoList.service.ProjectLookupService : projectLookupService
 com.springboot.MyTodoList.service.TaskAssignmentNotificationService -->  com.springboot.MyTodoList.service.EmailService : emailService
 com.springboot.MyTodoList.service.TaskAssignmentNotificationService -->  com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService : pendingTelegramAssignmentNoticeService
+com.springboot.MyTodoList.service.TaskAssignmentNotificationService -->  com.springboot.MyTodoList.service.TaskAssignmentNotificationService : self
 com.springboot.MyTodoList.service.TaskAssignmentSyncService -->  com.springboot.MyTodoList.service.KpiService : kpiService
 com.springboot.MyTodoList.service.TaskAssignmentSyncService -->  com.springboot.MyTodoList.service.ProjectBundleCacheEvictor : projectBundleCacheEvictor
 com.springboot.MyTodoList.service.TaskDueReminderService *--  com.springboot.MyTodoList.service.EmailService : emailService
