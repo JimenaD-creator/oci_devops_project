@@ -58,6 +58,7 @@ class com.springboot.MyTodoList.service.EmbeddingService {
 	{field} -insightRepository : com.springboot.MyTodoList.repository.SprintInsightRepository
 	{field} {static} -log : org.slf4j.Logger
 	{field} -mapper : com.fasterxml.jackson.databind.ObjectMapper
+	{field} -vectorSearchProperties : com.springboot.MyTodoList.config.VectorSearchProperties
 	{method} -alertSeverityRank ( severity : String ) : int
 	{method} +backfillProjectInsightEmbeddings ( projectId : Long ) : int
 	{method} -buildTaskChunk ( task : com.springboot.MyTodoList.model.Task ) : String
@@ -75,6 +76,7 @@ class com.springboot.MyTodoList.service.EmbeddingService {
 	{method} +getVectorSearchBackend () : com.springboot.MyTodoList.service.vector.VectorSearchBackend
 	{method} +hasStoredInsightVector ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding ) : boolean
 	{method} +hasStoredVector ( row : com.springboot.MyTodoList.model.TaskEmbedding ) : boolean
+	{method}  {static} ~normalizeEmbeddingVector ( vector : [D , expectedDimensions : int ) : [D
 	{method} -parseVectorJson ( json : String ) : [D
 	{method} -toInsightMatch ( row : com.springboot.MyTodoList.model.SprintInsightEmbedding , similarity : double ) : com.springboot.MyTodoList.dto.SimilarSprintInsightMatch
 }
@@ -93,6 +95,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{field} {static} -GLUED_PERCENT_LETTER : java.util.regex.Pattern
 	{field} {static} -INSIGHTS_GET_RESPONSE_CACHE_MS : long
 	{field} {static} +INSIGHT_STATUS_PROCESSING : String
+	{field} {static} -LATE_DELIVERY_SENTENCE : java.util.regex.Pattern
 	{field} {static} -LIVE_APPLY_CACHE_MS : long
 	{field} {static} -PREMATURE_EXECUTION_ALERT_PROSE : java.util.regex.Pattern
 	{field} {static} -PRETTIFY_SKIP_KEYS : java.util.Set
@@ -117,7 +120,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{field} -userTaskRepository : com.springboot.MyTodoList.repository.UserTaskRepository
 	{method} -addRecommendation ( recs : com.fasterxml.jackson.databind.node.ArrayNode , category : String , text : String ) : void
 	{method} -aggregatePerformanceStats ( myTasks : java.util.List ) : com.springboot.MyTodoList.service.GeminiService$PerformanceStats
-	{method}  {static} -aiNarrativeFactsStaleVsLive ( ai : String , pendingLive : int , completedLive : int , workedLive : double , live : String ) : boolean
+	{method}  {static} -aiNarrativeFactsStaleVsLive ( ai : String , pendingLive : int , completedLive : int , workedLive : double , live : String , liveLate : int ) : boolean
 	{method} -alignAlertsWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map , chronoOtd : java.util.List ) : void
 	{method}  {static} -alignExecutiveSummaryProseFields ( es : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map , chronoOtd : java.util.List ) : void
 	{method} -alignExecutiveSummaryWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprint : com.springboot.MyTodoList.model.Sprint , live : java.util.Map , chronoOtd : java.util.List ) : void
@@ -126,7 +129,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -alignProductivityPredictionWithLiveKpis ( root : com.fasterxml.jackson.databind.node.ObjectNode , live : java.util.Map ) : void
 	{method}  {static} -appendBlockedNotesIfMissing ( sb : StringBuilder , blockedNotes : java.util.List , lowerAlready : String ) : void
 	{method}  {static} -appendProductivityEndedSprintClosing ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
-	{method}  {static} -appendProductivityEvolutionNote ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -appendProductivityEvolutionNote ( text : String , sprint : com.springboot.MyTodoList.model.Sprint , liveKpis : java.util.Map ) : String
 	{method} -applyLiveDeveloperNarratives ( enriched : com.fasterxml.jackson.databind.JsonNode , sprintId : Long ) : com.fasterxml.jackson.databind.JsonNode
 	{method} -applyOverloadGuardrails ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -asDouble ( v : Object ) : double
@@ -160,6 +163,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -clampOverloadWhenBlockedWithoutTaskCountDisparity ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -clampOverloadWhenPeerHasSameAssignmentCount ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -clampOverloadWhenPendingLoadIsBalanced ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method}  {static} -clarifyAllOnTimeDeliveryWording ( ai : String , completed : int ) : String
 	{method} -clearWorkloadRedistribution ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
 	{method}  {static} -composeDeveloperInsightDisplay ( o : com.fasterxml.jackson.databind.node.ObjectNode , liveSummary : String , aiNarrative : String , blockedNotes : java.util.List ) : String
 	{method} -computeProductivityScore ( s : com.springboot.MyTodoList.model.Sprint ) : double
@@ -176,11 +180,13 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -enrichKpiManagerGuideIfEmpty ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -enrichSprintChangeSummary ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprint : com.springboot.MyTodoList.model.Sprint , live : java.util.Map , chronoOtd : java.util.List ) : void
 	{method} -ensureArrayField ( root : com.fasterxml.jackson.databind.node.ObjectNode , field : String ) : com.fasterxml.jackson.databind.node.ArrayNode
+	{method} -ensureEndedSprintIncompleteCompletionAlert ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -ensureWorkloadGuidanceFromAssignments ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long , sprint : com.springboot.MyTodoList.model.Sprint ) : void
 	{method} -excludeBlockedDevelopersFromRedistribution ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method}  {static} -extractCompletedCountFromAiNarrative ( ai : String ) : Integer
 	{method}  {static} -extractHoursLoggedFromAiNarrative ( ai : String ) : Double
 	{method} -extractJsonFromGeminiResponse ( rawGeminiResponse : String ) : String
+	{method}  {static} -extractLateCountFromAiNarrative ( ai : String ) : Integer
 	{method} -filterPrematureSprintKpiAlerts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -finalizeDeveloperInsightNarratives ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
 	{method} -finalizeExecutiveSummaryFromGemini ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
@@ -213,6 +219,7 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -isFirstSprintInProject ( sprintId : Long ) : boolean
 	{method} -isHighPriorityTask ( t : com.springboot.MyTodoList.model.Task ) : boolean
 	{method}  {static} -isLiveTemplateInsight ( text : String ) : boolean
+	{method}  {static} -isSprintDeliveryFinalized ( sprint : com.springboot.MyTodoList.model.Sprint , liveKpis : java.util.Map ) : boolean
 	{method}  {static} -isSprintEarlyForProductivityGuide ( sprint : com.springboot.MyTodoList.model.Sprint ) : boolean
 	{method} -isTaskDone ( t : com.springboot.MyTodoList.model.Task ) : boolean
 	{method} -isTaskFinishedLate ( t : com.springboot.MyTodoList.model.Task ) : boolean
@@ -222,16 +229,18 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -isValidWorkloadMoveRecommendation ( rec : com.fasterxml.jackson.databind.JsonNode ) : boolean
 	{method}  {static} -liveSnapshotRedundantWithAi ( live : String , aiText : String ) : boolean
 	{method}  {static} -liveValueForAlertKpi ( kpi : String , live : java.util.Map ) : int
+	{method} -loadAssigneeCountByTaskIds ( taskIds : java.util.Set ) : java.util.Map
 	{method} -mapDevelopersByName ( developersRaw : Object ) : java.util.Map
 	{method} +markInsightGenerationStarted ( sprintId : Long ) : void
+	{method}  {static} -mentionsLateDelivery ( ai : String ) : boolean
 	{method} -normalizeActionableRecommendationCounts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -normalizeActionableRecommendationRows ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
-	{method} -normalizeAlertSeverities ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
+	{method} -normalizeAlertSeverities ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -normalizeDeveloperInsightRows ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
 	{method} -normalizeKpiManagerGuidePercentSpacing ( root : com.fasterxml.jackson.databind.node.ObjectNode ) : void
 	{method} -normalizeKpiManagerGuideProductivityScore ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -normalizeKpiManagerGuideWorkloadBalance ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
-	{method}  {static} -normalizeProductivityScoreGuideText ( existing : String , scorePct : int , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method} -normalizeProductivityScoreGuideText ( existing : String , scorePct : int , sprint : com.springboot.MyTodoList.model.Sprint ) : String
 	{method} -normalizeWorkflowStatus ( raw : String ) : String
 	{method}  {static} -openPending ( d : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad ) : int
 	{method}  {static} -pickRedistributionReceiver ( withWork : java.util.List , from : com.springboot.MyTodoList.service.GeminiService$AssignmentLoadSnap , blockedDeveloperNamesLower : java.util.Set ) : com.springboot.MyTodoList.service.GeminiService$AssignmentLoadSnap
@@ -239,11 +248,14 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method}  {static} -preserveAiNarrativeFromPriorInsight ( o : com.fasterxml.jackson.databind.node.ObjectNode , priorInsight : String , liveSummary : String ) : void
 	{method} -prettifyHumanProseInInsights ( node : com.fasterxml.jackson.databind.JsonNode ) : void
 	{method}  {static} ~prettifyWorkflowStatusTokens ( text : String ) : String
-	{method}  {static} -productivityEvolutionNote ( sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -productivityEvolutionNote ( sprint : com.springboot.MyTodoList.model.Sprint , liveKpis : java.util.Map ) : String
+	{method} -pruneContradictoryOnTimeRecommendations ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -pruneInvalidWorkloadRecommendations ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} +putCachedInsightsGetResponse ( insight : com.springboot.MyTodoList.model.SprintInsight , payload : java.util.Map ) : void
 	{method} -readBlockedReportsFromSnapshot ( snap : java.util.Map ) : java.util.List
+	{method}  {static} -reconcileAiNarrativeWithLiveOnTime ( ai : String , liveLate : int , liveOnTime : int , liveCompleted : int ) : String
 	{method} -refineWorkloadRedistributionRecommendations ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
+	{method} -removeContradictoryOnTimeDeliveryAlerts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method} -removeContradictoryWorkloadBalanceAlerts ( root : com.fasterxml.jackson.databind.node.ObjectNode , sprintId : Long ) : void
 	{method}  {static} -renameFieldIfPresent ( obj : com.fasterxml.jackson.databind.node.ObjectNode , oldKey : String , newKey : String ) : void
 	{method}  {static} -replaceProductivityScoreMentionsInProse ( text : String , scorePct : int ) : String
@@ -264,7 +276,8 @@ class com.springboot.MyTodoList.service.GeminiService {
 	{method} -statusRow ( status : String , count : long , flowOrder : int ) : java.util.Map
 	{method} -statusValue ( d : com.springboot.MyTodoList.service.GeminiService$DeveloperStatusLoad , statusKey : String ) : int
 	{method}  {static} -stripCanonicalTaskStatusLead ( overview : String ) : String
-	{method}  {static} -stripProductivityEvolutionNotesForEndedSprint ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
+	{method}  {static} -stripLateDeliverySentences ( text : String ) : String
+	{method}  {static} -stripProductivityEvolutionNotesForEndedSprint ( text : String , sprint : com.springboot.MyTodoList.model.Sprint , liveKpis : java.util.Map ) : String
 	{method}  {static} -stripProductivityGuideInstructionEcho ( text : String ) : String
 	{method}  {static} -stripProductivityLowScoreExcuses ( text : String , sprint : com.springboot.MyTodoList.model.Sprint ) : String
 	{method}  {static} -stripRedistributionGuidanceFromNarrative ( text : String ) : String
