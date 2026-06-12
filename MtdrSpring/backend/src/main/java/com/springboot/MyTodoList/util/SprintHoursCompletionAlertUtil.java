@@ -64,26 +64,81 @@ public final class SprintHoursCompletionAlertUtil {
         if (current == null || previous == null) {
             return Optional.empty();
         }
-        if (sprintEarly) {
-            return Optional.empty();
-        }
-        if (previous.getCompletedTasks() < 1 || current.getCompletedTasks() < 1) {
-            return Optional.empty();
-        }
-        if (previous.getWorkedHours() <= 0.0 && current.getWorkedHours() <= 0.0) {
-            return Optional.empty();
-        }
-        if (current.getWorkedHours() <= 0.0 && current.getCompletedTasks() > 0) {
-            return Optional.empty();
-        }
 
         String prevLabel = labelOrDefault(previousSprintLabel);
-        double prevRate = previous.getWorkedHours() / previous.getCompletedTasks();
-        double curRate = current.getWorkedHours() / Math.max(1, current.getCompletedTasks());
-        if (prevRate <= 0.0) {
+        String earlyPrefix = sprintEarly ? "Early sprint snapshot — " : "";
+
+        if (previous.getCompletedTasks() < 1 && current.getCompletedTasks() < 1) {
             return Optional.empty();
         }
+        if (previous.getCompletedTasks() < 1) {
+            return Optional.of(alertMap(
+                    "info",
+                    earlyPrefix
+                            + String.format(
+                                    Locale.ROOT,
+                                    "This sprint: %d Done, %sh logged. %s had no completed tasks for an hours-per-task comparison.",
+                                    current.getCompletedTasks(),
+                                    formatHours(current.getWorkedHours()),
+                                    prevLabel)));
+        }
+        if (current.getCompletedTasks() < 1) {
+            double prevRate = hoursPerCompletedTask(previous);
+            return Optional.of(alertMap(
+                    "info",
+                    earlyPrefix
+                            + String.format(
+                                    Locale.ROOT,
+                                    "No completed tasks yet this sprint. %s: %d Done with %sh logged (%.1f h per completed task).",
+                                    prevLabel,
+                                    previous.getCompletedTasks(),
+                                    formatHours(previous.getWorkedHours()),
+                                    prevRate)));
+        }
 
+        if (previous.getWorkedHours() <= 0.0 && current.getWorkedHours() <= 0.0) {
+            return Optional.of(alertMap(
+                    "info",
+                    earlyPrefix
+                            + String.format(
+                                    Locale.ROOT,
+                                    "Compared with %s: %d Done vs this sprint %d Done. No hours logged in either sprint yet.",
+                                    prevLabel,
+                                    previous.getCompletedTasks(),
+                                    current.getCompletedTasks())));
+        }
+        if (current.getWorkedHours() <= 0.0) {
+            double prevRate = hoursPerCompletedTask(previous);
+            return Optional.of(alertMap(
+                    "info",
+                    earlyPrefix
+                            + String.format(
+                                    Locale.ROOT,
+                                    "Compared with %s (%d Done, %sh, %.1f h per completed task): "
+                                            + "this sprint has %d Done but no logged hours yet — validate timesheets.",
+                                    prevLabel,
+                                    previous.getCompletedTasks(),
+                                    formatHours(previous.getWorkedHours()),
+                                    prevRate,
+                                    current.getCompletedTasks())));
+        }
+        if (previous.getWorkedHours() <= 0.0) {
+            double curRate = hoursPerCompletedTask(current);
+            return Optional.of(alertMap(
+                    "info",
+                    earlyPrefix
+                            + String.format(
+                                    Locale.ROOT,
+                                    "Compared with %s (%d Done, no hours logged): this sprint %d Done with %sh (%.1f h per completed task).",
+                                    prevLabel,
+                                    previous.getCompletedTasks(),
+                                    current.getCompletedTasks(),
+                                    formatHours(current.getWorkedHours()),
+                                    curRate)));
+        }
+
+        double prevRate = hoursPerCompletedTask(previous);
+        double curRate = hoursPerCompletedTask(current);
         double rateChangeFraction = (curRate - prevRate) / prevRate;
         boolean completionSimilar =
                 completionCountsSimilar(current.getCompletedTasks(), previous.getCompletedTasks());
@@ -93,8 +148,9 @@ public final class SprintHoursCompletionAlertUtil {
             String severity = sprintEnded ? "warning" : "info";
             String message = String.format(
                     Locale.ROOT,
-                    "Team logged %d%% more hours per completed task than %s: %d Done with %sh logged "
+                    "%sTeam logged %d%% more hours per completed task than %s: %d Done with %sh logged "
                             + "vs %d Done with %sh in %s. Review estimates and timesheet accuracy.",
+                    earlyPrefix,
                     pct,
                     prevLabel,
                     current.getCompletedTasks(),
@@ -110,8 +166,9 @@ public final class SprintHoursCompletionAlertUtil {
             if (completionSimilar) {
                 String message = String.format(
                         Locale.ROOT,
-                        "Team logged %d%% fewer hours per completed task than %s with similar completions "
+                        "%sTeam logged %d%% fewer hours per completed task than %s with similar completions "
                                 + "(%d Done, %sh vs %d Done, %sh). Delivery pace improved or estimates were conservative.",
+                        earlyPrefix,
                         pct,
                         prevLabel,
                         current.getCompletedTasks(),
@@ -124,8 +181,9 @@ public final class SprintHoursCompletionAlertUtil {
                 String severity = sprintEnded ? "warning" : "info";
                 String message = String.format(
                         Locale.ROOT,
-                        "Logged hours fell %d%% vs %s but completed tasks dropped from %d to %d "
+                        "%sLogged hours fell %d%% vs %s but completed tasks dropped from %d to %d "
                                 + "(%sh vs %sh). Validate timesheet logging so KPIs reflect actual effort.",
+                        earlyPrefix,
                         pct,
                         prevLabel,
                         previous.getCompletedTasks(),
@@ -136,7 +194,61 @@ public final class SprintHoursCompletionAlertUtil {
             }
         }
 
-        return Optional.empty();
+        return Optional.of(alertMap(
+                "info",
+                earlyPrefix
+                        + buildBaselineComparisonMessage(
+                                current, previous, prevLabel, prevRate, curRate, rateChangeFraction)));
+    }
+
+    private static String buildBaselineComparisonMessage(
+            DeliverySnapshot current,
+            DeliverySnapshot previous,
+            String prevLabel,
+            double prevRate,
+            double curRate,
+            double rateChangeFraction) {
+        String base = String.format(
+                Locale.ROOT,
+                "Compared with %s: %d Done with %sh (%.1f h per completed task) vs this sprint "
+                        + "%d Done with %sh (%.1f h per completed task).",
+                prevLabel,
+                previous.getCompletedTasks(),
+                formatHours(previous.getWorkedHours()),
+                prevRate,
+                current.getCompletedTasks(),
+                formatHours(current.getWorkedHours()),
+                curRate);
+        return base + " " + formatHoursPerTaskRateChange(rateChangeFraction);
+    }
+
+    /** Relative change in hours-per-completed-task vs the previous sprint. */
+    static String formatHoursPerTaskRateChange(double rateChangeFraction) {
+        int pct = (int) Math.round(Math.abs(rateChangeFraction) * 100.0);
+        if (pct < 5) {
+            return String.format(
+                    Locale.ROOT,
+                    "Hours per completed task are similar (%d%% change vs %s).",
+                    pct,
+                    "the previous sprint");
+        }
+        if (rateChangeFraction > 0) {
+            return String.format(
+                    Locale.ROOT,
+                    "Hours per completed task increased %d%% vs the previous sprint.",
+                    pct);
+        }
+        return String.format(
+                Locale.ROOT,
+                "Hours per completed task decreased %d%% vs the previous sprint.",
+                pct);
+    }
+
+    private static double hoursPerCompletedTask(DeliverySnapshot snapshot) {
+        if (snapshot == null || snapshot.getCompletedTasks() < 1) {
+            return 0.0;
+        }
+        return snapshot.getWorkedHours() / snapshot.getCompletedTasks();
     }
 
     public static boolean alertsAlreadyContainHoursVsPrevious(ArrayNode alerts) {
@@ -149,6 +261,19 @@ public final class SprintHoursCompletionAlertUtil {
             }
         }
         return false;
+    }
+
+    /** Removes stale injected rows so live KPI refresh can replace the comparison message. */
+    public static void removeHoursVsPreviousAlerts(ArrayNode alerts) {
+        if (alerts == null) {
+            return;
+        }
+        for (int i = alerts.size() - 1; i >= 0; i--) {
+            JsonNode item = alerts.get(i);
+            if (item != null && ALERT_SOURCE.equals(item.path("alertSource").asText(""))) {
+                alerts.remove(i);
+            }
+        }
     }
 
     private static Map<String, Object> alertMap(String severity, String message) {

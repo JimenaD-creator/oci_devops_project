@@ -1567,6 +1567,7 @@ public class GeminiService {
         finalizeDeveloperInsightNarratives(copy);
         removeContradictoryOnTimeDeliveryAlerts(copy, sprintId);
         pruneContradictoryOnTimeRecommendations(copy, sprintId);
+        injectSprintHoursCompletionAlert(copy, sprintId);
         liveApplyCache.put(liveKey, new CachedEnrichedInsights(copy, now + LIVE_APPLY_CACHE_MS));
         if (liveApplyCache.size() > 80) {
             liveApplyCache.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
@@ -4694,9 +4695,7 @@ public class GeminiService {
             } else {
                 alerts = (ArrayNode) alertsNode;
             }
-            if (SprintHoursCompletionAlertUtil.alertsAlreadyContainHoursVsPrevious(alerts)) {
-                return;
-            }
+            SprintHoursCompletionAlertUtil.removeHoursVsPreviousAlerts(alerts);
             Map<String, Object> curLive = resolveLiveKpisForSprint(sprint);
             Map<String, Object> prevLive = resolveLiveKpisForSprint(previous);
             Map<Long, Integer> displayMap = buildSprintDisplayIndexMap(projectId);
