@@ -68,8 +68,12 @@ architecture/.structurizr/
 
 # Playwright
 node_modules/
-/test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+junit.xml
+test-results.json
+# test-results evidence yes; skip Playwright duplicate/temp outputs
+test-results/**/attachments/
+test-results/.playwright-artifacts-*/
