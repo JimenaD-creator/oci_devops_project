@@ -1,5 +1,20 @@
 {
   "dependencies": {
     "lucide-react": "^1.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.2"
+  },
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:fast": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:record": "playwright test",
+    "test:e2e:mock": "playwright test --grep @mock",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:trace": "playwright show-trace",
+    "test:e2e:snapshots": "playwright test --update-snapshots"
   }
 }
