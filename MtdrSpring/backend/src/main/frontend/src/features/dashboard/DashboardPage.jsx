@@ -619,7 +619,7 @@ export default function DashboardPage({
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 1.75, sm: 2 },
+            p: { xs: 1.25, sm: 2 },
             mb: 1.25,
             borderRadius: 3,
             border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
@@ -631,7 +631,7 @@ export default function DashboardPage({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              gap: 2,
+              gap: 1,
               mb: 1,
             }}
           >
@@ -642,7 +642,7 @@ export default function DashboardPage({
                   fontWeight: 800,
                   color: 'text.primary',
                   lineHeight: 1.2,
-                  fontSize: { xs: '1.4rem', sm: '1.65rem', md: '1.85rem' },
+                  fontSize: { xs: '1.1rem', sm: '1.65rem', md: '1.85rem' },
                 }}
               >
                 Dashboard – {projectName}
@@ -705,8 +705,10 @@ export default function DashboardPage({
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: { xs: 1, sm: 1.25 },
+                gap: { xs: 0.75, sm: 1.25 },
                 flexShrink: 0,
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-end', sm: 'center' },
               }}
             >
               {showTeamProductivityPill && sprintTeamProductivityScore != null ? (
@@ -724,10 +726,10 @@ export default function DashboardPage({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 0.5,
-                      px: 1.5,
-                      py: 0.6,
+                      px: { xs: 1, sm: 1.5 },
+                      py: { xs: 0.4, sm: 0.6 },
                       borderRadius: '999px',
-                      fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
+                      fontSize: { xs: '0.75rem', sm: '0.9375rem' },
                       fontWeight: 700,
                       lineHeight: 1.2,
                       letterSpacing: '0.01em',
