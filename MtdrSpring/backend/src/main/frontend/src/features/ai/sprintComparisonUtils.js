@@ -9,7 +9,7 @@ import { KPI_LABELS } from './aiInsightsConstants';
 export const SPRINT_COMPARISON_KPI_KEYS = [
   'completionRate',
   'onTimeDelivery',
-  'teamParticipation',
+  'efficiencyScore',
   'workloadBalance',
   'productivityScore',
 ];
@@ -45,7 +45,7 @@ export function extractSprintMetricBundle(sprint) {
     return {
       completionRate: 0,
       onTimeDelivery: 0,
-      teamParticipation: 0,
+      efficiencyScore: 0,
       workloadBalance: 0,
       productivityScore: 0,
       tasksDone: 0,
@@ -65,7 +65,7 @@ export function extractSprintMetricBundle(sprint) {
   return {
     completionRate: normalizeKpiComponentPercent(kpis.completionRate),
     onTimeDelivery: normalizeKpiComponentPercent(kpis.onTimeDelivery),
-    teamParticipation: normalizeKpiComponentPercent(kpis.teamParticipation),
+    efficiencyScore: normalizeKpiComponentPercent(kpis.efficiencyScore ?? kpis.teamParticipation),
     workloadBalance: normalizeWorkloadBalancePercent(kpis.workloadBalance),
     productivityScore: productivityScoreFromSprintKpis(kpis),
     tasksDone: Number.isFinite(totalCompleted) ? totalCompleted : 0,

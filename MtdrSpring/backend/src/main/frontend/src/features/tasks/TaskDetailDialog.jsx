@@ -17,6 +17,7 @@ import {
   Button,
   IconButton,
   Chip,
+  useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -47,8 +48,11 @@ import {
   putTask,
 } from './taskDetailApi';
 import {
+  buildSprintNumberMap,
   formatDate,
+  formatSprintLabel,
   resolveProjectIdForDevelopers,
+  sortSprintsByStartDate,
   taskDisplayName,
   userIdFromUserTaskRow,
 } from '../sprints/utils/sprintUtils';
@@ -228,7 +232,7 @@ function InfoCard({ children, accentColor = ORACLE_RED_ACTION, sx = {} }) {
     <Paper
       elevation={0}
       sx={{
-        p: 2.25,
+        p: { xs: 1.5, sm: 2.25 },
         borderRadius: '12px',
         border: `0.5px solid ${isDark ? '#2A2C32' : '#E8E8E8'}`,
         borderTop: `3px solid ${accentColor}`,
@@ -244,8 +248,9 @@ function InfoCard({ children, accentColor = ORACLE_RED_ACTION, sx = {} }) {
 function SegmentedButtons({ options, value, onChange }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
   return (
-    <Box sx={{ display: 'flex', gap: 0.75 }}>
+    <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 0.75, flexWrap: 'wrap' }}>
       {options.map((opt) => {
         const active = value === opt.value;
         return (
@@ -254,14 +259,14 @@ function SegmentedButtons({ options, value, onChange }) {
             component="button"
             onClick={() => onChange(opt.value)}
             sx={{
-              flex: 1,
-              py: 0.875,
+              flex: isMobile ? '1 1 auto' : 1,
+              py: isMobile ? 0.75 : 0.875,
               px: 0.5,
               borderRadius: '8px',
               border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
               transition: 'all 0.12s',
@@ -278,8 +283,8 @@ function SegmentedButtons({ options, value, onChange }) {
             {opt.dot && (
               <Box
                 sx={{
-                  width: 7,
-                  height: 7,
+                  width: 6,
+                  height: 6,
                   borderRadius: '50%',
                   bgcolor: active ? opt.dot : isDark ? '#5A5A5A' : '#BDBDBD',
                   flexShrink: 0,
@@ -297,8 +302,9 @@ function SegmentedButtons({ options, value, onChange }) {
 function TypeGrid({ value, onChange }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0.75 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(4, 1fr)`, gap: isMobile ? 0.5 : 0.75 }}>
       {TYPE_OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
@@ -307,13 +313,13 @@ function TypeGrid({ value, onChange }) {
             component="button"
             onClick={() => onChange(opt.value)}
             sx={{
-              py: 1,
+              py: isMobile ? 0.75 : 1,
               px: 0.5,
               borderRadius: '8px',
               border: `1px solid ${active ? opt.border : isDark ? '#2A2C32' : '#E0E0E0'}`,
               bgcolor: active ? opt.bg : 'transparent',
               color: active ? opt.color : isDark ? '#9A9A9A' : 'text.secondary',
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               fontWeight: active ? 600 : 500,
               cursor: 'pointer',
               transition: 'all 0.12s',
@@ -327,8 +333,8 @@ function TypeGrid({ value, onChange }) {
               },
             }}
           >
-            <Box sx={{ fontSize: 16, lineHeight: 1 }}>{opt.icon}</Box>
-            {opt.label}
+            <Box sx={{ fontSize: isMobile ? 14 : 16, lineHeight: 1 }}>{opt.icon}</Box>
+            <Typography sx={{ fontSize: isMobile ? 10 : 13 }}>{opt.label}</Typography>
           </Box>
         );
       })}
@@ -381,6 +387,7 @@ export function TaskDetailDialog({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
   const fieldSx = getFieldSx(isDark);
   const CHIP_PALETTES = isDark ? CHIP_PALETTES_DARK : CHIP_PALETTES_LIGHT;
 
@@ -405,11 +412,8 @@ export function TaskDetailDialog({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [taskUserTasks, setTaskUserTasks] = useState([]);
 
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    [...(sprints || [])].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i + 1));
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
+  const sortedSprints = useMemo(() => sortSprintsByStartDate(sprints), [sprints]);
   const resolvedDeveloperProjectId = useMemo(() => {
     const source =
       task && initialTask && Number(task.id) === Number(initialTask.id) ? task : initialTask;
@@ -731,6 +735,13 @@ export function TaskDetailDialog({
   const priorityOpt =
     PRIORITY_OPTIONS.find((o) => o.value === task?.priority) ?? PRIORITY_OPTIONS[1];
 
+  // Responsive padding and margins
+  const dialogContentPx = isMobile ? 2 : 3;
+  const headerPx = isMobile ? 2 : 2.5;
+  const headerPt = isMobile ? 1.5 : 2;
+  const headerPb = isMobile ? 1.25 : 1.75;
+  const buttonSize = isMobile ? 'small' : 'medium';
+
   return (
     <Dialog
       open={open}
@@ -745,7 +756,8 @@ export function TaskDetailDialog({
           border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
           bgcolor: 'background.paper',
           overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 24px)', sm: 720 },
+          maxWidth: { xs: 'calc(100% - 16px)', sm: 720 },
+          margin: { xs: 1, sm: 'auto' },
         },
       }}
     >
@@ -754,20 +766,20 @@ export function TaskDetailDialog({
         <Box
           sx={{
             bgcolor: ORACLE_RED_ACTION,
-            px: 2.5,
-            pt: 2,
-            pb: 1.75,
+            px: headerPx,
+            pt: headerPt,
+            pb: headerPb,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 1.5,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 1 : 1.5 }}>
             <Box
               sx={{
-                width: 38,
-                height: 38,
+                width: isMobile ? 32 : 38,
+                height: isMobile ? 32 : 38,
                 borderRadius: '10px',
                 bgcolor: 'rgba(255,255,255,0.18)',
                 display: 'flex',
@@ -776,15 +788,15 @@ export function TaskDetailDialog({
                 flexShrink: 0,
               }}
             >
-              <AssignmentOutlinedIcon sx={{ color: '#fff', fontSize: 20 }} />
+              <AssignmentOutlinedIcon sx={{ color: '#fff', fontSize: isMobile ? 18 : 20 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: 15, lineHeight: 1.2 }}>
+              <Typography sx={{ fontWeight: 600, color: '#fff', fontSize: isMobile ? 13 : 15, lineHeight: 1.2 }}>
                 {editMode ? 'Edit task' : 'Task details'}
               </Typography>
               {task?.id != null && (
                 <Typography
-                  sx={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}
+                  sx={{ fontSize: isMobile ? 11 : 13, color: 'rgba(255,255,255,0.72)', display: 'block' }}
                 >
                   ID #{task.id}
                 </Typography>
@@ -796,11 +808,12 @@ export function TaskDetailDialog({
               <>
                 <Button
                   variant="contained"
-                  startIcon={<EditIcon sx={{ fontSize: '15px !important' }} />}
+                  startIcon={<EditIcon sx={{ fontSize: isMobile ? '13px !important' : '15px !important' }} />}
                   onClick={handleStartEdit}
                   disableElevation
+                  size={buttonSize}
                   sx={{
-                    fontSize: 13,
+                    fontSize: isMobile ? 11 : 13,
                     bgcolor: 'rgba(255,255,255,0.22)',
                     color: '#fff',
                     textTransform: 'none',
@@ -808,23 +821,28 @@ export function TaskDetailDialog({
                     borderRadius: '8px',
                     border: '1px solid rgba(255,255,255,0.35)',
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' },
+                    px: isMobile ? 1.5 : 2,
+                    py: isMobile ? 0.5 : 0.75,
                   }}
                 >
                   Edit
                 </Button>
                 <Button
                   variant="outlined"
-                  startIcon={<DeleteOutlineIcon sx={{ fontSize: '15px !important' }} />}
+                  startIcon={<DeleteOutlineIcon sx={{ fontSize: isMobile ? '13px !important' : '15px !important' }} />}
                   onClick={handleDeleteTask}
                   disabled={saving}
+                  size={buttonSize}
                   sx={{
-                    fontSize: 13,
+                    fontSize: isMobile ? 11 : 13,
                     color: 'rgba(255,255,255,0.85)',
                     borderColor: 'rgba(255,255,255,0.4)',
                     textTransform: 'none',
                     fontWeight: 600,
                     borderRadius: '8px',
                     '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+                    px: isMobile ? 1.5 : 2,
+                    py: isMobile ? 0.5 : 0.75,
                   }}
                 >
                   Delete
@@ -850,9 +868,9 @@ export function TaskDetailDialog({
       {/* ── Body ── */}
       <DialogContent
         sx={{
-          pt: '32px !important',
-          px: 3,
-          pb: 2,
+          pt: isMobile ? '24px !important' : '32px !important',
+          px: dialogContentPx,
+          pb: isMobile ? 1.5 : 2,
           overflowY: 'auto',
           bgcolor: isDark ? '#111214' : '#FAFAFA',
         }}
@@ -877,13 +895,13 @@ export function TaskDetailDialog({
 
         {/* ── VIEW MODE ── */}
         {task && !editMode && !detailLoading && (
-          <Stack spacing={2}>
+          <Stack spacing={isMobile ? 1.5 : 2}>
             {/* Overview card */}
             <InfoCard accentColor={ORACLE_RED_ACTION}>
               <SectionLabel>Overview</SectionLabel>
 
               <FieldLabel>Title</FieldLabel>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary', mb: 2 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary', mb: isMobile ? 1.5 : 2 }}>
                 {taskDisplayName(task)}
               </Typography>
 
@@ -893,19 +911,19 @@ export function TaskDetailDialog({
               </Box>
 
               {/* Status / Type / Priority as colored badges */}
-              <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Stack direction="row" spacing={isMobile ? 0.75 : 1} flexWrap="wrap" sx={{ gap: isMobile ? 0.75 : 1 }}>
                 <Box
                   sx={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 0.5,
-                    px: 1.25,
-                    py: 0.5,
+                    px: isMobile ? 1 : 1.25,
+                    py: isMobile ? 0.4 : 0.5,
                     borderRadius: '20px',
                     bgcolor: typeOpt.bg,
                     border: `1px solid ${typeOpt.border}`,
                     color: typeOpt.color,
-                    fontSize: 12,
+                    fontSize: isMobile ? 10 : 12,
                     fontWeight: 600,
                   }}
                 >
@@ -916,30 +934,30 @@ export function TaskDetailDialog({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 0.5,
-                    px: 1.25,
-                    py: 0.5,
+                    px: isMobile ? 1 : 1.25,
+                    py: isMobile ? 0.4 : 0.5,
                     borderRadius: '20px',
                     bgcolor: statusOpt.bg,
                     border: `1px solid ${statusOpt.border}`,
                     color: statusOpt.color,
-                    fontSize: 12,
+                    fontSize: isMobile ? 10 : 12,
                     fontWeight: 600,
                   }}
                 >
-                  <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: statusOpt.dot }} />
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: statusOpt.dot }} />
                   {statusLabel}
                 </Box>
                 <Box
                   sx={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    px: 1.25,
-                    py: 0.5,
+                    px: isMobile ? 1 : 1.25,
+                    py: isMobile ? 0.4 : 0.5,
                     borderRadius: '20px',
                     bgcolor: priorityOpt.bg,
                     border: `1px solid ${priorityOpt.border}`,
                     color: priorityOpt.color,
-                    fontSize: 12,
+                    fontSize: isMobile ? 10 : 12,
                     fontWeight: 600,
                   }}
                 >
@@ -950,13 +968,13 @@ export function TaskDetailDialog({
                     sx={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      px: 1.25,
-                      py: 0.5,
+                      px: isMobile ? 1 : 1.25,
+                      py: isMobile ? 0.4 : 0.5,
                       borderRadius: '20px',
                       bgcolor: isDark ? '#1A4A3A' : '#E1F5EE',
                       border: `1px solid ${isDark ? '#4DB6AC' : '#5DCAA5'}`,
                       color: isDark ? '#80CBC4' : '#085041',
-                      fontSize: 12,
+                      fontSize: isMobile ? 10 : 12,
                       fontWeight: 600,
                     }}
                   >
@@ -970,12 +988,13 @@ export function TaskDetailDialog({
             <InfoCard accentColor="#5C6BC0">
               <SectionLabel>Planning</SectionLabel>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: isMobile ? 1.5 : 2, mb: 2 }}>
                 <Box>
                   <FieldLabel color="#5C6BC0">Sprint</FieldLabel>
                   <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>
                     {task.assignedSprint?.id != null
-                      ? `Sprint ${sprintNumberMap.get(task.assignedSprint.id) ?? task.assignedSprint.id}`
+                      ? formatSprintLabel(sprintNumberMap, task.assignedSprint.id) ||
+                        `Sprint ${task.assignedSprint.id}`
                       : '—'}
                   </Typography>
                 </Box>
@@ -992,13 +1011,13 @@ export function TaskDetailDialog({
                             sx={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              px: 1,
-                              py: 0.4,
+                              px: isMobile ? 0.75 : 1,
+                              py: isMobile ? 0.3 : 0.4,
                               borderRadius: '20px',
                               bgcolor: pal.bg,
                               border: `1px solid ${pal.border}`,
                               color: pal.color,
-                              fontSize: 12,
+                              fontSize: isMobile ? 10 : 12,
                               fontWeight: 600,
                             }}
                           >
@@ -1013,10 +1032,10 @@ export function TaskDetailDialog({
                 </Box>
               </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: isMobile ? 1 : 1.5 }}>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: isMobile ? 1 : 1.5,
                     borderRadius: '10px',
                     bgcolor: isDark ? '#4A2A1A' : '#FAEEDA',
                     border: `1px solid ${isDark ? '#FFB74D' : '#FAC775'}`,
@@ -1024,7 +1043,7 @@ export function TaskDetailDialog({
                 >
                   <Typography
                     sx={{
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 600,
                       color: isDark ? '#FFCC80' : '#854F0B',
                       letterSpacing: '0.04em',
@@ -1035,7 +1054,7 @@ export function TaskDetailDialog({
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: 13,
+                      fontSize: isMobile ? 12 : 13,
                       fontWeight: 600,
                       color: isDark ? '#FFE0B2' : '#412402',
                       mt: 0.5,
@@ -1046,7 +1065,7 @@ export function TaskDetailDialog({
                 </Box>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: isMobile ? 1 : 1.5,
                     borderRadius: '10px',
                     bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
                     border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
@@ -1054,7 +1073,7 @@ export function TaskDetailDialog({
                 >
                   <Typography
                     sx={{
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 600,
                       color: isDark ? '#90CAF9' : '#185FA5',
                       letterSpacing: '0.04em',
@@ -1065,7 +1084,7 @@ export function TaskDetailDialog({
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: 13,
+                      fontSize: isMobile ? 12 : 13,
                       fontWeight: 600,
                       color: isDark ? '#BBDEFB' : '#042C53',
                       mt: 0.5,
@@ -1084,7 +1103,7 @@ export function TaskDetailDialog({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ display: 'block', mb: 1 }}
+                  sx={{ display: 'block', mb: 1, fontSize: isMobile ? 10 : 12 }}
                 >
                   Each row shows whether that developer finished their part on or before the due
                   date.
@@ -1149,7 +1168,8 @@ export function TaskDetailDialog({
                             sx={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 1,
+                              gap: isMobile ? 0.5 : 1,
+                              flexWrap: isMobile ? 'wrap' : 'nowrap',
                             }}
                           >
                             <Box
@@ -1173,7 +1193,7 @@ export function TaskDetailDialog({
                                   bgcolor: pal.light,
                                   borderLeft: `3px solid ${pal.strip}`,
                                   color: pal.name,
-                                  fontSize: 13,
+                                  fontSize: isMobile ? 11 : 13,
                                   fontWeight: 600,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -1185,9 +1205,9 @@ export function TaskDetailDialog({
                               <Box
                                 sx={{
                                   flexShrink: 0,
-                                  px: 1,
+                                  px: isMobile ? 0.75 : 1,
                                   py: 0.6,
-                                  fontSize: 11,
+                                  fontSize: isMobile ? 9 : 11,
                                   fontWeight: 600,
                                   letterSpacing: '0.04em',
                                   color: statusChip.color,
@@ -1200,9 +1220,9 @@ export function TaskDetailDialog({
                               <Box
                                 sx={{
                                   flexShrink: 0,
-                                  px: 1,
+                                  px: isMobile ? 0.75 : 1,
                                   py: 0.6,
-                                  fontSize: 11,
+                                  fontSize: isMobile ? 9 : 11,
                                   fontWeight: 700,
                                   color: tone.color,
                                   bgcolor: tone.bgcolor,
@@ -1218,8 +1238,8 @@ export function TaskDetailDialog({
                                 sx={{
                                   flexShrink: 0,
                                   color: 'text.secondary',
-                                  fontSize: 11,
-                                  minWidth: 72,
+                                  fontSize: isMobile ? 9 : 11,
+                                  minWidth: isMobile ? 60 : 72,
                                   textAlign: 'right',
                                 }}
                               >
@@ -1229,13 +1249,13 @@ export function TaskDetailDialog({
                             {hrs > 0 && (
                               <Box
                                 sx={{
-                                  px: 1,
-                                  py: 0.4,
+                                  px: isMobile ? 0.75 : 1,
+                                  py: isMobile ? 0.3 : 0.4,
                                   borderRadius: '20px',
                                   bgcolor: isDark ? '#1A3A5C' : '#E6F1FB',
                                   border: `1px solid ${isDark ? '#64B5F6' : '#85B7EB'}`,
                                   color: isDark ? '#90CAF9' : '#0C447C',
-                                  fontSize: 12,
+                                  fontSize: isMobile ? 10 : 12,
                                   fontWeight: 600,
                                   flexShrink: 0,
                                 }}
@@ -1252,6 +1272,7 @@ export function TaskDetailDialog({
                                 pl: 0.5,
                                 mt: 0.35,
                                 color: isDark ? '#FFB74D' : '#E65100',
+                                fontSize: isMobile ? 9 : 11,
                               }}
                             >
                               {delivery.hint}
@@ -1268,10 +1289,10 @@ export function TaskDetailDialog({
 
         {/* ── EDIT MODE ── */}
         {task && editMode && (
-          <Stack spacing={2}>
+          <Stack spacing={isMobile ? 1.5 : 2}>
             <InfoCard accentColor={ORACLE_RED_ACTION}>
               <SectionLabel>Overview</SectionLabel>
-              <Stack spacing={2}>
+              <Stack spacing={isMobile ? 1.5 : 2}>
                 <TextField
                   label="Task title"
                   value={title}
@@ -1286,7 +1307,7 @@ export function TaskDetailDialog({
                   label="Description"
                   value={description}
                   onChange={setDescription}
-                  minRows={3}
+                  minRows={isMobile ? 3 : 3}
                   sx={fieldSx}
                 />
                 <Box>
@@ -1306,8 +1327,8 @@ export function TaskDetailDialog({
 
             <InfoCard accentColor="#5C6BC0">
               <SectionLabel>Planning</SectionLabel>
-              <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Stack spacing={isMobile ? 1.5 : 2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isMobile ? 1 : 1.5}>
                   <FormControl size="small" fullWidth sx={fieldSx}>
                     <InputLabel>Sprint</InputLabel>
                     <Select
@@ -1315,9 +1336,9 @@ export function TaskDetailDialog({
                       onChange={(e) => setSprintId(e.target.value)}
                       label="Sprint"
                     >
-                      {sprints.map((s) => (
+                      {sortedSprints.map((s) => (
                         <MenuItem key={s.id} value={String(s.id)}>
-                          {`Sprint ${sprintNumberMap.get(s.id) ?? s.id}`}
+                          {formatSprintLabel(sprintNumberMap, s.id) || `Sprint ${s.id}`}
                         </MenuItem>
                       ))}
                     </Select>
@@ -1329,7 +1350,7 @@ export function TaskDetailDialog({
                     onChange={(e) => setAssignedHours(e.target.value)}
                     fullWidth
                     size="small"
-                    inputProps={{ min: 0 }}
+                    inputProps={{ min: 0, step: 0.25 }}
                     sx={fieldSx}
                   />
                 </Stack>
@@ -1396,7 +1417,7 @@ export function TaskDetailDialog({
                     )}
                 </FormControl>
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isMobile ? 1 : 1.5}>
                   <TextField
                     label="Start date"
                     type="date"
@@ -1433,31 +1454,33 @@ export function TaskDetailDialog({
       {/* ── Footer ── */}
       <DialogActions
         sx={{
-          px: 3,
-          py: 1.5,
-          gap: 1,
+          px: isMobile ? 2 : 3,
+          py: isMobile ? 1 : 1.5,
+          gap: isMobile ? 0.75 : 1,
           borderTop: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
           bgcolor: isDark ? '#111214' : '#FAFAFA',
           justifyContent: editMode ? 'space-between' : 'flex-end',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
         }}
       >
         {editMode ? (
           <>
-            <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>
+            <Typography sx={{ fontSize: isMobile ? 10 : 12, color: 'text.disabled' }}>
               Unsaved changes will be lost on cancel
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: isMobile ? 0.75 : 1 }}>
               <Button
                 onClick={handleCancelEdit}
                 disabled={saving}
+                size={buttonSize}
                 sx={{
-                  fontSize: 13,
+                  fontSize: isMobile ? 11 : 13,
                   color: 'text.secondary',
                   textTransform: 'none',
                   fontWeight: 600,
                   borderRadius: '8px',
                   border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
-                  px: 2,
+                  px: isMobile ? 1.5 : 2,
                   '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
                 }}
               >
@@ -1468,14 +1491,15 @@ export function TaskDetailDialog({
                 disabled={saving}
                 variant="contained"
                 disableElevation
-                startIcon={<SaveOutlinedIcon sx={{ fontSize: '16px !important' }} />}
+                startIcon={<SaveOutlinedIcon sx={{ fontSize: isMobile ? '14px !important' : '16px !important' }} />}
+                size={buttonSize}
                 sx={{
-                  fontSize: 13,
+                  fontSize: isMobile ? 11 : 13,
                   bgcolor: ORACLE_RED_ACTION,
                   textTransform: 'none',
                   fontWeight: 600,
                   borderRadius: '8px',
-                  px: 2.5,
+                  px: isMobile ? 2 : 2.5,
                   '&:hover': { bgcolor: '#A83B2D' },
                   '&.Mui-disabled': { bgcolor: '#EFEBE9', color: '#BCAAA4' },
                 }}
@@ -1487,14 +1511,15 @@ export function TaskDetailDialog({
         ) : (
           <Button
             onClick={handleDialogClose}
+            size={buttonSize}
             sx={{
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               color: 'text.secondary',
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: '8px',
               border: `1px solid ${isDark ? '#2A2C32' : '#E0E0E0'}`,
-              px: 2,
+              px: isMobile ? 2 : 2.5,
               '&:hover': { bgcolor: isDark ? '#2A2C32' : '#F5F5F5' },
             }}
           >

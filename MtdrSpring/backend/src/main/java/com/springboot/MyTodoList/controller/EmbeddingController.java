@@ -98,11 +98,11 @@ public class EmbeddingController {
                 m.put("taskId", te.getTaskId());
                 m.put("textoChunk", te.getTextoChunk());
                 m.put("createdAt", te.getCreatedAt());
-                m.put("hasVector", te.getEmbedding() != null && !te.getEmbedding().isBlank());
+                m.put("hasVector", embeddingService.hasStoredVector(te));
                 return m;
             }).collect(Collectors.toList());
 
-
+            response.put("vectorSearchBackend", embeddingService.getVectorSearchBackend().name());
             response.put("tasks", preview);
             return ResponseEntity.ok(response);
 
@@ -115,7 +115,7 @@ public class EmbeddingController {
     // ─────────────────────────────────────────────────────────────────────────
     // PROBAR BUSQUEDA VECTORIAL
     // POST /api/embeddings/search
-    // Body: { "query": "tareas bloqueadas", "sprintId": 1, "topK": 5 }
+    // Body: { "query": "tareas bloqueadas", "sprintId": 1, "topK": 5, "taskStatus": "In progress" }
     // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/search")
@@ -127,16 +127,24 @@ public class EmbeddingController {
                 ? Long.valueOf(body.get("sprintId").toString()) : null;
             int topK = body.get("topK") != null
                 ? Integer.parseInt(body.get("topK").toString()) : 5;
+            String taskStatus = body.get("taskStatus") != null
+                ? body.get("taskStatus").toString().trim() : null;
+            if (taskStatus != null && taskStatus.isEmpty()) {
+                taskStatus = null;
+            }
 
             if (query == null || query.isBlank()) {
                 response.put("error", "query is required");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            List<TaskEmbedding> results = embeddingService.findRelevantTasks(query, sprintId, topK);
+            List<TaskEmbedding> results =
+                embeddingService.findRelevantTasks(query, sprintId, taskStatus, topK);
 
             response.put("query", query);
             response.put("sprintId", sprintId);
+            response.put("taskStatus", taskStatus);
+            response.put("vectorSearchBackend", embeddingService.getVectorSearchBackend().name());
             response.put("results", results.stream().map(te -> {
                 Map<String, Object> m = new HashMap<>();
                 m.put("taskId", te.getTaskId());

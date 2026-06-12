@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
   Typography,
   Stack,
   Box,
+  Checkbox,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
@@ -390,9 +391,26 @@ export default function TaskTable({
   variant = 'default',
   /** e.g. 400 or '42vh' — enables sticky header + internal scroll */
   scrollMaxHeight,
+  selectionEnabled = false,
+  selectedTaskIds = null,
+  onTaskSelectionChange,
+  onSelectAllChange,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  const selectedIdSet = useMemo(() => {
+    if (!selectedTaskIds) return new Set();
+    if (selectedTaskIds instanceof Set) {
+      return new Set(Array.from(selectedTaskIds, (id) => String(id)));
+    }
+    return new Set(Array.from(selectedTaskIds, (id) => String(id)));
+  }, [selectedTaskIds]);
+
+  const allRowsSelected =
+    selectionEnabled && items.length > 0 && items.every((item) => selectedIdSet.has(String(item.id)));
+  const someRowsSelected =
+    selectionEnabled && items.some((item) => selectedIdSet.has(String(item.id)));
 
   const managerView = variant === 'manager';
   const developerView = variant === 'developer';
@@ -408,7 +426,13 @@ export default function TaskTable({
         headers: baseLayout.headers.slice(0, -1),
         colWidths: baseLayout.colWidths.slice(0, -1),
       };
-  const colSpanEmpty = layout.headers.length;
+  const tableLayout = selectionEnabled
+    ? {
+        headers: ['__select__', ...layout.headers],
+        colWidths: ['44px', ...layout.colWidths],
+      }
+    : layout;
+  const colSpanEmpty = tableLayout.headers.length;
 
   const headCellSx = {
     fontSize: '0.7rem',
@@ -443,15 +467,30 @@ export default function TaskTable({
     >
       <Table stickyHeader={scrollMaxHeight != null} size="small" sx={{ tableLayout: 'fixed' }}>
         <colgroup>
-          {layout.colWidths.map((w, i) => (
+          {tableLayout.colWidths.map((w, i) => (
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
         <TableHead>
           <TableRow>
-            {layout.headers.map((h, i) => (
+            {tableLayout.headers.map((h, i) => (
               <TableCell key={i} sx={headCellSx}>
-                {h}
+                {h === '__select__' ? (
+                  <Checkbox
+                    size="small"
+                    checked={allRowsSelected}
+                    indeterminate={someRowsSelected && !allRowsSelected}
+                    onChange={(e) => onSelectAllChange?.(e.target.checked)}
+                    inputProps={{ 'aria-label': 'Select all tasks in table' }}
+                    sx={{
+                      p: 0,
+                      color: 'rgba(255,255,255,0.85)',
+                      '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: '#FFFFFF' },
+                    }}
+                  />
+                ) : (
+                  h
+                )}
               </TableCell>
             ))}
           </TableRow>
@@ -477,6 +516,7 @@ export default function TaskTable({
             const priorityChip = getPriorityChipProps(item.priority, isDark);
             const clickable = typeof onRowClick === 'function';
             const completed = isCompletedStatus(item);
+            const rowSelected = selectionEnabled && selectedIdSet.has(String(item.id));
             return (
               <TableRow
                 key={item.id}
@@ -488,6 +528,11 @@ export default function TaskTable({
                   '&:nth-of-type(odd)': {
                     bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(248, 251, 255, 0.6)',
                   },
+                  ...(rowSelected
+                    ? {
+                        bgcolor: isDark ? 'rgba(199, 70, 52, 0.14)' : 'rgba(199, 70, 52, 0.08)',
+                      }
+                    : {}),
                   '&:hover': {
                     bgcolor: clickable
                       ? isDark
@@ -498,6 +543,29 @@ export default function TaskTable({
                   ...(clickable ? { cursor: 'pointer' } : {}),
                 }}
               >
+                {selectionEnabled ? (
+                  <TableCell
+                    sx={{
+                      px: 0.75,
+                      width: 44,
+                      bgcolor: 'background.paper',
+                      borderLeft: `1px solid ${isDark ? '#2A2C32' : '#F0F0F0'}`,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={rowSelected}
+                      onChange={(e) => onTaskSelectionChange?.(item.id, e.target.checked)}
+                      inputProps={{ 'aria-label': `Select task ${item.id}` }}
+                      sx={{
+                        p: 0.25,
+                        color: isDark ? '#9A9A9A' : '#757575',
+                        '&.Mui-checked': { color: '#C74634' },
+                      }}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell
                   sx={{
                     ...columnCellSx(0),

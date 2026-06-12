@@ -33,7 +33,7 @@ public class DeveloperRadarController {
         int onTime;
         int late;
         double worked;
-        long assigned;
+        double assigned;
     }
 
     @Autowired

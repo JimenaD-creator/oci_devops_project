@@ -3,7 +3,7 @@ export const CHART_DESC = {
   compare: {
     workload: undefined,
     hours:
-      'Total hours worked and estimated hours per developer, summed across all selected sprints.',
+      'Hours worked per developer',
     teamTrend: 'Team productivity score (0–100%) across selected sprints',
     developerTrend: 'Individual productivity score (0–100%) across selected sprints for this developer.',
     devScoreByDeveloper: 'One line per developer with activity in the selected sprints.',

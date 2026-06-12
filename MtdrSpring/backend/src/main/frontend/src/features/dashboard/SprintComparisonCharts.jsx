@@ -142,7 +142,7 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
       <ResponsiveContainer width="100%" height={chartH}>
         <BarChart
           data={data}
-          margin={{ top: 8, right: 10, left: 4, bottom: marginBottom }}
+          margin={{ top: 8, right: 10, left: 14, bottom: marginBottom }}
           barCategoryGap={barCategoryGap}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE(isDark)} vertical={false} />
@@ -154,7 +154,7 @@ function SprintCompareBarBlock({ title, description, data, dataKey, valueFormatt
             interval={0}
             height={48}
           />
-          <YAxis tick={Y_AXIS_TICK(isDark)} axisLine={false} width={48} />
+          <YAxis tick={Y_AXIS_TICK(isDark)} axisLine={false} width={56} tickMargin={4} />
           <Tooltip
             {...RECHARTS_BAR_TOOLTIP_PROPS}
             shared={false}

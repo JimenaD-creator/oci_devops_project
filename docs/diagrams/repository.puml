@@ -1,0 +1,120 @@
+@startuml
+
+interface com.springboot.MyTodoList.repository.KpiRepository {
+	{method}  {abstract} +getCompletionRate ( sprintId : Long ) : java.util.Map
+	{method}  {abstract} +getContributionScore ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +getEfficiencyScore ( sprintId : Long ) : java.util.Map
+	{method}  {abstract} +getOnTimeDelivery ( sprintId : Long ) : java.util.Map
+	{method}  {abstract} +getWorkloadBalance ( sprintId : Long ) : java.util.Map
+}
+
+
+interface com.springboot.MyTodoList.repository.ProjectRepository {
+	{method}  {abstract} +existsByAssignedTeamId ( teamId : Long ) : boolean
+	{method}  {abstract} +findAllByManagerId ( managerId : Long ) : java.util.List
+	{method}  {abstract} +findAllProjectsForTeamMember ( userId : Long ) : java.util.List
+	{method}  {abstract} +findByManagerId ( managerId : Long ) : java.util.Optional
+	{method}  {abstract} +findByTeamMemberUserId ( userId : Long ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.SprintInsightEmbeddingRepository {
+	{method}  {abstract} +deleteBySprintId ( sprintId : Long ) : void
+	{method}  {abstract} +findByProjectId ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findBySprintId ( sprintId : Long ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.SprintInsightRepository {
+	{method}  {abstract} +findByProjectIdOrderByGeneratedAtDesc ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findBySprintId ( sprintId : Long ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.SprintRepository {
+	{method}  {abstract} +findByAssignedProjectId ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findByAssignedProjectIdOrderByStartDateAsc ( projectId : Long ) : java.util.List
+}
+
+
+interface com.springboot.MyTodoList.repository.TaskEmbeddingRepository {
+	{method}  {abstract} +deleteBySprintId ( sprintId : Long ) : void
+	{method}  {abstract} +deleteByTaskId ( taskId : Long ) : void
+	{method}  {abstract} +findBySprintId ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByTaskId ( taskId : Long ) : java.util.List
+}
+
+
+interface com.springboot.MyTodoList.repository.TaskLogRepository {
+	{method}  {abstract} +deleteByTask_Id ( taskId : Long ) : void
+}
+
+
+interface com.springboot.MyTodoList.repository.TaskRepository {
+	{method}  {abstract} +countTasksByStatusForSprint ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByAssignedSprintId ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByProjectId ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findByProjectIdWithSprint ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findProjectIdByTaskId ( taskId : Long ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.TeamMemberRepository {
+	{method}  {abstract} +deleteByUserId ( userId : Long ) : void
+}
+
+
+interface com.springboot.MyTodoList.repository.TeamMembersRepository {
+	{method}  {abstract} +findByTeam_Id ( teamId : Long ) : java.util.List
+}
+
+
+interface com.springboot.MyTodoList.repository.TeamRepository {
+	{method}  {abstract} +existsByManagerId ( userId : Long ) : boolean
+	{method}  {abstract} +findByManagerId ( managerId : Long ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.ToDoItemRepository {
+	{method}  {abstract} +findByAssignedSprint ( assignedSprint : Integer ) : java.util.List
+	{method}  {abstract} +updateStatusOnly ( id : int , status : String ) : int
+}
+
+
+interface com.springboot.MyTodoList.repository.UserRepository {
+	{method}  {abstract} +findAllUserDetails () : java.util.List
+	{method}  {abstract} +findByEmail ( email : String ) : java.util.Optional
+	{method}  {abstract} +findByEmailIgnoreCase ( email : String ) : java.util.Optional
+	{method}  {abstract} +findByNameIgnoreCase ( name : String ) : java.util.Optional
+	{method}  {abstract} +findByPhonenumber ( phonenumber : String ) : java.util.Optional
+	{method}  {abstract} +findByResetToken ( resetToken : String ) : java.util.Optional
+}
+
+
+interface com.springboot.MyTodoList.repository.UserSprintRepository {
+	{method}  {abstract} +findBySprintIdWithUser ( sprintId : Long ) : java.util.List
+}
+
+
+interface com.springboot.MyTodoList.repository.UserTaskRepository {
+	{method}  {abstract} +countAssigneesGroupedByTaskId ( taskIds : java.util.Collection ) : java.util.List
+	{method}  {abstract} +findAllWithUserAndTask () : java.util.List
+	{method}  {abstract} +findAssignmentsDueBefore ( windowEnd : java.time.LocalDateTime ) : java.util.List
+	{method}  {abstract} +findBlockerReportsByUserIdAndProjectId ( userId : Long , projectId : Long ) : java.util.List
+	{method}  {abstract} +findByProjectIdWithUserAndTask ( projectId : Long ) : java.util.List
+	{method}  {abstract} +findBySprintIdWithUserAndTask ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByTaskIdWithUserAndTask ( taskId : Long ) : java.util.List
+	{method}  {abstract} +findByTask_AssignedSprint_Id ( sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByTask_Id ( taskId : Long ) : java.util.List
+	{method}  {abstract} +findByUser_Id ( userId : Long ) : java.util.List
+	{method}  {abstract} +findByUser_IdAndTask_AssignedSprint_Id ( userId : Long , sprintId : Long ) : java.util.List
+	{method}  {abstract} +findByUser_IdAndTask_Id ( userId : Long , taskId : Long ) : java.util.Optional
+	{method}  {abstract} +findDistinctSprintIdsByUserId ( userId : Long ) : java.util.List
+}
+
+
+
+
+
+
+@enduml

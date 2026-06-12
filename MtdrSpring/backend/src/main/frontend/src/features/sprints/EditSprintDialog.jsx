@@ -17,6 +17,11 @@ import CheckIcon from '@mui/icons-material/Check';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import { API_BASE, FORM_FIELD_TINT_BG, ORACLE_RED_ACTION } from './constants/sprintConstants';
 import { sprintKpiNumber, toInputDate, oracleRgba } from './utils/sprintUtils';
+import {
+  dateInputToEndOfLocalDayIso,
+  dateInputToStartOfLocalDayIso,
+  isDateInputOnOrBefore,
+} from '../tasks/utils/taskUtils';
 
 export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
   const theme = useTheme();
@@ -49,6 +54,10 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (sprintId == null || !startDate || !dueDate) return;
+    if (!isDateInputOnOrBefore(startDate, dueDate)) {
+      setError('Start date must be on or before end date.');
+      return;
+    }
     const projectIdRaw = sprint?.assignedProject?.id ?? sprint?.assignedProject?.ID;
     const projectId =
       projectIdRaw == null || projectIdRaw === ''
@@ -69,11 +78,11 @@ export function EditSprintDialog({ open, sprint, onClose, onSaved }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assignedProject: { id: projectId },
-          startDate: new Date(startDate).toISOString(),
-          dueDate: new Date(dueDate).toISOString(),
+          startDate: dateInputToStartOfLocalDayIso(startDate),
+          dueDate: dateInputToEndOfLocalDayIso(dueDate),
           completionRate: sprintKpiNumber(sprint, 'completionRate'),
           onTimeDelivery: sprintKpiNumber(sprint, 'onTimeDelivery'),
-          teamParticipation: sprintKpiNumber(sprint, 'teamParticipation'),
+          efficiencyScore: sprintKpiNumber(sprint, 'efficiencyScore'),
           workloadBalance: sprintKpiNumber(sprint, 'workloadBalance'),
           goal: goalTrim || null,
         }),

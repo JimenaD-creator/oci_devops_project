@@ -16,6 +16,7 @@ import {
   IconButton,
   Alert,
   Chip,
+  useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -54,6 +55,7 @@ export function TasksNewTaskDialog({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -274,6 +276,12 @@ export function TasksNewTaskDialog({
 
   const compactSelectFieldSx = useMemo(() => createTaskSelectFillSx(isDark), [isDark]);
 
+  // Responsive padding y márgenes
+  const dialogContentPx = isMobile ? 2.5 : 5;
+  const stackMx = isMobile ? 0.5 : 1.25;
+  const dialogTitlePx = isMobile ? 2 : 2.5;
+  const dialogActionsPx = isMobile ? 2 : 2.5;
+
   return (
     <Dialog
       open={open}
@@ -292,7 +300,9 @@ export function TasksNewTaskDialog({
           height: { xs: 'auto', sm: '88vh' },
           maxHeight: 'calc(100vh - 24px)',
           overflow: 'hidden',
-          maxWidth: { xs: 'calc(100% - 32px)', sm: 980 },
+          maxWidth: { xs: 'calc(100% - 16px)', sm: 980 },
+          margin: { xs: 1, sm: 'auto' },
+          width: { xs: 'calc(100% - 16px)', sm: 'auto' },
         },
       }}
     >
@@ -303,17 +313,17 @@ export function TasksNewTaskDialog({
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 1.5,
-            px: 2.5,
-            py: 2,
+            px: dialogTitlePx,
+            py: isMobile ? 1.5 : 2,
             borderBottom: '1px solid',
             borderBottomColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 1 : 1.25 }}>
             <Box
               sx={{
-                width: 40,
-                height: 40,
+                width: isMobile ? 32 : 40,
+                height: isMobile ? 32 : 40,
                 borderRadius: 2,
                 bgcolor: isDark ? 'rgba(199,70,52,0.15)' : 'rgba(199,70,52,0.10)',
                 border: '1px solid',
@@ -323,43 +333,43 @@ export function TasksNewTaskDialog({
                 justifyContent: 'center',
               }}
             >
-              <TaskAltIcon sx={{ color: ORACLE_RED }} />
+              <TaskAltIcon sx={{ color: ORACLE_RED, fontSize: isMobile ? 20 : 24 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: 'text.primary' }}>
+              <Typography sx={{ fontWeight: 800, fontSize: isMobile ? '1.1rem' : '1.3rem', color: 'text.primary' }}>
                 Create task
               </Typography>
               <Typography
                 variant="caption"
-                sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}
+                sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', fontSize: isMobile ? '0.65rem' : '0.75rem' }}
               >
                 Details, planning & assignees
               </Typography>
             </Box>
           </Box>
           <IconButton onClick={handleClose} size="small" disabled={saving}>
-            <CloseIcon />
+            <CloseIcon fontSize={isMobile ? 'small' : 'medium'} />
           </IconButton>
         </Box>
       </DialogTitle>
       <DialogContent
         sx={{
-          pt: 3.5,
-          px: { xs: 3.5, sm: 5 },
-          pb: 3.25,
+          pt: isMobile ? 2.5 : 3.5,
+          px: dialogContentPx,
+          pb: isMobile ? 2.5 : 3.25,
           flex: 1,
           minHeight: 0,
           overflowY: 'auto',
         }}
       >
-        <Stack spacing={2.25} sx={{ mx: { xs: 0.75, sm: 1.25 }, my: { xs: 0.5, sm: 0.75 } }}>
+        <Stack spacing={isMobile ? 2 : 2.25} sx={{ mx: stackMx, my: { xs: 0.5, sm: 0.75 } }}>
           <TextField
             label="Task title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             fullWidth
             multiline
-            minRows={2}
+            minRows={isMobile ? 2 : 2}
             size="small"
             sx={primaryFieldSx}
           />
@@ -369,11 +379,11 @@ export function TasksNewTaskDialog({
             onChange={(e) => setDescription(e.target.value)}
             fullWidth
             multiline
-            minRows={5}
+            minRows={isMobile ? 4 : 5}
             size="small"
             sx={primaryFieldSx}
           />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isMobile ? 1.5 : 2}>
             <FormControl size="small" fullWidth sx={compactSelectFieldSx}>
               <InputLabel>Work item type</InputLabel>
               <Select
@@ -442,7 +452,7 @@ export function TasksNewTaskDialog({
               </Select>
             </FormControl>
           </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isMobile ? 1.5 : 2}>
             <FormControl size="small" fullWidth sx={compactSelectFieldSx}>
               <InputLabel>Sprint</InputLabel>
               <Select
@@ -450,7 +460,9 @@ export function TasksNewTaskDialog({
                 onChange={(e) => setSprintId(e.target.value)}
                 label="Sprint"
                 renderValue={(value) => {
-                  if (!value) return 'Select sprint';
+                  if (!value) {
+                    return <Typography component="span" sx={createTaskSelectPlaceholderSx}>Select sprint</Typography>;
+                  }
                   return formatSprintLabel(sprintNumberMap, value);
                 }}
               >
@@ -472,7 +484,7 @@ export function TasksNewTaskDialog({
               onChange={(e) => setAssignedHours(e.target.value)}
               fullWidth
               size="small"
-              inputProps={{ min: 0 }}
+              inputProps={{ min: 0, step: 0.25 }}
               sx={fieldOutlineTint}
             />
           </Stack>
@@ -533,7 +545,7 @@ export function TasksNewTaskDialog({
               ))}
             </Select>
           </FormControl>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={isMobile ? 1.5 : 2}>
             <TextField
               label="Start Date"
               type="date"
@@ -564,33 +576,56 @@ export function TasksNewTaskDialog({
       </DialogContent>
       <DialogActions
         sx={{
-          px: 2.5,
-          pb: 2.25,
-          pt: 1.5,
+          px: dialogActionsPx,
+          pb: isMobile ? 2 : 2.25,
+          pt: isMobile ? 1.5 : 1.5,
           borderTop: '1px solid',
           borderTopColor: isDark ? 'rgba(199, 70, 52, 0.2)' : 'rgba(199, 70, 52, 0.12)',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: { xs: 1, sm: 0 },
         }}
       >
-        <Button
-          onClick={handleClose}
-          sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
-          disabled={saving}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          variant="contained"
+        <Typography
           sx={{
-            bgcolor: ORACLE_RED,
-            textTransform: 'none',
-            fontWeight: 700,
-            '&:hover': { bgcolor: '#A83B2D' },
+            fontSize: isMobile ? 10 : 12,
+            color: 'text.disabled',
+            flex: { sm: 1 },
+            textAlign: { xs: 'center', sm: 'left' },
           }}
         >
-          {saving ? 'Creating...' : 'Create task'}
-        </Button>
+          Fields marked with{' '}
+          <Box component="span" sx={{ color: ORACLE_RED, fontWeight: 700 }}>*</Box>{' '}
+          are required
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'stretch', sm: 'flex-end' } }}>
+          <Button
+            onClick={handleClose}
+            sx={{
+              flex: { xs: 1, sm: 'none' },
+              color: 'text.secondary',
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            variant="contained"
+            sx={{
+              flex: { xs: 1, sm: 'none' },
+              bgcolor: ORACLE_RED,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#A83B2D' },
+            }}
+          >
+            {saving ? 'Creating...' : 'Create task'}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

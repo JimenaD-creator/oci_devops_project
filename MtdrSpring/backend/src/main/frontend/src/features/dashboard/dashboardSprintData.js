@@ -1,4 +1,4 @@
-import { inferStatusByDate } from '../sprints/utils/sprintUtils';
+import { inferStatusByDate, sortSprintsByStartDate } from '../sprints/utils/sprintUtils';
 import {
   computeIndividualWorkloadBalance,
   computeProductivityScore,
@@ -12,6 +12,7 @@ import {
 } from '../../utils/teamRosterUtils';
 import { getApiBase } from '../../utils/apiBase';
 import { apiFetch, getSessionExpiredMessage, isUnauthorizedHttpStatus } from '../../utils/auth';
+import { developerAvatarColors } from '../../utils/developerColors';
 
 /** Distinct chart + selector dot colors (saturated only — no slate/brown-gray). */
 export const SPRINT_CHART_COLORS = [
@@ -42,6 +43,20 @@ let cachedData = {
 /** In-memory TTL for sprints + tasks + user-tasks bundle (shared across all pages). */
 const CACHE_TTL = 120000; // 2 minutes
 const SESSION_CACHE_PREFIX = 'dashboardBundle:v1:';
+
+/** True after F5 / browser reload — sessionStorage may still hold stale bundle data. */
+export function isFullPageReload() {
+  try {
+    const nav = performance.getEntriesByType?.('navigation')?.[0];
+    return nav?.type === 'reload';
+  } catch {
+    return false;
+  }
+}
+
+function shouldBypassClientCache(options = {}) {
+  return Boolean(options?.forceFresh) || isFullPageReload();
+}
 
 function sessionCacheKey(pid) {
   return `${SESSION_CACHE_PREFIX}${pid}`;
@@ -112,6 +127,7 @@ function clearSessionBundleCache(pid) {
 }
 
 function hydrateMemoryCacheFromSession(pid) {
+  if (isFullPageReload()) return false;
   const sessionSnap = readSessionBundleCache(pid);
   if (!sessionSnap) return false;
   cachedData = {
@@ -352,16 +368,17 @@ function sprintTaskStatusRows(counts) {
   return { taskStatusDistribution: rows, taskStatusTotal };
 }
 
-function mapApiSprint(apiSprint, sprintNumber) {
+function mapApiSprint(apiSprint, displayIndex) {
   const id = apiSprint.id;
+  const label = Number.isFinite(Number(displayIndex)) ? `Sprint ${displayIndex}` : `Sprint ${id}`;
   return {
     id,
     assignedProject: apiSprint.assignedProject ?? null,
     startDate: apiSprint.startDate,
     dueDate: apiSprint.dueDate,
-    shortLabel: `Sprint ${sprintNumber}`,
+    shortLabel: label,
     accentColor: SPRINT_CHART_COLORS[0],
-    name: `Sprint ${sprintNumber}`,
+    name: label,
     dateRange: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     dateRangeEn: formatDateRange(apiSprint.startDate, apiSprint.dueDate, 'en'),
     /** Dashboard: planned / active / completed from sprint date range (not task completion). */
@@ -767,7 +784,7 @@ function storeBundleInCache(pid, bundle, now) {
     projectId: pid,
   };
 
-  const sortedSprints = [...apiSprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const sortedSprints = sortSprintsByStartDate(apiSprints);
   const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
   let enriched;
   try {
@@ -841,7 +858,7 @@ export function getCachedDevelopersSnapshot(projectId) {
  * Returns raw API arrays (sprints, tasks, userTasks) using the same cache as fetchDashboardSprints.
  */
 export async function fetchProjectBundleRaw(projectId, options = {}) {
-  const forceFresh = Boolean(options?.forceFresh);
+  const forceFresh = shouldBypassClientCache(options);
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
   if (!pid) {
@@ -872,7 +889,7 @@ export async function fetchCachedProjectTasks(projectId, options = {}) {
 }
 
 export async function fetchDashboardSprints(projectId, options = {}) {
-  const forceFresh = Boolean(options?.forceFresh);
+  const forceFresh = shouldBypassClientCache(options);
   const pid =
     projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
   if (!pid) {
@@ -888,7 +905,7 @@ export async function fetchDashboardSprints(projectId, options = {}) {
     if (Array.isArray(cachedData.enrichedSprints)) {
       return cachedData.enrichedSprints;
     }
-    const sortedCached = [...cachedData.sprints].sort((a, b) => Number(a.id) - Number(b.id));
+    const sortedCached = sortSprintsByStartDate(cachedData.sprints);
     const mapped = sortedCached.map((sprint, index) => mapApiSprint(sprint, index));
     const enriched = enrichSprintsWithUserTasks(mapped, cachedData.tasks, cachedData.userTasks);
     assignSprintAccentColors(enriched);
@@ -910,7 +927,7 @@ function rebuildEnrichedSprintsFromCache() {
     cachedData.enrichedSprints = [];
     return;
   }
-  const sortedSprints = [...cachedData.sprints].sort((a, b) => Number(a.id) - Number(b.id));
+  const sortedSprints = sortSprintsByStartDate(cachedData.sprints);
   const mapped = sortedSprints.map((sprint, index) => mapApiSprint(sprint, index));
   try {
     cachedData.enrichedSprints = enrichSprintsWithUserTasks(
@@ -975,6 +992,55 @@ export function applyOptimisticTaskCreated(projectId, task, userTasks = []) {
   }
   cachedData.userTasks = mergedUserTasks;
   cachedData.timestamp = Date.now();
+  rebuildEnrichedSprintsFromCache();
+  return getCachedBundleSnapshot(pid);
+}
+
+/** Instant Kanban/dashboard update after a local task save (status, hours, assignee sync). */
+export function applyOptimisticTaskUpdated(projectId, task, meta = {}) {
+  const pid =
+    projectId != null && String(projectId).trim() !== '' ? String(projectId).trim() : null;
+  const tid = Number(task?.id);
+  if (!pid || !Number.isFinite(tid)) return null;
+
+  if (cachedData.projectId !== pid) {
+    if (!Array.isArray(cachedData.tasks) && !Array.isArray(cachedData.userTasks)) {
+      return null;
+    }
+    cachedData.projectId = pid;
+  }
+
+  cachedData.tasks = (cachedData.tasks || []).map((t) =>
+    Number(t?.id) === tid ? { ...t, ...task } : t,
+  );
+  if (!cachedData.tasks.some((t) => Number(t?.id) === tid) && task) {
+    cachedData.tasks = [task, ...cachedData.tasks];
+  }
+
+  if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
+    const targetUserId =
+      meta.userId != null && Number.isFinite(Number(meta.userId)) ? Number(meta.userId) : null;
+    const hours =
+      meta.workedHours != null && Number.isFinite(Number(meta.workedHours))
+        ? Number(meta.workedHours)
+        : null;
+    cachedData.userTasks = (cachedData.userTasks || []).map((ut) => {
+      const utTid = resolveUserTaskTaskId(ut);
+      if (Number(utTid) !== tid) return ut;
+      const uid = resolveUserTaskUserId(ut);
+      if (targetUserId != null && uid !== targetUserId) return ut;
+      const next = { ...ut, status: meta.assignmentStatus };
+      if (hours != null) {
+        next.workedHours = hours;
+        next.worked_hours = hours;
+        next.hours = hours;
+      }
+      return next;
+    });
+  }
+
+  cachedData.timestamp = Date.now();
+  writeSessionBundleCache(pid);
   rebuildEnrichedSprintsFromCache();
   return getCachedBundleSnapshot(pid);
 }
@@ -1283,13 +1349,13 @@ export function buildDeveloperAverageTrendSeries(
         (row) => normalizeDeveloperName(row?.name) === selectedDeveloperKey,
       );
       return {
-        sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
+        sprintLabel: sp?.shortLabel || `S${sp?.id ?? 0}`,
         avgTasksPerDev: Number(dev?.assigned) || 0,
         avgHoursPerDev: Number(Number(dev?.hours ?? 0).toFixed(1)),
       };
     }
     return {
-      sprintLabel: sp?.shortLabel || `S${sp?.id ?? index + 1}`,
+      sprintLabel: sp?.shortLabel || `S${sp?.id ?? index}`,
       avgTasksPerDev: avgTasksPerDeveloper(sp),
       avgHoursPerDev: avgHoursPerDeveloper(sp),
     };
@@ -1377,7 +1443,7 @@ export function buildTeamProductivityTrendSeries(selectedSprints) {
     const productivityScore = productivityScoreFromSprintKpis(kpis);
     return {
       sprintId: sp.id,
-      sprintLabel: sp.shortLabel ?? `Sprint ${idx}`,
+      sprintLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
       accentColor: sp.accentColor,
       productivityScore,
       scoreDisplay: `${productivityScore}%`,
@@ -1404,7 +1470,7 @@ export function buildCompareDeveloperChartsModel(
 
   const sprintDefs = sprints.map((sp, idx) => ({
     id: Number(sp.id),
-    shortLabel: sp.shortLabel ?? `Sprint ${idx}`,
+    shortLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
     accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
   }));
 
@@ -1450,7 +1516,62 @@ export function buildCompareDeveloperChartsModel(
   const hoursRows = [...baseRows].sort((a, b) => sumHours(b) - sumHours(a));
   const comboRows = [...baseRows].sort((a, b) => sumComboTasks(b) - sumComboTasks(a));
 
-  return { sprintDefs, workloadRows, hoursRows, comboRows };
+  let developerDefs = names.map((fullName) => ({
+    fullName,
+    shortName: shortDevName(fullName),
+    accentColor: developerAvatarColors(fullName).color,
+  }));
+  developerDefs.sort((a, b) => {
+    const rowA = baseRows.find((r) => r.name === a.fullName);
+    const rowB = baseRows.find((r) => r.name === b.fullName);
+    const diff = sumWorkload(rowB) - sumWorkload(rowA);
+    return diff !== 0 ? diff : String(a.fullName).localeCompare(String(b.fullName));
+  });
+  developerDefs = developerDefs.map((dev, idx) => ({ ...dev, id: idx }));
+
+  const sprintWorkloadRows = sprints.map((sp, idx) => {
+    const row = {
+      sprintId: Number(sp.id),
+      shortLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
+      accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
+      name: sp.shortLabel ?? `Sprint ${sp.id}`,
+    };
+    developerDefs.forEach((dev) => {
+      const devData = (sp.developers || []).find((d) => d.name === dev.fullName);
+      const assigned = Number(devData?.assigned) || 0;
+      const completedRaw = Number(devData?.completed) || 0;
+      const completed = Math.min(completedRaw, assigned);
+      const open = Math.max(0, assigned - completed);
+      row[`wc_${dev.id}`] = completed;
+      row[`wo_${dev.id}`] = open;
+    });
+    return row;
+  });
+
+  const sprintHoursRows = sprints.map((sp, idx) => {
+    const row = {
+      sprintId: Number(sp.id),
+      shortLabel: sp.shortLabel ?? `Sprint ${sp.id}`,
+      accentColor: sp.accentColor ?? SPRINT_CHART_COLORS[idx % SPRINT_CHART_COLORS.length],
+      name: sp.shortLabel ?? `Sprint ${sp.id}`,
+    };
+    developerDefs.forEach((dev) => {
+      const devData = (sp.developers || []).find((d) => d.name === dev.fullName);
+      row[`hw_${dev.id}`] = Number(devData?.hours) || 0;
+      row[`ha_${dev.id}`] = Number(devData?.assignedHoursEstimate) || 0;
+    });
+    return row;
+  });
+
+  return {
+    sprintDefs,
+    developerDefs,
+    workloadRows,
+    hoursRows,
+    comboRows,
+    sprintWorkloadRows,
+    sprintHoursRows,
+  };
 }
 
 export const DEVELOPER_DISPLAY_NAME = {};

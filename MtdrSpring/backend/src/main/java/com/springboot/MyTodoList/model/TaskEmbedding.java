@@ -20,6 +20,10 @@ public class TaskEmbedding {
     @Column(name = "TEXTO_CHUNK", length = 4000)
     private String textoChunk;
 
+    /**
+     * Legacy JSON array of doubles ({@code [0.1, 0.2, ...]}).
+     * Used by the application fallback; production Oracle uses {@code EMBEDDING_VEC VECTOR(...)} via JDBC.
+     */
     @Lob
     @Column(name = "EMBEDDING", columnDefinition = "CLOB")
     private String embedding;

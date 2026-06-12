@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Dialog,
@@ -19,6 +19,7 @@ import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import { developerNumericId } from '../../utils/userIds';
+import { apiFetch } from '../../utils/auth';
 import {
   API_BASE,
   FORM_FIELD_TINT_BG,
@@ -261,6 +262,7 @@ export function NewTaskDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const status = 'TODO';
+  const wasOpenRef = useRef(false);
 
   const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
@@ -270,7 +272,10 @@ export function NewTaskDialog({
   }, [sprints]);
 
   useEffect(() => {
-    if (!open) return;
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (!justOpened) return;
+
     const fallbackSprintId = defaultSprintId != null ? String(defaultSprintId) : '';
     const isValidDefault = (sprints || []).some((s) => String(s.id) === fallbackSprintId);
     setSprintId(isValidDefault ? fallbackSprintId : '');
@@ -325,7 +330,7 @@ export function NewTaskDialog({
       const userId = Number(assignedUserId);
       const userIds = Number.isFinite(userId) && userId > 0 ? [userId] : [];
       const dueIso = dateInputToEndOfLocalDayIso(dueDate);
-      const res = await fetch(`${API_BASE}/api/tasks`, {
+      const res = await apiFetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -347,8 +352,8 @@ export function NewTaskDialog({
         return;
       }
       const task = await res.json();
-      onCreated?.(task, userIds, status);
       onClose();
+      onCreated?.(task, userIds, status);
     } catch {
       setError('Connection error.');
     } finally {
@@ -523,7 +528,7 @@ export function NewTaskDialog({
               onChange={(e) => setAssignedHours(e.target.value)}
               fullWidth
               size="small"
-              inputProps={{ min: 0 }}
+              inputProps={{ min: 0, step: 0.25 }}
               sx={fieldSx}
             />
           </Stack>

@@ -27,6 +27,16 @@ public class TaskAssignmentSyncService {
     @Autowired
     private KpiService kpiService;
 
+    @Autowired
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
+
+    private void evictDashboardBundleForTask(Long taskId) {
+        if (taskId == null) {
+            return;
+        }
+        taskRepository.findProjectIdByTaskId(taskId).ifPresent(projectBundleCacheEvictor::evictDashboardBundle);
+    }
+
     private static String norm(String s) {
         if (s == null) return "";
         String n = s.trim().toUpperCase().replaceAll("[\\s-]+", "_");
@@ -49,7 +59,11 @@ public class TaskAssignmentSyncService {
 
         Task task = opt.get();
         List<UserTask> uts = userTaskRepository.findByTask_Id(taskId);
-        if (uts.isEmpty()) return taskRepository.save(task);
+        if (uts.isEmpty()) {
+            Task saved = taskRepository.save(task);
+            evictDashboardBundleForTask(taskId);
+            return saved;
+        }
 
         boolean allDone       = uts.stream().allMatch(ut -> isAssigneeDone(ut.getStatus()));
         boolean anyInProgress = uts.stream().anyMatch(ut -> "IN_PROGRESS".equals(norm(ut.getStatus())));
@@ -86,6 +100,7 @@ public class TaskAssignmentSyncService {
             triggerKpiRecalc(sprintId);
         }
 
+        evictDashboardBundleForTask(taskId);
         return saved;
     }
 

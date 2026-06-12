@@ -12,6 +12,11 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { API_BASE } from '../sprints/constants/sprintConstants';
+import {
+  buildSprintNumberMap,
+  formatSprintLabel,
+  sortSprintsByStartDate,
+} from '../sprints/utils/sprintUtils';
 import { useGeminiAiStatus } from './useGeminiAiStatus';
 import { getErrorMessage } from './aiInsightsConstants';
 
@@ -148,33 +153,35 @@ export default function ManagerChatbot({ projectId }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Crear mapa de números de sprint secuenciales
-  const sprintNumberMap = useMemo(() => {
-    const map = new Map();
-    [...sprints].sort((a, b) => a.id - b.id).forEach((s, i) => map.set(s.id, i));
-    return map;
-  }, [sprints]);
+  const sprintNumberMap = useMemo(() => buildSprintNumberMap(sprints), [sprints]);
 
-  // Obtener sprints ordenados para el select
-  const sortedSprintsForSelect = useMemo(() => {
-    return [...sprints].sort((a, b) => a.id - b.id);
-  }, [sprints]);
+  const sortedSprintsForSelect = useMemo(() => sortSprintsByStartDate(sprints), [sprints]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     const pid =
       projectId != null && String(projectId).trim() !== ''
         ? String(projectId).trim()
         : String(localStorage.getItem('currentProjectId') || '').trim();
-    if (!pid || sprints.length > 0) return;
+    if (!pid) return undefined;
+
+    let cancelled = false;
     fetch(`${API_BASE}/api/sprints?projectId=${encodeURIComponent(pid)}`, {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
     })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setSprints(Array.isArray(data) ? data : []))
-      .catch(() => setSprints([]));
-  }, [open, projectId, sprints.length]);
+      .then((data) => {
+        if (!cancelled) setSprints(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSprints([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, projectId]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -243,16 +250,17 @@ export default function ManagerChatbot({ projectId }) {
   const clearChat = () => setMessages([]);
 
   const suggestions = [
-    'How many tasks did each developer complete?',
-    'What tasks are still pending?',
-    'Who has the most workload?',
-    'Show me the sprint summary',
+    'What are the key insights and alerts for this sprint?',
+    'What do you recommend to improve team productivity?',
+    'How has each developer performed across sprints?',
+    'Who has the most workload right now?',
+    'Which past sprints had similar problems to this one?',
   ];
 
   return (
     <>
-      {/* Floating button */}
-      <Box sx={{ position: 'fixed', bottom: 28, right: 28, zIndex: 1300 }}>
+      {/* Floating button - posición adaptada para móvil */}
+      <Box sx={{ position: 'fixed', bottom: { xs: 76, sm: 28 }, right: 28, zIndex: 1300 }}>
         <AnimatePresence>
           {!open && (
             <motion.div
@@ -306,7 +314,7 @@ export default function ManagerChatbot({ projectId }) {
           )}
         </AnimatePresence>
 
-        {/* Chat window */}
+        {/* Chat window - responsive */}
         <AnimatePresence>
           {open && (
             <motion.div
@@ -318,9 +326,9 @@ export default function ManagerChatbot({ projectId }) {
             >
               <Box
                 sx={{
-                  width: 380,
-                  height: 560,
-                  borderRadius: '20px',
+                  width: { xs: 'calc(100vw - 56px)', sm: 380 },
+                  height: { xs: '75vh', sm: 560 },
+                  borderRadius: { xs: '16px 0 0 16px', sm: '20px' },
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
@@ -482,18 +490,15 @@ export default function ManagerChatbot({ projectId }) {
                       >
                         All sprints
                       </MenuItem>
-                      {sortedSprintsForSelect.map((s) => {
-                        const sprintNumber = sprintNumberMap.get(s.id);
-                        return (
-                          <MenuItem
-                            key={s.id}
-                            value={s.id}
-                            sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}
-                          >
-                            Sprint {sprintNumber}
-                          </MenuItem>
-                        );
-                      })}
+                      {sortedSprintsForSelect.map((s) => (
+                        <MenuItem
+                          key={s.id}
+                          value={s.id}
+                          sx={{ fontSize: '0.75rem', color: isDark ? '#F0F0F0' : '#1A1A1A' }}
+                        >
+                          {formatSprintLabel(sprintNumberMap, s.id)}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Box>
@@ -564,7 +569,7 @@ export default function ManagerChatbot({ projectId }) {
                         >
                           {aiBlocked
                             ? aiConfigMessage || getErrorMessage('API_KEY_MISSING')
-                            : 'Ask me about tasks, developers, sprint progress, or anything about your project.'}
+                            : 'Ask about tasks, developers, similar sprint patterns, productivity, or sprint progress.'}
                         </Typography>
                       </Box>
                       <Box

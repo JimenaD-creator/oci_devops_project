@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  useMediaQuery,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -29,7 +30,7 @@ import { matchesDueDateRange } from './taskFilters';
 import { developerNumericId, finiteUserIds } from '../../utils/userIds';
 import { NewTaskDialog } from './NewTaskDialog';
 import { API_BASE, ORACLE_RED, pageEase } from './constants/taskConstants';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { pickDefaultSelectedSprint, buildSprintNumberMap } from '../sprints/utils/sprintUtils';
 import {
   resolveActiveProjectId,
   sprintProjectIdFromJson,
@@ -43,7 +44,9 @@ import {
   shouldPromptWorkedHoursOnKanbanDone,
   taskEntityId,
   userTaskRowTaskId,
+  deriveDeveloperKanbanStatus,
 } from './utils/taskUtils';
+import { applyOptimisticTaskUpdated, isFullPageReload } from '../dashboard/dashboardSprintData';
 import { useProjectData } from '../../contexts/ProjectDataContext';
 import { apiFetch, resolveLoadErrorMessage } from '../../utils/auth';
 import {
@@ -69,6 +72,7 @@ import {
 export default function TasksPage({ projectId, developerMode = false, currentUser = null }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   const effectiveProjectId = resolveActiveProjectId(projectId);
   const currentUserId = developerMode ? Number(currentUser?.id) : null;
@@ -95,9 +99,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const [pendingDone, setPendingDone] = useState(null);
 
   const getSprintNumber = useCallback((sprintId, sprintsList) => {
-    const sortedSprints = [...sprintsList].sort((a, b) => Number(a.id) - Number(b.id));
-    const index = sortedSprints.findIndex((s) => Number(s.id) === Number(sprintId));
-    return index >= 0 ? index : sprintId;
+    const map = buildSprintNumberMap(sprintsList);
+    const n = map.get(Number(sprintId));
+    return n !== undefined ? n : sprintId;
   }, []);
 
   const getSprintLabel = useCallback(
@@ -170,12 +174,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   );
 
   useEffect(() => {
-    loadData();
+    loadData({ forceRefresh: isFullPageReload() });
   }, [loadData]);
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceRefresh: false }).catch((e) => {
+      loadData({ silent: true, forceRefresh: true }).catch((e) => {
         console.error('TasksPage bundle sync failed:', e);
       });
     }, [loadData]),
@@ -190,7 +194,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'tasks-page') return;
-      if (event?.detail?.source === 'sse') return;
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceRefresh: true }).catch((e) => {
+          console.error('TasksPage SSE sync failed:', e);
+        });
+        return;
+      }
       if (event?.detail?.type === 'task-created' && event?.detail?.task) {
         const created = event.detail.task;
         setRawTasks((prev) => {
@@ -385,7 +394,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       }
     };
 
-    const commitServerUpdate = (updated, meta) => {
+    const commitServerUpdate = async (updated, meta) => {
       if (updated?.id != null) {
         setRawTasks((prev) => mergeUpdatedTask(prev, updated));
         if (meta?.syncAssignmentStatuses && meta.assignmentStatus != null) {
@@ -395,6 +404,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         }
       }
       if (!updated?.id) return;
+      applyOptimisticTaskUpdated(String(effectiveProjectId), updated, meta);
       notifyTasksMutated({
         source: 'tasks-page',
         type: 'task-updated',
@@ -402,6 +412,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         task: updated,
         meta,
       });
+      await loadData({ silent: true, forceRefresh: true });
     };
 
     const putTask = async () => {
@@ -454,7 +465,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           rollbackOptimistic();
           return;
         }
-        commitServerUpdate(updated, undefined);
+        await commitServerUpdate(updated, undefined);
         return;
       }
 
@@ -475,7 +486,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           rollbackOptimistic();
           return;
         }
-        commitServerUpdate(updated, {
+        await commitServerUpdate(updated, {
           syncAssignmentStatuses: true,
           assignmentStatus: 'COMPLETED',
         });
@@ -487,7 +498,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         rollbackOptimistic();
         return;
       }
-      commitServerUpdate(updated, {
+      await commitServerUpdate(updated, {
         syncAssignmentStatuses: true,
         assignmentStatus: ns,
       });
@@ -534,7 +545,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
   const refreshSharedAfterTaskMutation = useCallback(async () => {
     try {
       await invalidateAndRefresh({ silent: true, confirmOnly: true });
-      await loadData({ silent: true });
+      await loadData({ silent: true, forceRefresh: true });
     } catch (e) {
       console.error('Failed to refresh shared project data after task change:', e);
     }
@@ -619,16 +630,26 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       }
       patchUserTaskAfterCompletion(taskId, uid, workedHours);
       const taskRow = rawTasks.find((t) => Number(t.id) === Number(taskId));
+      const completionMeta = {
+        syncAssignmentStatuses: true,
+        assignmentStatus: 'COMPLETED',
+        userId: uid,
+        ...(workedHours != null && Number.isFinite(Number(workedHours))
+          ? { workedHours: Number(workedHours) }
+          : {}),
+      };
+      const updatedTask = taskRow ? { ...taskRow, status: 'DONE' } : { id: taskId, status: 'DONE' };
+      applyOptimisticTaskUpdated(String(effectiveProjectId), updatedTask, completionMeta);
       notifyTasksMutated({
         source: 'tasks-page',
         type: 'task-updated',
         taskId,
-        task: taskRow ?? { id: taskId },
-        meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+        task: taskRow ?? { id: taskId, status: 'DONE' },
+        meta: completionMeta,
       });
-      await loadData({ silent: true });
+      await loadData({ silent: true, forceRefresh: true });
     },
-    [rawTasks, loadData, patchUserTaskAfterCompletion],
+    [rawTasks, loadData, patchUserTaskAfterCompletion, effectiveProjectId],
   );
 
   const handleConfirmWorkedHours = useCallback(
@@ -704,25 +725,32 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         }
         const updated = await res.json();
         if (updated?.id != null) {
+          const completionMeta = {
+            syncAssignmentStatuses: true,
+            assignmentStatus: 'COMPLETED',
+            userId: uid,
+            ...(workedHours != null && Number.isFinite(Number(workedHours))
+              ? { workedHours: Number(workedHours) }
+              : {}),
+          };
           setRawTasks((prev) => mergeUpdatedTask(prev, updated));
           setUserTasks((prev) =>
             patchUserTasksAfterTaskSave(
               prev,
               updated,
-              {
-                syncAssignmentStatuses: true,
-                assignmentStatus: 'COMPLETED',
-              },
+              completionMeta,
               projectDevelopersRef.current,
             ),
           );
+          applyOptimisticTaskUpdated(String(effectiveProjectId), updated, completionMeta);
           notifyTasksMutated({
             source: 'tasks-page',
             type: 'task-updated',
             taskId: updated.id,
             task: updated,
-            meta: { syncAssignmentStatuses: true, assignmentStatus: 'COMPLETED' },
+            meta: completionMeta,
           });
+          await loadData({ silent: true, forceRefresh: true });
         }
       } catch (e) {
         console.error('Error saving worked hours:', e);
@@ -733,7 +761,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         setLoadError('Could not save worked hours. Please try again.');
       }
     },
-    [pendingDone, rawTasks, userTasks, finishAssigneeCompletion],
+    [pendingDone, rawTasks, userTasks, finishAssigneeCompletion, effectiveProjectId],
   );
 
   const markAssigneeDone = async (taskId, ut) => {
@@ -839,9 +867,17 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
       tasksForKanban.map((task) => {
         const tid = Number(task.id);
         const assignmentRows = assignmentsByTaskId.get(tid) ?? [];
-        return mapTaskToKanban(task, developersByTaskId.get(String(task.id)) ?? [], assignmentRows);
+        const statusOverride = developerMode
+          ? deriveDeveloperKanbanStatus(task.status, assignmentRows)
+          : undefined;
+        return mapTaskToKanban(
+          task,
+          developersByTaskId.get(String(task.id)) ?? [],
+          assignmentRows,
+          { statusOverride },
+        );
       }),
-    [tasksForKanban, developersByTaskId, assignmentsByTaskId],
+    [tasksForKanban, developersByTaskId, assignmentsByTaskId, developerMode],
   );
 
   const filteredItems = useMemo(() => {
@@ -913,8 +949,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
     );
   }
 
+  // Responsive paddings
+  const headerPadding = isMobile ? 1.5 : 2;
+  const kanbanPadding = isMobile ? 1.5 : 2;
+
   return (
-    <Box sx={{ maxWidth: 1200, width: '100%' }}>
+    <Box sx={{ maxWidth: 1200, width: '100%', px: { xs: 1, sm: 0 } }}>
       {loadError ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLoadError('')}>
           {loadError}
@@ -927,13 +967,13 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.06, duration: 0.34, ease: pageEase }}
         elevation={0}
-        sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
+        sx={{ p: headerPadding, mb: 2, borderRadius: 3, border: `1px solid ${borderColor}`, bgcolor: cardBg }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'flex-start' }, gap: { xs: 1.5, sm: 0 } }}>
           <Box>
             <Typography
               variant="h4"
-              sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}
+              sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px', fontSize: { xs: '1.5rem', sm: '2rem' } }}
             >
               Kanban Board
             </Typography>
@@ -945,9 +985,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           </Box>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            spacing={1.25}
+            spacing={isMobile ? 1 : 1.25}
             alignItems={{ xs: 'stretch', sm: 'center' }}
-            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' }, mt: { xs: 1, sm: 0 } }}
           >
             <FormControl
               size="small"
@@ -981,11 +1021,8 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                 disabled={!sprints.length}
                 renderValue={(value) => {
                   if (!value) return 'Select sprint';
-                  const sprintNum = getSprintNumber(
-                    Number(value),
-                    sprintsForActiveProject.length ? sprintsForActiveProject : sprints,
-                  );
-                  return `Sprint ${sprintNum}`;
+                  const pool = sprintsForActiveProject.length ? sprintsForActiveProject : sprints;
+                  return getSprintLabel(Number(value), pool);
                 }}
                 MenuProps={{
                   PaperProps: {
@@ -1022,6 +1059,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                   textTransform: 'none',
                   fontWeight: 700,
                   minHeight: 40,
+                  width: { xs: '100%', sm: 'auto' },
                   '&:hover': { bgcolor: '#A83B2D' },
                 }}
               >
@@ -1041,7 +1079,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           transition={{ delay: 0.12, duration: 0.34, ease: pageEase }}
           elevation={0}
           sx={{
-            p: 1.5,
+            p: isMobile ? 1.25 : 1.5,
             mb: 1.25,
             borderRadius: 3,
             border: `1px solid ${borderColor}`,
@@ -1049,12 +1087,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           }}
         >
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-            <FilterListIcon sx={{ fontSize: 21, color: ORACLE_RED }} />
-            <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '1rem' }}>
+            <FilterListIcon sx={{ fontSize: isMobile ? 18 : 21, color: ORACLE_RED }} />
+            <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: isMobile ? '0.9rem' : '1rem' }}>
               Filter tasks
             </Typography>
           </Stack>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'flex-end' }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: 1.25, alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
             <FormControl
               size="small"
               sx={{ flex: '1 1 130px', minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 180 } }}
@@ -1141,7 +1179,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
             <Chip
               label={`${filteredItems.length} shown`}
               size="small"
-              sx={{ bgcolor: chipBg, fontWeight: 700, height: 22 }}
+              sx={{ bgcolor: chipBg, fontWeight: 700, height: 22, alignSelf: { xs: 'flex-start', sm: 'center' } }}
             />
           </Box>
         </Paper>
@@ -1154,12 +1192,12 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18, duration: 0.36, ease: pageEase }}
         container
-        spacing={3}
+        spacing={isMobile ? 2 : 3}
       >
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
             <Box sx={{ width: 10, height: 10, bgcolor: ORACLE_RED, borderRadius: '50%' }} />
-            <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', color: 'text.primary' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: isMobile ? '1rem' : '1.2rem', color: 'text.primary' }}>
               {developerMode ? 'Kanban Board' : 'Tasks'}
             </Typography>
             <Chip
@@ -1171,7 +1209,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
           <Paper
             elevation={0}
             sx={{
-              p: 2,
+              p: kanbanPadding,
               mb: 3,
               borderRadius: 3,
               border: `1px solid ${borderColor}`,
@@ -1221,9 +1259,9 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
         onClose={() => setMultiDoneTaskId(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper' } }}
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper', margin: { xs: 1, sm: 'auto' } } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'text.primary' }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: isMobile ? '1rem' : '1.1rem', color: 'text.primary' }}>
           Complete each assignment
         </DialogTitle>
         <DialogContent>
@@ -1273,7 +1311,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
                             size="small"
                             variant="outlined"
                             onClick={() => markAssigneeDone(multiDoneTaskId, ut)}
-                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                            sx={{ textTransform: 'none', fontWeight: 600, width: { xs: '100%', sm: 'auto' } }}
                           >
                             Mark complete
                           </Button>
@@ -1284,7 +1322,7 @@ export default function TasksPage({ projectId, developerMode = false, currentUse
               : null}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 2.5, pb: 2 }}>
+        <DialogActions sx={{ px: isMobile ? 2 : 2.5, pb: 2 }}>
           <Button
             onClick={() => setMultiDoneTaskId(null)}
             sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}

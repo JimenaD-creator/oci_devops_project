@@ -4,6 +4,7 @@ import com.springboot.MyTodoList.model.Task;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.model.UserTask;
 import com.springboot.MyTodoList.repository.TaskEmbeddingRepository;
+import com.springboot.MyTodoList.repository.TaskLogRepository;
 import com.springboot.MyTodoList.repository.TaskRepository;
 import com.springboot.MyTodoList.repository.UserRepository;
 import com.springboot.MyTodoList.repository.UserTaskRepository;
@@ -12,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,18 +39,52 @@ public class TaskService {
     private TaskEmbeddingRepository taskEmbeddingRepository;
 
     @Autowired
+    private TaskLogRepository taskLogRepository;
+
+    @Autowired
     private ProjectTaskEventPublisher projectTaskEventPublisher;
+
+    @Autowired
+    private ProjectBundleCacheEvictor projectBundleCacheEvictor;
+
+    @Autowired
+    @Lazy
+    private TaskService self;
 
     @Transactional
     public void deleteTaskById(Long id) {
-        if (id == null) {
+        if (id == null || !taskRepository.existsById(id)) {
             return;
         }
         Long projectId = taskRepository.findProjectIdByTaskId(id).orElse(null);
+        deleteTaskByIdInternal(id, projectId);
+        if (projectId != null) {
+            projectBundleCacheEvictor.evictDashboardBundle(projectId);
+        }
+    }
+
+    /** Each task is deleted in its own transaction so large batches do not time out. */
+    public int deleteTasksByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int deleted = 0;
+        for (Long id : ids) {
+            if (id == null || !taskRepository.existsById(id)) {
+                continue;
+            }
+            self.deleteTaskById(id);
+            deleted++;
+        }
+        return deleted;
+    }
+
+    private void deleteTaskByIdInternal(Long id, Long projectId) {
         List<UserTask> assignments = userTaskRepository.findByTask_Id(id);
         if (!assignments.isEmpty()) {
             userTaskRepository.deleteAll(assignments);
         }
+        taskLogRepository.deleteByTask_Id(id);
         taskEmbeddingRepository.deleteByTaskId(id);
         taskRepository.deleteById(id);
         projectTaskEventPublisher.taskDeleted(id, projectId, "rest");
@@ -60,6 +96,13 @@ public class TaskService {
         List<Long> assigneeIds = assigneeUserIds;
 
         if (assigneeIds == null || assigneeIds.isEmpty()) {
+            Long projectId = saved.getAssignedSprint() != null
+                            && saved.getAssignedSprint().getAssignedProject() != null
+                    ? saved.getAssignedSprint().getAssignedProject().getId()
+                    : taskRepository.findProjectIdByTaskId(saved.getId()).orElse(null);
+            if (projectId != null) {
+                projectBundleCacheEvictor.evictDashboardBundle(projectId);
+            }
             return saved;
         }
 
@@ -93,8 +136,10 @@ public class TaskService {
 
         taskAssignmentSyncService.syncTaskStatusFromAssignments(saved.getId());
         Task result = taskRepository.findById(saved.getId()).orElse(saved);
-        taskRepository.findProjectIdByTaskId(result.getId()).ifPresent(projectId ->
-                projectTaskEventPublisher.taskCreated(result.getId(), projectId, "rest"));
+        taskRepository.findProjectIdByTaskId(result.getId()).ifPresent(projectId -> {
+            projectBundleCacheEvictor.evictDashboardBundle(projectId);
+            projectTaskEventPublisher.taskCreated(result.getId(), projectId, "rest");
+        });
         return result;
     }
 }

@@ -1,0 +1,538 @@
+@startuml
+
+class com.springboot.MyTodoList.util.BotActions {
+	{field} {static} -DEVELOPER_CANNOT_ADD_TASK_MSG : String
+	{field} {static} -TELEGRAM_BUTTON_MAX : int
+	{field} {static} -TELEGRAM_STATUS_BUTTON_MAX : int
+	{field} {static} -TELEGRAM_TASK_BUTTON_MAX : int
+	{field} {static} -USER_PICKER_ID : java.util.regex.Pattern
+	{field} -chatId : long
+	{field} +deepSeekService : com.springboot.MyTodoList.service.DeepSeekService
+	{field} -exit : boolean
+	{field} ~geminiService : com.springboot.MyTodoList.service.GeminiService
+	{field} {static} -logger : org.slf4j.Logger
+	{field} ~pendingTelegramAssignmentNoticeService : com.springboot.MyTodoList.service.PendingTelegramAssignmentNoticeService
+	{field} ~projectLookupService : com.springboot.MyTodoList.service.ProjectLookupService
+	{field} -requestText : String
+	{field} ~sprintService : com.springboot.MyTodoList.service.SprintService
+	{field} ~teamMembersRepository : com.springboot.MyTodoList.repository.TeamMembersRepository
+	{field} ~teamRepository : com.springboot.MyTodoList.repository.TeamRepository
+	{field} -telegramClient : org.telegram.telegrambots.meta.generics.TelegramClient
+	{field} ~telegramUserMappingService : com.springboot.MyTodoList.service.TelegramUserMappingService
+	{field} +todoService : com.springboot.MyTodoList.service.ToDoItemService
+	{field} ~userService : com.springboot.MyTodoList.service.UserService
+	{field} ~userTaskService : com.springboot.MyTodoList.service.UserTaskService
+	{method} -beginSignInFlow () : void
+	{method} -buildDeveloperPerformancePromptWithContext ( name : String , total : int , completed : int , pending : int , onTime : int , late : int , blocked : int , hours : double , completionRate : double , onTimeRate : double , taskDetails : java.util.List , sprintContext : String ) : String
+	{method} -buildFallbackSummaryWithContext ( name : String , total : int , completed : int , pending : int , onTime : int , late : int , blocked : int , hours : double , completionRate : double , onTimeRate : double , sprintContext : String ) : String
+	{method} -buildMainMenuKeyboardMarkup () : org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup
+	{method} -buildNewTaskConfirmation ( sprintId : Long , assigneeUserId : Long ) : String
+	{method} -buildTaskListKeyboardRow ( item : com.springboot.MyTodoList.model.ToDoItem , assigneeUserId : Long , sprintIndex : com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex , taskLevelStatusOnly : boolean ) : org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow
+	{method} -cancelAddNewTaskFlow () : void
+	{method} -createTaskFromBotDescription ( desc : String , sprintId : Long , assigneeUserId : Long ) : com.springboot.MyTodoList.model.ToDoItem
+	{method} -deliverPendingAssignmentNotices ( userId : Long ) : void
+	{method} -displayNameForUser ( u : com.springboot.MyTodoList.model.User ) : String
+	{method} -escapeMarkdown ( text : String ) : String
+	{method} -extractTaskIdFromLabel ( label : String ) : Integer
+	{method} +fnAddItem () : void
+	{method} +fnDelete () : void
+	{method} +fnDone () : void
+	{method} +fnElse () : void
+	{method} +fnHide () : void
+	{method} +fnLLM () : void
+	{method} +fnListAll () : void
+	{method} +fnLogOut () : void
+	{method} +fnMyPerformance () : void
+	{method} +fnSelectAssigneeForNewTask () : void
+	{method} +fnSelectMyPerformanceScope () : void
+	{method} +fnSelectSprint () : void
+	{method} +fnSelectSprintForNewTask () : void
+	{method} +fnSelectTaskStatus () : void
+	{method} +fnSelectUserInSprint () : void
+	{method} +fnSessionLogin () : void
+	{method} +fnStart () : void
+	{method} +fnUndo () : void
+	{method} +fnVerifyCredentialsPassword () : void
+	{method} +fnVerifyCredentialsPhoneEmail () : void
+	{method} +fnViewSprintTasks () : void
+	{method}  {static} -formatShortDate ( date : java.time.LocalDateTime ) : String
+	{method}  {static} -formatTaskDescriptionForDisplay ( description : String ) : String
+	{method}  {static} -formatTaskStatusForDisplay ( dbStatus : String ) : String
+	{method}  {static} -formatTaskStatusTextOnly ( dbStatus : String ) : String
+	{method}  {static} -formatTaskStatusTextShort ( dbStatus : String ) : String
+	{method} -generateAndSendPerformanceSummary ( userId : Long , sprintId : Long ) : void
+	{method}  {static} -helloMyTodoBotWithDeveloperName ( developerName : String ) : String
+	{method} -isAllowedSprintForManagerAdd ( managerId : Long , sprintId : Long ) : boolean
+	{method} -isManagerViewingTeamMemberTasks ( signedInUserId : Long , assigneeUserId : Long ) : boolean
+	{method} -isSignedInManagerFullSprintView ( assigneeUserId : Long ) : boolean
+	{method}  {static} -isStartCommand ( text : String ) : boolean
+	{method} -isUserManager ( userId : Long ) : boolean
+	{method}  {static} -keyboardLabelForItem ( item : com.springboot.MyTodoList.model.ToDoItem ) : String
+	{method}  {static} -looksLikeTaskListStatusColumnTap ( label : String ) : boolean
+	{method}  {static} -parseUserPickerSelection ( text : String ) : Long
+	{method} -performSignOut () : void
+	{method} -promptForNewTaskDescription ( sprintId : Long , assigneeUserId : Long ) : void
+	{method}  {static} -registerTaskMenuRow ( menuLabels : java.util.Map , row : org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow , item : com.springboot.MyTodoList.model.ToDoItem , linkStatusButton : boolean ) : void
+	{method} -resolveActingAssigneeUserId () : Long
+	{method} -resolveAssigneeStatusKey ( item : com.springboot.MyTodoList.model.ToDoItem , assigneeUserId : Long , sprintIndex : com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex , taskLevelStatusOnly : boolean ) : String
+	{method} -resolveEffectiveActingUserId () : Long
+	{method} -resolveUserWelcomeName ( userId : Long ) : String
+	{method} -restoreMainMenuAfterPerformance () : void
+	{method} -restoreMainMenuForSignedInUser () : void
+	{method} -saveBlockedReason ( taskId : Integer , blockedReason : String ) : void
+	{method} -saveWorkedHours ( taskId : Integer , hours : double ) : boolean
+	{method} -sendDeveloperCannotAddTaskMessage () : void
+	{method} -sendLoadingMessage ( what : String ) : void
+	{method} -sendMainMenuKeyboard ( introMessage : String ) : void
+	{method} -sendSelectAssigneeForNewTaskKeyboard ( sprintId : Long ) : void
+	{method} -sendSelectSprintForNewTaskKeyboard () : void
+	{method} -sendSelectSprintKeyboard ( optionalNotice : String ) : void
+	{method} -showSprintTasksForAssignee ( sprintId : Long , assigneeUserId : Long ) : void
+	{method} -showSprintTasksForAssignee ( sprintId : Long , assigneeUserId : Long , optionalNotice : String ) : void
+	{method} -showTaskDetailsCompletedForAssignee ( task : com.springboot.MyTodoList.model.ToDoItem , sprintId : Long , assigneeUserId : Long ) : void
+	{method} -showTaskDetailsReadOnly ( task : com.springboot.MyTodoList.model.ToDoItem , sprintId : Long , assigneeUserId : Long ) : void
+	{method} -showTaskDetailsWithStatusOptions ( task : com.springboot.MyTodoList.model.ToDoItem , sprintId : Long , assigneeUserId : Long ) : void
+	{method} -showUserPickerForSprint ( sprintId : Long ) : void
+	{method}  {static} -sortSprintsForTelegramMenu ( sprints : java.util.List ) : java.util.List
+	{method} -sprintsForManagerAddTask ( managerId : Long ) : java.util.List
+	{method} -sprintsForManagerScope ( managerId : Long ) : java.util.List
+	{method} -statusIconForAssigneeTaskList ( item : com.springboot.MyTodoList.model.ToDoItem , assigneeUserId : Long , sprintIndex : com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex , taskLevelStatusOnly : boolean ) : String
+	{method}  {static} -statusIconOnly ( dbStatus : String ) : String
+	{method} -statusTextShortForAssigneeTaskList ( item : com.springboot.MyTodoList.model.ToDoItem , assigneeUserId : Long , sprintIndex : com.springboot.MyTodoList.service.UserTaskService$UserSprintTaskListIndex , taskLevelStatusOnly : boolean ) : String
+	{method}  {static} -taskListLabelWithStatusIcon ( statusIcon : String , title : String ) : String
+	{method} -teamMembersForManager ( managerId : Long ) : java.util.List
+	{method}  {static} -toUserPickerButton ( u : com.springboot.MyTodoList.model.User ) : String
+	{method}  {static} -truncateTelegramButton ( text : String , maxLen : int ) : String
+	{method} +wasHandled () : boolean
+}
+
+
+class com.springboot.MyTodoList.util.BotClient {
+	{method} +telegramClient ( botProps : com.springboot.MyTodoList.config.BotProps ) : org.telegram.telegrambots.meta.generics.TelegramClient
+}
+
+
+enum com.springboot.MyTodoList.util.BotCommands {
+	{field} +ADD_ITEM
+	{field} +HIDE_COMMAND
+	{field} +LLM_REQ
+	{field} +LOGOUT_COMMAND
+	{field} +MY_PERFORMANCE
+	{field} +START_COMMAND
+	{field} +TODO_LIST
+}
+
+
+class com.springboot.MyTodoList.util.BotHelper {
+	{field} {static} -logger : org.slf4j.Logger
+	{method}  {static} +sendMessageKeepReplyKeyboard ( chatId : Long , text : String , bot : org.telegram.telegrambots.meta.generics.TelegramClient ) : void
+	{method}  {static} +sendMessageToTelegram ( chatId : Long , text : String , bot : org.telegram.telegrambots.meta.generics.TelegramClient ) : void
+	{method}  {static} +sendMessageToTelegram ( chatId : Long , text : String , bot : org.telegram.telegrambots.meta.generics.TelegramClient , rk : org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup ) : void
+}
+
+
+enum com.springboot.MyTodoList.util.BotLabels {
+	{field} +ADD_NEW_ITEM
+	{field} +CANCEL_ADD
+	{field} +DASH
+	{field} +DELETE
+	{field} +DONE
+	{field} +HIDE_MAIN_SCREEN
+	{field} +LIST_ALL_ITEMS
+	{field} +LOG_OUT
+	{field} +MY_PERFORMANCE
+	{field} +MY_TODO_LIST
+	{field} +SHOW_MAIN_SCREEN
+	{field} +SKIP_ASSIGNEE
+	{field} +UNDO
+}
+
+
+enum com.springboot.MyTodoList.util.BotMessages {
+	{field} +BOT_REGISTERED_STARTED
+	{field} +BYE
+	{field} +HELLO_MYTODO_BOT
+	{field} +ITEM_DELETED
+	{field} +ITEM_DONE
+	{field} +ITEM_UNDONE
+	{field} +NEW_ITEM_ADDED
+	{field} +NOT_SIGNED_IN_LOGOUT
+	{field} +SIGNED_OUT
+	{field} +TYPE_NEW_TODO_ITEM
+}
+
+
+class com.springboot.MyTodoList.util.BotStateManager {
+	{field} {static} -STATE_TIMEOUT_MINUTES : long
+	{field} {static} -logger : org.slf4j.Logger
+	{field} +myPerformanceSprints : java.util.Map
+	{field} +myPerformanceUserId : java.util.Map
+	{field} +selectingMyPerformanceScope : java.util.Set
+	{field} -sprintTaskMenuLabels : java.util.Map
+	{field} -telegramSignedInUserId : java.util.Map
+	{method} +clearPendingState ( chatId : Long ) : void
+	{method} +clearTelegramSignedIn ( chatId : Long ) : void
+	{method} +getActingUserIdForBlockedReason ( chatId : Long ) : Long
+	{method} +getActingUserIdForHours ( chatId : Long ) : Long
+	{method} +getAllStates () : java.util.Map
+	{method} +getCredentialVerificationUserId ( chatId : Long ) : Long
+	{method} +getNewTaskAssigneeUserId ( chatId : Long ) : Long
+	{method} +getNewTaskSprintId ( chatId : Long ) : Long
+	{method} +getSelectedTaskId ( chatId : Long ) : Integer
+	{method} +getSessionLoginPendingIdentifier ( chatId : Long ) : String
+	{method} +getSprintIdInSprintUserFlow ( chatId : Long ) : Long
+	{method} +getSprintIdWaitingForHours ( chatId : Long ) : Long
+	{method} +getState ( chatId : Long ) : com.springboot.MyTodoList.util.BotUserState
+	{method} +getStoredPhoneEmailForVerification ( chatId : Long ) : String
+	{method} +getTaskIdWaitingForBlockedReason ( chatId : Long ) : Integer
+	{method} +getTaskIdWaitingForHours ( chatId : Long ) : Integer
+	{method} +getViewingSelectedUserId ( chatId : Long ) : Long
+	{method} +getViewingSprintId ( chatId : Long ) : Long
+	{method} +hasPendingState ( chatId : Long ) : boolean
+	{method} +isSelectingAssigneeForNewTask ( chatId : Long ) : boolean
+	{method} +isSelectingSprint ( chatId : Long ) : boolean
+	{method} +isSelectingSprintForNewTask ( chatId : Long ) : boolean
+	{method} +isSelectingTaskStatus ( chatId : Long ) : boolean
+	{method} +isSelectingUserInSprint ( chatId : Long ) : boolean
+	{method} +isSessionLoginAwaitingIdentifier ( chatId : Long ) : boolean
+	{method} +isSessionLoginAwaitingPassword ( chatId : Long ) : boolean
+	{method} -isStateExpired ( state : com.springboot.MyTodoList.util.BotUserState ) : boolean
+	{method} +isTelegramSignedIn ( chatId : Long ) : boolean
+	{method} +isVerifyingCredentialsPassword ( chatId : Long ) : boolean
+	{method} +isVerifyingCredentialsPhoneEmail ( chatId : Long ) : boolean
+	{method} +isViewingSprintTasks ( chatId : Long ) : boolean
+	{method} +isWaitingForNewTaskDescription ( chatId : Long ) : boolean
+	{method} +resolveTaskIdFromMenuLabel ( chatId : Long , buttonText : String ) : Integer
+	{method} +setSelectingAssigneeForNewTask ( chatId : Long , sprintId : Long ) : void
+	{method} +setSelectingSprint ( chatId : Long ) : void
+	{method} +setSelectingSprintForNewTask ( chatId : Long ) : void
+	{method} +setSelectingTaskStatus ( chatId : Long , taskId : Integer , sprintId : Long , assigneeUserId : Long ) : void
+	{method} +setSelectingUserInSprint ( chatId : Long , sprintId : Long ) : void
+	{method} +setSessionLoginAwaitingIdentifier ( chatId : Long ) : void
+	{method} +setSessionLoginAwaitingPassword ( chatId : Long , phoneOrEmail : String ) : void
+	{method} +setTelegramSignedInUser ( chatId : Long , userId : Long ) : void
+	{method} +setVerifyingCredentialsPassword ( chatId : Long , userId : Long , sprintId : Long , phoneEmail : String ) : void
+	{method} +setVerifyingCredentialsPhoneEmail ( chatId : Long , userId : Long , sprintId : Long ) : void
+	{method} +setViewingSprintTasks ( chatId : Long , sprintId : Long , selectedUserId : Long ) : void
+	{method} +setWaitingForBlockedReason ( chatId : Long , taskId : Integer , actingUserId : Long ) : void
+	{method} +setWaitingForHours ( chatId : Long , taskId : Integer , sprintId : Long , actingUserId : Long ) : void
+	{method} +setWaitingForNewTaskDescription ( chatId : Long ) : void
+	{method} +setWaitingForNewTaskDescription ( chatId : Long , sprintId : Long , assigneeUserId : Long ) : void
+}
+
+
+class com.springboot.MyTodoList.util.BotUserState {
+	{field} +chatId : Long
+	{field} +credentialUserBeingVerified : Long
+	{field} +selectedTaskId : Integer
+	{field} +selectedUserId : Long
+	{field} +sprintId : Long
+	{field} +state : String
+	{field} +taskId : Integer
+	{field} +tempPhoneEmail : String
+	{field} +timestamp : java.time.LocalDateTime
+	{method} +toString () : String
+}
+
+
+class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil {
+	{field} {static} -COMPLETION_RATE_PATTERNS : [Ljava.util.regex.Pattern;
+	{field} {static} -COMPLETION_RATE_PERCENT_BEFORE_LABEL : java.util.regex.Pattern
+	{field} {static} -DANGLING_AT_COMMA : java.util.regex.Pattern
+	{field} {static} -DANGLING_AT_PERIOD : java.util.regex.Pattern
+	{field} {static} -DUPLICATE_TEAM_PHRASE : java.util.regex.Pattern
+	{field} {static} -EFFICIENCY_SCORE_PATTERNS : [Ljava.util.regex.Pattern;
+	{field} {static} -EXECUTIVE_TRENDS_MAX_CHARS : int
+	{field} {static} -EXECUTIVE_TRENDS_MAX_SENTENCES : int
+	{field} {static} -EXECUTIVE_TRENDS_MAX_WORDS : int
+	{field} {static} -FROM_SPRINT_TO_OPENING : java.util.regex.Pattern
+	{field} {static} -GENERATION_KPI_SNAPSHOT_KEYS : java.util.List
+	{field} {static} -GENERATION_TASK_BREAKDOWN_KEYS : java.util.List
+	{field} {static} -INSTRUCTION_ECHO_IN_PROSE : java.util.regex.Pattern
+	{field} {static} -INVENTED_LARGE_PERCENT_DROP : java.util.regex.Pattern
+	{field} {static} -LIVE_METRIC_KEYS : [Ljava.lang.String;
+	{field} {static} -MECHANICAL_EXECUTIVE_TRENDS : java.util.regex.Pattern
+	{field} {static} -ON_TIME_CONTEXT : java.util.regex.Pattern
+	{field} {static} -ON_TIME_DECLINE_CLAIM : java.util.regex.Pattern
+	{field} {static} -ON_TIME_DELIVERY_PROBLEM_CLAIM : java.util.regex.Pattern
+	{field} {static} -ON_TIME_IMPROVEMENT_PERCENT : java.util.regex.Pattern
+	{field} {static} -ON_TIME_PERFECT_BAND_PERCENT : int
+	{field} {static} -ON_TIME_PRIMARY_CONCERN_CLAUSE : java.util.regex.Pattern
+	{field} {static} -ON_TIME_STRONG_PERCENT : int
+	{field} {static} -ON_TIME_TIGHT_PATTERNS : [Ljava.util.regex.Pattern;
+	{field} {static} -OPEN_SPRINT_PENDING_ALREADY : java.util.regex.Pattern
+	{field} {static} -PERCENT_IN_PROSE : java.util.regex.Pattern
+	{field} {static} -PRIOR_SPRINT_PHRASE : java.util.regex.Pattern
+	{field} {static} -PRODUCTIVITY_SCORE_PATTERNS : [Ljava.util.regex.Pattern;
+	{field} {static} -PRODUCTIVITY_TREND_DELTA_PERCENT : java.util.regex.Pattern
+	{field} {static} -PRODUCTIVITY_TREND_DELTA_POINTS : java.util.regex.Pattern
+	{field} {static} -REPETITIVE_SOFT_WORD : java.util.regex.Pattern
+	{field} {static} -VAGUE_TEAM_CHANGE_SUMMARY : java.util.regex.Pattern
+	{field} {static} -WORKLOAD_BALANCE_PATTERNS : [Ljava.util.regex.Pattern;
+	{method}  {static} -addTrendClauseIfSignificant ( clauses : java.util.List , label : String , deltaPoints : int ) : void
+	{method}  {static} +alertContradictsLiveOnTimeTrend ( message : String , chronologicalOtd : java.util.List ) : boolean
+	{method}  {static} +alignAllLiveKpisInProse ( text : String , live : java.util.Map ) : String
+	{method}  {static} +alignCompletionRatePercentLabels ( text : String , completionPercent : int , onTimePercent : int ) : String
+	{method}  {static} -alignLooseAtPhrases ( text : String , actualPercent : int ) : String
+	{method}  {static} +alignMetricPercentInProse ( text : String , metricKey : String , actualPercent : int ) : String
+	{method}  {static} -alignOnTimePhrasesInProse ( text : String , onTimePercent : int ) : String
+	{method}  {static} +alignProductivityStableLevelInProse ( text : String , productivityScore : int ) : String
+	{method}  {static} +alignProductivityTrendDeltaInProse ( text : String , deltaProductivityPoints : int ) : String
+	{method}  {static} +appendCausalInsightIfThin ( text : String , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , deltaProductivity : int , teamWorkloadNote : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} -applyTightMetricPatterns ( text : String , display : String , patterns : [Ljava.util.regex.Pattern; ) : String
+	{method}  {static} +buildBriefTeamWorkSummary ( immediatePriorLabel : String , currentLabel : String , earlierSprintsList : String , todoCount : long , inProcessCount : long , inReviewCount : long , doneCount : long , sprintGoal : String , deltaCompletion : int , deltaOnTime : int , teamWorkloadNote : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +buildExecutiveTrendsNarrative ( immediatePreviousLabel : String , deltaProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +buildExecutiveTrendsSummary ( immediatePreviousLabel : String , deltaProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +buildFallbackSprintChangeSummary ( previousLabel : String , currentLabel : String , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , deltaProductivity : int ) : String
+	{method}  {static} +buildFallbackTeamEvolutionSummary ( previousLabel : String , currentLabel : String , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , deltaProductivity : int , teamWorkloadNote : String ) : String
+	{method}  {static} +buildHistoricalTeamChangeSummary ( priorLabelsOldestFirst : java.util.List , currentLabel : String , priorMetricsOldestFirst : java.util.List , curCr : int , curOtd : int , curTp : int , curWb : int , curPs : int , dCr : int , dOtd : int , dTp : int , dWb : int , dPs : int , teamWorkloadNote : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +buildOpenSprintTrendLine ( immediatePreviousLabel : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , scoreBelowPrior : boolean ) : String
+	{method}  {static} +buildStructuredTeamChangeSummary ( previousLabel : String , currentLabel : String , prevCompletion : int , prevOnTime : int , prevParticipation : int , prevWorkload : int , prevProductivity : int , curCompletion : int , curOnTime : int , curParticipation : int , curWorkload : int , curProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , deltaProductivity : int , teamWorkloadNote : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} -capitalizeFirst ( text : String ) : String
+	{method}  {static} -capitalizeSentenceStarts ( text : String ) : String
+	{method}  {static} +completionRateAlertSeverityForEndedSprint ( completionRate : int ) : String
+	{method}  {static} +condenseExecutiveTrends ( text : String ) : String
+	{method}  {static} +containsObviousMetricNumbers ( text : String ) : boolean
+	{method}  {static} -countTrendSentences ( text : String ) : int
+	{method}  {static} -countTrendWords ( text : String ) : int
+	{method}  {static} +detectGenerationKpiDrift ( snapshotNode : com.fasterxml.jackson.databind.JsonNode , liveKpis : java.util.Map , liveBreakdown : com.fasterxml.jackson.databind.JsonNode ) : java.util.List
+	{method}  {static} +ensureOpenSprintProductivityFraming ( trends : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , deltaProductivity : int , immediatePreviousLabel : String ) : String
+	{method}  {static} -explainCompletionAndOnTimeShift ( deltaCompletion : int , deltaOnTime : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , openContextEstablished : boolean , immediatePriorLabel : String ) : String
+	{method}  {static} -explainParticipationShift ( deltaParticipation : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , openContextEstablished : boolean ) : String
+	{method}  {static} -explainProductivityShift ( deltaProductivity : int , deltaCompletion : int , deltaOnTime : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , openContextEstablished : boolean , immediatePriorLabel : String ) : String
+	{method}  {static} -explainWorkloadShift ( deltaWorkload : int ) : String
+	{method}  {static} +fixBrokenMetricPhrases ( text : String ) : String
+	{method}  {static} -fixDanglingAtMetricPhrases ( text : String , live : java.util.Map ) : String
+	{method}  {static} +fixGluedPercentSpacing ( text : String ) : String
+	{method}  {static} +fixHavingIsAtGrammar ( text : String ) : String
+	{method}  {static} +fixProductivityPercentMisattributedToOnTime ( text : String , live : java.util.Map ) : String
+	{method}  {static} +forecastStabilityBand ( currentProductivityScore : int ) : int
+	{method}  {static} +hasInventedTrendPercentDrop ( text : String ) : boolean
+	{method}  {static} +hasRepetitiveSoftTrendLanguage ( text : String ) : boolean
+	{method}  {static} -immediatePriorRef ( label : String ) : String
+	{method}  {static} +intMetric ( live : java.util.Map , key : String ) : int
+	{method}  {static} +isMechanicalExecutiveTrends ( text : String ) : boolean
+	{method}  {static} -isOpenSprint ( ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : boolean
+	{method}  {static} +isOverlongExecutiveTrends ( text : String ) : boolean
+	{method}  {static} +isUnacceptableTeamChangeSummary ( text : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : boolean
+	{method}  {static} +isWeakTeamChangeSummary ( text : String ) : boolean
+	{method}  {static} +joinSprintLabelsReadable ( labels : java.util.List ) : String
+	{method}  {static} -joinTrendClausesNaturally ( clauses : java.util.List ) : String
+	{method}  {static} +lacksHowAndWhyInsight ( text : String ) : boolean
+	{method}  {static} -lastOtd ( chronologicalOtd : java.util.List ) : int
+	{method}  {static} +normalizePercentagePointsLabel ( text : String ) : String
+	{method}  {static} +onTimeDeclinedThreeConsecutiveSprints ( chronologicalOtd : java.util.List ) : boolean
+	{method}  {static} +openSprintPendingProductivityCaveat ( ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} -openingLineForSprintChange ( previousLabel : String , currentLabel : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +polishSprintChangeSummary ( text : String , live : java.util.Map ) : String
+	{method}  {static} +productivityForecastTrend ( liveProductivityScore : int , predictedScore : int ) : String
+	{method}  {static} +proseClaimsOnTimeDecline ( text : String ) : boolean
+	{method}  {static} +proseClaimsOnTimeDeliveryProblem ( text : String ) : boolean
+	{method}  {static} +qualitativeMovementPhrase ( label : String , deltaPoints : int ) : String
+	{method}  {static} +reconcileOnTimeDeliveryConcernProse ( text : String , onTimePercent : int ) : String
+	{method}  {static} +refineExecutiveTrends ( geminiTrends : String , immediatePreviousLabel : String , deltaProductivity : int , deltaCompletion : int , deltaOnTime : int , deltaParticipation : int , deltaWorkload : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +removeContradictoryOnTimeDeclineSentences ( text : String , chronologicalOtd : java.util.List ) : String
+	{method}  {static} +resolveForecastPredictedScore ( liveProductivityScore : int , rawPredicted : int ) : int
+	{method}  {static} -rewriteOpenSprintSentence ( sentence : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +sanitizeTeamChangeSummary ( text : String , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext ) : String
+	{method}  {static} +shouldDropOnTimeDeliveryAlertAtStrongScore ( kpi : String , message : String , liveOtd : int ) : boolean
+	{method}  {static} +shouldDropOnTimeEstimationRecommendation ( text : String , liveOtd : int ) : boolean
+	{method}  {static} +shouldElevateCompletionRateAlertForEndedSprint ( sprintPhase : String , completionRate : int ) : boolean
+	{method}  {static} +stripMetricNumbersFromTeamChangeSummary ( text : String ) : String
+	{method}  {static} -summarizePriorTrajectory ( label : String , priorMetrics : java.util.List , metricIndex : int , currentValue : int , deltaVsLastPrior : int , ctx : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext , openContextEstablished : boolean , immediatePriorLabel : String ) : String
+	{method}  {static} -textAlreadyEstablishesOpenSprint ( text : String ) : boolean
+	{method}  {static} -trendMovementPhrase ( label : String , deltaPoints : int ) : String
+	{method}  {static} +trimToMaxSentences ( text : String , maxSentences : int ) : String
+	{method}  {static} -truncateTrendsToCharLimit ( text : String ) : String
+}
+
+
+class com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext {
+	{field} +currentDone : int
+	{field} +currentTotalTasks : int
+	{field} +phase : String
+	{field} +previousDone : int
+	{field} +previousTotalTasks : int
+	{method} +completionDeclineIsScopeNotPerformance ( deltaCompletionRate : int ) : boolean
+	{method}  {static} +fromLiveMaps ( phase : String , currentLive : java.util.Map , previousLive : java.util.Map ) : com.springboot.MyTodoList.util.GeminiInsightKpiAlignUtil$SprintChangeContext
+	{method} +hasPendingWork () : boolean
+	{method} +isSmallerAssignmentScope () : boolean
+	{method} +isSprintStillOpen () : boolean
+	{method} +pendingTasks () : int
+}
+
+
+class com.springboot.MyTodoList.util.InsightEmbeddingTextBuilder {
+	{field} {static} -MAX_ALERTS : int
+	{field} {static} -MAX_FIELD_CHARS : int
+	{field} {static} -MAX_RECOMMENDATIONS : int
+	{method}  {static} -appendAlerts ( sb : StringBuilder , alerts : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} -appendExecutiveSummary ( sb : StringBuilder , es : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} -appendKpiSnapshot ( sb : StringBuilder , snapshot : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} -appendLine ( sb : StringBuilder , label : String , text : String ) : void
+	{method}  {static} -appendMetric ( sb : StringBuilder , label : String , value : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} -appendRecommendations ( sb : StringBuilder , recs : com.fasterxml.jackson.databind.JsonNode ) : void
+	{method}  {static} -appendSummary ( sb : StringBuilder , summary : String ) : void
+	{method}  {static} +buildDisplaySnippet ( root : com.fasterxml.jackson.databind.JsonNode ) : String
+	{method}  {static} +buildFromInsightsJson ( root : com.fasterxml.jackson.databind.JsonNode ) : String
+	{method}  {static} +truncate ( text : String ) : String
+}
+
+
+class com.springboot.MyTodoList.util.ManagerChatInsightContextUtil {
+	{field} {static} -MAX_ALERTS : int
+	{field} {static} -MAX_RECOMMENDATIONS : int
+	{method}  {static} +buildDeveloperPerformanceHistory ( sprintData : java.util.List ) : java.util.List
+	{method}  {static} +compactInsightForChat ( insight : com.springboot.MyTodoList.model.SprintInsight , mapper : com.fasterxml.jackson.databind.ObjectMapper ) : java.util.Map
+	{method}  {static} -findDeveloperMetrics ( devMetrics : java.util.List , name : String ) : java.util.Map
+	{method}  {static} -normalizeName ( name : String ) : String
+	{method}  {static} -putText ( target : java.util.Map , key : String , value : String ) : void
+	{method}  {static} -readAlerts ( alerts : com.fasterxml.jackson.databind.JsonNode ) : java.util.List
+	{method}  {static} -readDeveloperInsights ( devInsights : com.fasterxml.jackson.databind.JsonNode ) : java.util.List
+	{method}  {static} -readRecommendations ( recs : com.fasterxml.jackson.databind.JsonNode ) : java.util.List
+	{method}  {static} -sanitizeListOfMaps ( node : Object , textKey : String , answerLabel : String , previousSprintLabel : String , validSprintLabels : java.util.List , answerSprintDbId : Long ) : void
+	{method}  {static} +sanitizeSprintLabelsInInsightMap ( insight : java.util.Map , answerLabel : String , answerSprintDbId : Long , previousSprintLabel : String , validSprintLabels : java.util.List ) : void
+	{method}  {static} -sanitizeStringFields ( node : Object , answerLabel : String , previousSprintLabel : String , validSprintLabels : java.util.List , answerSprintDbId : Long ) : void
+}
+
+
+class com.springboot.MyTodoList.util.ManagerChatReplyUtil {
+	{field} {static} -BACKTICK_IDENTIFIER : java.util.regex.Pattern
+	{field} {static} -COMPLETION_RATE_VALUE : java.util.regex.Pattern
+	{field} {static} -INTERNAL_TOKENS : [Ljava.lang.String;
+	{field} {static} -PRODUCTIVITY_SCORE_VALUE : java.util.regex.Pattern
+	{field} {static} -SPRINT_LABEL_MENTION : java.util.regex.Pattern
+	{method}  {static} +alignCompletionRateMentions ( text : String , expectedRate : Integer ) : String
+	{method}  {static} +alignLiveKpiMentions ( text : String , liveKpis : java.util.Map ) : String
+	{method}  {static} +alignProductivityScoreMentions ( text : String , expectedScore : Integer ) : String
+	{method}  {static} +alignProductivityVsPreviousInProse ( text : String , signedDeltaPoints : int , currentScore : int , previousSprintLabel : String ) : String
+	{method}  {static} +clampPercentagesToRange ( text : String ) : String
+	{method}  {static} +enforceAnswerSprintLabel ( text : String , expectedLabel : String , validSprintLabels : java.util.List ) : String
+	{method}  {static} +enforceAnswerSprintLabel ( text : String , expectedLabel : String , validSprintLabels : java.util.List , previousSprintLabel : String , answerSprintDbId : Long ) : String
+	{method}  {static} +enforceSingleSprintReply ( text : String , answerLabel : String , previousSprintLabel : String , validSprintLabels : java.util.List , answerSprintDbId : Long ) : String
+	{method}  {static} -forceInsightsOpeningLine ( text : String , answerLabel : String ) : String
+	{method}  {static} -isComparedToContext ( text : String , matchStart : int ) : boolean
+	{method}  {static} +polishManagerChatReply ( reply : String , liveKpis : java.util.Map , productivityDelta : int , answerLabel : String , previousLabel : String , validLabels : java.util.List , answerSprintDbId : Long ) : String
+	{method}  {static} -replaceMetricPattern ( pattern : java.util.regex.Pattern , text : String , replacementSuffix : String ) : String
+	{method}  {static} -resolveSprintMentionReplacement ( text : String , matchStart : int , mentioned : int , expectedLabel : String , previousSprintLabel : String , expectedNumber : int , previousNumber : int , validNumbers : java.util.Set , answerSprintDbId : Long ) : String
+	{method}  {static} -sprintNumberFromLabel ( label : String ) : int
+	{method}  {static} -sprintNumbersFromLabels ( labels : java.util.List ) : java.util.Set
+	{method}  {static} +stripAiVsLiveKpiAsides ( text : String ) : String
+	{method}  {static} +stripInternalDataReferences ( text : String ) : String
+	{method}  {static} -stripSpuriousProductivityDeltaWhenFlat ( text : String , currentScore : int ) : String
+}
+
+
+class com.springboot.MyTodoList.util.PasswordMigration {
+	{field} {static} -logger : org.slf4j.Logger
+	{method} +migratePasswords ( userRepository : com.springboot.MyTodoList.repository.UserRepository , passwordEncoder : org.springframework.security.crypto.password.PasswordEncoder ) : org.springframework.boot.CommandLineRunner
+}
+
+
+class com.springboot.MyTodoList.util.RichTextDescriptionUtil {
+	{field} {static} -HTML_TAG : java.util.regex.Pattern
+	{field} {static} -LOOKS_LIKE_HTML : java.util.regex.Pattern
+	{method}  {static} -decodeBasicEntities ( input : String ) : String
+	{method}  {static} +looksLikeRichDescriptionHtml ( value : String ) : boolean
+	{method}  {static} -normalizeMultiline ( text : String ) : String
+	{method}  {static} +toPlainText ( value : String ) : String
+	{method}  {static} +toPlainTextSingleLine ( value : String ) : String
+}
+
+
+class com.springboot.MyTodoList.util.SprintDeveloperMetricsUtil {
+	{method}  {static} +buildDeveloperSummaryRows ( userTasks : java.util.List ) : java.util.List
+	{method}  {static} -doubleVal ( o : Object ) : double
+	{method}  {static} -intVal ( o : Object ) : int
+	{method}  {static} +mergeDeveloperRowsByUserId ( perSprintRows : java.util.List ) : java.util.List
+	{method}  {static} -normalizeAssignmentStatus ( raw : String ) : String
+	{method}  {static} +rosterOnlyRow ( userId : Long , name : String ) : java.util.Map
+	{method}  {static} +roundChartHours ( hours : double ) : double
+	{method}  {static} +userTaskWorkedHours ( ut : com.springboot.MyTodoList.model.UserTask ) : double
+}
+
+
+class com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil {
+	{field} {static} +ALERT_SOURCE : String
+	{field} {static} -COMPLETION_SIMILAR_FRACTION : double
+	{field} {static} -HOURS_PER_TASK_CHANGE_THRESHOLD : double
+	{method}  {static} -alertMap ( severity : String , message : String ) : java.util.Map
+	{method}  {static} +alertsAlreadyContainHoursVsPrevious ( alerts : com.fasterxml.jackson.databind.node.ArrayNode ) : boolean
+	{method}  {static} +buildAlert ( current : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previous : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previousSprintLabel : String , sprintEnded : boolean , sprintEarly : boolean ) : java.util.Optional
+	{method}  {static} -buildBaselineComparisonMessage ( current : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , previous : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot , prevLabel : String , prevRate : double , curRate : double , rateChangeFraction : double ) : String
+	{method}  {static} ~completionCountsSimilar ( currentCompleted : int , previousCompleted : int ) : boolean
+	{method}  {static} -doubleFrom ( value : Object ) : double
+	{method}  {static} -formatHours ( hours : double ) : String
+	{method}  {static} ~formatHoursPerTaskRateChange ( rateChangeFraction : double ) : String
+	{method}  {static} -hoursPerCompletedTask ( snapshot : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot ) : double
+	{method}  {static} -intFrom ( value : Object ) : int
+	{method}  {static} -labelOrDefault ( previousSprintLabel : String ) : String
+	{method}  {static} +removeHoursVsPreviousAlerts ( alerts : com.fasterxml.jackson.databind.node.ArrayNode ) : void
+}
+
+
+class com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot {
+	{field} -completedTasks : int
+	{field} -workedHours : double
+	{method}  {static} +fromLiveKpis ( live : java.util.Map ) : com.springboot.MyTodoList.util.SprintHoursCompletionAlertUtil$DeliverySnapshot
+}
+
+
+class com.springboot.MyTodoList.util.SprintLiveKpiUtil {
+	{method}  {static} +bucketTaskStatus ( raw : String ) : String
+	{method}  {static} -clampPercent ( value : int ) : int
+	{method}  {static} +computeLiveKpis ( sprint : com.springboot.MyTodoList.model.Sprint , sprintTasks : java.util.List , sprintUserTasks : java.util.List ) : java.util.Map
+	{method}  {static} +computeProductivityScore ( completionRate : int , onTimeDelivery : int , efficiencyScore : int , workloadBalance : int ) : int
+	{method}  {static} +normalizeWorkloadBalancePercent ( raw : java.math.BigDecimal ) : int
+}
+
+
+class com.springboot.MyTodoList.util.TaskDueDateFormatUtil {
+	{field} {static} -DATE_ONLY : java.time.format.DateTimeFormatter
+	{field} {static} -TIME_ONLY : java.time.format.DateTimeFormatter
+	{method}  {static} +formatDueDateForTelegram ( dt : java.time.OffsetDateTime ) : String
+	{method}  {static} ~isDateOnlyDueBoundary ( wall : java.time.LocalTime ) : boolean
+}
+
+
+class com.springboot.MyTodoList.util.UserRoleUtil {
+	{method}  {static} +isAdmin ( type : String ) : boolean
+	{method}  {static} +isAllowedMemberType ( type : String ) : boolean
+	{method}  {static} +isDeveloper ( type : String ) : boolean
+	{method}  {static} +isDeveloperUser ( user : com.springboot.MyTodoList.model.User ) : boolean
+	{method}  {static} +isManager ( type : String ) : boolean
+	{method}  {static} +normalizeDisplayType ( type : String ) : String
+	{method}  {static} +sidebarAccessLabel ( type : String ) : String
+	{method}  {static} -toTitleCaseWords ( value : String ) : String
+}
+
+
+class com.springboot.MyTodoList.util.UserTaskOnTimeUtil {
+	{method}  {static} +assignmentTimingSnapshot ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : java.util.Map
+	{method}  {static} ~completionCalendarDay ( completedAt : java.time.LocalDateTime ) : java.time.LocalDate
+	{method}  {static} ~dueCalendarDay ( dueAt : java.time.LocalDateTime ) : java.time.LocalDate
+	{method}  {static} +enrichAssignmentTimingFields ( target : java.util.Map , ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : void
+	{method}  {static} +evaluateAssignmentOnTime ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : Boolean
+	{method}  {static} +evaluateDeliveryTiming ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : String
+	{method}  {static} +isAssignmentComplete ( ut : com.springboot.MyTodoList.model.UserTask ) : boolean
+	{method}  {static} +isCompletionOnOrBeforeDueDay ( completedAt : java.time.LocalDateTime , dueDate : java.time.LocalDateTime ) : boolean
+	{method}  {static} +resolveAssigneeCompletionTime ( ut : com.springboot.MyTodoList.model.UserTask , t : com.springboot.MyTodoList.model.Task , assigneeCount : int ) : java.time.LocalDateTime
+}
+
+
+class com.springboot.MyTodoList.util.WorkedHoursUtil {
+	{field} {static} -MAX_HOURS : double
+	{field} {static} -MIN_HOURS : double
+	{method}  {static} +formatForDisplay ( hours : double ) : String
+	{method}  {static} +parseBotInput ( raw : String ) : double
+	{method}  {static} +validateRange ( hours : double ) : String
+}
+
+
+
+
+com.springboot.MyTodoList.util.BotActions -->  com.springboot.MyTodoList.util.BotStateManager : stateManager
+com.springboot.MyTodoList.util.BotStateManager "1" o-- "0..*"  com.springboot.MyTodoList.util.BotUserState : userStates
+
+
+@enduml

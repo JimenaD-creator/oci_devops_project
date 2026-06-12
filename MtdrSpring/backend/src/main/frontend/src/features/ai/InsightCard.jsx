@@ -30,6 +30,8 @@ import {
   isProcessingInsight,
   isValidSprintId,
   AI_INSIGHTS_EMPTY,
+  filterAlertsForStrongOnTimeDelivery,
+  prepareInsightAlerts,
 } from './aiInsightsConstants';
 import { computeRecommendationList } from './insightRecommendationsSync';
 import { clearSprintInsightsCache, fetchSprintInsights, peekSprintInsightsCache } from './insightsApi';
@@ -43,7 +45,6 @@ import {
   PredictionsBlock,
   BlockedAssignmentsSnapshot,
 } from './InsightCardParts';
-import InsightsFreshnessBanner from './InsightsFreshnessBanner';
 
 export default function InsightCard({
   sprintId,
@@ -54,6 +55,8 @@ export default function InsightCard({
   nextSprintActualScore = null,
   currentSprintActualScore = null,
   currentSprintMetrics = null,
+  sprintPhase = null,
+  liveTaskStatusBreakdown = null,
   productivityDeltaPoints = null,
   refreshToken = 0,
   autoGenerateOnMissing = true,
@@ -430,17 +433,32 @@ export default function InsightCard({
     }
   };
 
-  const alertCounts = insights?.alerts
+  const filteredAlerts = useMemo(
+    () =>
+      prepareInsightAlerts(
+        insights?.alerts,
+        currentSprintMetrics?.onTimeDelivery,
+        sprintPhase,
+        currentSprintMetrics,
+      ),
+    [insights?.alerts, currentSprintMetrics, sprintPhase],
+  );
+
+  const alertCounts = filteredAlerts.length
     ? {
-        critical: insights.alerts.filter((a) => a.severity === 'critical').length,
-        warning: insights.alerts.filter((a) => a.severity === 'warning').length,
-        info: insights.alerts.filter((a) => a.severity === 'info').length,
+        critical: filteredAlerts.filter((a) => a.severity === 'critical').length,
+        warning: filteredAlerts.filter((a) => a.severity === 'warning').length,
+        info: filteredAlerts.filter((a) => a.severity === 'info').length,
       }
     : null;
 
   const recommendationList = useMemo(
-    () => computeRecommendationList(insights, { teamDevelopers: sprintDevelopers }),
-    [insights, sprintDevelopers],
+    () =>
+      computeRecommendationList(insights, {
+        teamDevelopers: sprintDevelopers,
+        onTimeDelivery: currentSprintMetrics?.onTimeDelivery,
+      }),
+    [insights, sprintDevelopers, currentSprintMetrics?.onTimeDelivery],
   );
 
   const hasExtendedPredictions =
@@ -653,12 +671,6 @@ export default function InsightCard({
       {/* Loaded */}
       {status === 'loaded' && insights && (
         <Collapse in={expanded}>
-          <InsightsFreshnessBanner
-            generatedAt={
-              lastGeneratedAtMs != null ? new Date(lastGeneratedAtMs).toISOString() : null
-            }
-            status={status}
-          />
           {/* Snapshot counters */}
           <Box
             sx={{
@@ -756,8 +768,8 @@ export default function InsightCard({
                 </Box>
                 <Box sx={{ p: { xs: 1.25, md: 1.5 } }}>
                   <AlertTypesLegend />
-                  {insights.alerts?.length > 0 ? (
-                    insights.alerts.map((a, i) => (
+                  {filteredAlerts.length > 0 ? (
+                    filteredAlerts.map((a, i) => (
                       <AlertCard key={i} alert={a} currentSprintMetrics={currentSprintMetrics} />
                     ))
                   ) : (

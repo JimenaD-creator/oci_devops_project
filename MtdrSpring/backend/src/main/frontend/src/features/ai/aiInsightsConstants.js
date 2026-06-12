@@ -80,7 +80,12 @@ export function buildFallbackKpiManagerGuide(kpis = {}, sprint = null) {
       onTimeDelivery: `On-time delivery is ${otd}% — completed work finished by the due date.`,
       efficiencyScore: `Efficiency score is ${es}% — estimated hours vs hours logged (100% means on or ahead of estimates).`,
       workloadBalance: `Workload balance is ${wb}% — how evenly tasks are distributed across assignees.`,
-      productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint),
+      productivityScore: buildProductivityKpiAnalyticsGuideLine(ps, sprint, {
+        completionRate: cr,
+        onTimeDelivery: otd,
+        efficiencyScore: es,
+        workloadBalance: wb,
+      }),
     },
   };
 }
@@ -94,7 +99,17 @@ export const KPI_LABELS = {
   workloadBalance: 'Workload Balance',
   productivityScore: 'Productivity Score',
   blockers: 'Blockers',
+  sprintComparison: 'Sprint comparison',
 };
+
+/** Backend-injected alert comparing logged hours vs completions vs the previous sprint. */
+export const HOURS_VS_PREVIOUS_ALERT_SOURCE = 'hoursVsPreviousSprint';
+
+export function isHoursVsPreviousSprintAlert(alert) {
+  if (!alert || typeof alert !== 'object') return false;
+  if (alert.alertSource === HOURS_VS_PREVIOUS_ALERT_SOURCE) return true;
+  return alert.kpi === 'sprintComparison';
+}
 
 /** Only these `kpi` fields on alerts are 0–100% — others (e.g. blockers) must not show a % suffix. */
 export const KPI_ALERT_PERCENT_KEYS = new Set([
@@ -155,7 +170,7 @@ export function clampTrendsPercentLikeValues(text) {
     return c === n ? m : `${prefix}${toDisplay(n)}`;
   });
 
-  return out;
+  return fixGluedPercentProse(out);
 }
 
 /**
@@ -166,21 +181,33 @@ export function clampTrendsPercentLikeValues(text) {
  * Rewrites productivity sprint-over-sprint deltas to absolute score points (matches KPI Analytics).
  * Gemini often writes relative % (e.g. 24%) when the score fell 15 points (63% → 48%).
  */
+const PRODUCTIVITY_TREND_DELTA_VERB =
+  '(?:decreased|increased|improved|declined|dropped|rose|fell)';
+
 export function alignProductivityTrendDelta(text, deltaProductivityPoints) {
   if (text == null || !Number.isFinite(Number(deltaProductivityPoints))) return text;
   const delta = Math.round(Number(deltaProductivityPoints));
   if (delta === 0) return text;
   const source = String(text);
-  const pattern =
-    /(productivity(?:\s+score)?\s+(?:has\s+)?(?:decreased|increased|improved|declined|dropped|rose|fell)\s+by\s+)\d+(?:\.\d+)?\s*%/i;
-  if (!pattern.test(source)) return source;
   const absPoints = Math.abs(delta);
   const verb = delta > 0 ? 'increased' : 'decreased';
   const pointsLabel = absPoints === 1 ? ' point' : ' points';
-  return source.replace(
-    pattern,
-    `Productivity ${verb} by ${absPoints}${pointsLabel}`,
+  const replacement = `Productivity ${verb} by ${absPoints}${pointsLabel}`;
+  const percentPattern = new RegExp(
+    `(productivity(?:\\s+score)?\\s+(?:has\\s+)?${PRODUCTIVITY_TREND_DELTA_VERB}\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*%`,
+    'i',
   );
+  const pointsPattern = new RegExp(
+    `(productivity(?:\\s+score)?\\s+(?:has\\s+)?${PRODUCTIVITY_TREND_DELTA_VERB}\\s+by\\s+)\\d+(?:\\.\\d+)?\\s*(?:percentage\\s+)?points?`,
+    'i',
+  );
+  if (percentPattern.test(source)) {
+    return source.replace(percentPattern, replacement);
+  }
+  if (pointsPattern.test(source)) {
+    return source.replace(pointsPattern, replacement);
+  }
+  return source;
 }
 
 export function alignTrendsProductivityScore(text, actualScore) {
@@ -202,6 +229,24 @@ export function alignTrendsProductivityScore(text, actualScore) {
   return source;
 }
 
+/** "Productivity remained stable at 100 points" → live KPI score (e.g. 99 points). */
+export function alignProductivityStableLevelInProse(text, actualScore) {
+  if (text == null || actualScore == null) return text;
+  const score = Math.min(100, Math.max(0, Math.round(Number(actualScore))));
+  if (!Number.isFinite(score)) return text;
+  const displayPct = formatProductivityScoreDisplay(score);
+  return String(text).replace(
+    /(productivity\s+(?:remained|stays|stayed|is|was)\s+(?:stable\s+)?at\s+)(-?\d+(?:\.\d+)?)(\s*%|\s*(?:percentage\s+)?points?)?/gi,
+    (_, prefix, _num, suffix) => {
+      if (suffix && /points?/i.test(suffix) && !/^\s*%$/.test(suffix)) {
+        const unit = score === 1 ? ' point' : ' points';
+        return `${prefix}${score}${unit}`;
+      }
+      return `${prefix}${displayPct}`;
+    },
+  );
+}
+
 /**
  * Align all productivity-score mentions in AI prose to the KPI card value (integer %, e.g. 78%).
  */
@@ -211,6 +256,7 @@ export function alignProductivityScoreProse(text, actualScore) {
   if (!display) return text;
   let out = alignKpiMetricsInText(String(text), { productivityScore: actualScore });
   out = alignTrendsProductivityScore(out, actualScore);
+  out = alignProductivityStableLevelInProse(out, actualScore);
   const productivityPatterns = [
     /(productivity\s*score[^0-9]{0,48}?)(-?\d+(?:\.\d+)?)\s*(?:%|points?)?/gi,
     /(overall\s+productivity[^0-9]{0,40}?)(-?\d+(?:\.\d+)?)\s*%?/gi,
@@ -231,7 +277,7 @@ export function alignProductivityScoreProse(text, actualScore) {
     /(composite(?:\s+\w+){0,8}?\s+(?:is\s+)?(?:at\s+)?)(-?\d+(?:\.\d+)?)\s*%?/gi,
     `$1${display}`,
   );
-  return out;
+  return fixGluedPercentProse(out);
 }
 
 function formatKpiMetricNumber(rawValue) {
@@ -312,10 +358,12 @@ export function alignAlertLoosePercents(text, actualPercent) {
   return fixHavingIsAtGrammar(out);
 }
 
-/** Fixes "0%as" → "0% as" after KPI % alignment (regex consumed optional %). */
+/** Fixes "0%as" → "0% as" and collapses "100%%%" → "100%" after KPI alignment passes. */
 export function fixGluedPercentProse(text) {
   if (text == null) return text;
-  return String(text).replace(/(\d+)\s*%([a-zA-Z])/g, '$1% $2');
+  let out = String(text).replace(/(\d+)\s*%([a-zA-Z])/g, '$1% $2');
+  out = out.replace(/(\d(?:\.\d+)?)(?:\s*%){2,}/g, '$1%');
+  return out;
 }
 
 function applyKpiMetricPatterns(text, key, actual) {
@@ -395,7 +443,6 @@ export function alignSingleMetricBlock(text, metricKey, actual) {
       ? formatEfficiencyScoreDisplay(actual)
       : formatKpiMetricValue(actual);
   if (metricKey === 'efficiencyScore') {
-    out = applyKpiMetricPatterns(out, 'teamParticipation', actual);
     out = out.replace(
       /((?:team\s+)?participation\s+score(?:\s+is\s+|\s+of\s+))(-?\d+(?:\.\d+)?)\s*%?/gi,
       `efficiency score is ${display}`,
@@ -433,7 +480,7 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
   let aligned = alignKpiMetricsInText(text, metrics);
   const actual = metrics[metricKey];
   if (metricKey === 'efficiencyScore' && actual != null) {
-    aligned = applyKpiMetricPatterns(aligned, 'teamParticipation', actual);
+    aligned = applyKpiMetricPatterns(aligned, 'efficiencyScore', actual);
   }
   if (actual == null) return aligned;
   let out = alignAlertLoosePercents(aligned, actual);
@@ -449,6 +496,11 @@ export function alignKpiProseForMetric(text, metricKey, metrics = {}) {
 const ON_TIME_DECLINE_CLAIM_RE =
   /declined|declining|dropped|fell|decreased|reduced|worsened|declined\s+for\s+\d+\s+consecutive/i;
 
+const ON_TIME_DELIVERY_PROBLEM_RE =
+  /\b(?:slight\s+)?delay(?:ed|s)?\b(?:\s+in\s+meeting)?|\bmissed\b.{0,48}\b(?:due|deadline)\b|\b(?:after|past|beyond)\s+(?:their\s+|the\s+)?(?:original\s+)?(?:due|deadline)\b|\blate\s+delivery\b|\bbehind\s+schedule\b|\bnot\s+on\s+time\b|\bmonitor(?:\s+deadlines?|\s+due\s+dates?)\s+more\s+closely\b|\brefine\s+future\s+estimation\b|\bmissed\s+their\s+original\s+due\s+dates?\b/i;
+
+const ON_TIME_STRONG_PERCENT = 90;
+
 /**
  * Drops on-time "decline" sentences when the live KPI card shows strong delivery (e.g. 100%).
  */
@@ -461,10 +513,83 @@ export function fixHavingIsAtGrammar(text) {
 /**
  * On-time ≥ 70% should not be called the "primary concern".
  */
+export function mentionsOnTimeDeliveryProblem(text) {
+  if (text == null || typeof text !== 'string') return false;
+  return ON_TIME_DELIVERY_PROBLEM_RE.test(text) || ON_TIME_DECLINE_CLAIM_RE.test(text);
+}
+
+export function shouldDropOnTimeDeliveryAlert(alert, onTimePercent) {
+  const otd = Number(onTimePercent);
+  if (!Number.isFinite(otd) || otd < ON_TIME_STRONG_PERCENT) return false;
+  const kpi = String(alert?.kpi ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '');
+  const message = String(alert?.message ?? '');
+  if (otd >= 100 && kpi === 'ontimedelivery') return true;
+  if (!mentionsOnTimeDeliveryProblem(message)) return false;
+  return kpi === 'ontimedelivery' || /on[- ]?time/i.test(message);
+}
+
+export function shouldDropOnTimeEstimationRecommendation(text, onTimePercent) {
+  const otd = Number(onTimePercent);
+  if (!Number.isFinite(otd) || otd < ON_TIME_STRONG_PERCENT) return false;
+  return mentionsOnTimeDeliveryProblem(text);
+}
+
+export function filterAlertsForStrongOnTimeDelivery(alerts, onTimePercent) {
+  if (!Array.isArray(alerts)) return [];
+  return alerts.filter((alert) => !shouldDropOnTimeDeliveryAlert(alert, onTimePercent));
+}
+
+/** Ended sprint with open scope: warning if CR >= 40, critical if below. */
+export function completionRateAlertSeverityForEndedSprint(completionRate) {
+  const cr = Number(completionRate);
+  if (!Number.isFinite(cr) || cr >= 100) return null;
+  return cr < 40 ? 'critical' : 'warning';
+}
+
+export function normalizeSprintAlertSeverities(alerts, sprintPhase, metrics = {}) {
+  if (!Array.isArray(alerts)) return [];
+  const cr = Number(metrics.completionRate);
+  if (sprintPhase !== 'ended' || !Number.isFinite(cr) || cr >= 100) {
+    return alerts;
+  }
+  const elevated = completionRateAlertSeverityForEndedSprint(cr);
+  if (!elevated) return alerts;
+  return alerts.map((alert) => {
+    const kpi = String(alert?.kpi ?? '')
+      .replace(/_/g, '')
+      .toLowerCase();
+    if (kpi !== 'completionrate') return alert;
+    return { ...alert, severity: elevated, value: cr };
+  });
+}
+
+export function prepareInsightAlerts(alerts, onTimePercent, sprintPhase, metrics = {}) {
+  return normalizeSprintAlertSeverities(
+    filterAlertsForStrongOnTimeDelivery(alerts, onTimePercent),
+    sprintPhase,
+    metrics,
+  );
+}
+
+export function stripContradictoryOnTimeDeliveryProblems(text, onTimePercent) {
+  if (text == null || !Number.isFinite(Number(onTimePercent))) return text;
+  const otd = Number(onTimePercent);
+  if (otd < ON_TIME_STRONG_PERCENT || !mentionsOnTimeDeliveryProblem(text)) return text;
+  const sentences = String(text).split(/(?<=[.!?])\s+/);
+  const kept = sentences.filter((s) => !mentionsOnTimeDeliveryProblem(s));
+  return kept.join(' ').trim();
+}
+
 export function reconcileOnTimeDeliveryConcernProse(text, onTimePercent) {
   if (text == null || !Number.isFinite(Number(onTimePercent))) return fixHavingIsAtGrammar(text);
   const otd = Number(onTimePercent);
   let out = fixHavingIsAtGrammar(text);
+  if (otd >= ON_TIME_STRONG_PERCENT) {
+    out = stripContradictoryOnTimeDeliveryProblems(out, otd);
+  }
   if (otd < 70 || !/on[- ]?time/i.test(out)) return out;
   const primaryClause =
     /on[- ]?time\s+delivery\s+is\s+the\s+primary\s+concern,?\s*(?:having\s+)?(?:which\s+is\s+at|is\s+at|currently\s+at|now\s+at|stands\s+at)?\s*\d+(?:\.\d+)?\s*%\.?\s*/i;
@@ -545,15 +670,23 @@ export function normalizeWorkloadBalanceGuideText(text, workloadBalancePct) {
   );
 }
 
-/** Any integer-point gap on a 0–100 score is meaningful for forecast vs current. */
-const FORECAST_TREND_EPSILON = 0;
+/** Point band within which a forecast is treated as flat vs current sprint score. */
+export function forecastStabilityBand(currentProductivityScore) {
+  const current = Number(currentProductivityScore);
+  if (!Number.isFinite(current)) return 0;
+  if (current >= 98) return 2;
+  if (current >= 90) return 1;
+  return 0;
+}
 
 /** Trend for next-sprint forecast vs the selected sprint's live productivity score. */
-export function productivityForecastTrendFromDelta(deltaPoints) {
+export function productivityForecastTrendFromDelta(deltaPoints, currentProductivityScore = null) {
   const d = Number(deltaPoints);
   if (!Number.isFinite(d)) return 'stable';
-  if (d > FORECAST_TREND_EPSILON) return 'up';
-  if (d < -FORECAST_TREND_EPSILON) return 'down';
+  const band = forecastStabilityBand(currentProductivityScore);
+  if (Math.abs(d) <= band) return 'stable';
+  if (d > 0) return 'up';
+  if (d < 0) return 'down';
   return 'stable';
 }
 
@@ -581,20 +714,29 @@ export function resolveProductivityPredictionDisplay(
     predictedScore = rawScore;
   }
 
-  const clampedScore = Number.isFinite(predictedScore)
+  let clampedScore = Number.isFinite(predictedScore)
     ? Math.max(0, Math.min(100, Math.round(predictedScore)))
     : 0;
   const currentProductivityScore = Number.isFinite(currentPs)
     ? Math.max(0, Math.min(100, Math.round(currentPs)))
     : null;
-  const deltaVsCurrent =
+  let deltaVsCurrent =
     currentProductivityScore != null ? clampedScore - currentProductivityScore : null;
-  const trend =
+  let trend =
     deltaVsCurrent != null
-      ? productivityForecastTrendFromDelta(deltaVsCurrent)
+      ? productivityForecastTrendFromDelta(deltaVsCurrent, currentProductivityScore)
       : prediction?.trend === 'up' || prediction?.trend === 'down'
         ? prediction.trend
         : 'stable';
+  if (
+    trend === 'stable' &&
+    currentProductivityScore != null &&
+    deltaVsCurrent != null &&
+    deltaVsCurrent !== 0
+  ) {
+    deltaVsCurrent = 0;
+    clampedScore = currentProductivityScore;
+  }
 
   return {
     predictedScore: clampedScore,
@@ -613,10 +755,10 @@ export function formatProductivityForecastDeltaLine(resolved) {
     return null;
   }
   const abs = Math.abs(resolved.deltaVsCurrent);
-  if (resolved.deltaVsCurrent > FORECAST_TREND_EPSILON) {
+  if (resolved.deltaVsCurrent > 0) {
     return `+${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
   }
-  if (resolved.deltaVsCurrent < -FORECAST_TREND_EPSILON) {
+  if (resolved.deltaVsCurrent < 0) {
     return `−${abs} point${abs === 1 ? '' : 's'} vs current sprint (${resolved.currentProductivityScore}%)`;
   }
   return `About the same as current sprint (${resolved.currentProductivityScore}%)`;

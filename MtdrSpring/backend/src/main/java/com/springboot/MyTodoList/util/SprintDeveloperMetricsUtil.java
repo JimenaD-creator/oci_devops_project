@@ -200,7 +200,7 @@ public final class SprintDeveloperMetricsUtil {
         final Set<Long> toDoTaskIds = new LinkedHashSet<>();
         final Set<Long> inReviewTaskIds = new LinkedHashSet<>();
         double workedHours;
-        long assignedHoursEstimate;
+        double assignedHoursEstimate;
 
         DevAgg(Long userId, String name) {
             this.userId = userId;

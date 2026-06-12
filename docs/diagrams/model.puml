@@ -1,0 +1,202 @@
+@startuml
+
+class com.springboot.MyTodoList.model.ManagerChatRequest {
+	{field} +message : String
+	{field} +projectId : Long
+	{field} +sprintId : Long
+}
+
+
+class com.springboot.MyTodoList.model.ManagerChatRequest$ChatMessage {
+	{field} +content : String
+	{field} +role : String
+}
+
+
+class com.springboot.MyTodoList.model.ManagerChatResponse {
+	{field} +contextScope : String
+	{field} +error : boolean
+	{field} +errorCode : String
+	{field} +reply : String
+	{method}  {static} +error ( errorCode : String , message : String ) : com.springboot.MyTodoList.model.ManagerChatResponse
+	{method}  {static} +of ( reply : String , contextScope : String ) : com.springboot.MyTodoList.model.ManagerChatResponse
+}
+
+
+class com.springboot.MyTodoList.model.Project {
+	{field} +id : Long
+	{field} +name : String
+}
+
+
+class com.springboot.MyTodoList.model.Sprint {
+	{field} +completionRate : java.math.BigDecimal
+	{field} +dueDate : java.time.LocalDateTime
+	{field} +efficiencyScore : java.math.BigDecimal
+	{field} +goal : String
+	{field} +id : Long
+	{field} +onTimeDelivery : java.math.BigDecimal
+	{field} +startDate : java.time.LocalDateTime
+	{field} +workloadBalance : java.math.BigDecimal
+}
+
+
+class com.springboot.MyTodoList.model.SprintInsight {
+	{field} +acknowledged : boolean
+	{field} +errorMessage : String
+	{field} +generatedAt : java.time.LocalDateTime
+	{field} +id : Long
+	{field} +insightsJson : String
+	{field} +projectId : Long
+	{field} +sprintId : Long
+}
+
+
+class com.springboot.MyTodoList.model.SprintInsightEmbedding {
+	{field} +createdAt : java.time.LocalDateTime
+	{field} +embedding : String
+	{field} +id : Long
+	{field} +projectId : Long
+	{field} +sprintId : Long
+	{field} +textChunk : String
+}
+
+
+class com.springboot.MyTodoList.model.Task {
+	{field} +assignedHours : Double
+	{field} +classification : String
+	{field} +createdAt : java.time.LocalDateTime
+	{field} +description : String
+	{field} +dueDate : java.time.LocalDateTime
+	{field} +finishDate : java.time.LocalDateTime
+	{field} +id : Long
+	{field} +priority : String
+	{field} +startDate : java.time.LocalDateTime
+	{field} +status : String
+	{field} +title : String
+	{field} +updatedAt : java.time.LocalDateTime
+}
+
+
+class com.springboot.MyTodoList.model.TaskEmbedding {
+	{field} +createdAt : java.time.LocalDateTime
+	{field} +embedding : String
+	{field} +id : Long
+	{field} +sprintId : Long
+	{field} +taskId : Long
+	{field} +textoChunk : String
+}
+
+
+class com.springboot.MyTodoList.model.TaskLog {
+	{field} +changedAt : java.time.LocalDateTime
+	{field} +fieldName : String
+	{field} +id : Long
+	{field} +newValue : String
+	{field} +oldValue : String
+}
+
+
+class com.springboot.MyTodoList.model.Team {
+	{field} +id : Long
+	{field} +name : String
+}
+
+
+class com.springboot.MyTodoList.model.TeamMember {
+	{field} +role : String
+}
+
+
+class com.springboot.MyTodoList.model.TeamMembersId {
+	{field} +teamId : Long
+	{field} +userId : Long
+	{method} +equals ( o : Object ) : boolean
+	{method} +hashCode () : int
+}
+
+
+class com.springboot.MyTodoList.model.ToDoItem {
+	{field} +ID : int
+	{field} +assignedSprint : Integer
+	{field} +completedAt : java.time.OffsetDateTime
+	{field} +creation_ts : java.time.OffsetDateTime
+	{field} +description : String
+	{field} +dueDate : java.time.OffsetDateTime
+	{field} +priority : String
+	{field} +startDate : java.time.OffsetDateTime
+	{field} +status : String
+	{field} +title : String
+	{method} +isDone () : boolean
+	{method} +setDone ( done : boolean ) : void
+}
+
+
+class com.springboot.MyTodoList.model.User {
+	{field} +email : String
+	{field} +id : Long
+	{field} +name : String
+	{field} +phonenumber : String
+	{field} +profilePicture : String
+	{field} +resetToken : String
+	{field} +resetTokenExp : java.time.LocalDateTime
+	{field} +type : String
+	{field} +userpassword : String
+	{method} +getPassword () : String
+	{method} +setPassword ( password : String ) : void
+}
+
+
+class com.springboot.MyTodoList.model.UserSprint {
+	{field} +contributionScore : java.math.BigDecimal
+}
+
+
+class com.springboot.MyTodoList.model.UserSprintId {
+	{field} +sprintId : Long
+	{field} +userId : Integer
+	{method} +equals ( o : Object ) : boolean
+	{method} +hashCode () : int
+}
+
+
+class com.springboot.MyTodoList.model.UserTask {
+	{field} +blockedReason : String
+	{field} +completedAt : java.time.LocalDateTime
+	{field} +isBlocked : Boolean
+	{field} +status : String
+	{field} +workedHours : Double
+	{method} +isCompletedAssignment () : boolean
+	{method}  {static} +isCompletedAssignmentStatus ( status : String ) : boolean
+}
+
+
+class com.springboot.MyTodoList.model.UserTaskId {
+	{field} +taskId : Long
+	{field} +userId : Long
+	{method} +equals ( o : Object ) : boolean
+	{method} +hashCode () : int
+}
+
+
+
+
+com.springboot.MyTodoList.model.ManagerChatRequest "1" o-- "0..*"  com.springboot.MyTodoList.model.ManagerChatRequest$ChatMessage : history
+com.springboot.MyTodoList.model.Project -->  com.springboot.MyTodoList.model.Team :  @ManyToOne\nassignedTeam
+com.springboot.MyTodoList.model.Sprint -->  com.springboot.MyTodoList.model.Project :  @ManyToOne\nassignedProject
+com.springboot.MyTodoList.model.Task -->  com.springboot.MyTodoList.model.Sprint :  @ManyToOne\nassignedSprint
+com.springboot.MyTodoList.model.TaskLog -->  com.springboot.MyTodoList.model.Task :  @ManyToOne\ntask
+com.springboot.MyTodoList.model.TaskLog -->  com.springboot.MyTodoList.model.User :  @ManyToOne\nchangedBy
+com.springboot.MyTodoList.model.Team -->  com.springboot.MyTodoList.model.User :  @OneToOne\nmanager
+com.springboot.MyTodoList.model.TeamMember -->  com.springboot.MyTodoList.model.Team :  @ManyToOne\nteam
+com.springboot.MyTodoList.model.TeamMember -->  com.springboot.MyTodoList.model.TeamMembersId : id
+com.springboot.MyTodoList.model.TeamMember -->  com.springboot.MyTodoList.model.User :  @ManyToOne\nuser
+com.springboot.MyTodoList.model.UserSprint -->  com.springboot.MyTodoList.model.Sprint :  @ManyToOne\nsprint
+com.springboot.MyTodoList.model.UserSprint -->  com.springboot.MyTodoList.model.User :  @ManyToOne\nuser
+com.springboot.MyTodoList.model.UserSprint -->  com.springboot.MyTodoList.model.UserSprintId : id
+com.springboot.MyTodoList.model.UserTask -->  com.springboot.MyTodoList.model.Task :  @ManyToOne\ntask
+com.springboot.MyTodoList.model.UserTask -->  com.springboot.MyTodoList.model.User :  @ManyToOne\nuser
+com.springboot.MyTodoList.model.UserTask -->  com.springboot.MyTodoList.model.UserTaskId : id
+
+
+@enduml

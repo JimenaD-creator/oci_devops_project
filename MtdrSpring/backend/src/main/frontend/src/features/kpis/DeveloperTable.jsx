@@ -20,6 +20,7 @@ const initialData = [
     assigned: 8,
     completed: 6,
     hours: 32.5,
+    estimatedHours: 30.0,
     onTime: 70,
     efficiencyScore: 100,
   },
@@ -29,6 +30,7 @@ const initialData = [
     assigned: 10,
     completed: 8,
     hours: 45.0,
+    estimatedHours: 42.0,
     onTime: 85,
     efficiencyScore: 90,
   },
@@ -38,6 +40,7 @@ const initialData = [
     assigned: 6,
     completed: 5,
     hours: 20.0,
+    estimatedHours: 24.0,
     onTime: 60,
     efficiencyScore: 80,
   },
@@ -47,6 +50,7 @@ const initialData = [
     assigned: 7,
     completed: 6,
     hours: 31.0,
+    estimatedHours: 28.0,
     onTime: 75,
     efficiencyScore: 95,
   },
@@ -219,6 +223,7 @@ const fullColumns = [
   { key: 'completed', label: 'Tasks Completed', sortable: true },
   { key: 'completionRate', label: 'Completion Rate', sortable: true },
   { key: 'hours', label: 'Total Hours', sortable: true },
+  { key: 'estimatedHours', label: 'Estimated Hours', sortable: true },
   { key: 'avgHours', label: 'Average Hrs / Task', sortable: true },
   { key: 'onTime', label: 'On-Time Delivery', sortable: true },
   {
@@ -272,6 +277,7 @@ function SprintMetricsTable({
         row[`${sp.id}_assigned`] = d ? d.assigned : 0;
         row[`${sp.id}_completed`] = d ? d.completed : 0;
         row[`${sp.id}_hours`] = d ? d.hours : 0;
+        row[`${sp.id}_estimatedHours`] = d ? Number(d.assignedHoursEstimate) || 0 : 0;
         const spHours = d ? Number(d.hours) || 0 : 0;
         row[`${sp.id}_onTime`] = d && typeof d.onTime === 'number' ? d.onTime : '—';
         const spEstimate = d ? Number(d.assignedHoursEstimate) || 0 : 0;
@@ -347,6 +353,15 @@ function SprintMetricsTable({
 
   const hoursAvgForSprint = (spId) => {
     const nums = sorted.map((r) => r[`${spId}_hours`]).filter((v) => typeof v === 'number');
+    if (!nums.length) return '—';
+    const n = nums.reduce((acc, x) => acc + x, 0) / nums.length;
+    return `${Number.isInteger(n) ? n : n.toFixed(1)}h`;
+  };
+
+  const estimatedHoursAvgForSprint = (spId) => {
+    const nums = sorted
+      .map((r) => r[`${spId}_estimatedHours`])
+      .filter((v) => typeof v === 'number');
     if (!nums.length) return '—';
     const n = nums.reduce((acc, x) => acc + x, 0) / nums.length;
     return `${Number.isInteger(n) ? n : n.toFixed(1)}h`;
@@ -433,7 +448,7 @@ function SprintMetricsTable({
                     {selectedSprints.map((sp, si) => (
                       <th
                         key={sp.id}
-                        colSpan={5}
+                        colSpan={6}
                         className={`th-sprint-compare-group${si > 0 ? ' th-sprint-compare-group-bordered' : ''}`}
                       >
                         {sp.shortLabel}
@@ -470,6 +485,15 @@ function SprintMetricsTable({
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             Total Hours {sortIcon(`${sp.id}_hours`)}
+                          </div>
+                        </th>,
+                        <th
+                          key={`${sp.id}-eh`}
+                          className="sortable"
+                          onClick={() => toggleSort(`${sp.id}_estimatedHours`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Estimated Hours {sortIcon(`${sp.id}_estimatedHours`)}
                           </div>
                         </th>,
                         <th
@@ -519,6 +543,14 @@ function SprintMetricsTable({
                         <th className="sortable" onClick={() => toggleSort(`${sp.id}_hours`)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             Total Hours {sortIcon(`${sp.id}_hours`)}
+                          </div>
+                        </th>
+                        <th
+                          className="sortable"
+                          onClick={() => toggleSort(`${sp.id}_estimatedHours`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Estimated Hours {sortIcon(`${sp.id}_estimatedHours`)}
                           </div>
                         </th>
                         {!focusSingleDeveloper ? (
@@ -599,6 +631,9 @@ function SprintMetricsTable({
                             <td key={`${r.name}-${sp.id}-h`} className="text-center cell-muted">
                               {renderHours(r[`${sp.id}_hours`])}
                             </td>,
+                            <td key={`${r.name}-${sp.id}-eh`} className="text-center cell-muted">
+                              {renderHours(r[`${sp.id}_estimatedHours`])}
+                            </td>,
                             <td key={`${r.name}-${sp.id}-ot`} className="text-center">
                               {renderOnTimeCell(r[`${sp.id}_onTime`])}
                             </td>,
@@ -615,6 +650,9 @@ function SprintMetricsTable({
                               <td className="text-center cell-strong">{r[`${sp.id}_completed`]}</td>
                               <td className="text-center cell-muted">
                                 {renderHours(r[`${sp.id}_hours`])}
+                              </td>
+                              <td className="text-center cell-muted">
+                                {renderHours(r[`${sp.id}_estimatedHours`])}
                               </td>
                               {!focusSingleDeveloper ? (
                                 <>
@@ -650,6 +688,9 @@ function SprintMetricsTable({
                         <td key={`avg-${sp.id}-h`} className="summary-cell text-center">
                           {hoursAvgForSprint(sp.id)}
                         </td>,
+                        <td key={`avg-${sp.id}-eh`} className="summary-cell text-center">
+                          {estimatedHoursAvgForSprint(sp.id)}
+                        </td>,
                         <td key={`avg-${sp.id}-ot`} className="summary-cell text-center">
                           {otAvg != null ? (
                             <span className="summary-cell">{otAvg}%</span>
@@ -679,6 +720,9 @@ function SprintMetricsTable({
                             {avgForKey(`${sp.id}_completed`)}
                           </td>
                           <td className="summary-cell text-center">{hoursAvgForSprint(sp.id)}</td>
+                          <td className="summary-cell text-center">
+                            {estimatedHoursAvgForSprint(sp.id)}
+                          </td>
                           <td className="summary-cell text-center">
                             {otAvg != null ? (
                               <span className="summary-cell">{otAvg}%</span>
@@ -821,6 +865,7 @@ function FullAnalyticsTable() {
                       <Badge val={r.completionRate} green={80} yellow={50} />
                     </td>
                     <td className="text-center cell-muted">{r.hours}h</td>
+                    <td className="text-center cell-muted">{r.estimatedHours}h</td>
                     <td className="text-center cell-muted">{r.avgHours}h</td>
                     <td className="text-center">
                       <Badge val={r.onTime} green={90} yellow={70} />
@@ -839,6 +884,7 @@ function FullAnalyticsTable() {
                   <span className="summary-cell">{avg('completionRate')}%</span>
                 </td>
                 <td className="summary-cell text-center">{avg('hours')}h</td>
+                <td className="summary-cell text-center">{avg('estimatedHours')}h</td>
                 <td className="summary-cell text-center">{avg('avgHours')}h</td>
                 <td className="text-center">
                   <span className="summary-cell">{avg('onTime')}%</span>

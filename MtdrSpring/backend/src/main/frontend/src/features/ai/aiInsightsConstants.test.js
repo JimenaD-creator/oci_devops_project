@@ -6,10 +6,18 @@ import {
   alignCompletionRatePercentLabels,
   alignSingleMetricBlock,
   stripContradictoryOnTimeDecline,
+  stripContradictoryOnTimeDeliveryProblems,
+  shouldDropOnTimeDeliveryAlert,
+  shouldDropOnTimeEstimationRecommendation,
+  filterAlertsForStrongOnTimeDelivery,
+  normalizeSprintAlertSeverities,
+  prepareInsightAlerts,
   reconcileOnTimeDeliveryConcernProse,
   resolveProductivityPredictionDisplay,
   formatProductivityForecastDeltaLine,
   alignProductivityTrendDelta,
+  alignProductivityScoreProse,
+  isHoursVsPreviousSprintAlert,
 } from './aiInsightsConstants';
 
 describe('aiInsightsConstants KPI alignment', () => {
@@ -70,6 +78,19 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(resolved.deltaVsCurrent).toBe(-2);
     expect(formatProductivityForecastDeltaLine(resolved)).toBe(
       '−2 points vs current sprint (87%)',
+    );
+  });
+
+  it('resolveProductivityPredictionDisplay treats a 1-point drop at 100 as stable (99 vs 100)', () => {
+    const resolved = resolveProductivityPredictionDisplay(
+      { predictedScore: 99, trend: 'down' },
+      { productivityScore: 100 },
+    );
+    expect(resolved.trend).toBe('stable');
+    expect(resolved.predictedScore).toBe(100);
+    expect(resolved.deltaVsCurrent).toBe(0);
+    expect(formatProductivityForecastDeltaLine(resolved)).toBe(
+      'About the same as current sprint (100%)',
     );
   });
 
@@ -143,6 +164,61 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toContain('blocked tasks');
   });
 
+  it('elevates completion rate alert to warning when ended sprint is incomplete', () => {
+    const alerts = [
+      {
+        kpi: 'completionRate',
+        severity: 'info',
+        value: 78,
+        message: 'Completion rate is 78%, indicating some tasks remain in progress after the sprint ended.',
+      },
+    ];
+    const out = prepareInsightAlerts(alerts, 100, 'ended', { completionRate: 78 });
+    expect(out).toHaveLength(1);
+    expect(out[0].severity).toBe('warning');
+  });
+
+  it('elevates completion rate alert to critical when ended sprint completion is below 40', () => {
+    const out = normalizeSprintAlertSeverities(
+      [{ kpi: 'completionRate', severity: 'info', value: 30 }],
+      'ended',
+      { completionRate: 30 },
+    );
+    expect(out[0].severity).toBe('critical');
+  });
+
+  it('drops on-time alert at 100% when message claims delay', () => {
+    expect(
+      shouldDropOnTimeDeliveryAlert(
+        {
+          kpi: 'onTimeDelivery',
+          message:
+            'On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.',
+        },
+        100,
+      ),
+    ).toBe(true);
+    expect(
+      filterAlertsForStrongOnTimeDelivery(
+        [
+          {
+            kpi: 'onTimeDelivery',
+            message:
+              'On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.',
+          },
+        ],
+        100,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('drops estimates recommendation about missed due dates at 100% on-time', () => {
+    const text =
+      'Analyze the tasks that missed their original due dates to refine future estimation accuracy.';
+    expect(shouldDropOnTimeEstimationRecommendation(text, 100)).toBe(true);
+    expect(stripContradictoryOnTimeDeliveryProblems(text, 100)).toBe('');
+  });
+
   it('stripContradictoryOnTimeDecline removes false decline at 100%', () => {
     const text =
       'On-Time Delivery has declined for three consecutive sprints, currently at 100%. Focus on tasks.';
@@ -158,5 +234,46 @@ describe('aiInsightsConstants KPI alignment', () => {
     expect(out).toContain('decreased by 15 points');
     expect(out).not.toContain('24%');
     expect(out).toContain('work is still in progress');
+  });
+
+  it('alignProductivityTrendDelta replaces wrong point delta with live score points', () => {
+    const text =
+      'Productivity decreased by 18 points compared to the previous sprint.';
+    const out = alignProductivityTrendDelta(text, -13);
+    expect(out).toContain('decreased by 13 points');
+    expect(out).not.toContain('18 points');
+  });
+
+  it('alignProductivityScoreProse fixes stable-at-level when Gemini rounds up (99 vs 100 points)', () => {
+    const text =
+      'Productivity remained stable at 100 points compared to the previous sprint.';
+    const out = alignProductivityScoreProse(text, 99);
+    expect(out).toBe(
+      'Productivity remained stable at 99 points compared to the previous sprint.',
+    );
+  });
+
+  it('alignProductivityScoreProse does not duplicate % on stable-at-level trends', () => {
+    const text =
+      'Productivity remained stable at 100% compared to the previous sprint.';
+    const out = alignProductivityScoreProse(text, 100);
+    expect(out).toBe(
+      'Productivity remained stable at 100% compared to the previous sprint.',
+    );
+    const doubled =
+      'Productivity remained stable at 100%% compared to the previous sprint.';
+    expect(alignProductivityScoreProse(doubled, 100)).toBe(
+      'Productivity remained stable at 100% compared to the previous sprint.',
+    );
+  });
+
+  it('isHoursVsPreviousSprintAlert detects backend-injected sprint comparison alerts', () => {
+    expect(
+      isHoursVsPreviousSprintAlert({
+        alertSource: 'hoursVsPreviousSprint',
+        kpi: 'sprintComparison',
+      }),
+    ).toBe(true);
+    expect(isHoursVsPreviousSprintAlert({ kpi: 'efficiencyScore', value: 100 })).toBe(false);
   });
 });

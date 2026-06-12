@@ -75,7 +75,7 @@ class SprintDeveloperMetricsUtilTest {
     }
 
     private static UserTask assignment(
-            long userId, long taskId, String status, double workedHours, long assignedHours) {
+            long userId, long taskId, String status, double workedHours, double assignedHours) {
         User user = new User();
         user.setId(userId);
         user.setName("Dev " + userId);

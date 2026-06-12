@@ -162,7 +162,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
 
   useProjectBundleSync(
     useCallback(() => {
-      loadData({ silent: true, forceFresh: false }).catch((err) => {
+      loadData({ silent: true, forceFresh: true }).catch((err) => {
         console.error('MyTasksPage bundle sync failed:', err);
       });
     }, [loadData]),
@@ -171,8 +171,13 @@ export default function MyTasksPage({ projectId, currentUser }) {
   useEffect(() => {
     const onTasksMutated = (event) => {
       if (event?.detail?.source === 'my-tasks-page') return;
-      if (event?.detail?.source === 'sse') return;
-      loadData({ silent: true }).catch((err) => {
+      if (event?.detail?.source === 'sse') {
+        loadData({ silent: true, forceFresh: true }).catch((err) => {
+          console.error('MyTasksPage SSE sync failed:', err);
+        });
+        return;
+      }
+      loadData({ silent: true, forceFresh: true }).catch((err) => {
         console.error('MyTasksPage sync refresh failed:', err);
       });
     };
@@ -233,8 +238,12 @@ export default function MyTasksPage({ projectId, currentUser }) {
   }, [userTasks, mySprintTasks]);
 
   const tableRows = useMemo(
-    () => buildSprintTaskTableRows(mySprintTasks, sprintUserTasksForTable, projectDevelopers),
-    [mySprintTasks, sprintUserTasksForTable, projectDevelopers],
+    () =>
+      buildSprintTaskTableRows(mySprintTasks, sprintUserTasksForTable, projectDevelopers, {
+        assignmentFilter: (assignments) =>
+          assignments.filter((ut) => resolveUserTaskUserId(ut) === currentUserId),
+      }),
+    [mySprintTasks, sprintUserTasksForTable, projectDevelopers, currentUserId],
   );
 
   const mySprintStats = useMemo(() => {
@@ -488,7 +497,7 @@ export default function MyTasksPage({ projectId, currentUser }) {
               meta,
               source: 'my-tasks-page',
             });
-            await loadData({ silent: true });
+            await loadData({ silent: true, forceFresh: true });
           } catch (e) {
             console.error('Failed to refresh my tasks after save:', e);
           }

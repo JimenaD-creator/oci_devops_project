@@ -266,14 +266,29 @@ export function normalizeTaskStatus(value) {
 
 /** Mirrors TaskAssignmentSyncService: aggregate TASK status from USER_TASK rows. */
 export function deriveTaskStatusFromAssignments(taskStatus, assignmentRows = []) {
+  const taskNorm = normalizeTaskStatus(taskStatus);
+  if (taskNorm === 'DONE') return 'DONE';
   const rows = Array.isArray(assignmentRows) ? assignmentRows : [];
-  if (rows.length === 0) return normalizeTaskStatus(taskStatus);
+  if (rows.length === 0) return taskNorm;
   const statuses = rows.map((ut) => normalizeTaskStatus(ut?.status ?? ut?.STATUS));
   if (statuses.every((s) => s === 'DONE')) return 'DONE';
   if (statuses.some((s) => s === 'IN_PROGRESS')) return 'IN_PROGRESS';
   if (statuses.some((s) => s === 'IN_REVIEW')) return 'IN_REVIEW';
   if (statuses.some((s) => s === 'DONE')) return 'IN_REVIEW';
   return 'TODO';
+}
+
+/** Developer Kanban: Done column when TASK is done or this developer's assignment is complete. */
+export function deriveDeveloperKanbanStatus(taskStatus, assignmentRows = []) {
+  const taskNorm = normalizeTaskStatus(taskStatus);
+  if (taskNorm === 'DONE') return 'DONE';
+  const rows = Array.isArray(assignmentRows) ? assignmentRows : [];
+  if (rows.length === 0) return taskNorm;
+  if (rows.some((ut) => isUserTaskAssigneeComplete(ut))) return 'DONE';
+  const statuses = rows.map((ut) => normalizeTaskStatus(ut?.status ?? ut?.STATUS));
+  if (statuses.some((s) => s === 'IN_PROGRESS')) return 'IN_PROGRESS';
+  if (statuses.some((s) => s === 'IN_REVIEW')) return 'IN_REVIEW';
+  return statuses[0] ?? taskNorm;
 }
 
 export function assigneeStatusLabel(statusKey) {
@@ -298,14 +313,16 @@ export function assigneeStatusChipStyle(statusKey) {
   return styles[key] ?? styles.TODO;
 }
 
-export function mapTaskToKanban(task, developerNames = [], assignmentRows = []) {
+export function mapTaskToKanban(task, developerNames = [], assignmentRows = [], options = {}) {
   const statusMap = {
     DONE: 'done',
     IN_PROGRESS: 'in_progress',
     IN_REVIEW: 'in_review',
     TODO: 'todo',
   };
-  const normalizedStatus = deriveTaskStatusFromAssignments(task?.status, assignmentRows);
+  const normalizedStatus =
+    options.statusOverride ??
+    deriveTaskStatusFromAssignments(task?.status, assignmentRows);
   const list = Array.isArray(developerNames)
     ? [...new Set(developerNames.filter(Boolean))]
     : developerNames
@@ -369,11 +386,23 @@ export function patchUserTasksAfterTaskSave(prevUserTasks, updated, meta, projec
 
   if (meta.syncAssignmentStatuses && meta.assignmentStatus != null) {
     const st = meta.assignmentStatus;
+    const targetUserId =
+      meta.userId != null && Number.isFinite(Number(meta.userId)) ? Number(meta.userId) : null;
+    const hours =
+      meta.workedHours != null && Number.isFinite(Number(meta.workedHours))
+        ? Number(meta.workedHours)
+        : null;
     const nowComplete = isUserTaskAssigneeComplete({ status: st });
     return prevUserTasks.map((ut) => {
       if (userTaskRowTaskId(ut) !== tid) return ut;
+      const rowUserId = Number(ut?.user?.id ?? ut?.user?.ID ?? ut?.id?.userId ?? ut?.userId);
+      if (targetUserId != null && rowUserId !== targetUserId) return ut;
       const next = { ...ut, status: st };
-      if (!nowComplete && isUserTaskAssigneeComplete(ut)) {
+      if (hours != null) {
+        next.workedHours = hours;
+        next.worked_hours = hours;
+        next.hours = hours;
+      } else if (!nowComplete && isUserTaskAssigneeComplete(ut)) {
         next.workedHours = 0;
         next.worked_hours = 0;
         next.hours = 0;

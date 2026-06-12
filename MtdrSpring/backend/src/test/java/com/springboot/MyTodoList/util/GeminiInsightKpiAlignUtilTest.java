@@ -1,5 +1,7 @@
 package com.springboot.MyTodoList.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeminiInsightKpiAlignUtilTest {
@@ -47,6 +50,19 @@ class GeminiInsightKpiAlignUtilTest {
     }
 
     @Test
+    void shouldDropOnTimeDeliveryAlertAt100_whenMessageClaimsDelay() {
+        String msg = "On-Time Delivery is 100%, indicating a slight delay in meeting original deadlines.";
+        assertTrue(GeminiInsightKpiAlignUtil.shouldDropOnTimeDeliveryAlertAtStrongScore(
+            "onTimeDelivery", msg, 100));
+    }
+
+    @Test
+    void shouldDropEstimationRecommendation_whenOnTimeIsPerfect() {
+        String rec = "Analyze the tasks that missed their original due dates to refine future estimation accuracy.";
+        assertTrue(GeminiInsightKpiAlignUtil.shouldDropOnTimeEstimationRecommendation(rec, 100));
+    }
+
+    @Test
     void isWeakTeamChangeSummary_detectsVagueGeminiParagraph() {
         String vague =
             "While the team is meeting deadlines for completed work, the overall throughput has slowed significantly.";
@@ -71,7 +87,7 @@ class GeminiInsightKpiAlignUtilTest {
 
     @Test
     void polishSprintChangeSummary_fixesDuplicateTeamAndDanglingAt() {
-        Map<String, Object> live = Map.of("completionRate", 72, "teamParticipation", 65, "workloadBalance", 88);
+        Map<String, Object> live = Map.of("completionRate", 72, "efficiencyScore", 65, "workloadBalance", 88);
         String in =
             "Sprint 4 is still in progress; compared with Sprint 3, the team, the team moved completion. "
                 + "Completion rates remained stable at, and team participation stayed at.";
@@ -86,7 +102,7 @@ class GeminiInsightKpiAlignUtilTest {
         Map<String, Object> live = Map.of(
             "completionRate", 70,
             "onTimeDelivery", 82,
-            "teamParticipation", 60,
+            "efficiencyScore", 60,
             "workloadBalance", 75,
             "productivityScore", 78);
         String in =
@@ -112,7 +128,7 @@ class GeminiInsightKpiAlignUtilTest {
             Map.of(
                 "completionRate", 70,
                 "onTimeDelivery", 80,
-                "teamParticipation", 55,
+                "efficiencyScore", 55,
                 "workloadBalance", 78,
                 "productivityScore", 68));
         assertFalse(out.isBlank());
@@ -149,6 +165,28 @@ class GeminiInsightKpiAlignUtilTest {
         assertTrue(out.contains("payment API"));
         assertFalse(out.toLowerCase(Locale.ROOT).contains("prior sprint"));
         assertTrue(out.split("(?<=[.!?])\\s+").length <= 4);
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_warningWhenIncompleteAbove40() {
+        assertEquals("warning", GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(78));
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_criticalWhenBelow40() {
+        assertEquals("critical", GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(35));
+    }
+
+    @Test
+    void completionRateAlertSeverityForEndedSprint_nullWhenComplete() {
+        assertNull(GeminiInsightKpiAlignUtil.completionRateAlertSeverityForEndedSprint(100));
+    }
+
+    @Test
+    void shouldElevateCompletionRateAlertForEndedSprint_whenScopeOpen() {
+        assertTrue(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("ended", 78));
+        assertFalse(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("in_progress", 78));
+        assertFalse(GeminiInsightKpiAlignUtil.shouldElevateCompletionRateAlertForEndedSprint("ended", 100));
     }
 
     @Test
@@ -476,7 +514,7 @@ class GeminiInsightKpiAlignUtilTest {
             "productivityScore", 97,
             "onTimeDelivery", 71,
             "completionRate", 80,
-            "teamParticipation", 60,
+            "efficiencyScore", 60,
             "workloadBalance", 75);
         String in =
             "Productivity increased by 6 points compared to the previous sprint, "
@@ -514,6 +552,71 @@ class GeminiInsightKpiAlignUtilTest {
         assertTrue(out.contains("decreased by 15 points"));
         assertFalse(out.contains("24%"));
         assertTrue(out.contains("work is still in progress"));
+    }
+
+    @Test
+    void productivityForecastTrend_treatsOnePointDropAtPerfectScoreAsStable() {
+        assertEquals("stable", GeminiInsightKpiAlignUtil.productivityForecastTrend(100, 99));
+        assertEquals("down", GeminiInsightKpiAlignUtil.productivityForecastTrend(100, 97));
+    }
+
+    @Test
+    void resolveForecastPredictedScore_snapsToLiveWhenWithinStabilityBand() {
+        assertEquals(100, GeminiInsightKpiAlignUtil.resolveForecastPredictedScore(100, 99));
+        assertEquals(97, GeminiInsightKpiAlignUtil.resolveForecastPredictedScore(100, 97));
+    }
+
+    @Test
+    void alignProductivityStableLevelInProse_replacesRoundedGeminiScoreWithLive() {
+        String gemini =
+            "Productivity remained stable at 100 points compared to the previous sprint.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityStableLevelInProse(gemini, 99);
+        assertEquals(
+            "Productivity remained stable at 99 points compared to the previous sprint.",
+            out);
+    }
+
+    @Test
+    void alignProductivityStableLevelInProse_doesNotDuplicatePercentSign() {
+        String gemini =
+            "Productivity remained stable at 100% compared to the previous sprint.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityStableLevelInProse(gemini, 100);
+        assertEquals(
+            "Productivity remained stable at 100% compared to the previous sprint.",
+            out);
+        String doubled =
+            "Productivity remained stable at 100%% compared to the previous sprint.";
+        assertEquals(
+            "Productivity remained stable at 100% compared to the previous sprint.",
+            GeminiInsightKpiAlignUtil.fixGluedPercentSpacing(doubled));
+    }
+
+    @Test
+    void detectGenerationKpiDrift_flagsProductivityChange() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode snapshot = mapper.readTree(
+            "{\"kpis\":{\"completionRate\":100,\"onTimeDelivery\":100,\"efficiencyScore\":80,"
+                + "\"workloadBalance\":70,\"productivityScore\":99},"
+                + "\"taskStatusBreakdown\":{\"total\":10,\"done\":10,\"toDo\":0,\"inProgress\":0,\"inReview\":0}}");
+        Map<String, Object> live = Map.of(
+            "completionRate", 100,
+            "onTimeDelivery", 100,
+            "efficiencyScore", 80,
+            "workloadBalance", 70,
+            "productivityScore", 97);
+        JsonNode liveBreakdown = mapper.readTree(
+            "{\"total\":10,\"done\":10,\"toDo\":0,\"inProgress\":0,\"inReview\":0}");
+        List<String> changed =
+            GeminiInsightKpiAlignUtil.detectGenerationKpiDrift(snapshot, live, liveBreakdown);
+        assertTrue(changed.contains("productivityScore"));
+    }
+
+    @Test
+    void alignProductivityTrendDeltaInProse_replacesWrongPointDeltaWithLivePoints() {
+        String gemini = "Productivity decreased by 18 points compared to the previous sprint.";
+        String out = GeminiInsightKpiAlignUtil.alignProductivityTrendDeltaInProse(gemini, -13);
+        assertTrue(out.contains("decreased by 13 points"));
+        assertFalse(out.contains("18 points"));
     }
 
     @Test

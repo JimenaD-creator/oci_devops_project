@@ -19,6 +19,7 @@ const sprintSnapshot = {
       assigned: 3,
       completed: 2,
       hours: 18,
+      assignedHoursEstimate: 16,
       onTime: 100,
       workload: 80,
     },
@@ -28,6 +29,7 @@ const sprintSnapshot = {
       assigned: 2,
       completed: 1,
       hours: 9,
+      assignedHoursEstimate: 12,
       onTime: 50,
       workload: 50,
     },
@@ -51,6 +53,10 @@ test('columns show per-person assigned tasks, completed tasks, and hours', () =>
 
   // Worked hours
   expect(within(anaRow).getByText('18h')).toBeInTheDocument();
+
+  // Estimated hours
+  expect(within(anaRow).getByText('16h')).toBeInTheDocument();
+  expect(screen.getByText('Estimated Hours')).toBeInTheDocument();
 
   // On-time delivery badge
   expect(within(anaRow).getByText('100%', { selector: '.badge-base' })).toBeInTheDocument();

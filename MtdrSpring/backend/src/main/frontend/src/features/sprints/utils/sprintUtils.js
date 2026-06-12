@@ -6,6 +6,7 @@ export function oracleRgba(a) {
   return `rgba(199, 70, 52, ${a})`;
 }
 
+
 export const PLANNING_CARD_SX = {
   p: 2.25,
   borderRadius: 2,
@@ -275,42 +276,54 @@ export function resolveProjectIdForDevelopers(taskLike, sprintsList, parentProje
 }
 
 export function sprintKpiNumber(sprint, key) {
-  const v = sprint?.[key];
+  let v = sprint?.[key];
+  if (key === 'efficiencyScore' && (v == null || v === '')) {
+    v = sprint?.teamParticipation;
+  }
   if (v == null || v === '') return 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** DB sprint id → 0-based display index (Sprint 0, Sprint 1, …), sorted by id within project. */
+/** Sort sprints chronologically (startDate, then id). */
+export function sortSprintsByStartDate(sprints) {
+  if (!Array.isArray(sprints)) return [];
+  return [...sprints].sort((a, b) => {
+    const aTime = a?.startDate ? new Date(a.startDate).getTime() : Number(a?.id) || 0;
+    const bTime = b?.startDate ? new Date(b.startDate).getTime() : Number(b?.id) || 0;
+    return aTime - bTime || (Number(a?.id) || 0) - (Number(b?.id) || 0);
+  });
+}
+
+/** DB sprint id → 0-based display index within the project (Sprint 0, Sprint 1, …), sorted by startDate. */
 export function buildSprintNumberMap(sprints) {
   const map = new Map();
-  if (!Array.isArray(sprints)) return map;
-  [...sprints]
-    .sort((a, b) => Number(a.id) - Number(b.id))
-    .forEach((sprint, index) => {
-      map.set(sprint.id, index);
-    });
+  sortSprintsByStartDate(sprints).forEach((sprint, index) => {
+    const id = Number(sprint?.id);
+    if (Number.isFinite(id)) {
+      map.set(id, index);
+    }
+  });
   return map;
 }
 
-/** Lookup display index; handles numeric/string id keys. Returns undefined if not in map. */
+/** Lookup 0-based sprint display index; handles numeric/string id keys. */
 export function getSprintDisplayIndex(sprintNumberMap, sprintId) {
   if (sprintId == null || sprintId === '' || !(sprintNumberMap instanceof Map)) {
     return undefined;
   }
   const want = Number(sprintId);
   if (!Number.isFinite(want)) return undefined;
-  if (sprintNumberMap.has(sprintId)) return sprintNumberMap.get(sprintId);
+  if (sprintNumberMap.has(want)) return sprintNumberMap.get(want);
   for (const [id, num] of sprintNumberMap.entries()) {
     if (Number(id) === want) return num;
   }
   return undefined;
 }
 
-/** Human label for selectors/cards; Sprint 0 is valid (do not use truthy checks on index). */
+/** Human label for selectors/cards (Sprint 0, Sprint 1, …) — per project, not global DB id. */
 export function formatSprintLabel(sprintNumberMap, sprintId) {
   const n = getSprintDisplayIndex(sprintNumberMap, sprintId);
   if (n !== undefined && Number.isFinite(n)) return `Sprint ${n}`;
-  if (sprintId == null || sprintId === '') return '';
-  return `Sprint ${sprintId}`;
+  return '';
 }

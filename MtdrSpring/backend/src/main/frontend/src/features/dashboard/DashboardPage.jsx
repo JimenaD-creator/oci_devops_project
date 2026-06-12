@@ -48,7 +48,7 @@ import {
 } from './constants/dashboardConstants';
 import { SECTION_TITLE_SX, SECTION_DESC_SX } from './dashboardTypography';
 import ScrollReveal from './ScrollReveal';
-import { pickDefaultSelectedSprint } from '../sprints/utils/sprintUtils';
+import { pickDefaultSelectedSprint, buildSprintNumberMap, formatSprintLabel } from '../sprints/utils/sprintUtils';
 import { ORACLE_RED_ACTION } from '../sprints/constants/sprintConstants';
 import {
   fetchProjectById,
@@ -221,15 +221,19 @@ export default function DashboardPage({
     [allSprints],
   );
 
+  const sprintLabelMap = useMemo(
+    () => buildSprintNumberMap(allSprints),
+    [allSprints],
+  );
+
   const getSprintFilterLabel = useCallback(
     (sprintId) => {
       const sprint = allSprints.find((s) => Number(s.id) === Number(sprintId));
       if (sprint?.shortLabel) return sprint.shortLabel;
       if (typeof sprint?.name === 'string' && sprint.name.trim()) return sprint.name.trim();
-      const index = sortedSprintsForFilter.findIndex((s) => Number(s.id) === Number(sprintId));
-      return index >= 0 ? `Sprint ${index}` : `Sprint ${sprintId}`;
+      return formatSprintLabel(sprintLabelMap, sprintId) || `Sprint ${sprintId}`;
     },
-    [allSprints, sortedSprintsForFilter],
+    [allSprints, sprintLabelMap],
   );
 
   const selectedSprints = useMemo(() => {
@@ -480,7 +484,7 @@ export default function DashboardPage({
     );
   }
 
-  if (sharedLoading && sharedSprints.length === 0) {
+  if ((sharedLoading || sharedRefreshing) && sharedSprints.length === 0) {
     return <PageLoadingSpinner />;
   }
 
@@ -494,7 +498,11 @@ export default function DashboardPage({
     : null;
 
   const shouldShowEmptyDashboardView =
-    !loadErrorMessage && (allSprints.length === 0 || sharedTaskCount === 0);
+    !loadErrorMessage &&
+    !sharedLoading &&
+    !sharedRefreshing &&
+    allSprints.length === 0 &&
+    sharedTaskCount === 0;
 
   if (loadErrorMessage) {
     return (
@@ -611,7 +619,7 @@ export default function DashboardPage({
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 1.75, sm: 2 },
+            p: { xs: 1.25, sm: 2 },
             mb: 1.25,
             borderRadius: 3,
             border: `1px solid ${isDark ? '#2A2C32' : '#ECECEC'}`,
@@ -623,7 +631,7 @@ export default function DashboardPage({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              gap: 2,
+              gap: 1,
               mb: 1,
             }}
           >
@@ -634,7 +642,7 @@ export default function DashboardPage({
                   fontWeight: 800,
                   color: 'text.primary',
                   lineHeight: 1.2,
-                  fontSize: { xs: '1.4rem', sm: '1.65rem', md: '1.85rem' },
+                  fontSize: { xs: '1.1rem', sm: '1.65rem', md: '1.85rem' },
                 }}
               >
                 Dashboard – {projectName}
@@ -697,8 +705,10 @@ export default function DashboardPage({
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: { xs: 1, sm: 1.25 },
+                gap: { xs: 0.75, sm: 1.25 },
                 flexShrink: 0,
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-end', sm: 'center' },
               }}
             >
               {showTeamProductivityPill && sprintTeamProductivityScore != null ? (
@@ -716,10 +726,10 @@ export default function DashboardPage({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 0.5,
-                      px: 1.5,
-                      py: 0.6,
+                      px: { xs: 1, sm: 1.5 },
+                      py: { xs: 0.4, sm: 0.6 },
                       borderRadius: '999px',
-                      fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
+                      fontSize: { xs: '0.75rem', sm: '0.9375rem' },
                       fontWeight: 700,
                       lineHeight: 1.2,
                       letterSpacing: '0.01em',

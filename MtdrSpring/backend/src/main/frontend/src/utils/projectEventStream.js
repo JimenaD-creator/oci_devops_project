@@ -4,7 +4,14 @@ import { getAuthToken, isAuthenticated } from './auth';
 const DEFAULT_DEBOUNCE_MS = 800;
 const RECONNECT_MS = 15000;
 const MAX_RECONNECT_MS = 60000;
-const IMMEDIATE_EVENT_TYPES = new Set(['task-deleted', 'task-created', 'task-assigned']);
+const IMMEDIATE_EVENT_TYPES = new Set([
+  'task-deleted',
+  'task-created',
+  'task-assigned',
+  'task-updated',
+  'blocker-reported',
+  'blocker-resolved',
+]);
 
 /**
  * Opens an SSE stream for project task mutations (Telegram / REST → portal sync).
