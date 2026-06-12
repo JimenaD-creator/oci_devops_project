@@ -163,20 +163,6 @@ public final class SprintHoursCompletionAlertUtil {
 
         if (rateChangeFraction <= -HOURS_PER_TASK_CHANGE_THRESHOLD) {
             int pct = (int) Math.round(Math.abs(rateChangeFraction) * 100.0);
-            if (completionSimilar) {
-                String message = String.format(
-                        Locale.ROOT,
-                        "%sTeam logged %d%% fewer hours per completed task than %s with similar completions "
-                                + "(%d Done, %sh vs %d Done, %sh). Delivery pace improved or estimates were conservative.",
-                        earlyPrefix,
-                        pct,
-                        prevLabel,
-                        current.getCompletedTasks(),
-                        formatHours(current.getWorkedHours()),
-                        previous.getCompletedTasks(),
-                        formatHours(previous.getWorkedHours()));
-                return Optional.of(alertMap("info", message));
-            }
             if (current.getCompletedTasks() < previous.getCompletedTasks() && !completionSimilar) {
                 String severity = sprintEnded ? "warning" : "info";
                 String message = String.format(
@@ -192,6 +178,26 @@ public final class SprintHoursCompletionAlertUtil {
                         formatHours(previous.getWorkedHours()));
                 return Optional.of(alertMap(severity, message));
             }
+            String message = String.format(
+                    Locale.ROOT,
+                    "%sTeam logged %d%% fewer hours per completed task than %s: %d Done with %sh (%.1f h/task) "
+                            + "vs %d Done with %sh (%.1f h/task) in %s.",
+                    earlyPrefix,
+                    pct,
+                    prevLabel,
+                    current.getCompletedTasks(),
+                    formatHours(current.getWorkedHours()),
+                    curRate,
+                    previous.getCompletedTasks(),
+                    formatHours(previous.getWorkedHours()),
+                    prevRate,
+                    prevLabel);
+            if (completionSimilar) {
+                message += " Delivery pace improved or estimates were conservative.";
+            } else if (current.getCompletedTasks() > previous.getCompletedTasks()) {
+                message += " More tasks were completed with a lower average hours per task.";
+            }
+            return Optional.of(alertMap("info", message));
         }
 
         return Optional.of(alertMap(
@@ -208,18 +214,18 @@ public final class SprintHoursCompletionAlertUtil {
             double prevRate,
             double curRate,
             double rateChangeFraction) {
-        String base = String.format(
+        return String.format(
                 Locale.ROOT,
                 "Compared with %s: %d Done with %sh (%.1f h per completed task) vs this sprint "
-                        + "%d Done with %sh (%.1f h per completed task).",
+                        + "%d Done with %sh (%.1f h per completed task) — %s",
                 prevLabel,
                 previous.getCompletedTasks(),
                 formatHours(previous.getWorkedHours()),
                 prevRate,
                 current.getCompletedTasks(),
                 formatHours(current.getWorkedHours()),
-                curRate);
-        return base + " " + formatHoursPerTaskRateChange(rateChangeFraction);
+                curRate,
+                formatHoursPerTaskRateChange(rateChangeFraction));
     }
 
     /** Relative change in hours-per-completed-task vs the previous sprint. */
@@ -228,19 +234,18 @@ public final class SprintHoursCompletionAlertUtil {
         if (pct < 5) {
             return String.format(
                     Locale.ROOT,
-                    "Hours per completed task are similar (%d%% change vs %s).",
-                    pct,
-                    "the previous sprint");
+                    "similar hours per completed task (%d%% change)",
+                    pct);
         }
         if (rateChangeFraction > 0) {
             return String.format(
                     Locale.ROOT,
-                    "Hours per completed task increased %d%% vs the previous sprint.",
+                    "%d%% more hours per completed task",
                     pct);
         }
         return String.format(
                 Locale.ROOT,
-                "Hours per completed task decreased %d%% vs the previous sprint.",
+                "%d%% fewer hours per completed task",
                 pct);
     }
 
@@ -263,14 +268,21 @@ public final class SprintHoursCompletionAlertUtil {
         return false;
     }
 
-    /** Removes stale injected rows so live KPI refresh can replace the comparison message. */
+    /** Removes stale injected rows (and Gemini duplicates) before live refresh. */
     public static void removeHoursVsPreviousAlerts(ArrayNode alerts) {
         if (alerts == null) {
             return;
         }
         for (int i = alerts.size() - 1; i >= 0; i--) {
             JsonNode item = alerts.get(i);
-            if (item != null && ALERT_SOURCE.equals(item.path("alertSource").asText(""))) {
+            if (item == null) {
+                continue;
+            }
+            if (ALERT_SOURCE.equals(item.path("alertSource").asText(""))) {
+                alerts.remove(i);
+                continue;
+            }
+            if ("sprintComparison".equalsIgnoreCase(item.path("kpi").asText("").trim())) {
                 alerts.remove(i);
             }
         }

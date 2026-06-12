@@ -109,23 +109,38 @@ class SprintHoursCompletionAlertUtilTest {
     @Test
     void buildAlert_stableComparisonWhenRatesAreSimilar() {
         var current = new SprintHoursCompletionAlertUtil.DeliverySnapshot(10, 40.0);
-        var previous = new SprintHoursCompletionAlertUtil.DeliverySnapshot(10, 38.0);
+        var previous = new SprintHoursCompletionAlertUtil.DeliverySnapshot(10, 39.8);
 
         Map<String, Object> alert = SprintHoursCompletionAlertUtil.buildAlert(
                         current, previous, "Sprint 2", true, false)
                 .orElseThrow();
 
         assertEquals("info", alert.get("severity"));
-        assertTrue(alert.get("message").toString().contains("Compared with Sprint 2"));
-        assertTrue(alert.get("message").toString().contains("h per completed task"));
-        assertTrue(alert.get("message").toString().contains("5%"));
+        String message = alert.get("message").toString();
+        assertTrue(message.contains("Compared with Sprint 2"));
+        assertTrue(message.contains("h per completed task"));
+        assertTrue(message.contains("similar hours per completed task"), () -> message);
     }
 
     @Test
     void formatHoursPerTaskRateChange_describesDirection() {
-        assertTrue(SprintHoursCompletionAlertUtil.formatHoursPerTaskRateChange(0.12).contains("increased 12%"));
-        assertTrue(SprintHoursCompletionAlertUtil.formatHoursPerTaskRateChange(-0.18).contains("decreased 18%"));
+        assertTrue(SprintHoursCompletionAlertUtil.formatHoursPerTaskRateChange(0.12).contains("12% more"));
+        assertTrue(SprintHoursCompletionAlertUtil.formatHoursPerTaskRateChange(-0.18).contains("18% fewer"));
         assertTrue(SprintHoursCompletionAlertUtil.formatHoursPerTaskRateChange(0.02).contains("similar"));
+    }
+
+    @Test
+    void buildAlert_largeDecreaseWithMoreCompletions_showsPercent() {
+        var current = new SprintHoursCompletionAlertUtil.DeliverySnapshot(18, 61.7);
+        var previous = new SprintHoursCompletionAlertUtil.DeliverySnapshot(14, 113.0);
+
+        Map<String, Object> alert = SprintHoursCompletionAlertUtil.buildAlert(
+                        current, previous, "Sprint 3", false, false)
+                .orElseThrow();
+
+        String message = alert.get("message").toString();
+        assertTrue(message.contains("58%"), () -> message);
+        assertTrue(message.contains("fewer hours per completed task"), () -> message);
     }
 
     @Test
@@ -148,11 +163,14 @@ class SprintHoursCompletionAlertUtilTest {
     }
 
     @Test
-    void removeHoursVsPreviousAlerts_dropsOnlyInjectedRows() {
+    void removeHoursVsPreviousAlerts_dropsInjectedAndGeminiDuplicateRows() {
         ArrayNode alerts = JsonNodeFactory.instance.arrayNode();
         ObjectNode injected = JsonNodeFactory.instance.objectNode();
         injected.put("alertSource", SprintHoursCompletionAlertUtil.ALERT_SOURCE);
         alerts.add(injected);
+        ObjectNode geminiDup = JsonNodeFactory.instance.objectNode();
+        geminiDup.put("kpi", "sprintComparison");
+        alerts.add(geminiDup);
         ObjectNode other = JsonNodeFactory.instance.objectNode();
         other.put("kpi", "completionRate");
         alerts.add(other);
