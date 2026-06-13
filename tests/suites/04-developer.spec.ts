@@ -1,4 +1,4 @@
-/** Suite 4 — Developer (runs after Suite 3 Tasks creates the Kanban task) */
+/** Suite 4 — Developer */
 import { test, expect } from '@playwright/test';
 import { TAGS, UI } from '../constants';
 import { installFreshDashboardBundleRoute } from '../helpers/freshDashboardBundle';
